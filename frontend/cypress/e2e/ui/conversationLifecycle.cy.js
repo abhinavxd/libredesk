@@ -11,21 +11,49 @@ describe('Conversation lifecycle', () => {
   const subject = `Lifecycle subject ${stamp}`
   const noteBody = `Internal note ${stamp}`
   const replyBody = `Public reply ${stamp}`
+  const ccContactLastName = `CcCustomer${stamp}`
+  const ccContactName = `Lifecycle ${ccContactLastName}`
+  const ccAddress = `lifecycle.cc.${stamp}@example.com`
+  const customerEmail = `lifecycle.customer.${stamp}@example.com`
+  const ccCustomerEmail = `lifecycle.cc-customer.${stamp}@example.com`
+  const bccAddress = `lifecycle.bcc.${stamp}@example.com`
 
   const smtpHost = Cypress.env('SMTP_HOST') || '127.0.0.1'
   const smtpPort = Number(Cypress.env('SMTP_PORT') || 1025)
 
   let conversationUuid
+  let ccConversationUuid
   let inboxId
   let teamId
   let agentId
   let tagId
 
-  const openConversation = () => {
+  const openConversation = (uuid = conversationUuid) => {
     cy.intercept('GET', '**/messages?page=*').as('loadMessages')
-    cy.visit(`/inboxes/all/conversation/${conversationUuid}`)
+    cy.visit(`/inboxes/all/conversation/${uuid}`)
     cy.wait('@loadMessages')
   }
+
+  // A stubbed reply keeps the thread, and the recipients it prefills, the same for later tests.
+  const captureSend = () =>
+    cy
+      .intercept('POST', '**/conversations/*/messages', { statusCode: 200, body: { data: {} } })
+      .as('captureSend')
+
+  const recipientRow = (label) => cy.contains('label', label).parent()
+
+  const sendReply = (text) => {
+    cy.get('.tiptap.ProseMirror').first().click()
+    cy.get('.tiptap.ProseMirror').first().type(text)
+    cy.contains('button', /^Send$/).click()
+  }
+
+  const expectSentRecipients = (uuid, { cc, bcc }) =>
+    cy.wait('@captureSend').then(({ request }) => {
+      expect(request.url, 'conversation').to.include(uuid)
+      expect(request.body.cc, 'cc').to.deep.eq(cc)
+      expect(request.body.bcc, 'bcc').to.deep.eq(bcc)
+    })
 
   // The open set of sidebar sections is remembered per browser, so blind toggling closes it later.
   const openActionsSection = () => {
@@ -43,7 +71,7 @@ describe('Conversation lifecycle', () => {
       .trigger('input')
 
   // The list column also renders a status dropdown; this one is the header badge.
-  const statusBadge = () => cy.get('div.bg-primary.rounded-md')
+  const statusBadge = () => cy.get('span.bg-primary.rounded-md')
 
   before(() => {
     cy.login()
@@ -94,7 +122,7 @@ describe('Conversation lifecycle', () => {
       })
       cy.api('POST', '/api/v1/conversations', {
         inbox_id: inboxID,
-        contact_email: `lifecycle.customer.${stamp}@example.com`,
+        contact_email: customerEmail,
         first_name: 'Lifecycle',
         last_name: contactLastName,
         subject,
@@ -103,6 +131,26 @@ describe('Conversation lifecycle', () => {
       }).then((res) => {
         conversationUuid = res.body.data.uuid
         expect(conversationUuid, 'conversation uuid').to.be.a('string').and.not.be.empty
+      })
+      // The reply box prefills CC from the last email, so this thread ends on an agent reply that CC'd someone.
+      cy.api('POST', '/api/v1/conversations', {
+        inbox_id: inboxID,
+        contact_email: ccCustomerEmail,
+        first_name: 'Lifecycle',
+        last_name: ccContactLastName,
+        subject: `${subject} with CC`,
+        content: '<p>Customer opened the CC conversation.</p>',
+        initiator: 'contact'
+      }).then((res) => {
+        ccConversationUuid = res.body.data.uuid
+        cy.api('POST', `/api/v1/conversations/${ccConversationUuid}/messages`, {
+          sender_type: 'agent',
+          private: false,
+          message: '<p>Looping in a colleague.</p>',
+          to: [ccCustomerEmail],
+          cc: [ccAddress],
+          bcc: []
+        })
       })
     })
   })
@@ -229,6 +277,48 @@ describe('Conversation lifecycle', () => {
         .find('.message-bubble')
         .should('have.class', 'bg-private')
     })
+  })
+
+  it('sends the CC prefilled from the last email', () => {
+    captureSend()
+    openConversation(ccConversationUuid)
+    recipientRow('CC:').find('input').should('have.value', ccAddress)
+    sendReply('Reply with the prefilled CC')
+    expectSentRecipients(ccConversationUuid, { cc: [ccAddress], bcc: [] })
+  })
+
+  it('drops the CC once its row is closed', () => {
+    captureSend()
+    openConversation(ccConversationUuid)
+    recipientRow('CC:').find('button[aria-label="Remove CC"]').click()
+    cy.contains('label', 'CC:').should('not.exist')
+    sendReply('Reply after closing CC')
+    expectSentRecipients(ccConversationUuid, { cc: [], bcc: [] })
+  })
+
+  it('sends only what each conversation shows after switching between them', () => {
+    captureSend()
+    openConversation(ccConversationUuid)
+    recipientRow('CC:').find('button[aria-label="Remove CC"]').click()
+    cy.contains('button', /^BCC$/).click()
+    recipientRow('BCC:').find('input').type(bccAddress)
+
+    cy.contains(contactName).click()
+    cy.location('pathname').should('include', conversationUuid)
+    // A filled TO box means the new thread has loaded.
+    recipientRow('TO:').find('input').should('have.value', customerEmail)
+    cy.contains('label', 'CC:').should('not.exist')
+    cy.contains('label', 'BCC:').should('not.exist')
+    sendReply('Reply after switching away')
+    expectSentRecipients(conversationUuid, { cc: [], bcc: [] })
+
+    cy.contains(ccContactName).click()
+    cy.location('pathname').should('include', ccConversationUuid)
+    recipientRow('TO:').find('input').should('have.value', ccCustomerEmail)
+    recipientRow('CC:').find('input').should('have.value', ccAddress)
+    cy.contains('label', 'BCC:').should('not.exist')
+    sendReply('Reply after switching back')
+    expectSentRecipients(ccConversationUuid, { cc: [ccAddress], bcc: [] })
   })
 
   it('sends a reply that appears in the thread', () => {

@@ -353,6 +353,13 @@ LIMIT 50;
 
 -- name: get-chat-conversation
 SELECT
+    COALESCE((SELECT json_agg(json_build_object('name', media.filename, 'content_type', media.content_type, 'uuid', media.uuid, 'size', media.size, 'content_id', media.content_id, 'disposition', media.disposition))
+      FROM media WHERE media.model_type = 'messages' AND media.model_id = (
+        SELECT m.id FROM conversation_messages m
+        WHERE m.conversation_id = c.id AND m.private = FALSE AND m.type IN ('incoming', 'outgoing')
+        ORDER BY m.created_at DESC, m.id DESC LIMIT 1
+      )), '[]'::json) AS "last_message.attachments",
+    COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
     cs.name as status,
@@ -367,7 +374,7 @@ SELECT
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
-           AND unread.created_at > c.contact_last_seen_at
+           AND unread.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
            AND unread.type = 'outgoing'
            AND unread.private = false
          LIMIT 10
@@ -388,8 +395,67 @@ LEFT JOIN users lis ON c.last_interaction_sender_id = lis.id
 WHERE c.uuid = $1
   AND inb.deleted_at IS NULL;
 
+-- name: get-contact-unread-preview-messages
+SELECT
+    m.id,
+    m.created_at,
+    m.status,
+    m.type,
+    m.content,
+    m.text_content,
+    m.content_type,
+    m.conversation_id,
+    m.uuid,
+    m.private,
+    m.sender_id,
+    m.sender_type,
+    m.meta,
+    c.uuid AS conversation_uuid,
+    u.id AS "author.id",
+    u.first_name AS "author.first_name",
+    u.last_name AS "author.last_name",
+    u.email AS "author.email",
+    u.avatar_url AS "author.avatar_url",
+    u.availability_status AS "author.availability_status",
+    u.type AS "author.type",
+    u.last_active_at AS "author.last_active_at",
+    COALESCE(
+      (SELECT json_agg(
+        json_build_object(
+          'name', filename,
+          'content_type', content_type,
+          'uuid', uuid,
+          'size', size,
+          'content_id', content_id,
+          'disposition', disposition
+        ) ORDER BY filename
+      ) FROM media
+      WHERE model_type = 'messages' AND model_id = m.id),
+    '[]'::json) AS attachments
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+JOIN inboxes inb ON inb.id = c.inbox_id
+JOIN users u ON u.id = m.sender_id
+WHERE c.contact_id = $1
+  AND c.inbox_id = $2
+  AND inb.deleted_at IS NULL
+  AND m.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
+  AND m.type = 'outgoing'
+  AND m.private = false
+  AND u.type IN ('agent', 'ai_assistant')
+  AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3;
+
 -- name: get-contact-chat-conversations
 SELECT
+    COALESCE((SELECT json_agg(json_build_object('name', media.filename, 'content_type', media.content_type, 'uuid', media.uuid, 'size', media.size, 'content_id', media.content_id, 'disposition', media.disposition))
+      FROM media WHERE media.model_type = 'messages' AND media.model_id = (
+        SELECT m.id FROM conversation_messages m
+        WHERE m.conversation_id = c.id AND m.private = FALSE AND m.type IN ('incoming', 'outgoing')
+        ORDER BY m.created_at DESC, m.id DESC LIMIT 1
+      )), '[]'::json) AS "last_message.attachments",
+    COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
     cs.name as status,
@@ -404,7 +470,7 @@ SELECT
      FROM (
          SELECT 1 FROM conversation_messages unread
          WHERE unread.conversation_id = c.id
-           AND unread.created_at > c.contact_last_seen_at
+           AND unread.created_at > COALESCE(c.contact_last_seen_at, c.created_at)
            AND unread.type = 'outgoing'
            AND unread.private = false
          LIMIT 10
@@ -863,7 +929,7 @@ WHERE m.conversation_id = (
 AND ($2::boolean IS NULL OR m.private = $2)
 AND ($3::text[] IS NULL OR m.type::text = ANY($3))
 AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
-ORDER BY m.created_at DESC %s
+ORDER BY m.created_at DESC, m.id DESC %s
 
 -- name: insert-message
 WITH conversation_id AS (
@@ -898,6 +964,11 @@ update conversation_messages set status = $1, updated_at = NOW() where uuid = $2
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
+
+-- name: clear-message-handoff-form-pending
+UPDATE conversation_messages
+SET meta = meta || '{"handoff_form_pending": false}'::jsonb, updated_at = NOW()
+WHERE uuid = $1 AND COALESCE((meta->>'handoff_form_pending')::boolean, false);
 
 -- name: get-offline-livechat-conversations
 SELECT
@@ -1064,3 +1135,14 @@ FROM conversations
 WHERE contact_id = $1
 ORDER BY last_message_at DESC NULLS LAST
 LIMIT 200;
+
+-- name: lock-campaign-delivery
+SELECT COALESCE(conversation_uuid::text, '') FROM widget_campaign_deliveries WHERE id = $1 FOR UPDATE;
+
+-- name: complete-campaign-delivery
+UPDATE widget_campaign_deliveries
+SET conversation_uuid = $2, contact_id = $3, replied = TRUE, opened = TRUE, displayed = TRUE
+WHERE id = $1;
+
+-- name: assign-proactive-team
+UPDATE conversations SET assigned_team_id = NULLIF($2, 0) WHERE id = $1;

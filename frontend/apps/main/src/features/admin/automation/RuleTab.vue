@@ -36,7 +36,17 @@
 
     <div class="space-y-4">
       <div v-if="type === 'new_conversation'">
-        <draggable v-model="rules" class="space-y-6" item-key="id" @end="onDragEnd">
+        <draggable
+          v-model="rules"
+          class="space-y-6"
+          item-key="id"
+          :animation="200"
+          :force-fallback="true"
+          fallback-on-body
+          :fallback-tolerance="3"
+          ghost-class="drag-ghost"
+          @end="onDragEnd"
+        >
           <template #item="{ element }">
             <div class="draggable-item">
               <RuleList :rule="element" @delete-rule="deleteRule" @toggle-rule="toggleRule" />

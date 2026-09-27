@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	realip "github.com/ferluci/fast-realip"
@@ -138,9 +140,20 @@ type localeLink struct {
 	Path   string
 }
 
+type helpArticleResponse struct {
+	hcmodels.Article
+	Translations []hcmodels.ArticleTranslation `json:"translations"`
+}
+
 type previewTOCItem struct {
 	ID    string
 	Title string
+}
+
+type colorSchemeResult struct {
+	dark         bool
+	showToggle   bool
+	followSystem bool
 }
 
 func (w helpCenterCacheLogWriter) Write(p []byte) (int, error) {
@@ -255,7 +268,7 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title":       helpCenter.PageTitle,
 			"LandingHero": true,
-			"HelpCenter":  helpCenterTemplateData(app, helpCenter, locale),
+			"HelpCenter":  helpCenterTemplateData(app, r, helpCenter, locale),
 			"Tree":        tree.Tree,
 			"Popular":     popular,
 		},
@@ -445,7 +458,11 @@ func handleGetArticle(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(article)
+	translations, err := app.helpcenter.GetArticleTranslations(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(helpArticleResponse{Article: article, Translations: translations})
 }
 
 // handleCreateArticle creates a new article.
@@ -570,6 +587,67 @@ func handleUpdateArticleStatus(r *fastglue.Request) error {
 	return r.SendEnvelope(article)
 }
 
+// handleGetLinkableArticles lists articles in the other locales that can still be linked as a translation.
+func handleGetLinkableArticles(r *fastglue.Request) error {
+	var (
+		app           = r.Context.(*App)
+		id, _         = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		excludeLocale = strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("exclude_locale")))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if excludeLocale == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`exclude_locale`"), nil, envelope.InputError)
+	}
+	articles, err := app.helpcenter.GetLinkableArticles(id, excludeLocale)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(articles)
+}
+
+// handleLinkArticleTranslation moves an existing article into this article's translation group.
+func handleLinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req = struct {
+			TranslationOfID int `json:"translation_of_id"`
+		}{}
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if req.TranslationOfID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`translation_of_id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.LinkArticleTranslation(id, req.TranslationOfID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
+// handleUnlinkArticleTranslation detaches an article from its translation group.
+func handleUnlinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.UnlinkArticleTranslation(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
 // handleRedirectHelpCenterHome redirects bare /hc/{slug} to the default-locale home so the locale is always in the path.
 func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	var (
@@ -583,8 +661,12 @@ func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	if redirectHelpCenterCanonicalHost(r, helpCenter) {
 		return nil
 	}
+	uri := helpCenterHomePath(helpCenter, helpCenter.DefaultLocale)
+	if qs := r.RequestCtx.URI().QueryString(); len(qs) > 0 {
+		uri += "?" + string(qs)
+	}
 	// 302, not 301: the default locale is mutable and browsers cache permanent redirects.
-	redirectPath(r.RequestCtx, helpCenterHomePath(helpCenter, helpCenter.DefaultLocale), fasthttp.StatusFound)
+	redirectPath(r.RequestCtx, uri, fasthttp.StatusFound)
 	return nil
 }
 
@@ -620,7 +702,7 @@ func handleShowHelpCenterHome(r *fastglue.Request) error {
 		theme           = helpCenterTheme(tree.HelpCenter)
 		metaDescription = firstNonEmpty(tree.HelpCenter.MetaDescription, theme.Header.Heading)
 	)
-	data := helpCenterTemplateData(app, tree.HelpCenter, locale)
+	data := helpCenterTemplateData(app, r, tree.HelpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-center"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -674,7 +756,7 @@ func handleShowHelpCenterCollection(r *fastglue.Request) error {
 		root    = helpCenterBaseURL(app, helpCenter)
 		pathFor = func(l string) string { return collectionPath(helpCenter, l, collection.Slug) }
 	)
-	data := helpCenterTemplateData(app, helpCenter, locale)
+	data := helpCenterTemplateData(app, r, helpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-collection"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -736,18 +818,27 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 	if err != nil {
 		related = nil
 	}
-	translated, err := app.helpcenter.GetPublishedArticleLocales(slug, article.Slug)
+	translations, err := app.helpcenter.GetPublishedArticleTranslations(slug, article.ID)
 	if err != nil {
-		translated = []string{locale}
+		translations = nil
+	}
+	translated := make([]string, 0, len(translations)+1)
+	slugByLocale := map[string]string{locale: article.Slug}
+	for _, t := range translations {
+		translated = append(translated, t.Locale)
+		slugByLocale[t.Locale] = t.Slug
+	}
+	if !slices.Contains(translated, locale) {
+		translated = append(translated, locale)
 	}
 	var (
 		root            = helpCenterBaseURL(app, helpCenter)
-		pathFor         = func(l string) string { return articlePath(helpCenter, l, article.Slug) }
+		pathFor         = func(l string) string { return articlePath(helpCenter, l, slugByLocale[l]) }
 		metaDescription = firstNonEmpty(article.MetaDescription, article.Excerpt)
 		metaTitle       = firstNonEmpty(article.MetaTitle, fmt.Sprintf("%s - %s", article.Title, helpCenter.Name))
 		ogImage         = absoluteURL(root, publicAssetPaths(app, firstNonEmpty(article.MetaImageURL, helpCenterTheme(helpCenter).LogoURL)))
 	)
-	data := helpCenterTemplateData(app, helpCenter, locale)
+	data := helpCenterTemplateData(app, r, helpCenter, locale)
 	return renderHelpCenterPage(r, hcPageName(helpCenter, "help-article"), map[string]interface{}{
 		"L": localeI18n(app, locale),
 		"Data": map[string]interface{}{
@@ -770,6 +861,7 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 			"Tree":             sidebarTree(app, helpCenter, locale),
 			"ActiveCollection": collection.Slug,
 			"ActiveArticle":    article.Slug,
+			"NoIndex":          isEmbedRequest(r),
 			"Content":          template.HTML(publicAssetPaths(app, stringutil.DeferOffscreenImages(article.Content))),
 		},
 	})
@@ -803,7 +895,7 @@ func handleHelpCenterSearch(r *fastglue.Request) error {
 		}
 	}
 	var (
-		data    = helpCenterTemplateData(app, helpCenter, locale)
+		data    = helpCenterTemplateData(app, r, helpCenter, locale)
 		lcl     = localeI18n(app, locale)
 		pathFor = func(l string) string { return searchPath(helpCenter, l) }
 	)
@@ -1153,14 +1245,21 @@ func cacheHCPage(h fastglue.FastRequestHandler, noIndex bool) fastglue.FastReque
 			}
 			r.RequestCtx.Response.Header.Set("X-Cache", status)
 			r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-			r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+			if !isEmbedRequest(r) {
+				r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
+			}
 			r.RequestCtx.Response.Header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
-			if noIndex || isMarkdownRequest(r) {
+			if noIndex || isEmbedRequest(r) || isMarkdownRequest(r) {
 				r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
 			}
 		}
 		return err
 	}
+}
+
+// isEmbedRequest reports whether the page is framed by the chat widget.
+func isEmbedRequest(r *fastglue.Request) bool {
+	return r.RequestCtx.QueryArgs().GetBool("embed")
 }
 
 func isMarkdownRequest(r *fastglue.Request) bool {
@@ -1678,7 +1777,7 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 }
 
 // helpCenterTemplateData shapes a help center row for the public templates.
-func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
+func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
 	theme := helpCenterTheme(hc)
 	theme.Favicon = publicAssetPaths(app, theme.Favicon)
 	theme.Header.BackgroundImage = publicAssetPaths(app, theme.Header.BackgroundImage)
@@ -1686,6 +1785,8 @@ func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map
 	if pageTemplate == "" {
 		pageTemplate = hcmodels.TemplateClassic
 	}
+	embed := isEmbedRequest(r)
+	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1695,7 +1796,11 @@ func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map
 		"PageTitle":         hc.PageTitle,
 		"HeaderText":        theme.Header.Heading,
 		"LogoURL":           publicAssetPaths(app, theme.LogoURL),
+		"LogoURLDark":       publicAssetPaths(app, cmp.Or(theme.LogoURLDark, theme.LogoURL)),
 		"Color":             theme.Color,
+		"ColorDark":         cmp.Or(theme.ColorDark, theme.Color),
+		"ShowThemeToggle":   scheme.showToggle,
+		"FollowSystemTheme": scheme.followSystem,
 		"DefaultLocale":     hc.DefaultLocale,
 		"CurrentLocale":     locale,
 		"OGLocale":          strings.ReplaceAll(locale, "-", "_"),
@@ -1704,13 +1809,29 @@ func helpCenterTemplateData(app *App, hc hcmodels.HelpCenter, locale string) map
 		"NavLinks":          theme.NavLinks,
 		"Theme":             theme,
 		"ThemeCSS":          buildThemeCSSVars(theme),
+		"ThemeCSSDark":      buildDarkThemeCSSVars(theme),
 		"AnnouncementKey":   announcementKey(hc.Slug, theme.Announcement),
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
 		"CustomCSS":         template.CSS(hc.CustomCSS),
 		"CustomJS":          template.JS(hc.CustomJS),
+		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
+		"WidgetRootURL":     helpCenterRootURL(app),
+		"Embed":             embed,
+		"Dark":              scheme.dark,
 	}
+}
+
+func livechatWidgetInboxUUID(app *App, hc hcmodels.HelpCenter) string {
+	if !hc.LivechatInboxID.Valid {
+		return ""
+	}
+	inb, err := app.inbox.GetDBRecord(hc.LivechatInboxID.Int)
+	if err != nil || !inb.Enabled || inb.Channel != livechat.ChannelLiveChat {
+		return ""
+	}
+	return inb.UUID
 }
 
 // announcementKey keys the dismissal on help center and content, so an edited announcement reappears for visitors who dismissed the old one.
@@ -1762,6 +1883,38 @@ func buildThemeCSSVars(t hcmodels.Theme) template.CSS {
 	return template.CSS(b.String())
 }
 
+// buildDarkThemeCSSVars swaps in the dark footer colors and resets light-only colors to the dark defaults.
+func buildDarkThemeCSSVars(t hcmodels.Theme) template.CSS {
+	var b strings.Builder
+	if t.Header.TextColor != "" && !hasHeaderBackground(t.Header) {
+		b.WriteString("--hc-header-text:initial;")
+	}
+	writeDarkVar(&b, "--hc-footer-bg", t.Footer.BackgroundColorDark, t.Footer.BackgroundColor)
+	writeDarkVar(&b, "--hc-footer-text", t.Footer.TextColorDark, t.Footer.TextColor)
+	return template.CSS(b.String())
+}
+
+func writeDarkVar(b *strings.Builder, name, dark, light string) {
+	switch {
+	case dark != "":
+		fmt.Fprintf(b, "%s:%s;", name, dark)
+	case light != "":
+		fmt.Fprintf(b, "%s:initial;", name)
+	}
+}
+
+func hasHeaderBackground(h hcmodels.HeaderTheme) bool {
+	switch h.BackgroundType {
+	case "image":
+		return h.BackgroundImage != ""
+	case "gradient":
+		return h.GradientFrom != "" && h.GradientTo != ""
+	case "solid":
+		return h.BackgroundColor != ""
+	}
+	return false
+}
+
 // renderHelpCenterNotFound renders the help center's themed 404, falling back to the
 // generic error page when the help center is nil.
 func renderHelpCenterNotFound(r *fastglue.Request, hc *hcmodels.HelpCenter) error {
@@ -1788,7 +1941,7 @@ func renderHelpCenterStatusPage(r *fastglue.Request, hc *hcmodels.HelpCenter, st
 		if !ok {
 			locale = helpCenter.DefaultLocale
 		}
-		data := helpCenterTemplateData(app, helpCenter, locale)
+		data := helpCenterTemplateData(app, r, helpCenter, locale)
 		lcl := localeI18n(app, locale)
 		r.RequestCtx.Response.Header.Set("X-Robots-Tag", noIndexHeader)
 		rerr := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-notfound"), map[string]interface{}{
@@ -1832,6 +1985,15 @@ func validateHelpCenter(app *App, req *helpcenter.HelpCenterRequest) error {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`page_title`"), nil)
 	}
 	req.Theme = json.RawMessage(publicAssetPaths(app, string(req.Theme)))
+	if req.LivechatInboxID.Valid {
+		inb, err := app.inbox.GetDBRecord(req.LivechatInboxID.Int)
+		if err != nil {
+			return err
+		}
+		if inb.Channel != livechat.ChannelLiveChat {
+			return envelope.NewError(envelope.InputError, app.i18n.T("helpCenter.invalidLivechatInbox"), nil)
+		}
+	}
 	return nil
 }
 
@@ -1970,7 +2132,7 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 		"Data": map[string]interface{}{
 			"Title":         article.Title,
 			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterTemplateData(app, helpCenter, locale),
+			"HelpCenter":    helpCenterTemplateData(app, r, helpCenter, locale),
 			"Article":       article,
 			"AuthorInitial": authorInitial(article),
 			"Collection":    collection,
@@ -1995,4 +2157,15 @@ func redirectPath(ctx *fasthttp.RequestCtx, uri string, statusCode int) {
 	ctx.Response.Header.SetCanonical([]byte(fasthttp.HeaderLocation), u.RequestURI())
 	ctx.SetStatusCode(statusCode)
 	ctx.Response.SetBodyString("")
+}
+
+// resolveColorScheme lets the widget embed and the admin preview override the admin's scheme.
+func resolveColorScheme(scheme, requested string, embed bool) colorSchemeResult {
+	res := colorSchemeResult{dark: scheme == hcmodels.ColorSchemeDark}
+	if requested != "" || embed {
+		res.dark = requested == hcmodels.ColorSchemeDark
+	}
+	res.showToggle = scheme == hcmodels.ColorSchemeSystem && !embed
+	res.followSystem = res.showToggle && requested == ""
+	return res
 }

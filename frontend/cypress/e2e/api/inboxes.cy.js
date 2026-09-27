@@ -388,7 +388,9 @@ describe('API: inboxes', () => {
       expect(status).to.eq(200)
       expect(body.data.name).to.eq(chatName)
       expect(body.data.channel).to.eq('livechat')
-      expect(body.data.config.colors.primary).to.eq('#112233')
+      // A read normalizes the legacy colors field into both branding themes.
+      expect(body.data.config.branding.light.colors.primary).to.eq('#112233')
+      expect(body.data.config.branding.dark.colors.primary).to.eq('#112233')
     })
   })
 
@@ -408,7 +410,7 @@ describe('API: inboxes', () => {
     cy.api('GET', `/api/v1/inboxes/${chatInboxId}`).then(({ body }) => {
       expect(body.data.name).to.eq(`${chatName}.renamed`)
       expect(body.data.config.brand_name).to.eq('Acme Renamed')
-      expect(body.data.config.colors.primary).to.eq('#445566')
+      expect(body.data.config.branding.light.colors.primary).to.eq('#445566')
       expect(body.data.config.launcher.position).to.eq('left')
     })
   })

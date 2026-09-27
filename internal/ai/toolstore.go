@@ -53,6 +53,24 @@ func (m *Manager) GetEnabledToolsByIDs(ids []int) ([]models.Tool, error) {
 	return tools, nil
 }
 
+func (m *Manager) GetEnabledCopilotToolIDs() ([]int, error) {
+	ids := make([]int, 0)
+	if err := m.q.GetEnabledCopilotToolIDs.Select(&ids); err != nil {
+		m.lo.Error("error fetching Copilot tool ids", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return ids, nil
+}
+
+func (m *Manager) GetEnabledGenerateReplyToolIDs() ([]int, error) {
+	ids := make([]int, 0)
+	if err := m.q.GetEnabledGenerateToolIDs.Select(&ids); err != nil {
+		m.lo.Error("error fetching Generate Reply tool ids", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return ids, nil
+}
+
 func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	if err := m.validateToolInput(&t); err != nil {
 		return t, err
@@ -63,7 +81,7 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	}
 	params := toolParametersOrEmpty(t)
 	var created models.Tool
-	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
+	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		m.lo.Error("error creating tool", "error", err)
 		return created, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -89,7 +107,7 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	}
 	params := toolParametersOrEmpty(t)
 	var updated models.Tool
-	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification); err != nil {
+	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		if err == sql.ErrNoRows {
 			return updated, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
 		}

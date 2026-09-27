@@ -1,4 +1,6 @@
-{{ define "docs-header" }}
+{{ define "docs-header" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-open" . }}{{ else }}{{ template "docs-site-header" . }}{{ end }}{{ end }}
+
+{{ define "docs-site-header" }}
 {{ template "hc-head" . }}
 <body class="hcd">
     <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
@@ -10,7 +12,7 @@
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
                 </button>
                 <a class="hcd-brand" href="{{ .Data.HelpCenter.BasePath }}">
-                    {{ if .Data.HelpCenter.LogoURL }}<img src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ else }}<span class="hcd-brand-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
+                    {{ if .Data.HelpCenter.LogoURL }}<img class="hc-logo-light" src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ if .Data.HelpCenter.LogoURLDark }}<img class="hc-logo-dark" src="{{ .Data.HelpCenter.LogoURLDark }}" alt="{{ .Data.HelpCenter.Name }}" />{{ end }}{{ else }}<span class="hcd-brand-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
                 </a>
             </div>
             <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
@@ -24,7 +26,10 @@
                     {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
                 </nav>
                 {{ end }}
-                {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
+                <div class="hc-nav-actions">
+                    {{ if gt (len .Data.HelpCenter.AvailableLocales) 1 }}{{ template "hc-lang-switcher" . }}{{ end }}
+                    {{ if .Data.HelpCenter.ShowThemeToggle }}{{ template "hc-theme-toggle" . }}{{ end }}
+                </div>
             </div>
         </div>
     </header>
@@ -85,7 +90,9 @@
 </div>
 {{ end }}
 
-{{ define "docs-footer" }}
+{{ define "docs-footer" }}{{ if .Data.HelpCenter.Embed }}{{ template "hc-embed-close" . }}{{ else }}{{ template "docs-site-footer" . }}{{ end }}{{ end }}
+
+{{ define "docs-site-footer" }}
         </main>
     </div>
     <footer class="hcd-footer">
@@ -187,6 +194,8 @@
     </script>
     <script src="/static/public/static/help-center-search.js?v={{ AssetVer }}" defer></script>
     {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+    {{ if .Data.HelpCenter.ShowThemeToggle }}{{ template "hc-theme-script" . }}{{ end }}
+{{ template "hc-livechat-widget" . }}
 </body>
 </html>
 {{ end }}

@@ -16,6 +16,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/media"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/setting"
@@ -68,6 +69,7 @@ type Manager struct {
 	i18n     *i18n.I18n
 	ai       *ai.Manager
 	convo    *conversation.Manager
+	inbox    *inbox.Manager
 	media    *media.Manager
 	setting  *setting.Manager
 	user     *user.Manager
@@ -108,7 +110,7 @@ type Opts struct {
 }
 
 // New creates the AI agent manager.
-func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) (*Manager, error) {
+func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
@@ -122,6 +124,7 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, mediaMan
 		maxHistoryMessages: opts.MaxHistoryMessages,
 		ai:                 aiManager,
 		convo:              convo,
+		inbox:              inboxManager,
 		media:              mediaManager,
 		setting:            settingManager,
 		user:               userManager,

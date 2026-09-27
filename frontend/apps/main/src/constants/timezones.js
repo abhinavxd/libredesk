@@ -19,6 +19,7 @@ export const timeZones = {
     "Istanbul, Europe (UTC+03:00)": "Europe/Istanbul",
     "Dubai, Asia (UTC+04:00)": "Asia/Dubai",
     "Kolkata, Asia (UTC+05:30)": "Asia/Kolkata",
+    "Kathmandu, Asia (UTC+05:45)": "Asia/Kathmandu",
     "Bangkok, Asia (UTC+07:00)": "Asia/Bangkok",
     "Singapore, Asia (UTC+08:00)": "Asia/Singapore",
     "Shanghai, Asia (UTC+08:00)": "Asia/Shanghai",

@@ -3,9 +3,15 @@
     <!-- Sender Name -->
     <div
       v-if="!groupWithPrev"
-      class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
+      class="mb-1 flex items-center gap-1.5"
+      :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'"
     >
+      <Avatar class="w-7 h-7 text-xs md:hidden" :class="{ 'order-last': isOutgoing }">
+        <AvatarImage :src="getAvatar" />
+        <AvatarFallback class="font-medium">
+          {{ avatarFallback }}
+        </AvatarFallback>
+      </Avatar>
       <router-link
         v-if="!isOutgoing"
         :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
@@ -39,7 +45,7 @@
         <router-link
           v-if="!groupWithPrev"
           :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -48,11 +54,11 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <div v-else class="w-8 flex-shrink-0" />
+        <div v-else class="w-8 flex-shrink-0 max-md:hidden" />
       </template>
 
       <div
-        class="w-full md:w-4/5"
+        class="w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
@@ -209,11 +215,11 @@
 
       <!-- Avatar (right for outgoing) -->
       <template v-if="isOutgoing">
-        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <div v-if="groupWithPrev" class="w-8 flex-shrink-0 max-md:hidden" />
         <router-link
           v-else-if="canManageAI"
           :to="aiAssistantRoute"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -225,7 +231,7 @@
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -234,7 +240,7 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <Avatar v-else class="w-8 h-8">
+        <Avatar v-else class="w-8 h-8 max-md:hidden">
           <AvatarImage :src="getAvatar" />
           <AvatarFallback class="font-medium">
             {{ avatarFallback }}
@@ -244,7 +250,7 @@
     </div>
 
     <!-- Timestamp tooltip -->
-    <div v-if="!groupWithNext" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div v-if="!groupWithNext" :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'">
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">

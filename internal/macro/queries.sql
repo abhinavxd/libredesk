@@ -51,7 +51,7 @@ SELECT
 FROM
     macros
 WHERE
-    ($1 = '' OR name ILIKE '%' || $1 || '%')
+    ($1 = '' OR name ILIKE $4 ESCAPE '\')
 ORDER BY
     updated_at DESC
 LIMIT NULLIF($2, 0) OFFSET $3;
@@ -72,7 +72,7 @@ SELECT
 FROM
     macros
 WHERE
-    ($1 = '' OR name ILIKE '%' || $1 || '%')
+    ($1 = '' OR name ILIKE $5 ESCAPE '\')
     AND ($2 = '' OR $2 = ANY(visible_when::text[]))
     AND (
         visibility = 'all'

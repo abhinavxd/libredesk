@@ -64,15 +64,18 @@ const createBaseSchema = (t) => {
   return z.object({
     name: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .refine(withinLength(MAX_NAME), t('globals.messages.maxLength', { max: MAX_NAME })),
     slug: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .max(200, t('helpCenter.invalidSlug'))
       .regex(/^[a-z0-9_-]+$/, t('helpCenter.invalidSlug')),
     page_title: z
       .string()
+      .trim()
       .min(1, t('globals.messages.required'))
       .refine(
         withinLength(MAX_PAGE_TITLE),
@@ -93,6 +96,7 @@ const createBaseSchema = (t) => {
         t('helpCenter.invalidCustomDomain')
       )
       .optional(),
+    livechat_inbox_id: z.string().optional(),
     custom_css: z.string().optional(),
     custom_js: z.string().optional(),
     default_locale: z
@@ -111,8 +115,11 @@ const createBaseSchema = (t) => {
       .default(['en']),
     theme: z
       .object({
+        color_scheme: z.enum(['system', 'light', 'dark']).optional(),
         color: z.string().optional(),
+        color_dark: optionalHexColor,
         logo_url: optionalURL,
+        logo_url_dark: optionalURL,
         nav_links: linkArray,
         favicon: optionalURL,
         tagline: z.string().optional(),
@@ -155,6 +162,8 @@ const createBaseSchema = (t) => {
           .object({
             background_color: optionalHexColor,
             text_color: optionalHexColor,
+            background_color_dark: optionalHexColor,
+            text_color_dark: optionalHexColor,
             tagline: z.string().optional()
           })
           .optional(),

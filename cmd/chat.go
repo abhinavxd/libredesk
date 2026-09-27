@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -21,6 +22,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -82,11 +84,20 @@ type customAttributeWidget struct {
 }
 
 type chatInitReq struct {
-	Message  string         `json:"message"`
+	DeliveryID string         `json:"delivery_id"`
+	BrowserKey string         `json:"browser_key"`
+	Message    string         `json:"message"`
+	FormData   map[string]any `json:"form_data"`
+}
+
+type handoffFormReq struct {
 	FormData map[string]any `json:"form_data"`
 }
 
 type chatSettingsResponse struct {
+	Campaigns            *struct{} `json:"campaigns,omitempty"`
+	HasCampaigns         bool      `json:"has_campaigns"`
+	CampaignDelaySeconds int       `json:"campaign_delay_seconds"`
 	livechat.Config
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
@@ -114,10 +125,7 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
 	}
 
-	return r.SendEnvelope(map[string]any{
-		"launcher": config.Launcher,
-		"colors":   config.Colors,
-	})
+	return r.SendEnvelope(chatLauncherSettings(config))
 }
 
 // handleGetChatSettings returns the live chat settings for the widget
@@ -128,9 +136,16 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
 	}
+	customAttributes := map[int]customAttributeWidget(nil)
+	if config.PreChatForm.Enabled {
+		config, customAttributes = filterPreChatForms(config, app)
+	}
 
 	response := chatSettingsResponse{
-		Config: config,
+		Config:               config,
+		HasCampaigns:         slices.ContainsFunc(config.Campaigns, func(c proactive.Campaign) bool { return c.Enabled }),
+		CampaignDelaySeconds: earliestCampaignDelay(config.Campaigns),
+		CustomAttributes:     customAttributes,
 	}
 
 	// Get business hours data if office hours feature is enabled.
@@ -160,15 +175,6 @@ func handleGetChatSettings(r *fastglue.Request) error {
 					}
 				}
 			}
-		}
-	}
-
-	// Filter out pre-chat form fields for which custom attributes don't exist anymore.
-	if config.PreChatForm.Enabled && len(config.PreChatForm.Fields) > 0 {
-		filteredFields, customAttributes := filterPreChatFormFields(config.PreChatForm.Fields, app)
-		response.PreChatForm.Fields = filteredFields
-		if len(customAttributes) > 0 {
-			response.CustomAttributes = customAttributes
 		}
 	}
 
@@ -211,6 +217,11 @@ func handleChatInit(r *fastglue.Request) error {
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
+	initialConfig := resolveInitialChatConfig(config, getWidgetIsVisitor(r))
+
+	if req.DeliveryID != "" {
+		return handleWidgetCampaignReply(r, req, inbox, initialConfig)
+	}
 
 	// Check if user is already authenticated (has session token).
 	contactID, _ = getWidgetContactID(r)
@@ -219,11 +230,11 @@ func handleChatInit(r *fastglue.Request) error {
 		// Custom attributes from JWT were already saved during /auth/exchange.
 		// Only process form-level attributes here.
 		isVisitor = getWidgetIsVisitor(r)
-		conversationAttrs = saveContactAttrsAndCollectConvoAttrs(app, contactID, nil, req.FormData, config)
+		conversationAttrs = saveContactAttrsAndCollectConvoAttrs(app, contactID, nil, req.FormData, initialConfig)
 	} else {
 		// New visitor - create visitor and session token.
 		isVisitor = true
-		visitor, newSessionToken, conversationAttrs, err = createVisitorContact(app, req.FormData, config, inbox)
+		visitor, newSessionToken, conversationAttrs, err = createVisitorContact(app, req.FormData, initialConfig, inbox)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -510,6 +521,18 @@ func handleGetConversations(r *fastglue.Request) error {
 		app.lo.Error("error fetching conversations for contact", "contact_id", contactID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
+	unreadMessages, err := app.conversation.GetContactUnreadPreviewMessages(contactID, inbox.ID, 3)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	for _, message := range unreadMessages {
+		for i := range chatConversations {
+			if chatConversations[i].UUID == message.ConversationUUID {
+				chatConversations[i].UnreadMessages = append(chatConversations[i].UnreadMessages, message)
+				break
+			}
+		}
+	}
 
 	return r.SendEnvelope(chatConversations)
 }
@@ -564,6 +587,70 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 
 	return sendChatMessageResponse(app, r, message.UUID)
+}
+
+// handleChatSubmitHandoffForm saves the form the AI agent asks the visitor to fill before it hands the chat to a human agent.
+func handleChatSubmitHandoffForm(r *fastglue.Request) error {
+	var (
+		app              = r.Context.(*App)
+		conversationUUID = r.RequestCtx.UserValue("uuid").(string)
+		req              handoffFormReq
+	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	contactID, conversation, err := getContactConversation(r, conversationUUID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	config, err := getWidgetConfig(r)
+	if err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+	}
+	config = config.ResolvePreChatForm(getWidgetIsVisitor(r))
+	if !config.PreChatForm.Enabled || !config.PreChatForm.HandoffOnly {
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
+	}
+	config.PreChatForm.Fields, _ = filterPreChatFormFields(config.PreChatForm.Fields, app)
+	if err := validateRequiredFormFields(req.FormData, config, app); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	contact, err := app.user.GetContactOrVisitor(contactID, "")
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	// An identified contact's details come from the JWT, which resyncs them on every exchange, so the form only fills blanks.
+	var identified *umodels.User
+	if !getWidgetIsVisitor(r) {
+		identified = &contact
+	}
+	name, email, phone, countryCode, err := validateFormData(app, req.FormData, config, identified)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	name = cmp.Or(name, contact.FirstName)
+	email = cmp.Or(email, contact.Email.String)
+	phone = cmp.Or(phone, contact.PhoneNumber.String)
+	countryCode = cmp.Or(countryCode, contact.PhoneNumberCountryCode.String)
+	if name != "" || email != "" || phone != "" {
+		if err := app.user.UpdateContactBasicInfo(contactID, name, contact.LastName, email, phone, countryCode); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+	conversationAttrs := saveContactAttrsAndCollectConvoAttrs(app, contactID, nil, req.FormData, config)
+	if len(conversationAttrs) > 0 {
+		merged := make(map[string]any)
+		_ = json.Unmarshal(conversation.CustomAttributes, &merged)
+		maps.Copy(merged, conversationAttrs)
+		if err := app.conversation.UpdateConversationCustomAttributes(conversation.UUID, merged); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+	if err := app.aiAgent.CompleteHandoff(conversation); err != nil {
+		app.lo.Error("error completing AI handoff form", "conversation_uuid", conversation.UUID, "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
+	}
+	return r.SendEnvelope(true)
 }
 
 // handleWidgetMediaUpload handles media uploads for the widget.
@@ -694,6 +781,7 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 	author.Email = null.String{}
 
 	return r.SendEnvelope(cmodels.ChatMessage{
+		ID:               message.ID,
 		UUID:             message.UUID,
 		CreatedAt:        message.CreatedAt,
 		Content:          message.Content,
@@ -1211,6 +1299,19 @@ func validateFormData(app *App, formData map[string]any, config livechat.Config,
 	return finalName, finalEmail, finalPhone, finalPhoneCountryCode, nil
 }
 
+func validateRequiredFormFields(formData map[string]any, config livechat.Config, app *App) error {
+	for _, field := range config.PreChatForm.Fields {
+		if !field.Enabled || !field.Required || field.Type == "checkbox" {
+			continue
+		}
+		value, exists := formData[field.Key]
+		if !exists || !isFormFieldValuePresent(field, value) {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", field.Label), nil)
+		}
+	}
+	return nil
+}
+
 func resolveFormField(formData map[string]any, key, existing string) string {
 	if existing != "" {
 		return existing
@@ -1219,6 +1320,28 @@ func resolveFormField(formData map[string]any, key, existing string) string {
 		return value
 	}
 	return ""
+}
+
+func isFormFieldValuePresent(field livechat.PreChatFormField, value any) bool {
+	switch field.Type {
+	case "checkbox":
+		_, ok := value.(bool)
+		return ok
+	case "number":
+		number, ok := value.(float64)
+		return ok && !math.IsNaN(number) && !math.IsInf(number, 0)
+	default:
+		text, ok := value.(string)
+		return ok && strings.TrimSpace(text) != ""
+	}
+}
+
+func resolveInitialChatConfig(config livechat.Config, isVisitor bool) livechat.Config {
+	config = config.ResolvePreChatForm(isVisitor)
+	if config.PreChatForm.HandoffOnly {
+		config.PreChatForm.Enabled = false
+	}
+	return config
 }
 
 // filterPreChatFormFields filters out pre-chat form fields that reference non-existent custom attributes while retaining the default fields
@@ -1276,6 +1399,27 @@ func filterPreChatFormFields(fields []livechat.PreChatFormField, app *App) ([]li
 	return filteredFields, existingCustomAttrs
 }
 
+func filterPreChatForms(config livechat.Config, app *App) (livechat.Config, map[int]customAttributeWidget) {
+	customAttributes := make(map[int]customAttributeWidget)
+	filter := func(fields []livechat.PreChatFormField) []livechat.PreChatFormField {
+		filtered, attributes := filterPreChatFormFields(fields, app)
+		maps.Copy(customAttributes, attributes)
+		return filtered
+	}
+
+	config.PreChatForm.Fields = filter(config.PreChatForm.Fields)
+	if config.PreChatForm.Visitors != nil && config.PreChatForm.Visitors.Fields != nil {
+		config.PreChatForm.Visitors.Fields = filter(config.PreChatForm.Visitors.Fields)
+	}
+	if config.PreChatForm.Users != nil && config.PreChatForm.Users.Fields != nil {
+		config.PreChatForm.Users.Fields = filter(config.PreChatForm.Users.Fields)
+	}
+	if len(customAttributes) == 0 {
+		return config, nil
+	}
+	return config, customAttributes
+}
+
 // getSessionDuration returns the configured session TTL for authenticated users.
 // Falls back to defaultSessionTTL if the config value is empty or invalid.
 // Enforces a minimum of 1 hour.
@@ -1308,4 +1452,22 @@ func canReply(r *fastglue.Request, conversation cmodels.Conversation) error {
 		return envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationClosed"), nil)
 	}
 	return nil
+}
+
+func launcherBranding(b livechat.Branding) map[string]any {
+	return map[string]any{
+		"colors":   b.Colors,
+		"launcher": b.Launcher,
+	}
+}
+
+func chatLauncherSettings(config livechat.Config) map[string]any {
+	return map[string]any{
+		"theme":    config.Theme,
+		"launcher": config.Launcher,
+		"branding": map[string]any{
+			"light": launcherBranding(config.Branding.Light),
+			"dark":  launcherBranding(config.Branding.Dark),
+		},
+	}
 }

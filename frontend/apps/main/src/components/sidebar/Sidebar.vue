@@ -83,11 +83,18 @@ const isInboxRoute = (path) => {
   return path.startsWith('/inboxes')
 }
 
+const sidebarProviderRef = ref(null)
+
+// An open mobile drawer treats taps on the view form as outside clicks and closes it.
+const closeMobileSidebar = () => sidebarProviderRef.value?.setOpenMobile(false)
+
 const openCreateViewDialog = () => {
+  closeMobileSidebar()
   emit('createView')
 }
 
 const editView = (view) => {
+  closeMobileSidebar()
   emit('editView', view)
 }
 
@@ -151,6 +158,7 @@ onMounted(() => {
 
 <template>
   <SidebarProvider
+    ref="sidebarProviderRef"
     style="--sidebar-width: 14rem"
     :default-open="sidebarOpen"
     v-on:update:open="sidebarOpen = $event"

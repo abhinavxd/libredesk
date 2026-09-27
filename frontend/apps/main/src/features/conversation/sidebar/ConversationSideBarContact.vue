@@ -27,16 +27,18 @@
       </Button>
     </div>
 
-    <div class="h-6 flex items-center gap-2">
+    <div class="min-h-6 flex items-center gap-2">
       <router-link
         v-if="userStore.can('contacts:read') && conversation?.contact_id"
         :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
-        class="flex items-center gap-2 hover:underline cursor-pointer"
+        class="flex min-w-0 items-center gap-2 hover:underline cursor-pointer"
       >
-        {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
+        <span class="min-w-0 break-words">
+          {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
+        </span>
         <ExternalLink size="16" class="text-muted-foreground flex-shrink-0" />
       </router-link>
-      <span v-else>
+      <span v-else class="min-w-0 break-words">
         {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
       </span>
     </div>
@@ -51,9 +53,12 @@
           isVerified ? t('contact.identityVerified') : t('contact.identityNotVerified')
         }}</TooltipContent>
       </Tooltip>
-      <span v-if="conversation?.contact?.email" class="sidebar-value break-all">
-        {{ conversation?.contact?.email }}
-      </span>
+      <template v-if="conversation?.contact?.email">
+        <span class="sidebar-value min-w-0 truncate" :title="conversation.contact.email">
+          {{ conversation.contact.email }}
+        </span>
+        <CopyButton :text="conversation.contact.email" class="h-6 w-6 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5" />
+      </template>
       <span v-else class="sidebar-label">
         {{ t('conversation.sidebar.notAvailable') }}
       </span>
@@ -113,6 +118,7 @@ import { ViewVerticalIcon } from '@radix-icons/vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
+import CopyButton from '@/components/button/CopyButton.vue'
 import {
   Mail,
   Phone,
@@ -131,7 +137,7 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api'
+import api from '@/api'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)

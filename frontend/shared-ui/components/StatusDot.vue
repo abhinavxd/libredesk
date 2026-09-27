@@ -50,11 +50,9 @@ const props = defineProps({
   }
 })
 
-const isOnline = computed(() => props.status === 'online')
+const isOnline = computed(() => ['online', 'away'].includes(props.status))
 
-const isAway = computed(() =>
-  ['away', 'away_manual', 'away_and_reassigning'].includes(props.status)
-)
+const isAway = computed(() => ['away_manual', 'away_and_reassigning'].includes(props.status))
 
 const sizeClass = computed(() => {
   const sizes = {
