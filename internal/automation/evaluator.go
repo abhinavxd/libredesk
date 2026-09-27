@@ -305,10 +305,7 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 
 func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
 	negative := rule.Operator == models.RuleOperatorNotEqual || rule.Operator == models.RuleOperatorNotContains
-	ruleValue := rule.Value
-	if !rule.CaseSensitiveMatch {
-		ruleValue = strings.ToLower(ruleValue)
-	}
+	ruleValue := strings.ToLower(strings.TrimSpace(rule.Value))
 
 	for _, recipient := range recipients {
 		recipient = strings.TrimSpace(recipient)
@@ -321,9 +318,7 @@ func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
 		if rule.Operator == models.RuleOperatorNotSet {
 			return false
 		}
-		if !rule.CaseSensitiveMatch {
-			recipient = strings.ToLower(recipient)
-		}
+		recipient = strings.ToLower(recipient)
 
 		var matched bool
 		switch rule.Operator {

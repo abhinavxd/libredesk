@@ -145,6 +145,7 @@ export function useConversationFilters () {
                     label: attribute.label,
                     type: customAttributeDataTypeToFieldType[attribute.data_type] || FIELD_TYPE.TEXT,
                     operators: customAttributeDataTypeToFieldOperators[attribute.data_type] || FIELD_OPERATORS.TEXT,
+                    allowCaseSensitive: ['text', 'link'].includes(attribute.data_type),
                     options: attribute.values.map(value => ({
                         label: value,
                         value: value
@@ -168,12 +169,14 @@ export function useConversationFilters () {
         content: {
             label: t('globals.terms.content'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT_AUTOMATION
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION,
+            allowCaseSensitive: true
         },
         subject: {
             label: t('globals.terms.subject'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT_AUTOMATION
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION,
+            allowCaseSensitive: true
         },
         status: {
             label: t('globals.terms.status'),
@@ -208,11 +211,6 @@ export function useConversationFilters () {
     }))
 
     const conversationFilters = computed(() => ({
-        to: {
-            label: t('globals.terms.toEmailAddress'),
-            type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT
-        },
         status: {
             label: t('globals.terms.status'),
             type: FIELD_TYPE.SELECT,

@@ -23,6 +23,34 @@ const openRule = (id) => {
   cy.get('input[name="name"]').should('not.have.value', '')
 }
 
+const pickType = (label) => {
+  cy.get('select[name="type"]').siblings('button[role="combobox"]').click()
+  cy.contains('[role="option"]', label).click()
+  cy.get('[role="option"]').should('not.exist')
+}
+
+const openFieldList = () => conditionRows().eq(0).find('button[role="combobox"]').eq(0).click()
+
+const closeList = () => {
+  cy.get('[role="listbox"]').type('{esc}')
+  cy.get('[role="option"]').should('not.exist')
+}
+
+const switchField = (label) => {
+  openFieldList()
+  cy.contains('[role="option"]', label).click()
+  cy.get('[role="option"]').should('not.exist')
+}
+
+const caseSensitiveBox = () => conditionRows().eq(0).parent().find('button[role="checkbox"]')
+
+const addPrivateNoteAction = () => {
+  cy.contains('button', 'Add action').click()
+  pickOption('Select action', 'Add private note')
+  cy.get('.tiptap.ProseMirror').click()
+  cy.get('.tiptap.ProseMirror').type(noteBody)
+}
+
 describe('Automation form', () => {
   let ruleId
 
@@ -147,5 +175,214 @@ describe('Automation form', () => {
 
     cy.wait('@deleteRule').its('response.statusCode').should('eq', 200)
     cy.contains(renamedRule).should('not.exist')
+  })
+})
+
+describe('Automation form case sensitive match', () => {
+  const caseRuleName = `Cypress case rule ${stamp}`
+  const savedRuleName = `Cypress saved case rule ${stamp}`
+  const created = []
+
+  beforeEach(() => {
+    cy.viewport(1280, 900)
+    cy.login()
+  })
+
+  after(() => {
+    cy.login()
+    created.forEach((id) => {
+      cy.api('DELETE', `/api/v1/automations/rules/${id}`, null, { failOnStatusCode: false })
+    })
+  })
+
+  it('clears the tick when the field changes', () => {
+    cy.intercept('POST', '**/api/v1/automations/rules').as('createRule')
+
+    cy.visit(newPath)
+    cy.get('input[name="name"]').type(caseRuleName)
+    pickType('New conversation')
+
+    cy.contains('button', 'Add condition').first().click()
+    pickOption('Select field', 'Subject')
+    caseSensitiveBox().click().should('have.attr', 'data-state', 'checked')
+
+    switchField(/^Content$/)
+    caseSensitiveBox().should('have.attr', 'data-state', 'unchecked')
+
+    caseSensitiveBox().click().should('have.attr', 'data-state', 'checked')
+    switchField(/^Email$/)
+    caseSensitiveBox().should('not.exist')
+
+    switchField(/^To email address$/)
+    caseSensitiveBox().should('not.exist')
+
+    switchField(/^Subject$/)
+    caseSensitiveBox().should('have.attr', 'data-state', 'unchecked')
+
+    caseSensitiveBox().click().should('have.attr', 'data-state', 'checked')
+    switchField(/^Email$/)
+    pickOption('Select operator', /^equals$/)
+    conditionRows().eq(0).find('input[type="text"]').type('Customer@Example.com')
+    addPrivateNoteAction()
+
+    cy.get('button[type="submit"]').click()
+    cy.wait('@createRule').then(({ request, response }) => {
+      expect(response.statusCode).to.eq(200)
+      created.push(response.body.data.id)
+      const condition = request.body.rules[0].groups[0].rules[0]
+      expect(condition.field).to.eq('contact_email')
+      expect(condition.case_sensitive_match).to.eq(false)
+    })
+  })
+
+  it('saves a ticked subject condition as case sensitive', () => {
+    cy.intercept('POST', '**/api/v1/automations/rules').as('createRule')
+
+    cy.visit(newPath)
+    cy.get('input[name="name"]').type(`${caseRuleName} ticked`)
+    pickType('New conversation')
+
+    cy.contains('button', 'Add condition').first().click()
+    pickOption('Select field', 'Subject')
+    pickOption('Select operator', /^equals$/)
+    conditionRows().eq(0).find('input[type="text"]').type('Exact Subject')
+    caseSensitiveBox().click()
+    caseSensitiveBox().should('have.attr', 'data-state', 'checked')
+    addPrivateNoteAction()
+
+    cy.get('button[type="submit"]').click()
+    cy.wait('@createRule').then(({ request, response }) => {
+      expect(response.statusCode).to.eq(200)
+      created.push(response.body.data.id)
+      const condition = request.body.rules[0].groups[0].rules[0]
+      expect(condition.field).to.eq('subject')
+      expect(condition.case_sensitive_match).to.eq(true)
+    })
+  })
+
+  it('shows a saved tick when editing and clears it on a field change', () => {
+    cy.api('POST', '/api/v1/automations/rules', {
+      name: savedRuleName,
+      description: 'created by the case sensitive spec',
+      type: 'new_conversation',
+      enabled: false,
+      events: [],
+      rules: [
+        {
+          group_operator: 'OR',
+          groups: [
+            {
+              logical_op: 'OR',
+              rules: [
+                {
+                  field: 'subject',
+                  field_type: 'conversation',
+                  operator: 'equals',
+                  value: `Cypress subject ${stamp}`,
+                  case_sensitive_match: true
+                }
+              ]
+            },
+            { logical_op: 'OR', rules: [] }
+          ],
+          actions: [{ type: 'send_private_note', value: [noteBody] }]
+        }
+      ]
+    }).then(({ body }) => {
+      const id = body.data.id
+      created.push(id)
+      cy.intercept('PUT', `**/api/v1/automations/rules/${id}`).as('updateRule')
+
+      openRule(id)
+      caseSensitiveBox().should('have.attr', 'data-state', 'checked')
+
+      switchField(/^Email$/)
+      caseSensitiveBox().should('not.exist')
+      switchField(/^Subject$/)
+      caseSensitiveBox().should('have.attr', 'data-state', 'unchecked')
+
+      pickOption('Select operator', /^equals$/)
+      conditionRows().eq(0).find('input[type="text"]').type(`Cypress subject ${stamp}`)
+      cy.get('button[type="submit"]').click()
+      cy.wait('@updateRule').then(({ request, response }) => {
+        expect(response.statusCode).to.eq(200)
+        const condition = request.body.rules[0].groups[0].rules[0]
+        expect(condition.field).to.eq('subject')
+        expect(condition.case_sensitive_match).to.eq(false)
+      })
+    })
+  })
+})
+
+describe('Automation form To email address field', () => {
+  const toRuleName = `Cypress to rule ${stamp}`
+  const created = []
+
+  beforeEach(() => {
+    cy.viewport(1280, 900)
+    cy.login()
+  })
+
+  after(() => {
+    cy.login()
+    created.forEach((id) => {
+      cy.api('DELETE', `/api/v1/automations/rules/${id}`, null, { failOnStatusCode: false })
+    })
+  })
+
+  it('is offered only on new conversation rules', () => {
+    cy.visit(newPath)
+
+    pickType('New conversation')
+    cy.contains('button', 'Add condition').first().click()
+    openFieldList()
+    cy.contains('[role="option"]', /^To email address$/).should('exist')
+    closeList()
+
+    pickType('Conversation update')
+    cy.contains('button', 'Add condition').first().click()
+    openFieldList()
+    cy.contains('[role="option"]', /^Status$/).should('exist')
+    cy.contains('[role="option"]', /^To email address$/).should('not.exist')
+    closeList()
+
+    pickType('Time triggers')
+    cy.contains('button', 'Add condition').first().click()
+    openFieldList()
+    cy.contains('[role="option"]', /^Status$/).should('exist')
+    cy.contains('[role="option"]', /^To email address$/).should('not.exist')
+    closeList()
+  })
+
+  it('saves a To email address condition and loads it back', () => {
+    cy.intercept('POST', '**/api/v1/automations/rules').as('createRule')
+
+    cy.visit(newPath)
+    cy.get('input[name="name"]').type(toRuleName)
+    pickType('New conversation')
+
+    cy.contains('button', 'Add condition').first().click()
+    pickOption('Select field', 'To email address')
+    caseSensitiveBox().should('not.exist')
+    pickOption('Select operator', /^equals$/)
+    conditionRows().eq(0).find('input[type="text"]').type('sales@example.com')
+    addPrivateNoteAction()
+
+    cy.get('button[type="submit"]').click()
+    cy.wait('@createRule').then(({ request, response }) => {
+      expect(response.statusCode).to.eq(200)
+      created.push(response.body.data.id)
+      const condition = request.body.rules[0].groups[0].rules[0]
+      expect(condition.field).to.eq('to')
+      expect(condition.field_type).to.eq('conversation')
+      expect(condition.operator).to.eq('equals')
+      expect(condition.value).to.eq('sales@example.com')
+
+      openRule(response.body.data.id)
+      conditionRows().eq(0).find('button[role="combobox"]').eq(0).should('contain.text', 'To email address')
+      conditionRows().eq(0).find('button[role="combobox"]').eq(1).should('contain.text', 'equals')
+      conditionRows().eq(0).find('input[type="text"]').should('have.value', 'sales@example.com')
+      caseSensitiveBox().should('not.exist')
+    })
   })
 })

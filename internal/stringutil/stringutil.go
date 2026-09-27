@@ -260,6 +260,11 @@ func ExtractConvUUID(email string) string {
 	return match[6 : len(match)-1]
 }
 
+// RemoveConvPlusAddress strips the +conv-{uuid} tag, e.g. support+conv-{uuid}@domain.com -> support@domain.com.
+func RemoveConvPlusAddress(email string) string {
+	return regexpConvUUID.ReplaceAllString(email, "@")
+}
+
 // ExtractUUID finds and returns the first valid UUID v4 in the given text.
 // Returns empty string if no valid UUID is found.
 func ExtractUUID(text string) string {

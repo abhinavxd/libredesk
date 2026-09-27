@@ -187,10 +187,10 @@
             <CloseButton :onClose="() => removeCondition(index)" />
           </div>
 
-          <div class="flex items-center space-x-2">
+          <div v-if="showCaseSensitive(index)" class="flex items-center space-x-2">
             <Checkbox
               id="terms"
-              :defaultChecked="rule.case_sensitive_match"
+              :checked="!!rule.case_sensitive_match"
               @update:checked="(value) => handleCaseSensitiveCheck(value, index)"
             />
             <label for="terms"> {{ $t('globals.messages.caseSensitiveMatch') }} </label>
@@ -231,7 +231,7 @@ import {
 import { Label } from '@shared-ui/components/ui/label'
 import { Input } from '@shared-ui/components/ui/input'
 import { useI18n } from 'vue-i18n'
-import { useConversationFilters } from '../../../composables/useConversationFilters'
+import { useConversationFilters } from '@/composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
@@ -300,6 +300,7 @@ const handleFieldChange = (value, ruleIndex) => {
 
   ruleGroup.value.rules[ruleIndex].operator = ''
   ruleGroup.value.rules[ruleIndex].value = ''
+  ruleGroup.value.rules[ruleIndex].case_sensitive_match = false
   ruleGroup.value.rules[ruleIndex].field = value
   ruleGroup.value.rules[ruleIndex].field_type = fieldType
   emitUpdate()
@@ -411,5 +412,14 @@ const inputType = (index) => {
 const showInput = (index) => {
   const operator = ruleGroup.value.rules[index]?.operator
   return !['set', 'not set'].includes(operator)
+}
+
+const showCaseSensitive = (index) => {
+  const rule = ruleGroup.value.rules[index]
+  const field =
+    rule?.field_type === fieldTypeConstants.contact_custom_attribute
+      ? contactCustomAttributes.value[rule.field]
+      : currentFilters.value[rule?.field]
+  return field?.allowCaseSensitive === true
 }
 </script>

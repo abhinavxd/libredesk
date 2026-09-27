@@ -26,6 +26,10 @@ var (
 		"hours_since_last_reply",
 		"hours_since_resolved",
 		"inbox",
+		"previous_status",
+		"previous_priority",
+		"previous_assigned_user",
+		"previous_assigned_team",
 	}
 )
 

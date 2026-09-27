@@ -18,20 +18,20 @@ func TestEvaluateRuleIncomingTo(t *testing.T) {
 	}{
 		{
 			name:       "equals any recipient case insensitively",
-			recipients: []string{"support@example.com", "foundation@zerya.dev"},
-			rule:       models.RuleDetail{Operator: models.RuleOperatorEquals, Value: "FOUNDATION@ZERYA.DEV"},
+			recipients: []string{"support@example.com", "sales@example.net"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorEquals, Value: "SALES@EXAMPLE.NET"},
 			want:       true,
 		},
 		{
 			name:       "not equals requires all recipients to differ",
-			recipients: []string{"support@example.com", "foundation@zerya.dev"},
-			rule:       models.RuleDetail{Operator: models.RuleOperatorNotEqual, Value: "foundation@zerya.dev"},
+			recipients: []string{"support@example.com", "sales@example.net"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorNotEqual, Value: "sales@example.net"},
 			want:       false,
 		},
 		{
 			name:       "contains matches recipient fragment",
-			recipients: []string{"support@example.com", "foundation@zerya.dev"},
-			rule:       models.RuleDetail{Operator: models.RuleOperatorContains, Value: "example.org, @zerya.dev"},
+			recipients: []string{"support@example.com", "sales@example.net"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorContains, Value: "example.org, @example.net"},
 			want:       true,
 		},
 		{
@@ -53,18 +53,24 @@ func TestEvaluateRuleIncomingTo(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "case sensitive match is respected",
-			recipients: []string{"foundation@zerya.dev"},
+			name:       "case sensitive flag is ignored",
+			recipients: []string{"sales@example.net"},
 			rule: models.RuleDetail{
 				Operator:           models.RuleOperatorEquals,
-				Value:              "Foundation@zerya.dev",
+				Value:              "Sales@example.net",
 				CaseSensitiveMatch: true,
 			},
-			want: false,
+			want: true,
+		},
+		{
+			name:       "equals trims the rule value",
+			recipients: []string{"sales@example.net"},
+			rule:       models.RuleDetail{Operator: models.RuleOperatorEquals, Value: " sales@example.net "},
+			want:       true,
 		},
 		{
 			name:       "set requires a recipient",
-			recipients: []string{"foundation@zerya.dev"},
+			recipients: []string{"sales@example.net"},
 			rule:       models.RuleDetail{Operator: models.RuleOperatorSet},
 			want:       true,
 		},
