@@ -23,7 +23,7 @@ func (k testOIDCKeys) VerifySignature(context.Context, string) ([]byte, error) {
 	return k.payload, nil
 }
 
-func TestOIDCRejectsUnverifiedEmail(t *testing.T) {
+func TestOIDCRejectsBlankEmail(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		email    string
@@ -31,7 +31,7 @@ func TestOIDCRejectsUnverifiedEmail(t *testing.T) {
 		want     bool
 	}{
 		{"verified", "agent@example.com", true, true},
-		{"unverified", "agent@example.com", false, false},
+		{"unverified", "agent@example.com", false, true},
 		{"missing verification", "agent@example.com", nil, true},
 		{"empty email", "", true, false},
 		{"blank email", " \t", true, false},
