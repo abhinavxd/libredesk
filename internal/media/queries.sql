@@ -44,7 +44,7 @@ SET model_type = 'messages',
 WHERE (id = ANY($2::INT[]) OR uuid = ANY($3::uuid[]))
   AND COALESCE(model_type, 'messages') = 'messages'
   AND COALESCE(model_id, 0) = 0
-  AND (uploaded_by = NULLIF($4, 0) OR ($4 = 0 AND uploaded_by IS NULL));
+  AND uploaded_by IS NOT DISTINCT FROM NULLIF($4::INT, 0);
 
 -- name: get-model-media
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by

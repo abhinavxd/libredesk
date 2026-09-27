@@ -31,12 +31,19 @@ func (u *Manager) MonitorUserAvailability(ctx context.Context, onUsersOffline fu
 	}
 }
 
+// GetSessionVersion returns the agent's session version, or 0 when no enabled agent has this ID.
 func (u *Manager) GetSessionVersion(userID int) (int, error) {
-	var version int
-	if err := u.q.GetSessionVersion.Get(&version, userID); err != nil {
+	agent, err := u.GetAgentCachedOrLoad(userID)
+	if err != nil {
+		if e, ok := err.(envelope.Error); ok && e.ErrorType == envelope.NotFoundError {
+			return 0, nil
+		}
 		return 0, err
 	}
-	return version, nil
+	if !agent.Enabled {
+		return 0, nil
+	}
+	return agent.SessionVersion, nil
 }
 
 // GetAgent retrieves an agent (or AI assistant) by ID and caches it.

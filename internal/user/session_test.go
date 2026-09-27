@@ -10,6 +10,7 @@ func TestPasswordChangesAdvanceSessionVersion(t *testing.T) {
 	}
 	check := func(want int) {
 		t.Helper()
+		m.InvalidateAgentCache(id)
 		got, err := m.GetSessionVersion(id)
 		if err != nil || got != want {
 			t.Fatalf("session version = %d, err = %v, want %d", got, err, want)

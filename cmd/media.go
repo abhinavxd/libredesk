@@ -212,7 +212,7 @@ func handleServeMedia(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if media.ModelID.Int <= 0 && (!media.UploadedBy.Valid || media.UploadedBy.Int != auser.ID) {
+	if media.ModelID.Int <= 0 && !media.UploadedByUser(auser.ID) {
 		return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
@@ -301,7 +301,7 @@ func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, err
 	out := make([]mmodels.Media, 0, len(all))
 	seen := make(map[int]bool, len(all))
 	for _, m := range all {
-		if !m.UploadedBy.Valid || m.UploadedBy.Int != userID || userID <= 0 || (m.Model.String != "" && m.Model.String != mmodels.ModelMessages) {
+		if !m.UploadedByUser(userID) || (m.Model.String != "" && m.Model.String != mmodels.ModelMessages) {
 			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 		}
 		if seen[m.ID] {

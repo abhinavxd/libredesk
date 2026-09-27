@@ -6,23 +6,17 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
-	"github.com/jmoiron/sqlx"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
 func TestPendingMediaOwnership(t *testing.T) {
 	db := testutil.NewDB(t, "media_ownership")
-	var q struct {
-		Link  *sqlx.Stmt `query:"link-message-media"`
-		Draft *sqlx.Stmt `query:"get-draft-inline-media"`
-	}
-	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
-		t.Fatal(err)
-	}
 	lo := logf.New(logf.Opts{})
 	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
-	m.queries.LinkMessageMedia, m.queries.GetDraftInlineMedia = q.Link, q.Draft
+	if err := dbutil.ScanSQLFile("queries.sql", &m.queries, db, efs); err != nil {
+		t.Fatal(err)
+	}
 	var owner, other int
 	for _, id := range []*int{&owner, &other} {
 		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name) VALUES ('agent', 'Agent', '') RETURNING id`); err != nil {

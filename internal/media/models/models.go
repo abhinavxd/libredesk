@@ -51,6 +51,11 @@ type Media struct {
 	Content []byte `json:"-"`
 }
 
+// UploadedByUser reports whether the given user uploaded this media.
+func (m Media) UploadedByUser(userID int) bool {
+	return m.UploadedBy.Valid && m.UploadedBy.Int == userID
+}
+
 // NormalizeContentType returns the lowercased type/subtype of a Content-Type value, or application/octet-stream if it does not parse.
 func NormalizeContentType(contentType string) string {
 	mediaType, _, err := mime.ParseMediaType(contentType)

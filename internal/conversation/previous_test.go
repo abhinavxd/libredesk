@@ -9,21 +9,16 @@ import (
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )
 
 func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 	db := testutil.NewDB(t, "previous_access")
-	var q struct {
-		Previous *sqlx.Stmt `query:"get-contact-previous-conversations"`
-	}
-	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
-		t.Fatal(err)
-	}
 	lo := logf.New(logf.Opts{})
 	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
-	m.q.GetContactPreviousConversations = q.Previous
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
 	var contact, actor, other, team, inbox int
 	for i, id := range []*int{&contact, &actor, &other} {
 		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name) VALUES ('agent', $1, '') RETURNING id`, fmt.Sprintf("User %d", i)); err != nil {

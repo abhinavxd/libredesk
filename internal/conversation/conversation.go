@@ -498,14 +498,8 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 // GetContactPreviousConversations retrieves previous conversations for a contact with a configurable limit.
 func (c *Manager) GetContactPreviousConversations(contactID int, limit int, user umodels.User) ([]models.PreviousConversation, error) {
 	var conversations = make([]models.PreviousConversation, 0)
-	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit,
-		user.ID, pq.Array(user.Teams.IDs()),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned)); err != nil {
+	args := append([]any{contactID, limit, user.ID}, readScopeArgs(user)...)
+	if err := c.q.GetContactPreviousConversations.Select(&conversations, args...); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -788,7 +782,9 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 
 	c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
 	// Reopening unassigns an agent who is away and reassigning.
-	c.wsHub.RecheckSubscribers(conversationUUID)
+	if conv, err := c.GetConversationListItem(conversationUUID); err == nil {
+		c.retainAuthorizedSubscribers(&conv)
+	}
 
 	if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
 		return true, err
@@ -2323,17 +2319,7 @@ func (c *Manager) FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]stri
 		return nil, nil
 	}
 	var authorized []string
-	err = c.q.FilterAuthorizedListUUIDs.Select(&authorized,
-		pq.Array(uuids),
-		user.ID,
-		pq.Array(user.Teams.IDs()),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned),
-	)
+	err = c.q.FilterAuthorizedListUUIDs.Select(&authorized, append([]any{pq.Array(uuids), user.ID}, readScopeArgs(user)...)...)
 	if err != nil {
 		c.lo.Error("error filtering authorized list uuids", "agent_id", agentID, "error", err)
 		return nil, err
@@ -2508,4 +2494,17 @@ func replyNotificationText(message models.Message) string {
 		return cmp.Or(stringutil.HTML2TextNoQuotes(message.Content), full)
 	}
 	return cmp.Or(stringutil.TrimPlainTextQuotes(full), full)
+}
+
+// readScopeArgs returns the agent's team IDs and read permissions in the argument order the read-permission queries expect.
+func readScopeArgs(user umodels.User) []any {
+	return []any{
+		pq.Array(user.Teams.IDs()),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned),
+	}
 }

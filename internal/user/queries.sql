@@ -602,7 +602,3 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
-
--- name: get-session-version
-SELECT session_version FROM users
-WHERE id = $1 AND type = 'agent' AND enabled AND deleted_at IS NULL;

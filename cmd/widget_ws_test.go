@@ -29,8 +29,9 @@ func TestWidgetWSClosesAfterJoinLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
+	join := WidgetMessage{Type: WidgetMsgTypeJoin, Data: json.RawMessage(`[]`)}
 	for range wsMaxJoinsPerConn {
-		if err := conn.WriteJSON(WidgetMessage{Type: WidgetMsgTypeJoin, Data: json.RawMessage(`[]`)}); err != nil {
+		if err := conn.WriteJSON(join); err != nil {
 			t.Fatal(err)
 		}
 		conn.SetReadDeadline(time.Now().Add(time.Second))
@@ -39,11 +40,9 @@ func TestWidgetWSClosesAfterJoinLimit(t *testing.T) {
 			t.Fatalf("expected rejected join, type=%q err=%v", msg.Type, err)
 		}
 	}
-	conn.WriteJSON(WidgetMessage{Type: WidgetMsgTypeJoin, Data: json.RawMessage(`[]`)})
+	conn.WriteJSON(join)
 	conn.SetReadDeadline(time.Now().Add(time.Second))
-	if _, _, err := conn.ReadMessage(); err == nil {
-		t.Fatal("connection remained open after join limit")
-	} else if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-		t.Fatal("connection was not closed")
+	if _, _, err := conn.ReadMessage(); !websocket.IsCloseError(err, websocket.ClosePolicyViolation) {
+		t.Fatalf("expected policy violation close after join limit, got %v", err)
 	}
 }

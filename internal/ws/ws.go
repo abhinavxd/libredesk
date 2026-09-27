@@ -135,23 +135,10 @@ func (h *Hub) ListSubscribers(uuid string) []*Client {
 	return out
 }
 
-// RecheckSubscribers drops the conversation's subscribers who can no longer read it, including when the access lookup fails.
-func (h *Hub) RecheckSubscribers(uuid string) {
-	if h.conversationStore == nil {
-		return
-	}
-	allowed := make(map[int]bool)
+// RetainSubscribers drops the conversation's subscribers whose agent is not in allowedAgentIDs.
+func (h *Hub) RetainSubscribers(uuid string, allowedAgentIDs []int) {
 	for _, c := range h.ListSubscribers(uuid) {
-		ok, checked := allowed[c.ID]
-		if !checked {
-			uuids, err := h.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{uuid})
-			if err != nil {
-				h.lo.Error("error rechecking conversation subscriber access", "agent_id", c.ID, "uuid", uuid, "error", err)
-			}
-			ok = slices.Contains(uuids, uuid)
-			allowed[c.ID] = ok
-		}
-		if !ok {
+		if !slices.Contains(allowedAgentIDs, c.ID) {
 			h.removeConversationSub(c, uuid)
 		}
 	}

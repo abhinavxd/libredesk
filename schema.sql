@@ -443,6 +443,7 @@ CREATE TABLE media (
 );
 CREATE INDEX index_media_on_model_type_and_model_id ON media(model_type, model_id);
 CREATE INDEX index_media_on_content_id ON media(content_id);
+CREATE INDEX index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
 
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (

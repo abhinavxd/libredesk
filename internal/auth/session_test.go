@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"database/sql"
 	"errors"
 	"testing"
 
@@ -34,10 +33,17 @@ func TestSessionsRejectRevokedAndLegacyCookies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	login := func(id, version int) string {
-		t.Helper()
+	request := func(cookie string) *fastglue.Request {
 		r := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}}
 		r.RequestCtx.Request.SetRequestURI("https://app.example.com/")
+		if cookie != "" {
+			r.RequestCtx.Request.Header.SetCookie("libredesk_session", cookie)
+		}
+		return r
+	}
+	login := func(id, version int) string {
+		t.Helper()
+		r := request("")
 		if err := a.SaveSession(amodels.User{ID: id, SessionVersion: version}, r); err != nil {
 			t.Fatal(err)
 		}
@@ -50,10 +56,7 @@ func TestSessionsRejectRevokedAndLegacyCookies(t *testing.T) {
 	}
 	validate := func(cookie string, wantValid bool) {
 		t.Helper()
-		r := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}}
-		r.RequestCtx.Request.SetRequestURI("https://app.example.com/")
-		r.RequestCtx.Request.Header.SetCookie("libredesk_session", cookie)
-		user, err := a.ValidateSession(r)
+		user, err := a.ValidateSession(request(cookie))
 		if wantValid {
 			if err != nil || user.ID <= 0 {
 				t.Fatalf("valid session rejected: %v", err)
@@ -72,13 +75,10 @@ func TestSessionsRejectRevokedAndLegacyCookies(t *testing.T) {
 	validate(other, true)
 	validate(login(1, 2), true)
 	validate(login(1, 0), false)
-	users.err = sql.ErrNoRows
+	delete(users.versions, 2)
 	validate(other, false)
 	users.err = errors.New("database unavailable")
-	r := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}}
-	r.RequestCtx.Request.SetRequestURI("https://app.example.com/")
-	r.RequestCtx.Request.Header.SetCookie("libredesk_session", other)
-	if user, err := a.ValidateSession(r); err == nil || errors.Is(err, simplesessions.ErrInvalidSession) || user.ID != 0 {
+	if user, err := a.ValidateSession(request(other)); err == nil || errors.Is(err, simplesessions.ErrInvalidSession) || user.ID != 0 {
 		t.Fatalf("lookup failure must reject without revoking: user=%d err=%v", user.ID, err)
 	}
 }

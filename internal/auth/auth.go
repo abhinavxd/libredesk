@@ -3,7 +3,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -411,12 +410,12 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 			return models.User{}, simplesessions.ErrInvalidSession
 		}
 		current, err := a.users.GetSessionVersion(userID)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && version != current) {
-			return models.User{}, simplesessions.ErrInvalidSession
-		}
 		if err != nil {
 			a.logger.Error("error fetching session version", "user_id", userID, "error", err)
 			return models.User{}, err
+		}
+		if version != current {
+			return models.User{}, simplesessions.ErrInvalidSession
 		}
 	}
 
