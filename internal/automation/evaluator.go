@@ -149,6 +149,12 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			if !conversation.ResolvedAt.IsZero() {
 				valueToCompare = fmt.Sprintf("%.0f", (time.Since(conversation.ResolvedAt.Time).Hours()))
 			}
+		case models.ConversationHoursSinceLastResolved:
+			if !conversation.LastResolvedAt.IsZero() {
+				valueToCompare = fmt.Sprintf("%.0f", time.Since(conversation.LastResolvedAt.Time).Hours())
+			} else if rule.Operator != models.RuleOperatorSet && rule.Operator != models.RuleOperatorNotSet {
+				return false
+			}
 		case models.ConversationInbox:
 			valueToCompare = strconv.Itoa(conversation.InboxID)
 		case models.ConversationPreviousStatus, models.ConversationPreviousPriority,
