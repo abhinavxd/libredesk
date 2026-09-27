@@ -50,6 +50,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
+	"github.com/abhinavxd/libredesk/internal/telegram"
 	"github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/webhook"
@@ -138,6 +139,8 @@ type App struct {
 	importer           *importer.Importer
 	whatsappTemplate   *whatsappTemplate.Manager
 	whatsappClient     *whatsappapi.Client
+	telegramClient     *telegram.Client
+	telegramHookErrors sync.Map
 	whatsappIngester   atomic.Pointer[WhatsAppIngester]
 	whatsappIngesterMu sync.Mutex
 	// Inbox IDs whose provider credentials were recently rejected, keyed to the last error time.
@@ -278,6 +281,7 @@ func main() {
 	conversation.SetAIAgent(aiAgent)
 
 	waClient := initWhatsAppClient()
+	tgClient := telegram.New()
 	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
 	conversation.SetWhatsAppTemplateStore(waTemplates)
 
@@ -340,6 +344,7 @@ func main() {
 		fc:               initFastCache(rdb),
 		userNotification: userNotification,
 		whatsappClient:   waClient,
+		telegramClient:   tgClient,
 		whatsappTemplate: waTemplates,
 		wsHub:            wsHub,
 	}
@@ -351,9 +356,10 @@ func main() {
 		app.lo.Error("error starting whatsapp ingester, inbound whatsapp messages will not be processed", "error", err)
 	}
 
-	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, conversation, makeInboxAuthStatusHook(app))
+	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL, waClient, tgClient, conversation, makeInboxAuthStatusHook(app))
 
 	go whatsappTemplateSyncWorker(ctx, app)
+	go reconcileTelegramWebhooks(app)
 
 	g := fastglue.NewGlue()
 	g.SetContext(app)

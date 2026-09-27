@@ -20,3 +20,11 @@ type CSATResponse struct {
 	Meta              json.RawMessage `db:"meta" json:"meta"`
 	ResponseTimestamp null.Time       `db:"response_timestamp" json:"response_timestamp"`
 }
+
+func (c CSATResponse) FeedbackPending() bool {
+	var meta struct {
+		Pending bool `json:"telegram_feedback_pending"`
+	}
+	_ = json.Unmarshal(c.Meta, &meta)
+	return c.ResponseTimestamp.Valid && meta.Pending
+}

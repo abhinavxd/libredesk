@@ -251,6 +251,17 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 
 	forceDownload := string(r.RequestCtx.QueryArgs().Peek("download")) == "1"
 
+	if !forceDownload && strings.EqualFold(filepath.Ext(media.Filename), ".tgs") {
+		data, err := telegramStickerData(app, media)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		r.RequestCtx.Response.Header.Set("Content-Type", "application/x-tgsticker")
+		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
+		r.RequestCtx.Response.SetBody(data)
+		return nil
+	}
+
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":

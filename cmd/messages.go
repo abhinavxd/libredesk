@@ -8,22 +8,25 @@ import (
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/telegram"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
 
 type messageReq struct {
-	Attachments []int                  `json:"attachments"`
-	Message     string                 `json:"message"`
-	Private     bool                   `json:"private"`
-	To          []string               `json:"to"`
-	CC          []string               `json:"cc"`
-	BCC         []string               `json:"bcc"`
-	SenderType  string                 `json:"sender_type"`
-	Mentions    []cmodels.MentionInput `json:"mentions"`
-	EchoID      string                 `json:"echo_id"`
-	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
+	TelegramButtons    []telegram.Button      `json:"telegram_buttons"`
+	ReplyToMessageUUID string                 `json:"reply_to_message_uuid"`
+	Attachments        []int                  `json:"attachments"`
+	Message            string                 `json:"message"`
+	Private            bool                   `json:"private"`
+	To                 []string               `json:"to"`
+	CC                 []string               `json:"cc"`
+	BCC                []string               `json:"bcc"`
+	SenderType         string                 `json:"sender_type"`
+	Mentions           []cmodels.MentionInput `json:"mentions"`
+	EchoID             string                 `json:"echo_id"`
+	SourceID           string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
 
 	// WhatsApp-only. Set TemplateID to send an approved template; omit for free-form.
 	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
@@ -275,6 +278,12 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Queue outgoing reply.
 	meta := map[string]any{}
+	if conv.InboxChannel == "telegram" && len(req.TelegramButtons) > 0 {
+		meta["telegram_buttons"] = req.TelegramButtons
+	}
+	if req.ReplyToMessageUUID != "" && conv.InboxChannel == "telegram" {
+		meta["reply_to_message_uuid"] = req.ReplyToMessageUUID
+	}
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
 	}

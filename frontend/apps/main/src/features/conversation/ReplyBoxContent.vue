@@ -8,30 +8,31 @@
     >
       <Tabs v-model="messageType" class="rounded-lg">
         <TabsList class="rounded-lg border bg-muted/50 p-0.5">
-          <TabsTrigger
-            v-if="canSendReply"
-            value="reply"
-            :class="TAB_TRIGGER_CLASS"
-          >
+          <TabsTrigger v-if="canSendReply" value="reply" :class="TAB_TRIGGER_CLASS">
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
-          <TabsTrigger
-            v-if="canSendPrivateNote"
-            value="private_note"
-            :class="TAB_TRIGGER_CLASS"
-          >
+          <TabsTrigger v-if="canSendPrivateNote" value="private_note" :class="TAB_TRIGGER_CLASS">
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
       <Button
+        type="button"
         class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
         variant="ghost"
+        :aria-label="t(isFullscreen ? 'globals.terms.collapse' : 'globals.terms.expand')"
         @click="toggleFullscreen"
       >
         <component :is="isFullscreen ? Minimize2 : Maximize2" />
       </Button>
     </div>
+
+    <QuotedReplyPreview
+      v-if="quotedReply && messageType === 'reply'"
+      :content="quotedReply.content"
+      :class="{ 'mt-4': isFullscreen }"
+      @clear="clearQuotedReply"
+    />
 
     <!-- To, CC, and BCC fields -->
     <div v-if="conversationStore.current.inbox_channel === 'email'">
@@ -106,6 +107,14 @@
       />
     </div>
 
+    <TelegramButtonsEditor
+      v-if="isTelegramReply && telegramButtons.length"
+      ref="telegramButtonsEditorRef"
+      v-model="telegramButtons"
+      :validated="telegramButtonsValidated"
+      @empty="focus"
+    />
+
     <!-- Macro preview -->
     <MacroActionsPreview
       v-if="conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions?.length > 0"
@@ -128,6 +137,8 @@
       class="mt-2"
       :isFullscreen="isFullscreen"
       :isWhatsApp="isWhatsAppConversation"
+      :showAddButton="isTelegramReply"
+      :disableAddButton="telegramButtons.length >= 10"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
@@ -136,8 +147,18 @@
       :isGenerating="isGenerating"
       :showGenerateReply="messageType !== 'private_note'"
       @emojiSelect="handleEmojiSelect"
+      @addButton="addTelegramButton"
       @generateReply="$emit('generateReply')"
-    />
+    >
+      <template #audio-recorder>
+        <AudioReplyRecorder
+          v-if="isTelegramReply"
+          :key="conversationStore.current.uuid"
+          @recorded="handleFilesDropped"
+          @busy="recordingBusy = $event"
+        />
+      </template>
+    </ReplyBoxMenuBar>
   </div>
 </template>
 
@@ -164,6 +185,9 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useEmitter } from '@main/composables/useEmitter'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
+import AudioReplyRecorder from './AudioReplyRecorder.vue'
+import TelegramButtonsEditor from './TelegramButtonsEditor.vue'
+import QuotedReplyPreview from '@main/features/conversation/message/QuotedReplyPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
@@ -173,6 +197,7 @@ import api from '@main/api'
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
 
+const telegramButtons = defineModel('telegramButtons', { default: () => [] })
 const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
@@ -192,13 +217,12 @@ const fetchSuggestions = async (query) => {
     api.getTeamsCompact({ q: query, page_size: MENTION_LIMIT })
   ])
 
-  const users = (agentsResponse?.data?.data || [])
-    .map((u) => ({
-      id: u.id,
-      type: 'agent',
-      label: `${u.first_name} ${u.last_name}`.trim(),
-      avatar_url: u.avatar_url
-    }))
+  const users = (agentsResponse?.data?.data || []).map((u) => ({
+    id: u.id,
+    type: 'agent',
+    label: `${u.first_name} ${u.last_name}`.trim(),
+    avatar_url: u.avatar_url
+  }))
 
   const teams = (teamsResponse?.data?.data || []).map((t) => ({
     id: t.id,
@@ -228,6 +252,8 @@ const toggleMessageType = () => {
 }
 
 const props = defineProps({
+  quotedReply: { type: Object, default: null },
+  telegramButtonsValidated: Boolean,
   isFullscreen: {
     type: Boolean,
     default: false
@@ -271,6 +297,7 @@ const props = defineProps({
 const emit = defineEmits([
   'toggleFullscreen',
   'send',
+  'clearQuotedReply',
   'sendAndSetStatus',
   'fileUpload',
   'inlineImageUpload',
@@ -284,11 +311,30 @@ const conversationStore = useConversationStore()
 const isWhatsAppConversation = computed(
   () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
 )
+const isTelegramReply = computed(
+  () => conversationStore.current?.inbox_channel === 'telegram' && messageType.value === 'reply'
+)
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
+const recordingBusy = ref(false)
 const editorRef = ref(null)
+const telegramButtonsEditorRef = ref(null)
+
+const addTelegramButton = async () => {
+  if (telegramButtons.value.length >= 10) return
+  telegramButtons.value = [...telegramButtons.value, { text: '', url: '' }]
+  await nextTick()
+  telegramButtonsEditorRef.value?.focus()
+}
+
+const clearQuotedReply = () => {
+  emit('clearQuotedReply')
+  focus()
+}
+
+const focusTelegramButtonError = () => telegramButtonsEditorRef.value?.focusError()
 
 const toggleBcc = async () => {
   showBcc.value = !showBcc.value
@@ -308,6 +354,7 @@ const toggleFullscreen = () => {
 const enableSend = computed(() => {
   const html = htmlContent.value
   return (
+    !recordingBusy.value &&
     !hasPendingInlineUpload(html) &&
     (textContent.value.trim().length > 0 ||
       hasInlineImage(html) ||
@@ -350,20 +397,14 @@ const validateBeforeSend = async () => {
     })
     return false
   }
-  return true
+  return !recordingBusy.value
 }
 
-/**
- * Send the reply or private note
- */
 const handleSend = async () => {
   if (!(await validateBeforeSend())) return
   emit('send')
 }
 
-/**
- * Send the reply or private note and set conversation status
- */
 const handleSendAndSetStatus = async (status) => {
   if (!(await validateBeforeSend())) return
   emit('sendAndSetStatus', status)
@@ -394,7 +435,7 @@ const handleAiPromptSelected = (key) => {
 // Watch and update macro view based on message type this filters our macros.
 watch(
   messageType,
-  (newType, oldType) => {
+  (newType) => {
     if (newType === 'reply') {
       macroStore.setCurrentView('replying')
     } else if (newType === 'private_note') {
@@ -408,9 +449,8 @@ watch(
   { immediate: true }
 )
 
-// Expose focus method for parent components
 const focus = () => {
   editorRef.value?.focus()
 }
-defineExpose({ focus })
+defineExpose({ focus, focusTelegramButtonError })
 </script>

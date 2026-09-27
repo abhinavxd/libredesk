@@ -12,16 +12,9 @@
       >
         <div class="flex items-start gap-2">
           <div class="relative flex-shrink-0 w-10 h-10">
-            <div
-              class="transition-opacity"
-              :class="avatarOpacityClass"
-              :aria-hidden="showCheckbox"
-            >
+            <div class="transition-opacity" :class="avatarOpacityClass" :aria-hidden="showCheckbox">
               <Avatar class="w-10 h-10 rounded-full">
-                <AvatarImage
-                  :src="conversation.contact.avatar_url || ''"
-                  class="object-cover"
-                />
+                <AvatarImage :src="conversation.contact.avatar_url || ''" class="object-cover" />
                 <AvatarFallback>
                   {{ conversation.contact.first_name.substring(0, 2).toUpperCase() }}
                 </AvatarFallback>
@@ -113,7 +106,9 @@
                 v-if="isUnread"
                 class="flex items-center justify-center w-5 h-5 bg-primary text-primary-foreground text-xs font-medium rounded-full flex-shrink-0"
               >
-                {{ conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count }}
+                {{
+                  conversation.unread_message_count > 9 ? '9+' : conversation.unread_message_count
+                }}
               </div>
             </div>
 
@@ -167,6 +162,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
@@ -206,7 +202,8 @@ const handleMarkAsUnread = () => {
 
 const CHANNEL_ICONS = {
   livechat: MessageSquare,
-  whatsapp: WhatsAppIcon
+  whatsapp: WhatsAppIcon,
+  telegram: TelegramIcon
 }
 
 const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
@@ -267,7 +264,8 @@ const draftPreview = computed(() => {
   if (!draft?.content && !draft?.meta?.attachments?.length) return ''
   const text = (draft.content || '').replace(/<[^>]*>/g, '').trim()
   if (text) return text.length > 120 ? text.slice(0, 120) + '...' : text
-  if (draft.meta?.attachments?.length) return conversationStore.getMediaPreview(draft.meta.attachments)
+  if (draft.meta?.attachments?.length)
+    return conversationStore.getMediaPreview(draft.meta.attachments)
   if (/<img\b/i.test(draft.content || '')) return t('globals.terms.image', 1)
   return ''
 })

@@ -5,7 +5,7 @@
   <div class="space-y-6">
     <div v-if="currentStep === 1" class="space-y-4 mt-10">
       <h3 class="font-semibold text-lg">{{ $t('admin.inbox.chooseChannel') }}</h3>
-      <div class="flex space-x-6">
+      <div class="grid gap-4 md:grid-cols-2">
         <MenuCard
           v-for="channel in channels"
           :key="channel.title"
@@ -14,7 +14,7 @@
           :subTitle="channel.subTitle"
           :icon="channel.icon"
           :badge="channel.badge"
-          class="w-full max-w-sm cursor-pointer"
+          class="w-full max-w-none cursor-pointer"
         >
         </MenuCard>
       </div>
@@ -39,6 +39,14 @@
           :available-languages="availableLanguages"
         />
       </div>
+      <div v-else-if="selectedChannel === 'telegram'">
+        <TelegramInboxForm
+          :initial-values="{}"
+          :submitForm="submitTelegramForm"
+          :isLoading="isLoading"
+          :isNewForm="true"
+        />
+      </div>
       <div v-else-if="selectedChannel === 'whatsapp'">
         <WhatsAppInboxForm
           :initial-values="{}"
@@ -57,6 +65,8 @@ import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import { Mail, MessageCircle } from 'lucide-vue-next'
+import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
+import TelegramInboxForm from '@main/features/admin/inbox/TelegramInboxForm.vue'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
@@ -117,6 +127,12 @@ const channels = [
     onClick: selectWhatsAppChannel,
     icon: WhatsAppIcon,
     badge: t('globals.terms.beta')
+  },
+  {
+    title: t('globals.terms.telegram'),
+    subTitle: t('admin.inbox.createTelegramInbox'),
+    onClick: () => selectChannel('telegram'),
+    icon: TelegramIcon
   }
 ]
 
@@ -182,14 +198,26 @@ const submitWhatsAppForm = (values) => {
   createInbox(payload)
 }
 
+const submitTelegramForm = (values) => createInbox({ ...values, channel: 'telegram' })
+
 async function createInbox(payload) {
   try {
     isLoading.value = true
-    await api.createInbox(payload)
+    const response = await api.createInbox(payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
-    router.push({ name: 'inbox-list' })
+    if (response.data.data.webhook_error) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: response.data.data.webhook_error
+      })
+    }
+    router.push(
+      response.data.data.webhook_error && payload.channel === 'telegram'
+        ? { name: 'edit-inbox', params: { id: response.data.data.id } }
+        : { name: 'inbox-list' }
+    )
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

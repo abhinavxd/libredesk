@@ -83,6 +83,13 @@ func setComputedInboxFields(app *App, inb *imodels.Inbox) {
 
 func setComputedInboxFieldsWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
+	if inb.Channel == "telegram" {
+		inb.WebhookURL = telegramCallbackURL(rootURL, inb.ID)
+		if value, ok := app.telegramHookErrors.Load(inb.ID); ok {
+			inb.WebhookError, _ = value.(string)
+		}
+		return
+	}
 	if inb.Channel != whatsappChannel.ChannelWhatsApp {
 		return
 	}
@@ -181,6 +188,13 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	if inbox.Channel == "telegram" {
+		telegramSetupMu.Lock()
+		defer telegramSetupMu.Unlock()
+		if err := prepareTelegramInbox(app.ctx, app, &inbox, 0); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
 	createdInbox, err := app.inbox.Create(inbox)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -191,6 +205,9 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	if createdInbox.Channel == "telegram" {
+		configureTelegramWebhook(app, createdInbox)
+	}
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
 		go postSaveWhatsAppTasks(app, createdInbox.ID)
 	}
@@ -236,7 +253,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		merged, err := app.inbox.MergeWhatsAppSecrets(previous.Config, inbox.Config)
+		merged, err := app.inbox.MergeChannelSecrets(previous.Config, inbox.Config)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -246,6 +263,13 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		}
 	}
 
+	if inbox.Channel == "telegram" {
+		telegramSetupMu.Lock()
+		defer telegramSetupMu.Unlock()
+		if err := prepareTelegramInbox(app.ctx, app, &inbox, id); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
 	updatedInbox, err := app.inbox.Update(id, inbox)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -256,6 +280,9 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	if updatedInbox.Channel == "telegram" {
+		configureTelegramWebhook(app, updatedInbox)
+	}
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
 		go postSaveWhatsAppTasks(app, id)
 	}
@@ -272,6 +299,8 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 // handleToggleInbox toggles an inbox
 func handleToggleInbox(r *fastglue.Request) error {
+	telegramSetupMu.Lock()
+	defer telegramSetupMu.Unlock()
 	var (
 		app = r.Context.(*App)
 	)
@@ -291,6 +320,10 @@ func handleToggleInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
+	if toggledInbox.Channel == "telegram" {
+		configureTelegramWebhook(app, toggledInbox)
+	}
+
 	// Clear passwords before returning
 	if err := toggledInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
@@ -303,6 +336,8 @@ func handleToggleInbox(r *fastglue.Request) error {
 
 // handleDeleteInbox deletes an inbox
 func handleDeleteInbox(r *fastglue.Request) error {
+	telegramSetupMu.Lock()
+	defer telegramSetupMu.Unlock()
 	var (
 		app   = r.Context.(*App)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
@@ -315,6 +350,10 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	if err := reloadInbox(app, id); err != nil {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+	if recErr == nil && deleted.Channel == "telegram" {
+		deleted.Enabled = false
+		configureTelegramWebhook(app, deleted)
 	}
 	if recErr == nil && deleted.Channel == whatsappChannel.ChannelWhatsApp {
 		go repointWhatsAppWebhookAfterDelete(app, deleted)

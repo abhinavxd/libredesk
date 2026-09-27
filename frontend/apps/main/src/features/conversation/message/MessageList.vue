@@ -1,11 +1,12 @@
 <template>
   <div class="flex flex-col relative h-full">
-    <div ref="threadEl" class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]" @scroll="handleScroll">
+    <div
+      ref="threadEl"
+      class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
+      @scroll="handleScroll"
+    >
       <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
-        <div
-          v-if="showLoadMore"
-          class="text-center mt-3"
-        >
+        <div v-if="showLoadMore" class="text-center mt-3">
           <Button
             size="sm"
             variant="outline"
@@ -25,18 +26,24 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
+        <TransitionGroup
+          v-else
+          enter-active-class="animate-slide-in"
+          leave-active-class="message-leaving"
+          tag="div"
+        >
           <div
             v-for="row in messageRows"
             :key="row.message.uuid"
             :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
-            <DaySeparator
-              v-if="row.showDaySeparator"
-              :date="row.message.created_at"
-              class="mb-4"
+            <span
+              v-for="uuid in row.message.albumMessageUUIDs.slice(1)"
+              :key="uuid"
+              :data-message-uuid="uuid"
             />
+            <DaySeparator v-if="row.showDaySeparator" :date="row.message.created_at" class="mb-4" />
             <div v-if="!row.message.private && row.message.type !== 'activity'">
               <MessageBubble
                 :message="row.message"
@@ -85,6 +92,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { groupTelegramAlbums } from '@main/features/conversation/telegramReply'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
@@ -124,9 +132,15 @@ const assignToSelf = () => {
   conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
 }
 
-const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
-  onArriveBottom: () => { unReadMessages.value = 0 }
-})
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(
+  threadEl,
+  contentEl,
+  {
+    onArriveBottom: () => {
+      unReadMessages.value = 0
+    }
+  }
+)
 
 const handleScrollToBottom = () => {
   hasUserScrolled.value = false
@@ -150,7 +164,8 @@ const applyOpenScroll = () => {
       scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
       stableFrames = offset === lastOffset ? stableFrames + 1 : 0
       lastOffset = offset
-      if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES) requestAnimationFrame(anchorToTarget)
+      if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES)
+        requestAnimationFrame(anchorToTarget)
     }
     anchorToTarget()
     targetEl.classList.add('highlight-mention')
@@ -159,6 +174,26 @@ const applyOpenScroll = () => {
     hasUserScrolled.value = false
     scrollToBottom()
   }
+}
+
+const jumpToMessage = async ({ conversation_uuid, uuid }) => {
+  if (!uuid || conversation_uuid !== conversationStore.current.uuid) return
+  hasUserScrolled.value = true
+  while (!conversationStore.conversationMessages.some((message) => message.uuid === uuid)) {
+    if (!conversationStore.currentConversationHasMoreMessages || conversationStore.messages.fetching) return
+    const count = conversationStore.conversationMessages.length
+    await conversationStore.fetchNextMessages()
+    if (conversationStore.current.uuid !== conversation_uuid || conversationStore.conversationMessages.length === count) return
+  }
+  await nextTick()
+  const target = threadEl.value?.querySelector(`[data-message-uuid="${CSS.escape(uuid)}"]`)
+  if (!target) return
+  const row = target.tagName === 'SPAN' ? target.parentElement : target
+  scrollToOffset(Math.max(0, row.offsetTop - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
+  row.tabIndex = -1
+  row.focus({ preventScroll: true })
+  row.classList.add('highlight-mention')
+  setTimeout(() => row.classList.remove('highlight-mention'), HIGHLIGHT_MS)
 }
 
 const newMessageHandler = (data) => {
@@ -181,10 +216,12 @@ const newMessageHandler = (data) => {
 
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
+  emitter.on(EMITTER_EVENTS.SCROLL_TO_MESSAGE, jumpToMessage)
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.NEW_MESSAGE, newMessageHandler)
+  emitter.off(EMITTER_EVENTS.SCROLL_TO_MESSAGE, jumpToMessage)
 })
 
 watch(
@@ -262,7 +299,7 @@ const loadMore = async () => {
 }
 
 const messageRows = computed(() => {
-  const messages = conversationStore.conversationMessages
+  const messages = groupTelegramAlbums(conversationStore.conversationMessages)
   return messages.map((message, index) => {
     const groupWithPrev = canGroup(messages[index - 1], message)
     const groupWithNext = canGroup(message, messages[index + 1])
@@ -297,13 +334,13 @@ const messageRows = computed(() => {
   position: absolute;
   inset: 0;
   border-radius: 0.5rem;
-  background-color: rgb(251 191 36 / 0.35);
+  background-color: hsl(var(--primary) / 0.2);
   pointer-events: none;
   animation: highlightFade 2.5s ease-out forwards;
 }
 
 :global(.dark .highlight-mention::after) {
-  background-color: rgb(250 204 21 / 0.2);
+  background-color: hsl(var(--primary) / 0.2);
 }
 
 @keyframes highlightFade {

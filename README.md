@@ -14,7 +14,7 @@
     width="250">
 </picture>
 
-<br> Modern, open source, self-hosted omnichannel customer support desk. Email, live chat, WhatsApp, and more in a single binary.
+<br> Modern, open source, self-hosted omnichannel customer support desk. Email, live chat, WhatsApp, Telegram, and more in a single binary.
 
 ![image](https://libredesk.io/hero-dark.png?q=5)
 
@@ -24,11 +24,13 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live 
 ## Features
 
 - **Omnichannel inbox**  
-  Email, live chat, and WhatsApp in one inbox. Every conversation lands in the same place, whichever channel it came from.
+  Email, live chat, WhatsApp, and Telegram in one inbox. Every conversation lands in the same place, whichever channel it came from.
 - **Live chat widget**  
   Embed a real-time chat widget on your website. Replies go out from the same inbox your team already works in.
 - **WhatsApp**  
   Connect a WhatsApp number through the Meta Cloud API. Agents reply from the same inbox, with approved templates for messages outside WhatsApp's 24-hour window.
+- **Telegram**  
+  Connect a Telegram bot to receive private messages and attachments, and send formatted or quoted replies. Configure when resolved conversations reopen.
 - **Help center**  
   Publish a searchable knowledge base with collections, articles in multiple languages, and customize it however you want.  
 - **AI assistant**  

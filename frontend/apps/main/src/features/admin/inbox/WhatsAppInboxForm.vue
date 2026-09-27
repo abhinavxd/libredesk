@@ -21,12 +21,12 @@
 
       <FormField v-slot="{ componentField }" name="reopen_window_hours">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
+          <FormLabel>{{ $t('admin.inbox.reopenWindow') }}</FormLabel>
           <FormControl>
             <Input type="number" min="0" placeholder="48" v-bind="componentField" />
           </FormControl>
           <FormDescription>
-            {{ $t('admin.inbox.whatsapp.reopenWindow.description') }}
+            {{ $t('admin.inbox.reopenWindow.description') }}
           </FormDescription>
           <FormMessage />
         </FormItem>

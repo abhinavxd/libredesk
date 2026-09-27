@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/csat/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -98,7 +99,7 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string, meta j
 		return err
 	}
 
-	if csat.ResponseTimestamp.Valid {
+	if csat.ResponseTimestamp.Valid && (!csat.FeedbackPending() || strings.TrimSpace(feedback) == "") {
 		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
 	}
 
@@ -106,10 +107,13 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string, meta j
 		meta = json.RawMessage(`{}`)
 	}
 
-	_, err = m.q.Update.Exec(uuid, score, feedback, meta)
+	result, err := m.q.Update.Exec(uuid, score, feedback, meta)
 	if err != nil {
 		m.lo.Error("error updating CSAT", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if n, err := result.RowsAffected(); err != nil || n == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
 	}
 	return nil
 }

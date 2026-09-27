@@ -189,8 +189,8 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
-		if inb.Channel() == inbox.ChannelWhatsApp {
-			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
+		if inb.Channel() == inbox.ChannelWhatsApp || inb.Channel() == inbox.ChannelTelegram {
+			m.RecordProviderSendFailure(message.UUID, err.Error())
 		}
 		handleError(err, "error sending message")
 		return
@@ -321,7 +321,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
-	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp:
+	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp, inbox.ChannelTelegram:
 		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
@@ -637,6 +637,15 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		content = rendered
 	}
 
+	if inboxRecord.Channel == inbox.ChannelTelegram {
+		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
+			content = m.template.RenderString(data, content)
+		}
+		if err := m.prepareTelegramOutbound(inboxRecord, conversationUUID, content, media, metaMap); err != nil {
+			return models.Message{}, err
+		}
+	}
+
 	// Marshal meta.
 	metaJSON, err := json.Marshal(metaMap)
 	if err != nil {
@@ -645,7 +654,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	// Best-effort render template variables before saving so agents see rendered content immediately.
-	if inboxRecord.Channel != inbox.ChannelWhatsApp {
+	if inboxRecord.Channel != inbox.ChannelWhatsApp && inboxRecord.Channel != inbox.ChannelTelegram {
 		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
 			content = m.template.RenderString(data, content)
 		}

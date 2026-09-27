@@ -143,7 +143,7 @@
 
           <FormField v-slot="{ componentField }" name="footer_content">
             <FormItem>
-              <FormLabel>{{ $t('admin.whatsappTemplates.footer') }}</FormLabel>
+              <FormLabel>{{ $t('globals.terms.footer') }}</FormLabel>
               <FormControl>
                 <Input type="text" maxlength="60" v-bind="componentField" />
               </FormControl>
@@ -163,10 +163,7 @@
           <div v-for="key in placeholders" :key="key" class="grid grid-cols-3 gap-3 items-start">
             <label class="text-sm font-mono pt-2">{{ placeholderLabel(key) }}</label>
             <div class="col-span-2">
-              <Input
-                v-model="sampleValues[key]"
-                :placeholder="$t('globals.terms.sampleValue')"
-              />
+              <Input v-model="sampleValues[key]" :placeholder="$t('globals.terms.sampleValue')" />
               <p v-if="sampleErrors[key]" class="text-sm text-destructive mt-1">
                 {{ sampleErrors[key] }}
               </p>

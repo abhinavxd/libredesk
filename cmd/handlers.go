@@ -72,6 +72,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/conversations/{uuid}/mark-unread", perm(handleMarkConversationAsUnread, "conversations:read"))
 	g.POST("/api/v1/conversations/{uuid}/tags", perm(handleUpdateConversationtags, "conversations:update_tags"))
 	g.GET("/api/v1/conversations/{uuid}/page-visits", perm(handleGetContactPageVisits, "conversations:read"))
+	g.POST("/api/v1/conversations/{cuuid}/messages/{uuid}/telegram-contact", perm(handleSaveTelegramContact, "contacts:write"))
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/messages", perm(handleGetMessages, "messages:read"))
 	g.GET("/api/v1/conversations/{uuid}/transcript", perm(handleDownloadConversationTranscript, "messages:read"))
@@ -372,6 +373,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// WhatsApp.
 	g.GET("/webhooks/whatsapp/{inbox_id}", rateLimit(handleWhatsAppWebhookVerify, "public"))
 	g.POST("/webhooks/whatsapp/{inbox_id}", handleWhatsAppWebhookEvent)
+	g.POST("/webhooks/telegram/{inbox_id}", handleTelegramWebhook)
 
 	// WhatsApp templates.
 	g.GET("/api/v1/whatsapp/templates", auth(handleListWhatsAppTemplates))

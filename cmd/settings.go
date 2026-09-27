@@ -89,6 +89,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 
 	if strings.TrimRight(oldRootURL, "/") != req.RootURL {
 		go reconcileWhatsAppRootURL(app)
+		go reconcileTelegramWebhooks(app)
 	}
 
 	return r.SendEnvelope(true)

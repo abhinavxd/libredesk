@@ -4,7 +4,7 @@
       <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
       <div class="flex items-center gap-1.5">
         <component
-          :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+          :is="channelIcons[conversation.inbox_channel] || Mail"
           class="size-3.5 text-muted-foreground flex-shrink-0"
         />
         <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
@@ -133,18 +133,20 @@
 </template>
 
 <script setup>
+import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { ref, computed } from 'vue'
 import { format } from 'date-fns'
 import { Mail, MessageSquare } from 'lucide-vue-next'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
-import { useConversationStore } from '../../../stores/conversation'
+import { useConversationStore } from '@main/stores/conversation'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
-import { useCustomAttributeStore } from '../../../stores/customAttributes'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import { useCustomAttributeStore } from '@main/stores/customAttributes'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { csatRatingEmoji, csatRatingTextKey } from '@shared-ui/utils/csat.js'
-import api from '../../../api'
+import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 
 const emitter = useEmitter()
@@ -172,5 +174,11 @@ const updateCustomAttributes = async (attributes) => {
     })
     conversationStore.current.custom_attributes = previousAttributes
   }
+}
+const channelIcons = {
+  email: Mail,
+  livechat: MessageSquare,
+  whatsapp: WhatsAppIcon,
+  telegram: TelegramIcon
 }
 </script>

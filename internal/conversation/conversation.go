@@ -313,6 +313,14 @@ func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
 }
 
 type queries struct {
+	GetTelegramAutoReplyState     *sqlx.Stmt `query:"get-telegram-auto-reply-state"`
+	RecordTelegramSend            *sqlx.Stmt `query:"record-telegram-send"`
+	SubmitTelegramRating          *sqlx.Stmt `query:"submit-telegram-rating"`
+	GetTelegramReplyUUID          *sqlx.Stmt `query:"get-telegram-reply-uuid"`
+	GetTelegramReplyTarget        *sqlx.Stmt `query:"get-telegram-reply-target"`
+	GetTelegramConversation       *sqlx.Stmt `query:"get-telegram-conversation"`
+	GetTelegramConversationTarget *sqlx.Stmt `query:"get-telegram-conversation-target"`
+	UpdateTelegramMessage         *sqlx.Stmt `query:"update-telegram-message"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversationInboxContact         *sqlx.Stmt `query:"get-conversation-inbox-contact"`
@@ -1787,6 +1795,10 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 
 	if conversation.InboxChannel == inbox.ChannelWhatsApp {
 		return m.sendWhatsAppCSAT(actorUserID, conversation, csatResp.UUID, csatPublicURL)
+	}
+
+	if conversation.InboxChannel == inbox.ChannelTelegram {
+		return m.sendTelegramCSAT(actorUserID, conversation, csatResp.UUID)
 	}
 
 	// Render CSAT email template.
