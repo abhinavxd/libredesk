@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/automation/models"
@@ -22,6 +23,8 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+const maxConversationSubjectLength = 255
+
 type assigneeChangeReq struct {
 	AssigneeID int `json:"assignee_id"`
 }
@@ -32,6 +35,10 @@ type teamAssigneeChangeReq struct {
 
 type priorityUpdateReq struct {
 	Priority string `json:"priority"`
+}
+
+type subjectUpdateReq struct {
+	Subject *string `json:"subject"`
 }
 
 type statusUpdateReq struct {
@@ -596,6 +603,54 @@ func handleUpdateConversationPriority(r *fastglue.Request) error {
 	}
 
 	return r.SendEnvelope(true)
+}
+
+// handleUpdateConversationSubject updates the subject of a conversation. An empty subject clears it.
+func handleUpdateConversationSubject(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = subjectUpdateReq{}
+	)
+
+	if err := r.Decode(&req, "json"); err != nil {
+		app.lo.Error("error decoding subject update request", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+
+	if req.Subject == nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`subject`"), nil, envelope.InputError)
+	}
+
+	subject, ok := normalizeConversationSubject(*req.Subject)
+	if !ok {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxConversationSubjectLength)), nil, envelope.InputError)
+	}
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	_, err = enforceConversationAccess(app, uuid, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	if err := app.conversation.UpdateConversationSubject(uuid, subject, user); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	return r.SendEnvelope(true)
+}
+
+// normalizeConversationSubject collapses all whitespace in a subject to single spaces and trims it, then
+// enforces maxConversationSubjectLength in characters rather than bytes. Returns false when it is too long.
+func normalizeConversationSubject(subject string) (string, bool) {
+	subject = strings.Join(strings.Fields(subject), " ")
+	if utf8.RuneCountInString(subject) > maxConversationSubjectLength {
+		return "", false
+	}
+	return subject, true
 }
 
 // handleUpdateConversationStatus updates the status of a conversation.

@@ -11,11 +11,32 @@
       </div>
     </div>
 
-    <div v-if="conversation.subject">
+    <div v-if="conversation.subject || canEditSubject" class="group/subject">
       <p class="sidebar-label">{{ $t('globals.terms.subject') }}</p>
-      <p class="sidebar-value break-all">
-        {{ conversation.subject }}
-      </p>
+      <Input
+        v-if="editingSubject"
+        ref="subjectInputRef"
+        v-model="subjectDraft"
+        maxlength="255"
+        class="h-7 text-xs px-2"
+        @keydown.enter="saveSubject"
+        @keydown.esc="editingSubject = false"
+        @blur="editingSubject = false"
+      />
+      <div v-else class="flex items-center justify-between gap-1">
+        <p class="sidebar-value break-all">
+          {{ conversation.subject || '-' }}
+        </p>
+        <button
+          v-if="canEditSubject"
+          type="button"
+          class="p-1 rounded-md hover:bg-muted cursor-pointer flex-shrink-0 transition-opacity can-hover:opacity-0 can-hover:group-hover/subject:opacity-100 focus-visible:!opacity-100"
+          :aria-label="$t('globals.messages.edit')"
+          @click="startEditingSubject"
+        >
+          <Pencil size="12" class="text-muted-foreground" />
+        </button>
+      </div>
     </div>
 
     <div>
@@ -133,11 +154,13 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { format } from 'date-fns'
-import { Mail, MessageSquare } from 'lucide-vue-next'
+import { Mail, MessageSquare, Pencil } from 'lucide-vue-next'
+import { Input } from '@shared-ui/components/ui/input'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '../../../stores/conversation'
+import { useUserStore } from '../../../stores/user'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
 import { useCustomAttributeStore } from '../../../stores/customAttributes'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
@@ -151,8 +174,28 @@ const emitter = useEmitter()
 const { t } = useI18n()
 const customAttributeStore = useCustomAttributeStore()
 const conversationStore = useConversationStore()
+const userStore = useUserStore()
 const conversation = computed(() => conversationStore.current)
 customAttributeStore.fetchCustomAttributes()
+
+const canEditSubject = computed(() => userStore.can('conversations:write'))
+const editingSubject = ref(false)
+const subjectDraft = ref('')
+const subjectInputRef = ref(null)
+
+const startEditingSubject = async () => {
+  subjectDraft.value = conversation.value.subject || ''
+  editingSubject.value = true
+  await nextTick()
+  subjectInputRef.value?.$el?.focus()
+}
+
+const saveSubject = (e) => {
+  // Enter also confirms an IME composition; only save once the text is committed.
+  if (e.isComposing) return
+  editingSubject.value = false
+  conversationStore.updateSubject(subjectDraft.value.trim())
+}
 
 const feedbackExpanded = ref(false)
 const isFeedbackLong = computed(() => (conversation.value?.csat_feedback?.length || 0) > 160)
