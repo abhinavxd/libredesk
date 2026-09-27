@@ -1,6 +1,7 @@
 export const WS_EVENT = {
     NEW_MESSAGE: 'new_message',
     NEW_CONVERSATION: 'new_conversation',
+    CONVERSATION_DELETE: 'conversation_delete',
     MESSAGE_UPDATE: 'message_update',
     CONVERSATION_UPDATE: 'conversation_update',
     CONTACT_UPDATE: 'contact_update',
