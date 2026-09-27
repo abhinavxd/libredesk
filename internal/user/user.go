@@ -88,6 +88,8 @@ type queries struct {
 	GetAgentsCompactByIDs         *sqlx.Stmt `query:"get-agents-compact-by-ids"`
 	UpdateContact                 *sqlx.Stmt `query:"update-contact"`
 	UpdateContactBasicInfo        *sqlx.Stmt `query:"update-contact-basic-info"`
+	LockContactExternalIdentity   *sqlx.Stmt `query:"lock-contact-external-identity"`
+	SyncContactExternalIdentity   *sqlx.Stmt `query:"sync-contact-external-identity"`
 	UpdateAgent                   *sqlx.Stmt `query:"update-agent"`
 	UpdateCustomAttributes        *sqlx.Stmt `query:"update-custom-attributes"`
 	UpsertCustomAttributes        *sqlx.Stmt `query:"upsert-custom-attributes"`
