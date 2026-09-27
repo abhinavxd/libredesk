@@ -113,3 +113,61 @@ func TestTelegramAutomaticReplyFailures(t *testing.T) {
 		t.Fatal("root URL lookup failure ignored")
 	}
 }
+
+func TestTelegramAutomaticReplyAfterDeliveryFailure(t *testing.T) {
+	for _, kind := range []string{"greeting", "away", "agent"} {
+		for _, status := range []string{"failed", "pending", "sent"} {
+			t.Run(kind+"/"+status, func(t *testing.T) {
+				app, db, rec := newTelegramIntegrationApp(t)
+				var message telegram.Message
+				if err := json.Unmarshal([]byte(`{"message_id":1,"from":{"id":42},"chat":{"id":42,"type":"private"},"text":"Hello"}`), &message); err != nil {
+					t.Fatal(err)
+				}
+				cfg := telegramChannel.Config{GreetingMessage: "Welcome"}
+				if kind != "greeting" {
+					var err error
+					app.businessHours, err = businesshours.New(businesshours.Opts{DB: db, Lo: app.lo, I18n: app.i18n})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err := db.Get(&cfg.BusinessHoursID, `INSERT INTO business_hours (name,is_always_open,hours,holidays) VALUES ('Closed',false,'{}','[]') RETURNING id`); err != nil {
+						t.Fatal(err)
+					}
+					cfg.AwayMessage = "We are closed"
+				}
+				if err := ingestTelegramMessage(t.Context(), app, rec, cfg, message); err != nil {
+					t.Fatal(err)
+				}
+				var replyUUID string
+				if err := db.Get(&replyUUID, `SELECT uuid FROM conversation_messages WHERE type='outgoing'`); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := db.Exec(`UPDATE conversation_messages SET status=$1 WHERE uuid=$2`, status, replyUUID); err != nil {
+					t.Fatal(err)
+				}
+				if kind == "agent" {
+					if _, err := db.Exec(`UPDATE conversation_messages SET meta='{}' WHERE uuid=$1`, replyUUID); err != nil {
+						t.Fatal(err)
+					}
+				}
+				for _, id := range []int64{2, 2, 3} {
+					message.ID = id
+					if err := ingestTelegramMessage(t.Context(), app, rec, cfg, message); err != nil {
+						t.Fatal(err)
+					}
+				}
+				var count int
+				if err := db.Get(&count, `SELECT COUNT(*) FROM conversation_messages WHERE type='outgoing'`); err != nil {
+					t.Fatal(err)
+				}
+				want := 1
+				if status == "failed" {
+					want = 2
+				}
+				if count != want {
+					t.Fatalf("outgoing replies=%d, want %d", count, want)
+				}
+			})
+		}
+	}
+}

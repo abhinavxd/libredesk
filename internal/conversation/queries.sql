@@ -1349,12 +1349,12 @@ LIMIT 1;
 -- name: get-telegram-auto-reply-state
 SELECT c.uuid AS conversation_uuid, c.contact_id,
     EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
-        AND r.type = 'outgoing' AND r.private = false) AS has_outgoing,
+        AND r.type = 'outgoing' AND r.private = false AND r.status != 'failed') AS has_outgoing,
     EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
-        AND r.type = 'outgoing' AND r.private = false AND r.created_at > NOW() - INTERVAL '5 minutes'
+        AND r.type = 'outgoing' AND r.private = false AND r.status != 'failed' AND r.created_at > NOW() - INTERVAL '5 minutes'
         AND COALESCE(r.meta->>'is_automated', 'false') != 'true') AS recent_reply,
     EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
-        AND r.meta->>'telegram_automatic_reply' = 'away'
+        AND r.meta->>'telegram_automatic_reply' = 'away' AND r.status != 'failed'
         AND (r.created_at AT TIME ZONE $2)::date = (NOW() AT TIME ZONE $2)::date) AS away_sent_today
 FROM conversation_messages m
 JOIN conversations c ON c.id = m.conversation_id
