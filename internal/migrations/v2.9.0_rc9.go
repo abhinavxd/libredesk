@@ -10,7 +10,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// V2_9_0_RC9 adds globally unique ownership and verification state for inbox email addresses.
+// V2_9_0_RC9 adds the inbox email addresses table with alias verification state.
 func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	tx, err := db.Beginx()
 	if err != nil {
@@ -20,7 +20,7 @@ func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 
 	if _, err := tx.Exec(`
 		CREATE TABLE IF NOT EXISTS inbox_email_addresses (
-			id BIGSERIAL PRIMARY KEY,
+			id SERIAL PRIMARY KEY,
 			inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 			email TEXT NOT NULL,
 			kind TEXT NOT NULL,
@@ -31,23 +31,10 @@ func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			verified_at TIMESTAMPTZ NULL,
 			CONSTRAINT constraint_inbox_email_addresses_on_kind CHECK (kind IN ('primary', 'alias'))
 		);
-		CREATE UNIQUE INDEX IF NOT EXISTS index_unique_inbox_email_addresses_on_email
-			ON inbox_email_addresses (LOWER(email));
+		CREATE UNIQUE INDEX IF NOT EXISTS index_unique_inbox_email_addresses_on_inbox_email
+			ON inbox_email_addresses (inbox_id, LOWER(email));
 		CREATE UNIQUE INDEX IF NOT EXISTS index_unique_inbox_email_addresses_on_primary
 			ON inbox_email_addresses (inbox_id) WHERE kind = 'primary';
-		CREATE INDEX IF NOT EXISTS index_inbox_email_addresses_on_inbox_id
-			ON inbox_email_addresses (inbox_id);
-		ALTER TABLE inbox_email_addresses
-			ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'not_verified',
-			ADD COLUMN IF NOT EXISTS verification_token TEXT NULL,
-			ADD COLUMN IF NOT EXISTS verification_started_at TIMESTAMPTZ NULL,
-			ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ NULL,
-			DROP COLUMN IF EXISTS receive,
-			DROP COLUMN IF EXISTS send;
-
-		UPDATE inbox_email_addresses
-		SET verification_status = 'verified'
-		WHERE kind = 'primary';
 	`); err != nil {
 		return err
 	}
@@ -70,6 +57,7 @@ func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 		return err
 	}
 
+	// Register each existing email inbox's From address as its primary address.
 	for _, inb := range inboxes {
 		addr, err := mail.ParseAddress(inb.From)
 		if err != nil || addr.Address == "" {
@@ -77,12 +65,8 @@ func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			continue
 		}
 		email := strings.ToLower(strings.TrimSpace(addr.Address))
-		res, err := tx.Exec(`INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status) VALUES ($1, $2, 'primary', 0, 'verified') ON CONFLICT DO NOTHING`, inb.ID, email)
-		if err != nil {
+		if _, err := tx.Exec(`INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status) VALUES ($1, $2, 'primary', 0, 'verified')`, inb.ID, email); err != nil {
 			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			log.Printf("WARNING: Skipping email inbox %d during address migration: address %q is already used by another inbox. Give this inbox a unique From address to register it.", inb.ID, email)
 		}
 	}
 

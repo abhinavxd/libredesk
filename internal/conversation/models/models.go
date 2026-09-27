@@ -363,6 +363,9 @@ func (m *Message) IsContinuityMessage() bool {
 // SendFrom returns the immutable sender address stored for an outgoing message.
 func (m *Message) SendFrom() string { return metaString(m.Meta, "send_from") }
 
+// InboxAddress returns the owned address that received an incoming message.
+func (m *Message) InboxAddress() string { return metaString(m.Meta, "inbox_address") }
+
 // ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
 func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
 	return m.SenderID != systemUserID && !m.IsAutomated()
@@ -538,18 +541,6 @@ type IncomingMessage struct {
 	References                  []string
 }
 
-// InboxAddress returns the owned address that received an incoming message.
-func (in *IncomingMessage) InboxAddress() string { return metaString(in.Meta, "inbox_address") }
-
-func metaString(meta json.RawMessage, key string) string {
-	var values map[string]any
-	if err := json.Unmarshal(meta, &values); err != nil {
-		return ""
-	}
-	value, _ := values[key].(string)
-	return value
-}
-
 // ToMessage converts IncomingMessage to a Message for DB insertion.
 func (in *IncomingMessage) ToMessage(senderID, conversationID int, conversationUUID string) Message {
 	return Message{
@@ -628,4 +619,13 @@ func Transcript(msgs []Message, max int) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func metaString(meta json.RawMessage, key string) string {
+	var values map[string]any
+	if err := json.Unmarshal(meta, &values); err != nil {
+		return ""
+	}
+	value, _ := values[key].(string)
+	return value
 }

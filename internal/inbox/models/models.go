@@ -18,6 +18,14 @@ const (
 	AuthTypeOAuth2   = "oauth2"
 )
 
+// Alias send verification states.
+const (
+	AliasVerificationNotVerified = "not_verified"
+	AliasVerificationPending     = "pending"
+	AliasVerificationVerified    = "verified"
+	AliasVerificationFailed      = "failed"
+)
+
 // Inbox represents a inbox record in DB.
 type Inbox struct {
 	ID                 int             `db:"id" json:"id"`
@@ -38,13 +46,6 @@ type Inbox struct {
 	LinkedEmailInboxID null.Int        `db:"linked_email_inbox_id" json:"linked_email_inbox_id"`
 }
 
-const (
-	AliasVerificationNotVerified = "not_verified"
-	AliasVerificationPending     = "pending"
-	AliasVerificationVerified    = "verified"
-	AliasVerificationFailed      = "failed"
-)
-
 // EmailAlias is an owned non-primary inbox address.
 type EmailAlias struct {
 	Email              string     `json:"email"`
@@ -52,8 +53,6 @@ type EmailAlias struct {
 	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 }
 
-// EmailAliases is the JSON representation returned by inbox queries. It also
-// accepts the old string-array form for existing clients.
 type EmailAliases []EmailAlias
 
 func (a *EmailAliases) Scan(value any) error {
@@ -76,36 +75,6 @@ func (a *EmailAliases) Scan(value any) error {
 func (a EmailAliases) Value() (driver.Value, error) {
 	data, err := json.Marshal(a)
 	return data, err
-}
-
-func (a *EmailAliases) UnmarshalJSON(data []byte) error {
-	var values []json.RawMessage
-	if err := json.Unmarshal(data, &values); err != nil {
-		return err
-	}
-	aliases := make(EmailAliases, 0, len(values))
-	for _, value := range values {
-		var email string
-		if err := json.Unmarshal(value, &email); err == nil {
-			aliases = append(aliases, EmailAlias{Email: email, VerificationStatus: AliasVerificationNotVerified})
-			continue
-		}
-		var alias struct {
-			Email              string     `json:"email"`
-			VerificationStatus string     `json:"verification_status"`
-			VerifiedAt         *time.Time `json:"verified_at"`
-		}
-		if err := json.Unmarshal(value, &alias); err != nil {
-			return err
-		}
-		status := alias.VerificationStatus
-		if status == "" {
-			status = AliasVerificationNotVerified
-		}
-		aliases = append(aliases, EmailAlias{Email: alias.Email, VerificationStatus: status, VerifiedAt: alias.VerifiedAt})
-	}
-	*a = aliases
-	return nil
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.

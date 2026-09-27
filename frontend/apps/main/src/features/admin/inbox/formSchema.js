@@ -1,6 +1,7 @@
 import * as z from 'zod'
 import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/string'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
+import { extractEmailAddress } from '@main/utils/email-sender'
 
 const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
@@ -9,8 +10,7 @@ export const createFormSchema = (t) => z.object({
   from: z.string().min(1, t('globals.messages.required')),
   aliases: z.array(z.object({
     email: z.string().refine(validateEmail, { message: t('validation.invalidEmail') }),
-    verification_status: z.string().optional(),
-    verified_at: z.string().optional()
+    verification_status: z.string().optional()
   })).optional().default([]),
   from_name_template: z
     .string()
@@ -72,12 +72,12 @@ export const createFormSchema = (t) => z.object({
     auth_protocol: z.enum(['login', 'cram', 'plain', 'none'])
   })
 }).superRefine((values, ctx) => {
-  const primary = (values.from.match(/<([^>]+)>/)?.[1] || values.from).trim().toLowerCase()
+  const primary = extractEmailAddress(values.from).toLowerCase()
   const seen = new Set([primary])
   for (const [index, value] of (values.aliases || []).entries()) {
     const alias = value.email.trim().toLowerCase()
     if (seen.has(alias)) {
-      ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: t('admin.inbox.aliases.duplicate') })
+      ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: t('globals.messages.errorAlreadyExists') })
     }
     seen.add(alias)
   }

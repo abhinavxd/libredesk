@@ -26,6 +26,9 @@ const (
 	defaultScanInboxSince = time.Duration(48 * time.Hour)
 )
 
+// Direct recipient headers come first, then the headers MTAs add when forwarding.
+var recipientHeaders = []string{"To", "Cc", "Bcc", "X-Original-To", "Original-Recipient", "Envelope-To", "X-Envelope-To", "Delivered-To"}
+
 // Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
 var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
 
@@ -190,6 +193,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 					headerAliasVerification,
 					headerMessageID,
 				},
+				Peek: true,
 			},
 		},
 	}
@@ -289,7 +293,6 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 	}
 
 	// Now process each collected message.
-	var verificationSeqNums []uint32
 	var verificationUIDs []imap.UID
 	for _, msgData := range messages {
 		// Check for context cancellation before processing each message.
@@ -299,16 +302,12 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		default:
 		}
 
-		// Verification messages must be handled before loop prevention because
-		// outgoing verification mail carries the normal LibreDesk loop header.
+		// Checked before loop prevention: verification mail carries this inbox's own loop header.
 		if msgData.verificationToken != "" {
-			if err := e.processAliasVerification(ctx, client, msgData.seqNum, msgData.verificationToken); err != nil {
+			if err := e.processAliasVerification(ctx, msgData.env, msgData.verificationToken); err != nil {
 				e.lo.Error("error processing alias verification", "error", err, "inbox_id", inboxID)
 			}
-			verificationSeqNums = append(verificationSeqNums, msgData.seqNum)
-			if msgData.uid != 0 {
-				verificationUIDs = append(verificationUIDs, msgData.uid)
-			}
+			verificationUIDs = append(verificationUIDs, msgData.uid)
 			continue
 		}
 
@@ -328,20 +327,12 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			e.lo.Error("error processing envelope", "error", err)
 		}
 	}
-	if len(verificationSeqNums) > 0 {
-		var deleteSet imap.NumSet
-		if len(verificationUIDs) == len(verificationSeqNums) {
-			uidSet := imap.UIDSet{}
-			uidSet.AddNum(verificationUIDs...)
-			deleteSet = uidSet
-		} else {
-			seqSet := imap.SeqSet{}
-			seqSet.AddNum(verificationSeqNums...)
-			deleteSet = seqSet
-		}
-		if err := client.Store(deleteSet, &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagDeleted}}, nil).Close(); err != nil {
+	if len(verificationUIDs) > 0 {
+		uidSet := imap.UIDSet{}
+		uidSet.AddNum(verificationUIDs...)
+		if err := client.Store(uidSet, &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagDeleted}}, nil).Close(); err != nil {
 			e.lo.Error("error deleting alias verification messages", "error", err, "inbox_id", inboxID)
-		} else if uidSet, ok := deleteSet.(imap.UIDSet); ok && client.Caps().Has(imap.CapUIDPlus) {
+		} else if client.Caps().Has(imap.CapUIDPlus) {
 			if err := client.UIDExpunge(uidSet).Close(); err != nil {
 				e.lo.Error("error expunging alias verification messages", "error", err, "inbox_id", inboxID)
 			}
@@ -451,7 +442,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	// Fetch full message body.
 	fetchOptions := &imap.FetchOptions{
-		BodySection: []*imap.FetchItemBodySection{{}},
+		BodySection: []*imap.FetchItemBodySection{{Peek: true}},
 	}
 	seqSet := imap.SeqSet{}
 	seqSet.AddNum(seqNum)
@@ -637,21 +628,13 @@ func (e *Email) isLoopMessage(envelope *enmime.Envelope) bool {
 	if loopHeader == "" {
 		return false
 	}
-	return strings.EqualFold(loopHeader, e.uuid) || e.OwnsAddress(loopHeader)
+	return strings.EqualFold(loopHeader, e.uuid) || e.ReceivesAddress(loopHeader)
 }
 
 func (e *Email) resolveInboxAddress(envelope *enmime.Envelope) string {
-	for _, header := range []string{"To", "Cc", "Bcc"} {
+	for _, header := range recipientHeaders {
 		for _, address := range parseHeaderAddresses(envelope.GetHeader(header)) {
 			if e.ReceivesAddress(address) {
-				normalized, _ := inbox.NormalizeEmailAddress(address)
-				return normalized
-			}
-		}
-	}
-	for _, header := range []string{"X-Original-To", "Original-Recipient", "Envelope-To", "X-Envelope-To", "Delivered-To"} {
-		for _, address := range parseHeaderAddresses(envelope.GetHeader(header)) {
-			if e.OwnsAddress(address) {
 				normalized, _ := inbox.NormalizeEmailAddress(address)
 				return normalized
 			}
@@ -660,48 +643,15 @@ func (e *Email) resolveInboxAddress(envelope *enmime.Envelope) string {
 	return e.PrimaryAddress()
 }
 
-func (e *Email) processAliasVerification(ctx context.Context, client *imapclient.Client, seqNum uint32, token string) error {
+func (e *Email) processAliasVerification(ctx context.Context, env *imap.Envelope, token string) error {
 	if e.aliasVerificationCallback == nil {
 		return nil
 	}
-	failVerification := func(err error) error {
-		if callbackErr := e.aliasVerificationCallback(ctx, token, ""); callbackErr != nil {
-			return callbackErr
-		}
-		return err
+	from := ""
+	if len(env.From) > 0 {
+		from = env.From[0].Addr()
 	}
-	seqSet := imap.SeqSet{}
-	seqSet.AddNum(seqNum)
-	cmd := client.Fetch(seqSet, &imap.FetchOptions{BodySection: []*imap.FetchItemBodySection{{}}})
-	message := cmd.Next()
-	if message == nil {
-		return failVerification(fmt.Errorf("verification message not found"))
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		item := message.Next()
-		if item == nil {
-			return failVerification(fmt.Errorf("verification message body not found"))
-		}
-		section, ok := item.(imapclient.FetchItemDataBodySection)
-		if !ok {
-			continue
-		}
-		envelope, err := mimeParser.ReadEnvelope(section.Literal)
-		if err != nil {
-			return failVerification(err)
-		}
-		from := ""
-		addresses := parseHeaderAddresses(envelope.GetHeader("From"))
-		if len(addresses) > 0 {
-			from = addresses[0]
-		}
-		return e.aliasVerificationCallback(ctx, token, from)
-	}
+	return e.aliasVerificationCallback(ctx, token, from)
 }
 
 func parseHeaderAddresses(value string) []string {

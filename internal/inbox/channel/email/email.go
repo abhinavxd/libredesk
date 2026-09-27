@@ -4,7 +4,6 @@ package email
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
@@ -20,6 +19,8 @@ import (
 const (
 	ChannelEmail = "email"
 )
+
+var _ inbox.EmailInbox = (*Email)(nil)
 
 // Email represents the email inbox with multiple SMTP servers and IMAP clients.
 type Email struct {
@@ -37,7 +38,7 @@ type Email struct {
 	headers                   map[string]string
 	lo                        *logf.Logger
 	from                      string
-	aliases                   models.EmailAliases
+	primary                   string
 	receiveAddresses          map[string]struct{}
 	sendAddresses             map[string]struct{}
 	addressesMu               sync.RWMutex
@@ -50,8 +51,6 @@ type Email struct {
 	tokenRefreshCallback      TokenRefreshCallback
 	aliasVerificationCallback func(context.Context, string, string) error
 }
-
-var _ inbox.EmailInbox = (*Email)(nil)
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
 // It receives the inbox ID and the updated config with new tokens.
@@ -113,7 +112,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		name:                      opts.Name,
 		headers:                   opts.Headers,
 		from:                      opts.Config.From,
-		aliases:                   append(models.EmailAliases(nil), opts.Aliases...),
+		primary:                   primary,
 		receiveAddresses:          receiveSet,
 		sendAddresses:             sendSet,
 		fromNameTemplate:          opts.Config.FromNameTemplate,
@@ -139,60 +138,33 @@ func (e *Email) Identifier() int {
 	return e.id
 }
 
-// UUID returns the stable UUID of the inbox.
-func (e *Email) UUID() string {
-	return e.uuid
-}
-
 // PrimaryAddress returns the normalized primary email address.
 func (e *Email) PrimaryAddress() string {
-	address, _ := inbox.NormalizeEmailAddress(e.from)
-	return address
-}
-
-// OwnsAddress reports whether the normalized address belongs to this inbox.
-func (e *Email) OwnsAddress(value string) bool {
-	return e.ReceivesAddress(value)
-}
-
-// OwnedAddresses returns the normalized addresses configured to receive mail.
-func (e *Email) OwnedAddresses() []string {
-	e.addressesMu.RLock()
-	addresses := make([]string, 0, len(e.receiveAddresses))
-	for address := range e.receiveAddresses {
-		addresses = append(addresses, address)
-	}
-	e.addressesMu.RUnlock()
-	sort.Strings(addresses)
-	return addresses
+	return e.primary
 }
 
 // ReceivesAddress reports whether the address is configured to receive mail.
 func (e *Email) ReceivesAddress(value string) bool {
-	address, err := inbox.NormalizeEmailAddress(value)
-	if err != nil {
-		return false
-	}
-	e.addressesMu.RLock()
-	_, ok := e.receiveAddresses[address]
-	e.addressesMu.RUnlock()
-	return ok
+	return e.hasAddress(e.receiveAddresses, value)
 }
 
 // SendsAddress reports whether the address is currently authorized for From.
 func (e *Email) SendsAddress(value string) bool {
+	return e.hasAddress(e.sendAddresses, value)
+}
+
+func (e *Email) hasAddress(set map[string]struct{}, value string) bool {
 	address, err := inbox.NormalizeEmailAddress(value)
 	if err != nil {
-		e.lo.Info("error sending email address", "error", err)
 		return false
 	}
 	e.addressesMu.RLock()
-	_, ok := e.sendAddresses[address]
-	e.addressesMu.RUnlock()
+	defer e.addressesMu.RUnlock()
+	_, ok := set[address]
 	return ok
 }
 
-// SetAliasSendable updates the in-memory sending capability after verification changes.
+// SetAliasSendable allows or blocks an alias as a From address.
 func (e *Email) SetAliasSendable(value string, send bool) {
 	address, err := inbox.NormalizeEmailAddress(value)
 	if err != nil {
@@ -215,12 +187,11 @@ func (e *Email) StartAliasVerification(alias, token string) error {
 	return e.Send(conversationmodels.OutboundMessage{
 		From:                   alias,
 		To:                     []string{e.PrimaryAddress()},
-		Subject:                "LibreDesk alias verification",
+		Subject:                "libredesk alias verification",
 		ContentType:            conversationmodels.ContentTypeText,
-		Content:                "This message verifies the sending capability of a LibreDesk email alias.",
+		Content:                "This message verifies the sending capability of a libredesk email alias.",
 		SourceID:               "alias-verification-" + token,
 		AliasVerificationToken: token,
-		Meta:                   []byte(`{"alias_verification":true}`),
 	})
 }
 

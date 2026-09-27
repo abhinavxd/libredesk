@@ -182,18 +182,19 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 	if inb.Channel() == inbox.ChannelEmail {
 		emailInbox, ok := inb.(inbox.EmailInbox)
+		if !ok {
+			handleError(errors.New("email inbox does not expose its sender addresses"), "invalid email inbox")
+			return
+		}
 		selected := message.SendFrom()
-		if selected == "" && ok {
+		if selected == "" {
 			selected = emailInbox.PrimaryAddress()
 		}
-		if !ok || !emailInbox.SendsAddress(selected) {
+		if !emailInbox.SendsAddress(selected) {
 			handleError(errors.New("message sender address is no longer owned by the inbox"), "invalid email sender")
 			return
 		}
-		outbound.From = m.emailFromAddress(inb, message)
-		if selected != emailInbox.PrimaryAddress() {
-			outbound.ReplyTo = selected
-		}
+		outbound.From = m.emailFromAddress(inb, message, selected)
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -1564,12 +1565,11 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 
 // emailFromAddress returns the From header, applying the inbox from-name template for agent senders
 // Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
-func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
+// emailFromAddress keeps the inbox From (with its display name) for the primary address and uses the bare alias otherwise.
+func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message, sender string) string {
 	from := inb.FromAddress()
-	if emailInbox, ok := inb.(inbox.EmailInbox); ok {
-		if selected := message.SendFrom(); selected != "" && emailInbox.SendsAddress(selected) {
-			from = selected
-		}
+	if emailInbox, ok := inb.(inbox.EmailInbox); ok && sender != emailInbox.PrimaryAddress() {
+		from = sender
 	}
 
 	tpl := inb.FromNameTemplate()
@@ -1624,58 +1624,31 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 }
 
 func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.Inbox, requested string) (string, error) {
-	owned, err := inbox.SendableEmailAddresses(inboxRecord.From, inboxRecord.Aliases)
+	sendable, err := inbox.SendableEmailAddresses(inboxRecord.From, inboxRecord.Aliases)
 	if err != nil {
+		m.lo.Error("error resolving inbox sender addresses", "inbox_id", inboxRecord.ID, "error", err)
 		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	ownedSet := make(map[string]struct{}, len(owned))
-	for _, address := range owned {
-		ownedSet[address] = struct{}{}
+
+	if requested != "" {
+		normalized, err := inbox.NormalizeEmailAddress(requested)
+		if err != nil || !slices.Contains(sendable, normalized) {
+			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.senderAddressNotAllowed"), nil)
+		}
+		return normalized, nil
 	}
 
-	selected := requested
-	if selected == "" {
-		var latest struct {
-			Type string          `db:"type"`
-			Meta json.RawMessage `db:"meta"`
-		}
-		err := m.db.Get(&latest, `
-			SELECT m.type, m.meta
-			FROM conversation_messages m
-			JOIN conversations c ON c.id = m.conversation_id
-			WHERE c.uuid = $1 AND m.private = false AND m.type IN ('incoming', 'outgoing')
-			ORDER BY m.id DESC LIMIT 1`, conversationUUID)
-		if err == nil {
-			key := "send_from"
-			if latest.Type == models.MessageIncoming {
-				key = "inbox_address"
-			}
-			selected = metaStringValue(latest.Meta, key)
-		} else if err != sql.ErrNoRows {
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-		}
+	var latest models.Message
+	if err := m.q.GetLatestPublicEmailMessage.Get(&latest, conversationUUID); err != nil && err != sql.ErrNoRows {
+		m.lo.Error("error fetching latest message for sender address", "conversation_uuid", conversationUUID, "error", err)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	if selected == "" {
-		selected = owned[0]
+	previous := latest.SendFrom()
+	if latest.Type == models.MessageIncoming {
+		previous = latest.InboxAddress()
 	}
-	normalized, err := inbox.NormalizeEmailAddress(selected)
-	if err != nil {
-		return "", envelope.NewError(envelope.InputError, "Invalid sender address.", nil)
+	if normalized, err := inbox.NormalizeEmailAddress(previous); err == nil && slices.Contains(sendable, normalized) {
+		return normalized, nil
 	}
-	if _, ok := ownedSet[normalized]; !ok && requested == "" {
-		return owned[0], nil
-	}
-	if _, ok := ownedSet[normalized]; !ok {
-		return "", envelope.NewError(envelope.InputError, "Sender address does not belong to this inbox.", nil)
-	}
-	return normalized, nil
-}
-
-func metaStringValue(meta json.RawMessage, key string) string {
-	var values map[string]any
-	if err := json.Unmarshal(meta, &values); err != nil {
-		return ""
-	}
-	value, _ := values[key].(string)
-	return value
+	return sendable[0], nil
 }

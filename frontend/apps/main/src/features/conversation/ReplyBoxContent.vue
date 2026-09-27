@@ -52,7 +52,7 @@
         v-if="messageType === 'reply'"
       >
         <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">{{ $t('replyBox.from') }}:</label>
+          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">{{ $t('globals.terms.from') }}:</label>
           <Select v-model="sendFrom">
             <SelectTrigger class="flex-grow"><SelectValue /></SelectTrigger>
             <SelectContent>

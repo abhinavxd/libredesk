@@ -365,6 +365,7 @@ type queries struct {
 	GetContactUnreadPreviewMessages    *sqlx.Stmt `query:"get-contact-unread-preview-messages"`
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
+	GetLatestPublicEmailMessage        *sqlx.Stmt `query:"get-latest-public-email-message"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
@@ -1607,7 +1608,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			[]string{conv.Contact.Email.String},
 			nil,
 			nil,
-			"",
+			"", /** sendFrom **/
 			map[string]any{"is_automated": true},
 		)
 		if err != nil {

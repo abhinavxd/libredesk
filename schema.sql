@@ -128,7 +128,7 @@ CREATE TABLE inboxes (
 
 DROP TABLE IF EXISTS inbox_email_addresses CASCADE;
 CREATE TABLE inbox_email_addresses (
-	id BIGSERIAL PRIMARY KEY,
+	id SERIAL PRIMARY KEY,
 	inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
 	email TEXT NOT NULL,
 	kind TEXT NOT NULL,
@@ -139,9 +139,8 @@ CREATE TABLE inbox_email_addresses (
 	verified_at TIMESTAMPTZ NULL,
 	CONSTRAINT constraint_inbox_email_addresses_on_kind CHECK (kind IN ('primary', 'alias'))
 );
-CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_email ON inbox_email_addresses (LOWER(email));
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_inbox_email ON inbox_email_addresses (inbox_id, LOWER(email));
 CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_primary ON inbox_email_addresses (inbox_id) WHERE kind = 'primary';
-CREATE INDEX index_inbox_email_addresses_on_inbox_id ON inbox_email_addresses (inbox_id);
 
 DROP TABLE IF EXISTS teams CASCADE;
 CREATE TABLE teams (

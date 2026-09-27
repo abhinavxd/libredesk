@@ -1,3 +1,14 @@
+export function extractEmailAddress (value) {
+  return (value?.match(/<([^>]+)>/)?.[1] || value || '').trim()
+}
+
+export function sendableAddresses (from, aliases) {
+  return [
+    extractEmailAddress(from),
+    ...(aliases || []).filter(alias => alias.verification_status === 'verified').map(alias => alias.email)
+  ].filter(Boolean)
+}
+
 export function resolveEmailSender (message, ownedAddresses) {
   const owned = (ownedAddresses || [])
   const ownedSet = new Set(owned.map(address => address.toLowerCase()))

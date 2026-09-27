@@ -32,7 +32,7 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
-import api from '../../../api'
+import api from '@/api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
@@ -52,7 +52,7 @@ const inbox = ref({})
 const aliasVerificationState = ref({})
 let verificationPollTimer = null
 let verificationPollAttempts = 0
-const maxVerificationPollAttempts = 12
+const maxVerificationPollAttempts = 72
 const availableLanguages = ref([])
 const breadcrumbLinks = [
   { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
@@ -132,8 +132,11 @@ const updateInbox = async (payload) => {
 const verifyAlias = async (email) => {
   try {
     await api.verifyInboxAlias(inbox.value.id, { email })
-    aliasVerificationState.value[email] = { verification_status: 'pending' }
-    startVerificationPolling()
+    const key = email.trim().toLowerCase()
+    if (aliasVerificationState.value[key]?.verification_status !== 'verified') {
+      aliasVerificationState.value[key] = { verification_status: 'pending' }
+      startVerificationPolling()
+    }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('admin.inbox.aliases.sendingVerificationStarted') })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -150,15 +153,17 @@ const stopVerificationPolling = () => {
   }
 }
 
-const pollAliasVerification = async () => {
-  const isPending = (alias) =>
-    (aliasVerificationState.value[alias.email]?.verification_status || alias.verification_status) === 'pending'
+const hasPendingAlias = () =>
+  Object.values(aliasVerificationState.value).some((state) => state.verification_status === 'pending')
 
-  if (!inbox.value?.aliases?.some(isPending)) {
-    stopVerificationPolling()
-    return
-  }
-  if (verificationPollAttempts >= maxVerificationPollAttempts) {
+const setAliasVerificationState = (aliases) => {
+  aliasVerificationState.value = Object.fromEntries(
+    aliases.map((alias) => [alias.email, { verification_status: alias.verification_status }])
+  )
+}
+
+const pollAliasVerification = async () => {
+  if (!hasPendingAlias() || verificationPollAttempts >= maxVerificationPollAttempts) {
     stopVerificationPolling()
     return
   }
@@ -166,21 +171,12 @@ const pollAliasVerification = async () => {
   try {
     verificationPollAttempts += 1
     const response = await api.getInbox(props.id)
-    const aliases = response.data.data.aliases || []
-    for (const alias of inbox.value.aliases || []) {
-      const latest = aliases.find((item) => item.email === alias.email)
-      if (latest) {
-        aliasVerificationState.value[alias.email] = {
-          verification_status: latest.verification_status,
-          verified_at: latest.verified_at
-        }
-      }
-    }
-    if (!inbox.value.aliases.some(isPending)) {
+    setAliasVerificationState(response.data.data.aliases || [])
+    if (!hasPendingAlias()) {
       stopVerificationPolling()
     }
   } catch {
-    // Polling is best-effort; the next interval will retry.
+    // Ignored, the next poll retries.
   }
 }
 
@@ -213,8 +209,8 @@ onMounted(async () => {
     inboxData.reply_to = inboxData?.config?.reply_to || ''
     inboxData.aliases = inboxData?.aliases || []
     inbox.value = inboxData
-    aliasVerificationState.value = {}
-    if (inboxData.aliases.some((alias) => alias.verification_status === 'pending')) {
+    setAliasVerificationState(inboxData.aliases)
+    if (hasPendingAlias()) {
       startVerificationPolling()
     }
   } catch (error) {

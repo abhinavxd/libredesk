@@ -144,7 +144,7 @@
 
               <FormField v-if="fromOptions.length > 1" v-slot="{ componentField }" name="send_from">
                 <FormItem>
-                  <FormLabel>{{ $t('replyBox.from') }}</FormLabel>
+                  <FormLabel>{{ $t('globals.terms.from') }}</FormLabel>
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
@@ -298,6 +298,7 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { sendableAddresses } from '@main/utils/email-sender'
 import { useInboxStore } from '@main/stores/inbox'
 import {
   Select,
@@ -425,15 +426,7 @@ const form = useForm({
 
 const fromOptions = computed(() => {
   const inbox = inboxStore.inboxes.find((item) => String(item.id) === String(form.values.inbox_id))
-  if (!inbox) return []
-
-  const primary = inbox.from?.match(/<([^>]+)>/)?.[1] || inbox.from || ''
-  return [
-    primary.trim(),
-    ...(inbox.aliases || [])
-      .filter((alias) => alias.verification_status === 'verified')
-      .map((alias) => alias.email)
-  ].filter(Boolean)
+  return inbox ? sendableAddresses(inbox.from, inbox.aliases) : []
 })
 
 watch(fromOptions, (options) => {

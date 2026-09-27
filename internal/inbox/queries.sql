@@ -50,5 +50,32 @@ DELETE FROM inbox_email_addresses WHERE inbox_id = $1;
 -- name: insert-inbox-email-address
 INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status, verification_token, verification_started_at, verified_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 
--- name: get-email-address-owner
-SELECT inbox_id FROM inbox_email_addresses WHERE LOWER(email) = LOWER($1);
+-- name: get-alias-verification-states
+SELECT email, verification_status, verification_token, verification_started_at, verified_at
+FROM inbox_email_addresses
+WHERE inbox_id = $1 AND kind = 'alias'
+FOR UPDATE;
+
+-- name: start-alias-verification
+UPDATE inbox_email_addresses
+SET verification_status = CASE WHEN verification_status = $5 THEN verification_status ELSE $3 END,
+    verification_token = $4,
+    verification_started_at = NOW(),
+    verified_at = CASE WHEN verification_status = $5 THEN verified_at ELSE NULL END
+WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias';
+
+-- name: fail-alias-verification
+UPDATE inbox_email_addresses
+SET verification_status = $3, verification_token = NULL
+WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias';
+
+-- name: complete-alias-verification
+UPDATE inbox_email_addresses
+SET verification_status = $4, verification_token = NULL, verified_at = NOW()
+WHERE inbox_id = $1 AND verification_token = $2 AND LOWER(email) = $3
+  AND kind = 'alias';
+
+-- name: fail-alias-verification-by-token
+UPDATE inbox_email_addresses
+SET verification_status = $3, verification_token = NULL
+WHERE inbox_id = $1 AND verification_token = $2 AND kind = 'alias' AND verification_status = $4;

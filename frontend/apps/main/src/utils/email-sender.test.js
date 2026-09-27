@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { resolveEmailSender } from './email-sender'
+import { resolveEmailSender, sendableAddresses } from './email-sender'
 
 const owned = ['support@example.com', 'billing@example.com']
 
@@ -17,5 +17,16 @@ describe('resolveEmailSender', () => {
   test('rejects stale or arbitrary metadata and falls back to primary', () => {
     expect(resolveEmailSender({ type: 'outgoing', meta: { send_from: 'attacker@example.net' } }, owned))
       .toBe('support@example.com')
+  })
+})
+
+describe('sendableAddresses', () => {
+  test('lists the primary address and verified aliases only', () => {
+    const aliases = [
+      { email: 'billing@example.com', verification_status: 'verified' },
+      { email: 'sales@example.com', verification_status: 'pending' }
+    ]
+    expect(sendableAddresses('Support <support@example.com>', aliases))
+      .toEqual(['support@example.com', 'billing@example.com'])
   })
 })

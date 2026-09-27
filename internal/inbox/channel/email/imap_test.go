@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
 )
@@ -79,8 +78,9 @@ func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 
 func TestResolveInboxAddress(t *testing.T) {
 	e := &Email{
-		from: "Support <support@example.com>",
-		uuid: "inbox-uuid",
+		from:    "Support <support@example.com>",
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
 		receiveAddresses: map[string]struct{}{
 			"support@example.com": {},
 			"billing@example.com": {},
@@ -131,10 +131,6 @@ func TestLoopMessageIdentity(t *testing.T) {
 func TestEmailAliasCapabilities(t *testing.T) {
 	e := &Email{
 		from: "support@company.com",
-		aliases: models.EmailAliases{
-			{Email: "billing@company.com"},
-			{Email: "support@otherbrand.com", VerificationStatus: models.AliasVerificationVerified},
-		},
 		receiveAddresses: map[string]struct{}{
 			"support@company.com": {}, "billing@company.com": {}, "support@otherbrand.com": {},
 		},
@@ -142,10 +138,10 @@ func TestEmailAliasCapabilities(t *testing.T) {
 			"support@company.com": {}, "support@otherbrand.com": {},
 		},
 	}
-	if !e.OwnsAddress("BILLING@COMPANY.COM") || e.SendsAddress("billing@company.com") {
+	if !e.ReceivesAddress("BILLING@COMPANY.COM") || e.SendsAddress("billing@company.com") {
 		t.Fatal("unverified alias capability was not enforced")
 	}
-	if !e.SendsAddress("SUPPORT@OTHERBRAND.COM") || !e.OwnsAddress("support@otherbrand.com") {
+	if !e.SendsAddress("SUPPORT@OTHERBRAND.COM") || !e.ReceivesAddress("support@otherbrand.com") {
 		t.Fatal("verified alias capability was not enforced")
 	}
 }

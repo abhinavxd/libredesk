@@ -3,7 +3,6 @@ package inbox
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"testing"
 
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -12,8 +11,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
-func TestInboxEmailAddressOwnership(t *testing.T) {
-	db := testutil.NewDB(t, "inbox_email_ownership")
+func TestInboxEmailAddresses(t *testing.T) {
+	db := testutil.NewDB(t, "inbox_email_addresses")
 	ctx := context.Background()
 	lo := logf.New(logf.Opts{})
 	mgr, err := New(&lo, db, testutil.NewI18n(t), "01234567890123456789012345678901")
@@ -34,11 +33,11 @@ func TestInboxEmailAddressOwnership(t *testing.T) {
 
 	first, err := mgr.Create(makeInbox("Support", "support@example.com", "billing@example.com"))
 	require.NoError(t, err)
-	_, err = mgr.Create(makeInbox("Duplicate primary", "SUPPORT@example.com"))
+	_, err = mgr.Create(makeInbox("Shared primary", "SUPPORT@example.com", "billing@example.com"))
+	require.NoError(t, err)
+	_, err = mgr.Create(makeInbox("Alias repeats own primary", "sales@example.com", "SALES@example.com"))
 	require.Error(t, err)
-	_, err = mgr.Create(makeInbox("Alias hits primary", "sales@example.com", "support@example.com"))
-	require.Error(t, err)
-	_, err = mgr.Create(makeInbox("Alias hits alias", "help@example.com", "BILLING@example.com"))
+	_, err = mgr.Create(makeInbox("Alias listed twice", "help@example.com", "desk@example.com", "DESK@example.com"))
 	require.Error(t, err)
 
 	updated, err := mgr.Update(first.ID, makeInbox("Support", "support@example.com", "accounts@example.com"))
@@ -60,8 +59,6 @@ func TestInboxEmailAddressOwnership(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT verification_token, verification_started_at::text FROM inbox_email_addresses WHERE inbox_id = $1 AND email = 'accounts@example.com'`, first.ID).Scan(&verificationToken, &verificationStartedAt))
 	require.Equal(t, "pending-token", verificationToken)
 	require.Contains(t, verificationStartedAt, "2025-01-01 12:00:00")
-	_, err = mgr.Create(makeInbox("Released alias", "billing@example.com"))
-	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, `UPDATE inbox_email_addresses SET verification_status = 'pending', verification_token = 'old-token' WHERE inbox_id = $1 AND email = 'accounts@example.com'`, first.ID)
 	require.NoError(t, err)
 	require.NoError(t, mgr.CompleteAliasVerification(context.Background(), first.ID, "old-token", "accounts@example.com"))
@@ -73,35 +70,4 @@ func TestInboxEmailAddressOwnership(t *testing.T) {
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT verification_status FROM inbox_email_addresses WHERE inbox_id = $1 AND email = 'accounts@example.com'`, first.ID).Scan(&status))
 	require.Equal(t, "pending", status)
 
-	require.NoError(t, mgr.SoftDelete(ctx, first.ID))
-	_, err = mgr.Create(makeInbox("Released primary", "support@example.com", "accounts@example.com"))
-	require.NoError(t, err)
-}
-
-func TestConcurrentInboxAddressClaim(t *testing.T) {
-	db := testutil.NewDB(t, "concurrent_inbox_email_claim")
-	lo := logf.New(logf.Opts{})
-	mgr, err := New(&lo, db, testutil.NewI18n(t), "01234567890123456789012345678901")
-	require.NoError(t, err)
-
-	var wg sync.WaitGroup
-	results := make(chan error, 2)
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err := mgr.Create(imodels.Inbox{Name: "Concurrent", Channel: ChannelEmail, From: "shared@example.com", Enabled: true, Config: json.RawMessage(`{}`)})
-			results <- err
-		}()
-	}
-	wg.Wait()
-	close(results)
-
-	var successes int
-	for err := range results {
-		if err == nil {
-			successes++
-		}
-	}
-	require.Equal(t, 1, successes)
 }

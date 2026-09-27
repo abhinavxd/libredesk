@@ -5,7 +5,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { TYPING_RECEIVE_TIMEOUT } from '@shared-ui/composables/useTypingIndicator.js'
 import { deepMerge } from '@shared-ui/utils/object.js'
 import { computeRecipientsFromMessage } from '@main/utils/email-recipients'
-import { resolveEmailSender } from '@main/utils/email-sender'
+import { extractEmailAddress, resolveEmailSender, sendableAddresses } from '@main/utils/email-sender'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } from '@main/websocket'
@@ -442,7 +442,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const _ = messages.version // eslint-disable-line no-unused-vars
     const conv = conversation.data
     const msgData = messages.data
-    const inboxEmail = conv?.inbox_mail
+    const inboxEmail = extractEmailAddress(conv?.inbox_mail)
 
     if (conv?.inbox_channel === 'livechat') {
       currentTo.value = []
@@ -461,11 +461,8 @@ export const useConversationStore = defineStore('conversation', () => {
 
     const aliases = Array.isArray(conv.inbox_aliases) ? conv.inbox_aliases : []
     const receivingAddresses = [inboxEmail, ...aliases.map(alias => alias.email)].filter(Boolean)
-    const sendableAddresses = [
-      inboxEmail,
-      ...aliases.filter(alias => alias.verification_status === 'verified').map(alias => alias.email)
-    ].filter(Boolean)
-    currentFromOptions.value = sendableAddresses
+    const senders = sendableAddresses(conv.inbox_mail, aliases)
+    currentFromOptions.value = senders
 
     // Skip automated messages (auto-replies, CSAT) so the prefill reflects the last human-driven recipients.
     const latestMessage = msgData.getLatestMessage(conv.uuid, ['incoming', 'outgoing'], true, true)
@@ -473,11 +470,11 @@ export const useConversationStore = defineStore('conversation', () => {
       currentTo.value = []
       currentCC.value = []
       currentBCC.value = []
-      currentFrom.value = sendableAddresses[0] || ''
+      currentFrom.value = senders[0] || ''
       return
     }
 
-    currentFrom.value = resolveEmailSender(latestMessage, sendableAddresses)
+    currentFrom.value = resolveEmailSender(latestMessage, senders)
     const { to, cc, bcc } = computeRecipientsFromMessage(
       latestMessage,
       conv.contact?.email || '',
