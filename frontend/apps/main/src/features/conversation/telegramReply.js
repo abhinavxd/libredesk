@@ -1,5 +1,10 @@
+export const TELEGRAM_CHANNEL = 'telegram'
+export const TELEGRAM_MAX_BUTTONS = 10
+export const TELEGRAM_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+const TELEGRAM_MAX_BUTTON_TEXT = 64
+
 export function telegramButtonError(buttons) {
-  if (buttons.length > 10) return true
+  if (buttons.length > TELEGRAM_MAX_BUTTONS) return true
   return buttons.some((button) => {
     const errors = telegramButtonFieldErrors(button)
     return Boolean(errors.text || errors.url)
@@ -10,8 +15,8 @@ export function telegramButtonFieldErrors(button) {
   const errors = { text: '', url: false }
   if (!button.text.trim()) errors.text = 'required'
   else if (
-    [...button.text].length > 64 ||
-    (!button.url && new TextEncoder().encode(button.text).length > 64)
+    [...button.text].length > TELEGRAM_MAX_BUTTON_TEXT ||
+    (!button.url && new TextEncoder().encode(button.text).length > TELEGRAM_MAX_BUTTON_TEXT)
   ) {
     errors.text = 'tooLong'
   }

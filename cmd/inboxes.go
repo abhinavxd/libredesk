@@ -17,6 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
@@ -103,7 +104,7 @@ func setComputedInboxFields(app *App, inb *imodels.Inbox) {
 
 func setComputedInboxFieldsWithRoot(app *App, inb *imodels.Inbox, rootURL string) {
 	_, inb.TokenInvalid = app.inboxAuthErrors.Load(inb.ID)
-	if inb.Channel == "telegram" {
+	if inb.Channel == telegramChannel.ChannelTelegram {
 		inb.WebhookURL = telegramCallbackURL(rootURL, inb.ID)
 		if value, ok := app.telegramHookErrors.Load(inb.ID); ok {
 			inb.WebhookError, _ = value.(string)
@@ -208,7 +209,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if inbox.Channel == "telegram" {
+	if inbox.Channel == telegramChannel.ChannelTelegram {
 		telegramSetupMu.Lock()
 		defer telegramSetupMu.Unlock()
 		if err := prepareTelegramInbox(app.ctx, app, &inbox, 0); err != nil {
@@ -225,7 +226,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	if createdInbox.Channel == "telegram" {
+	if createdInbox.Channel == telegramChannel.ChannelTelegram {
 		configureTelegramWebhook(app, createdInbox)
 	}
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
@@ -283,7 +284,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		}
 	}
 
-	if inbox.Channel == "telegram" {
+	if inbox.Channel == telegramChannel.ChannelTelegram {
 		telegramSetupMu.Lock()
 		defer telegramSetupMu.Unlock()
 		if err := prepareTelegramInbox(app.ctx, app, &inbox, id); err != nil {
@@ -300,7 +301,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	if updatedInbox.Channel == "telegram" {
+	if updatedInbox.Channel == telegramChannel.ChannelTelegram {
 		configureTelegramWebhook(app, updatedInbox)
 	}
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
@@ -340,7 +341,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
-	if toggledInbox.Channel == "telegram" {
+	if toggledInbox.Channel == telegramChannel.ChannelTelegram {
 		configureTelegramWebhook(app, toggledInbox)
 	}
 
@@ -371,7 +372,7 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
-	if recErr == nil && deleted.Channel == "telegram" {
+	if recErr == nil && deleted.Channel == telegramChannel.ChannelTelegram {
 		deleted.Enabled = false
 		configureTelegramWebhook(app, deleted)
 	}

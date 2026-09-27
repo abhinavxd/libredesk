@@ -8,6 +8,7 @@ import (
 	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	"github.com/abhinavxd/libredesk/internal/telegram"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
@@ -278,10 +279,10 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Queue outgoing reply.
 	meta := map[string]any{}
-	if conv.InboxChannel == "telegram" && len(req.TelegramButtons) > 0 {
+	if conv.InboxChannel == telegramChannel.ChannelTelegram && len(req.TelegramButtons) > 0 {
 		meta["telegram_buttons"] = req.TelegramButtons
 	}
-	if req.ReplyToMessageUUID != "" && conv.InboxChannel == "telegram" {
+	if req.ReplyToMessageUUID != "" && conv.InboxChannel == telegramChannel.ChannelTelegram {
 		meta["reply_to_message_uuid"] = req.ReplyToMessageUUID
 	}
 	if req.EchoID != "" {

@@ -199,7 +199,7 @@
       :isWhatsApp="isWhatsAppReply"
       :showWhatsAppTemplate="isWhatsAppReply"
       :showAddButton="isTelegramReply"
-      :disableAddButton="telegramButtons.length >= 10"
+      :disableAddButton="telegramButtons.length >= TELEGRAM_MAX_BUTTONS"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
@@ -237,6 +237,7 @@ import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
 import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
+import { TELEGRAM_CHANNEL, TELEGRAM_MAX_BUTTONS } from '@main/features/conversation/telegramReply'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
@@ -387,7 +388,7 @@ const isWhatsAppReply = computed(
     messageType.value !== 'private_note'
 )
 const isTelegramReply = computed(
-  () => conversationStore.current?.inbox_channel === 'telegram' && messageType.value === 'reply'
+  () => conversationStore.current?.inbox_channel === TELEGRAM_CHANNEL && messageType.value === 'reply'
 )
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
@@ -401,7 +402,7 @@ const bccInputRef = ref(null)
 const telegramButtonsEditorRef = ref(null)
 
 const addTelegramButton = async () => {
-  if (telegramButtons.value.length >= 10) return
+  if (telegramButtons.value.length >= TELEGRAM_MAX_BUTTONS) return
   telegramButtons.value = [...telegramButtons.value, { text: '', url: '' }]
   await nextTick()
   telegramButtonsEditorRef.value?.focus()

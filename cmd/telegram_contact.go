@@ -5,6 +5,7 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	"github.com/zerodha/fastglue"
 )
 
@@ -25,7 +26,7 @@ func handleSaveTelegramContact(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	if message.ConversationUUID != cuuid || message.Private || conversation.InboxChannel != "telegram" {
+	if message.ConversationUUID != cuuid || message.Private || conversation.InboxChannel != telegramChannel.ChannelTelegram {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, "Permission denied", nil))
 	}
 	var meta struct {

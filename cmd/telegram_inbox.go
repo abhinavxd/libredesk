@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/abhinavxd/libredesk/internal/telegram"
+	"math"
 	"regexp"
 	"strings"
 	"sync"
@@ -16,6 +16,7 @@ import (
 	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/abhinavxd/libredesk/internal/telegram"
 )
 
 var (
@@ -67,7 +68,7 @@ func prepareTelegramInbox(ctx context.Context, app *App, inb *imodels.Inbox, id 
 	if !telegramTokenPattern.MatchString(cfg.BotToken) {
 		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.invalidToken"), nil)
 	}
-	if inb.ReopenWindowHours < 0 || inb.ReopenWindowHours > 2147483647 {
+	if inb.ReopenWindowHours < 0 || inb.ReopenWindowHours > math.MaxInt32 {
 		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.reopenWindow"), nil)
 	}
 	cfg.SecretToken = previous.SecretToken

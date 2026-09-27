@@ -3,7 +3,7 @@
     <template v-for="attachment in attachments" :key="attachment.uuid">
       <TelegramSticker v-if="/\.tgs$/i.test(attachment.name || '')" :attachment="attachment" />
       <div
-        v-else-if="channel === 'telegram' && attachment.content_type?.startsWith('audio/')"
+        v-else-if="channel === TELEGRAM_CHANNEL && attachment.content_type?.startsWith('audio/')"
         class="w-64 min-w-0 max-w-full space-y-2"
       >
         <audio
@@ -40,6 +40,7 @@
 import { ref, computed } from 'vue'
 import BubbleAttachmentItem from '@/features/conversation/message/attachment/BubbleAttachmentItem.vue'
 import TelegramSticker from './TelegramSticker.vue'
+import { TELEGRAM_CHANNEL } from '@main/features/conversation/telegramReply'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import DownloadLink from '@main/components/DownloadLink.vue'
 

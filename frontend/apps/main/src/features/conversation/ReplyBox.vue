@@ -228,7 +228,12 @@ import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { useStorage } from '@vueuse/core'
-import { buildTelegramReplyParts, telegramButtonError } from './telegramReply'
+import {
+  TELEGRAM_CHANNEL,
+  TELEGRAM_MAX_UPLOAD_BYTES,
+  buildTelegramReplyParts,
+  telegramButtonError
+} from './telegramReply'
 import { UserTypeAgent } from '@/constants/user'
 import { permissions as perms } from '@main/constants/permissions.js'
 
@@ -288,9 +293,9 @@ function buildWhatsAppReplyParts(content, files) {
 
 function validateChannelFiles(files) {
   if (messageType.value === 'private_note') return files
-  if (conversationStore.current?.inbox_channel === 'telegram') {
+  if (conversationStore.current?.inbox_channel === TELEGRAM_CHANNEL) {
     return files.filter((file) => {
-      if (file.size <= 50 * 1024 * 1024) return true
+      if (file.size <= TELEGRAM_MAX_UPLOAD_BYTES) return true
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
         description: t('conversation.telegram.error.fileTooLarge')
@@ -497,7 +502,7 @@ const setReplyTarget = (message) => {
   if (
     !canSendReply.value ||
     message.conversationUUID !== currentConversationUUID.value ||
-    conversationStore.current?.inbox_channel !== 'telegram'
+    conversationStore.current?.inbox_channel !== TELEGRAM_CHANNEL
   )
     return
   replyTarget.value = message
@@ -561,7 +566,7 @@ const processSend = async (
   const isPrivate = messageType.value === 'private_note'
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
-  if (!isPrivate && conversationStore.current.inbox_channel === 'telegram') {
+  if (!isPrivate && conversationStore.current.inbox_channel === TELEGRAM_CHANNEL) {
     telegramButtonsValidated.value = true
     if (telegramButtonError(telegramButtons.value)) {
       await nextTick()
@@ -662,7 +667,7 @@ const processSend = async (
 
     const isWhatsAppReply =
       !isPrivate && conversationStore.current.inbox_channel === WHATSAPP_CHANNEL
-    const isTelegramReply = !isPrivate && conversationStore.current.inbox_channel === 'telegram'
+    const isTelegramReply = !isPrivate && conversationStore.current.inbox_channel === TELEGRAM_CHANNEL
     const sentReplyTarget = isTelegramReply ? replyTarget.value : null
     if (sentReplyTarget)
       meta.reply_to = { uuid: sentReplyTarget.uuid, content: sentReplyTarget.content }

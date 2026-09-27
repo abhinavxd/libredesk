@@ -396,6 +396,7 @@ import { Letter } from 'vue-letter'
 import { allowedCssProperties } from 'lettersanitizer'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import BubbleAttachmentPreview from '@main/features/conversation/message/attachment/BubbleAttachmentPreview.vue'
+import { TELEGRAM_CHANNEL } from '@main/features/conversation/telegramReply'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
@@ -457,7 +458,7 @@ const userStore = useUserStore()
 const emitter = useEmitter()
 const canQuoteReply = computed(
   () =>
-    convStore.current?.inbox_channel === 'telegram' &&
+    convStore.current?.inbox_channel === TELEGRAM_CHANNEL &&
     !props.message.meta?.telegram_callback &&
     !props.message.private &&
     !props.message.meta?.deleted_at &&
