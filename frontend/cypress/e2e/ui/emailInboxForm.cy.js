@@ -77,6 +77,7 @@ describe('Email inbox form', () => {
   beforeEach(() => {
     inbox = inboxFixture()
     cy.viewport(1280, 900)
+    cy.login()
     cy.intercept('**/api/v1/**', { body: { data: [] } })
     cy.readFile('../i18n/en-US.json').then((messages) => {
       cy.intercept('GET', '**/api/v1/lang/en-US', { body: messages })
@@ -349,7 +350,7 @@ describe('Email inbox form', () => {
     })
     cy.setEmailInboxSection('imap', true)
     cy.setEmailInboxSection('smtp', true)
-    cy.contains('Connected via OAuth - Google').should('be.visible')
+    cy.contains('Connected via OAuth - Google').scrollIntoView().should('be.visible')
     field('imap.username').should('not.be.visible')
     field('smtp.password').should('not.be.visible')
     cy.contains('button', 'Reconnect').click()

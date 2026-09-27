@@ -115,7 +115,8 @@ const submitForm = (values) => {
 const updateInbox = async (payload) => {
   try {
     isLoading.value = true
-    await api.updateInbox(inbox.value.id, payload)
+    const response = await api.updateInbox(inbox.value.id, payload)
+    setAliasVerificationState(response.data.data?.aliases || [])
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
@@ -137,7 +138,9 @@ const verifyAlias = async (email) => {
       aliasVerificationState.value[key] = { verification_status: 'pending' }
       startVerificationPolling()
     }
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('admin.inbox.aliases.sendingVerificationStarted') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('admin.inbox.aliases.sendingVerificationStarted')
+    })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -154,7 +157,9 @@ const stopVerificationPolling = () => {
 }
 
 const hasPendingAlias = () =>
-  Object.values(aliasVerificationState.value).some((state) => state.verification_status === 'pending')
+  Object.values(aliasVerificationState.value).some(
+    (state) => state.verification_status === 'pending'
+  )
 
 const setAliasVerificationState = (aliases) => {
   aliasVerificationState.value = Object.fromEntries(

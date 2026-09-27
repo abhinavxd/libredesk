@@ -90,7 +90,8 @@
           v-model:to="to"
           v-model:cc="cc"
           v-model:bcc="bcc"
-          v-model:sendFrom="sendFrom"
+          :sendFrom="sendFrom"
+          @update:sendFrom="pickSender"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
           v-model:showCc="showCc"
@@ -157,7 +158,8 @@
         v-model:to="to"
         v-model:cc="cc"
         v-model:bcc="bcc"
-        v-model:sendFrom="sendFrom"
+        :sendFrom="sendFrom"
+        @update:sendFrom="pickSender"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
         v-model:showCc="showCc"
@@ -288,6 +290,7 @@ const to = ref('')
 const cc = ref('')
 const bcc = ref('')
 const sendFrom = ref('')
+const senderPickedFor = ref(null)
 const showCc = ref(false)
 const showBcc = ref(false)
 const emailErrors = ref([])
@@ -629,9 +632,20 @@ watch(
   { deep: true }
 )
 
+const pickSender = (value) => {
+  sendFrom.value = value
+  senderPickedFor.value = currentConversationUUID.value
+}
+
+// Keep the agent's own sender pick while it is still allowed, since currentFrom changes whenever a new message arrives.
 watch(
-  () => conversationStore.currentFrom,
-  (value) => { sendFrom.value = value || '' },
+  [currentConversationUUID, () => conversationStore.currentFrom],
+  ([uuid, value]) => {
+    const picked =
+      senderPickedFor.value === uuid &&
+      conversationStore.currentFromOptions.includes(sendFrom.value)
+    if (!picked) sendFrom.value = value || ''
+  },
   { immediate: true }
 )
 
