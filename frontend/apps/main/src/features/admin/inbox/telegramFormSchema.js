@@ -10,11 +10,14 @@ export const createFormSchema = (t) =>
     enabled: z.boolean(),
     csat_enabled: z.boolean(),
     prompt_tags_on_reply: z.boolean(),
-    reopen_window_hours: z.coerce
-      .number({ invalid_type_error: t('admin.inbox.telegram.error.reopenWindow') })
-      .int(t('admin.inbox.telegram.error.reopenWindow'))
-      .min(0, t('admin.inbox.telegram.error.reopenWindow'))
-      .max(2147483647, t('admin.inbox.telegram.error.reopenWindow')),
+    reopen_window_hours: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce
+        .number({ invalid_type_error: t('admin.inbox.telegram.error.reopenWindow') })
+        .int(t('admin.inbox.telegram.error.reopenWindow'))
+        .min(0, t('admin.inbox.telegram.error.reopenWindow'))
+        .max(2147483647, t('admin.inbox.telegram.error.reopenWindow'))
+    ),
     config: z
       .object({
         greeting_message: z

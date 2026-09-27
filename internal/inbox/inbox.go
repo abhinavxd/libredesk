@@ -496,6 +496,15 @@ func (m *Manager) Toggle(id int) (imodels.Inbox, error) {
 		m.lo.Error("error toggling inbox", "error", err)
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
+	decryptedConfig, err := m.decryptInboxConfig(updatedInbox.Config)
+	if err != nil {
+		m.lo.Error("error decrypting inbox config after toggle", "error", err)
+	} else {
+		updatedInbox.Config = decryptedConfig
+	}
+	m.decryptInboxSecret(&updatedInbox)
+
 	return updatedInbox, nil
 }
 

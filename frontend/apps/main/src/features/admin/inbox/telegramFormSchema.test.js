@@ -34,7 +34,7 @@ describe('Telegram inbox validation', () => {
       })
     ).toEqual({ ...valid(), reopen_window_hours: 24 })
   })
-  it.each([-1, -24, 0.5, 'abc', Infinity, NaN, 2147483648])(
+  it.each([-1, -24, 0.5, 'abc', '', Infinity, NaN, 2147483648])(
     'rejects invalid reopen hours %s',
     (hours) => {
       expect(schema.safeParse({ ...valid(), reopen_window_hours: hours }).success).toBe(false)

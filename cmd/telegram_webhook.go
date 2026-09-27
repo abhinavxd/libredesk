@@ -121,7 +121,10 @@ func ingestTelegramMessage(ctx context.Context, app *App, rec imodels.Inbox, cfg
 		if message.Outgoing() || message.CallbackID != "" {
 			return nil
 		}
-		return sendTelegramAutomaticReply(app, rec, cfg, sourceID)
+		if err := sendTelegramAutomaticReply(app, rec, cfg, sourceID); err != nil {
+			app.lo.Error("error sending telegram automatic reply", "inbox_id", rec.ID, "source_id", sourceID, "error", err)
+		}
+		return nil
 	}
 	attachments, notice, err := fetchTelegramAttachment(ctx, app, cfg, message)
 	if err != nil {
@@ -220,7 +223,7 @@ func ingestTelegramMessage(ctx context.Context, app *App, rec imodels.Inbox, cfg
 	}
 	if !message.Outgoing() && message.CallbackID == "" {
 		if err := sendTelegramAutomaticReply(app, rec, cfg, sourceID); err != nil {
-			return err
+			app.lo.Error("error sending telegram automatic reply", "inbox_id", rec.ID, "source_id", sourceID, "error", err)
 		}
 	}
 	if err := fetchTelegramAvatar(ctx, app, cfg, contactID, message.Chat.ID); err != nil {
