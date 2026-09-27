@@ -52,6 +52,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	req.SiteName = strings.TrimSpace(req.SiteName)
 	req.FaviconURL = strings.TrimSpace(req.FaviconURL)
 	req.LogoURL = strings.TrimSpace(req.LogoURL)
+	req.ReplyGuardPhrases = strings.TrimSpace(req.ReplyGuardPhrases)
 	req.Timezone = strings.TrimSpace(req.Timezone)
 	if req.Timezone != "" && !stringutil.IsValidTimezone(req.Timezone) {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid timezone.", nil, envelope.InputError)

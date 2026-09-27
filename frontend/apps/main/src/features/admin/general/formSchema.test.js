@@ -24,7 +24,8 @@ describe('General Form Schema', () => {
             business_hours_id: '1',
             logo_url: 'https://support.example.com/logo.png',
             allowed_file_upload_extensions: ['png', 'pdf'],
-            show_conversation_subject: true
+            show_conversation_subject: true,
+            reply_guard_phrases: 'Juno\nwarehouse B'
         })).not.toThrow()
     })
 
