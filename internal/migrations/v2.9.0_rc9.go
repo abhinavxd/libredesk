@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"fmt"
 	"log"
 	"net/mail"
 	"strings"
@@ -78,8 +77,12 @@ func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 			continue
 		}
 		email := strings.ToLower(strings.TrimSpace(addr.Address))
-		if _, err := tx.Exec(`INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status) VALUES ($1, $2, 'primary', 0, 'verified')`, inb.ID, email); err != nil {
-			return fmt.Errorf("cannot migrate email inbox %d with address %q: the address is already owned by another inbox; make inbox From addresses unique and retry: %w", inb.ID, email, err)
+		res, err := tx.Exec(`INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status) VALUES ($1, $2, 'primary', 0, 'verified') ON CONFLICT DO NOTHING`, inb.ID, email)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			log.Printf("WARNING: Skipping email inbox %d during address migration: address %q is already used by another inbox. Give this inbox a unique From address to register it.", inb.ID, email)
 		}
 	}
 
