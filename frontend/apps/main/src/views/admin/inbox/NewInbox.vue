@@ -123,10 +123,12 @@ const submitForm = (values) => {
     csat_enabled: values.csat_enabled ?? false,
     prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     config: {
+      transport: values.transport || 'smtp_imap',
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
       imap: [values.imap],
-      smtp: [values.smtp]
+      smtp: [values.smtp],
+      http_api: values.http_api
     }
   }
   createInbox(payload)

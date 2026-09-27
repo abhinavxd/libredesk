@@ -1,6 +1,7 @@
 import * as z from 'zod'
 import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/string'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
+import { TRANSPORT_SMTP_IMAP, TRANSPORT_HTTP_API } from '@main/constants/inbox.js'
 
 const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
@@ -25,6 +26,7 @@ export const createFormSchema = (t) => z.object({
   prompt_tags_on_reply: z.boolean().optional(),
   enable_plus_addressing: z.boolean().optional(),
   auth_type: z.enum([AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2]),
+  transport: z.enum([TRANSPORT_SMTP_IMAP, TRANSPORT_HTTP_API]).optional().default(TRANSPORT_SMTP_IMAP),
   oauth: z.object({
     access_token: z.string().optional(),
     client_id: z.string().optional(),
@@ -33,12 +35,14 @@ export const createFormSchema = (t) => z.object({
     provider: z.string().optional(),
     refresh_token: z.string().optional()
   }).optional(),
+  // username/password are validated conditionally below (superRefine) since they're not
+  // applicable when transport is TRANSPORT_HTTP_API.
   imap: z.object({
     host: z.string().min(1, t('globals.messages.required')),
     port: z.number().min(1).max(65535),
     mailbox: z.string().min(1, t('globals.messages.required')),
-    username: z.string().min(1, t('globals.messages.required')),
-    password: z.string().min(1, t('globals.messages.required')),
+    username: z.string().optional(),
+    password: z.string().optional(),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
     scan_inbox_since: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
@@ -51,8 +55,8 @@ export const createFormSchema = (t) => z.object({
   smtp: z.object({
     host: z.string().min(1, t('globals.messages.required')),
     port: z.number().min(1).max(65535),
-    username: z.string().min(1, t('globals.messages.required')),
-    password: z.string().min(1, t('globals.messages.required')),
+    username: z.string().optional(),
+    password: z.string().optional(),
     max_conns: z.number().min(1),
     max_msg_retries: z.number().min(0).max(100),
     idle_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
@@ -65,5 +69,39 @@ export const createFormSchema = (t) => z.object({
     tls_skip_verify: z.boolean().optional(),
     hello_hostname: z.string().optional(),
     auth_protocol: z.enum(['login', 'cram', 'plain', 'none'])
-  })
+  }),
+  http_api: z.object({
+    provider: z.string().optional(),
+    api_key: z.string().optional(),
+    webhook_secret: z.string().optional()
+  }).optional()
+}).superRefine((data, ctx) => {
+  if (data.transport === TRANSPORT_HTTP_API) {
+    if (!data.http_api?.provider) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['http_api', 'provider'],
+        message: t('globals.messages.required')
+      })
+    }
+    // On edit the api_key is resubmitted masked (non-empty), so this only trips for a new
+    // inbox left blank. webhook_secret stays optional (only needed to receive mail).
+    if (!data.http_api?.api_key) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['http_api', 'api_key'],
+        message: t('globals.messages.required')
+      })
+    }
+    return
+  }
+
+  for (const field of ['username', 'password']) {
+    if (!data.imap?.[field]) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['imap', field], message: t('globals.messages.required') })
+    }
+    if (!data.smtp?.[field]) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['smtp', field], message: t('globals.messages.required') })
+    }
+  }
 })
