@@ -9,6 +9,7 @@ type General struct {
 	RootURL                     string   `json:"app.root_url"`
 	AllowedFileUploadExtensions []string `json:"app.allowed_file_upload_extensions"`
 	Timezone                    string   `json:"app.timezone"`
+	TimeFormat                  string   `json:"app.time_format"`
 	BusinessHoursID             string   `json:"app.business_hours_id"`
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
 }

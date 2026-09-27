@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import api from '@/api'
+import { setTimeFormat } from '@shared-ui/utils/datetime.js'
 
 export const useAppSettingsStore = defineStore('settings', {
     state: () => ({
@@ -11,6 +12,7 @@ export const useAppSettingsStore = defineStore('settings', {
             try {
                 const response = await api.getSettings(key)
                 this.settings = response?.data?.data || {}
+                setTimeFormat(this.settings['app.time_format'])
                 return this.settings
             } catch (error) {
                 // Pass

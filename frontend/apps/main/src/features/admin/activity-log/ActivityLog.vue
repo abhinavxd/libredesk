@@ -105,7 +105,7 @@ import { ListFilter, ArrowDownWideNarrow } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useActivityLogFilters } from '../../../composables/useActivityLogFilters'
 import { useI18n } from 'vue-i18n'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
 import api from '../../../api'
 
@@ -152,7 +152,7 @@ async function fetchActivityLogs() {
     // Format the created_at field
     activityLogs.value = activityLogs.value.map((log) => ({
       ...log,
-      created_at: format(new Date(log.created_at), 'PPpp')
+      created_at: formatDateTime(new Date(log.created_at))
     }))
   } catch (err) {
     console.error('Error fetching activity logs:', err)

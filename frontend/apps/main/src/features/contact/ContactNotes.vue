@@ -184,6 +184,7 @@ const notesCache = new Map()
 <script setup>
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { format, formatDistanceToNow } from 'date-fns'
+import { timePattern } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
@@ -261,7 +262,7 @@ const fetchNotes = async (contactId = props.contactId, { useCache = true } = {})
   }
 }
 
-const formatDate = (date) => format(new Date(date), 'PPP p')
+const formatDate = (date) => format(new Date(date), `PPP ${timePattern()}`)
 const relativeDate = (date) => formatDistanceToNow(new Date(date), { addSuffix: true })
 
 const startAddingNote = () => {

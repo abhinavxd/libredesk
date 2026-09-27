@@ -1,6 +1,6 @@
 import { h } from 'vue'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import { CONVERSATION_DEFAULT_STATUSES_LIST } from '@/constants/conversation.js'
 
 const DEFAULT_STATUS_KEY = {
@@ -46,7 +46,7 @@ export const createColumns = (t, { onEdit } = {}) => [
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h('div', { class: 'text-center' }, formatDateTime(row.getValue('created_at')))
     }
   },
   {

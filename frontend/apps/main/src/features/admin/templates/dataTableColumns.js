@@ -1,7 +1,7 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 
 export const createOutgoingEmailTableColumns = (t) => [
   {
@@ -44,7 +44,7 @@ export const createOutgoingEmailTableColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h('div', { class: 'text-center' }, formatDateTime(row.getValue('created_at')))
     }
   },
   {
@@ -91,7 +91,7 @@ export const createEmailNotificationTableColumns = (t) => [
       return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h('div', { class: 'text-center' }, formatDateTime(row.getValue('created_at')))
     }
   },
   {

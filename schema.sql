@@ -1050,6 +1050,7 @@ VALUES
     ('app.max_file_upload_size', '20'::jsonb),
     ('app.allowed_file_upload_extensions', '["*"]'::jsonb),
 	('app.timezone', '"Asia/Kolkata"'::jsonb),
+	('app.time_format', '"12h"'::jsonb),
 	('app.business_hours_id', '""'::jsonb),
 	('app.show_conversation_subject', 'true'::jsonb),
 	('ai_agent.faq_learning_enabled', 'false'::jsonb),

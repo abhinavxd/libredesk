@@ -1,7 +1,7 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 
 export const createColumns = (t) => [
     {
@@ -28,7 +28,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+            return h('div', { class: 'text-center' }, formatDateTime(row.getValue('created_at')))
         }
     },
     {
@@ -38,7 +38,7 @@ export const createColumns = (t) => [
             return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
         },
         cell: function ({ row }) {
-            return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+            return h('div', { class: 'text-center' }, formatDateTime(row.getValue('updated_at')))
         }
     },
     {

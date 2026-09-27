@@ -1,5 +1,5 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import dropdown from './editorPromptDropdown.vue'
 
 export const createEditorPromptColumns = (t, { onEdit } = {}) => [
@@ -27,7 +27,7 @@ export const createEditorPromptColumns = (t, { onEdit } = {}) => [
     enableGlobalFilter: false,
     header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h('div', { class: 'text-center' }, formatDateTime(row.getValue('updated_at')))
   },
   {
     id: 'actions',

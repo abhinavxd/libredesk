@@ -2,7 +2,7 @@ import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import UserDataTableDropDown from '@/features/admin/agents/dataTableDropdown.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 
 export const createColumns = (t) => [
   {
@@ -66,7 +66,7 @@ export const createColumns = (t) => [
       return h(
         'div',
         { class: 'text-center' },
-        format(row.getValue('created_at'), 'PPpp')
+        formatDateTime(row.getValue('created_at'))
       )
     }
   },
@@ -80,7 +80,7 @@ export const createColumns = (t) => [
       return h(
         'div',
         { class: 'text-center' },
-        format(row.getValue('updated_at'), 'PPpp')
+        formatDateTime(row.getValue('updated_at'))
       )
     }
   },
