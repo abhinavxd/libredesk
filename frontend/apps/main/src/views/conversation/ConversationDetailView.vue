@@ -23,7 +23,7 @@
       <!-- Sidebar Panel (collapsible) -->
       <ResizablePanel
         ref="sidebarPanelRef"
-        :default-size="panelSizes[1]"
+        :default-size="sidebarOpen ? panelSizes[1] : 0"
         :min-size="15"
         :max-size="60"
         :collapsible="true"
@@ -69,6 +69,8 @@
 </template>
 
 <script setup>
+const DEFAULT_PANEL_SIZES = [70, 30]
+
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useStorage, useDocumentVisibility } from '@vueuse/core'
@@ -92,7 +94,9 @@ const emitter = useEmitter()
 const isMobile = useIsMobile()
 const sidebarPanelRef = ref(null)
 const sidebarOpen = useStorage('conversationSidebarOpen', true)
-const panelSizes = useStorage('conversationDetailPanelSizes', [70, 30])
+const panelSizes = useStorage('conversationDetailPanelSizes', DEFAULT_PANEL_SIZES)
+// Older builds saved the collapsed [100, 0], which would reopen the panel at zero width.
+if (!(panelSizes.value[1] > 0)) panelSizes.value = DEFAULT_PANEL_SIZES
 const sheetSidebarOpen = ref(false)
 
 const showContent = computed(
@@ -113,7 +117,7 @@ const toggleSidebar = () => {
   if (sidebarOpen.value) {
     sidebarPanelRef.value?.collapse()
   } else {
-    sidebarPanelRef.value?.expand()
+    sidebarPanelRef.value?.resize(panelSizes.value[1])
   }
 }
 
@@ -126,7 +130,8 @@ const onSidebarExpand = () => {
 }
 
 const onLayoutChange = (sizes) => {
-  if (sidebarOpen.value && sizes.length === 2) {
+  // Layout fires before the collapse event, and saving the collapsed [100, 0] reopens the panel at its minimum width.
+  if (sizes.length === 2 && sizes[1] > 0) {
     panelSizes.value = sizes
   }
 }

@@ -7,30 +7,42 @@
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
       <Tabs v-model="messageType" class="rounded-lg">
-        <TabsList class="rounded-lg border bg-muted/50 p-0.5">
+        <TabsList>
           <TabsTrigger
             v-if="canSendReply"
             value="reply"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             v-if="canSendPrivateNote"
             value="private_note"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button
-        class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
-        variant="ghost"
-        @click="toggleFullscreen"
-      >
-        <component :is="isFullscreen ? Minimize2 : Maximize2" />
-      </Button>
+      <div class="flex items-center">
+        <Button
+          v-if="!isFullscreen"
+          type="button"
+          class="text-muted-foreground"
+          variant="ghost"
+          :aria-label="t('globals.terms.collapse')"
+          @click="emit('minimize')"
+        >
+          <Minus class="translate-y-1" />
+        </Button>
+        <Button
+          class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
+          variant="ghost"
+          @click="toggleFullscreen"
+        >
+          <component :is="isFullscreen ? Minimize2 : Maximize2" />
+        </Button>
+      </div>
     </div>
 
     <!-- To, CC, and BCC fields -->
@@ -39,8 +51,8 @@
         :class="['space-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
         v-if="messageType === 'reply'"
       >
-        <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center space-x-2">
-          <label class="w-12 text-sm font-medium text-muted-foreground">{{ $t('replyBox.from') }}:</label>
+        <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center gap-2">
+          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">{{ $t('replyBox.from') }}:</label>
           <Select v-model="sendFrom">
             <SelectTrigger class="flex-grow"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -50,8 +62,8 @@
             </SelectContent>
           </Select>
         </div>
-        <div class="flex items-center space-x-2">
-          <label class="w-12 text-sm font-medium text-muted-foreground">TO:</label>
+        <div class="flex items-center gap-2">
+          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">TO:</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
@@ -59,29 +71,68 @@
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
+          <Button
+            v-if="!showCc"
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            @click="showRecipientField('cc')"
+          >
+            {{ $t('replyBox.cc') }}
+          </Button>
+          <Button
+            v-if="!showBcc"
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            @click="showRecipientField('bcc')"
+          >
+            {{ $t('replyBox.bcc') }}
+          </Button>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">CC:</label>
+        <div v-if="showCc" class="flex items-center gap-2">
+          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">CC:</label>
           <Input
+            ref="ccInputRef"
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
-          <Button size="sm" @click="toggleBcc" variant="secondary">
-            {{ showBcc ? $t('replyBox.removeBCC') : $t('replyBox.bcc') }}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            :aria-label="t('replyBox.removeCC')"
+            @click="hideRecipientField('cc')"
+          >
+            <X class="w-4 h-4" />
           </Button>
         </div>
         <div v-if="showBcc" class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">BCC:</label>
+          <label class="w-12 shrink-0 text-xs font-semibold tracking-wide text-muted-foreground">BCC:</label>
           <Input
+            ref="bccInputRef"
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            :aria-label="t('replyBox.removeBCC')"
+            @click="hideRecipientField('bcc')"
+          >
+            <X class="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
@@ -102,17 +153,19 @@
         v-model:textContent="textContent"
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
-        :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
         :enableMentions="messageType === 'private_note'"
+        :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
-        @aiPromptSelected="handleAiPromptSelected"
+        :getConversationSuggestions="getConversationSuggestions"
+        @aiGenerationChange="emit('aiGenerationChange', $event)"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
+        @toggleMessageType="toggleMessageType"
       />
     </div>
 
@@ -153,15 +206,13 @@
 <script setup>
 const RECIPIENT_INPUT_CLASS =
   'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
-
-const TAB_TRIGGER_CLASS =
-  'rounded-md px-3 py-1 text-sm transition-colors duration-150 max-md:py-2.5 data-[state=active]:bg-card data-[state=active]:shadow-sm'
+const RECIPIENT_TOGGLE_CLASS = 'shrink-0 px-2 text-muted-foreground'
 
 import { ref, computed, nextTick, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Minus, X } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
@@ -178,6 +229,10 @@ import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
+import {
+  createLatestConversationSuggestionFetcher,
+  getConversationSuggestions as fetchConversationSuggestions
+} from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -187,6 +242,7 @@ const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
 const sendFrom = defineModel('sendFrom', { default: '' })
+const showCc = defineModel('showCc', { default: false })
 const showBcc = defineModel('showBcc', { default: false })
 const emailErrors = defineModel('emailErrors', { default: () => [] })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -227,19 +283,32 @@ const getSuggestions = async (query) => {
   return (await debouncedFetchSuggestions(query)) || []
 }
 
+const debouncedFetchConversationSuggestions = useDebounceFn(fetchConversationSuggestions, MENTION_DEBOUNCE_MS)
+const fetchLatestConversationSuggestions = createLatestConversationSuggestionFetcher(
+  debouncedFetchConversationSuggestions
+)
+
+const getConversationSuggestions = async (query) => {
+  if (messageType.value !== 'private_note') return []
+  const messageTypeAtRequest = messageType.value
+  const suggestions = (await fetchLatestConversationSuggestions(query)) || []
+  return messageType.value === messageTypeAtRequest ? suggestions : []
+}
+
 // Handle mentions changed from editor
 const handleMentionsChanged = (newMentions) => {
   mentions.value = newMentions
+}
+
+const toggleMessageType = () => {
+  if (props.isGenerating || !props.canSendReply || !props.canSendPrivateNote) return
+  messageType.value = messageType.value === 'private_note' ? 'reply' : 'private_note'
 }
 
 const props = defineProps({
   isFullscreen: {
     type: Boolean,
     default: false
-  },
-  aiPrompts: {
-    type: Array,
-    required: true
   },
   isSending: {
     type: Boolean,
@@ -275,13 +344,14 @@ const props = defineProps({
 
 const emit = defineEmits([
   'toggleFullscreen',
+  'minimize',
   'send',
   'sendAndSetStatus',
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected',
+  'aiGenerationChange',
   'generateReply'
 ])
 
@@ -291,16 +361,28 @@ const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
 const editorRef = ref(null)
+const ccInputRef = ref(null)
+const bccInputRef = ref(null)
 
-const toggleBcc = async () => {
-  showBcc.value = !showBcc.value
+const showRecipientField = async (field) => {
+  if (field === 'cc') showCc.value = true
+  else showBcc.value = true
   await nextTick()
-  // If hiding BCC field, clear the content and validate email bcc so it doesn't show errors.
-  if (!showBcc.value) {
+  const input = field === 'cc' ? ccInputRef.value : bccInputRef.value
+  input?.$el?.focus()
+}
+
+// A hidden field must stay empty, its address would still be sent otherwise.
+const hideRecipientField = async (field) => {
+  if (field === 'cc') {
+    showCc.value = false
+    cc.value = ''
+  } else {
+    showBcc.value = false
     bcc.value = ''
-    await nextTick()
-    validateEmails()
   }
+  await nextTick()
+  validateEmails()
 }
 
 const toggleFullscreen = () => {
@@ -387,10 +469,6 @@ const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
   // Force reactivity so the user can select the same emoji multiple times
   nextTick(() => (insertContent.value = emoji))
-}
-
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
 }
 
 // Watch and update macro view based on message type this filters our macros.

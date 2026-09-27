@@ -1,4 +1,30 @@
 <template>
+  <AlertDialog
+    :open="!!pendingToolApproval && pendingToolConversationUUID === currentConversationUUID"
+  >
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ $t('ai.toolApprovalTitle') }}</AlertDialogTitle>
+        <AlertDialogDescription as="div">
+          <ToolApprovalDetails v-if="pendingToolApproval" :approval="pendingToolApproval" />
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          :disabled="isGenerating"
+          @click="resolveGenerateToolApproval(false)"
+        >
+          {{ $t('globals.messages.reject') }}
+        </Button>
+        <Button type="button" :disabled="isGenerating" @click="resolveGenerateToolApproval(true)">
+          {{ $t('globals.messages.approveAndRun') }}
+        </Button>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+
   <AlertDialog :open="showContactEmailWarning" @update:open="showContactEmailWarning = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -53,8 +79,8 @@
       >
         <ReplyBoxContent
           v-if="isEditorFullscreen"
+          ref="fullscreenContentRef"
           :isFullscreen="true"
-          :aiPrompts="aiPrompts"
           :isSending="isSending"
           :isDraftLoading="isDraftLoading"
           :uploadingFiles="uploadingFiles"
@@ -67,6 +93,7 @@
           v-model:sendFrom="sendFrom"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
+          v-model:showCc="showCc"
           v-model:showBcc="showBcc"
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
@@ -75,7 +102,7 @@
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
-          @aiPromptSelected="handleAiPromptSelected"
+          @aiGenerationChange="isGenerating = $event"
           :isGenerating="isGenerating"
           :canSendReply="canSendReply"
           :canSendPrivateNote="canSendPrivateNote"
@@ -85,18 +112,22 @@
       </DialogContent>
     </Dialog>
 
-    <div v-if="isCramped && !isEditorFullscreen" class="p-2">
+    <div v-if="isCollapsed && !isEditorFullscreen" class="p-2">
       <Button
         type="button"
         variant="outline"
         class="w-full h-11 justify-start font-normal min-w-0"
         :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-        @click="isEditorFullscreen = true"
+        @click="expandComposer"
       >
         <Pencil class="shrink-0 text-muted-foreground" />
         <span v-if="draftPreview" class="truncate">{{ draftPreview }}</span>
         <span v-else class="truncate text-muted-foreground">
-          {{ messageType === 'private_note' ? $t('globals.terms.privateNote') : $t('globals.terms.reply') }}
+          {{
+            messageType === 'private_note'
+              ? $t('globals.terms.privateNote')
+              : $t('globals.terms.reply')
+          }}
         </span>
         <span
           v-if="attachmentCount"
@@ -112,12 +143,11 @@
     <div
       class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
-      v-if="!isCramped && !isEditorFullscreen"
+      v-if="!isCollapsed && !isEditorFullscreen"
     >
       <ReplyBoxContent
         ref="replyBoxContentRef"
         :isFullscreen="false"
-        :aiPrompts="aiPrompts"
         :isSending="isSending"
         :isDraftLoading="isDraftLoading"
         :uploadingFiles="uploadingFiles"
@@ -130,15 +160,17 @@
         v-model:sendFrom="sendFrom"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
+        v-model:showCc="showCc"
         v-model:showBcc="showBcc"
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
+        @minimize="toggleMinimize"
         @send="processSend"
         @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
-        @aiPromptSelected="handleAiPromptSelected"
+        @aiGenerationChange="isGenerating = $event"
         :isGenerating="isGenerating"
         :canSendReply="canSendReply"
         :canSendPrivateNote="canSendPrivateNote"
@@ -149,8 +181,9 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, toRaw, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, toRaw, nextTick, onMounted, onUnmounted } from 'vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { getTextFromHTML } from '@shared-ui/utils/string'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useUserStore } from '@main/stores/user'
@@ -159,7 +192,6 @@ import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
-import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { useNotificationStore } from '@main/stores/notification'
 import {
   AlertDialog,
@@ -173,6 +205,7 @@ import {
 } from '@shared-ui/components/ui/alert-dialog'
 import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
+import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import { Pencil, Paperclip } from 'lucide-vue-next'
 import { useVisualViewportHeight } from '@main/composables/useVisualViewportHeight'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
@@ -248,33 +281,49 @@ const {
 
 // Rest of existing state
 const isEditorFullscreen = ref(false)
+const isMinimized = ref(false)
 const isSending = ref(false)
 const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
 const sendFrom = ref('')
+const showCc = ref(false)
 const showBcc = ref(false)
 const emailErrors = ref([])
-const aiPromptStore = useAiPromptStore()
-const aiPrompts = computed(() => aiPromptStore.prompts)
 const replyBoxContentRef = ref(null)
+const fullscreenContentRef = ref(null)
+const activeContentRef = () =>
+  isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 const showMissingTagsWarning = ref(false)
+const pendingToolApproval = ref(null)
+const pendingToolConversationUUID = ref('')
 const deferredStatus = ref(null)
 const mentions = ref([])
 
-aiPromptStore.fetchPrompts()
+watch(currentConversationUUID, (uuid) => {
+  if (pendingToolApproval.value && pendingToolConversationUUID.value !== uuid) {
+    pendingToolApproval.value = null
+    pendingToolConversationUUID.value = ''
+  }
+})
 
 const runAiGeneration = async (requestFn) => {
-  if (isGenerating.value) return
+  if (isGenerating.value || pendingToolApproval.value) return
   const uuid = currentConversationUUID.value
   if (!uuid) return
   isGenerating.value = true
   try {
     const resp = await requestFn(uuid)
     if (uuid !== currentConversationUUID.value) return
-    htmlContent.value = resp.data.data || ''
+    const result = resp.data.data
+    if (result.status === 'approval_required') {
+      pendingToolApproval.value = result.approval
+      pendingToolConversationUUID.value = uuid
+      return
+    }
+    htmlContent.value = result.content || ''
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -285,28 +334,92 @@ const runAiGeneration = async (requestFn) => {
   }
 }
 
-const handleAiPromptSelected = (key) =>
-  runAiGeneration(() => api.aiCompletion({ prompt_key: key, content: htmlContent.value }))
-
 const handleGenerateReply = () =>
   runAiGeneration((uuid) =>
     api.aiGenerateReply({ conversation_uuid: uuid, instruction: textContent.value })
   )
+
+const resolveGenerateToolApproval = async (approved) => {
+  const approval = pendingToolApproval.value
+  const uuid = pendingToolConversationUUID.value
+  if (!approval || isGenerating.value) return
+  isGenerating.value = true
+  try {
+    const resp = approved
+      ? await api.approveAIToolRun(approval.run_id)
+      : await api.declineAIToolRun(approval.run_id)
+    const result = resp.data.data
+    if (uuid !== currentConversationUUID.value) return
+    if (result.status === 'approval_required') {
+      pendingToolApproval.value = result.approval
+      pendingToolConversationUUID.value = uuid
+      return
+    }
+    pendingToolApproval.value = null
+    pendingToolConversationUUID.value = ''
+    htmlContent.value = result.content || ''
+  } catch (error) {
+    if ([403, 404, 409].includes(error?.response?.status)) {
+      pendingToolApproval.value = null
+      pendingToolConversationUUID.value = ''
+    }
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isGenerating.value = false
+  }
+}
 
 // Copilot's "Insert into reply" replaces the draft with its answer (already HTML from the panel),
 // forcing reply mode so a private note in progress does not silently receive customer-facing text.
 const handleCopilotInsertReply = (html) => {
   if (!html || !canSendReply.value) return
   if (messageType.value === 'private_note') messageType.value = 'reply'
+  isMinimized.value = false
   htmlContent.value = html
+}
+
+const setMessageTypeFromPalette = (type) => {
+  if (isGenerating.value || !isAllowedMessageType(type)) return
+  messageType.value = type
+}
+
+const focusFromPalette = () => {
+  // The cramped layout renders no editor until the fullscreen dialog opens.
+  if (isCramped.value && !isEditorFullscreen.value) {
+    isEditorFullscreen.value = true
+    nextTick(() => fullscreenContentRef.value?.focus())
+    return
+  }
+  if (isMinimized.value) {
+    isMinimized.value = false
+    nextTick(() => replyBoxContentRef.value?.focus())
+    return
+  }
+  activeContentRef()?.focus()
+}
+
+const toggleMinimize = () => {
+  // Unmounting the editor mid AI rewrite drops the result and leaves isGenerating stuck.
+  if (isCramped.value || isEditorFullscreen.value || isGenerating.value) return
+  isMinimized.value = !isMinimized.value
+  if (!isMinimized.value) nextTick(() => replyBoxContentRef.value?.focus())
 }
 
 onMounted(() => {
   emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
+  emitter.on(EMITTER_EVENTS.REPLY_BOX_TOGGLE_MINIMIZE, toggleMinimize)
 })
 
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
+  emitter.off(EMITTER_EVENTS.REPLY_BOX_TOGGLE_MINIMIZE, toggleMinimize)
 })
 
 /**
@@ -316,11 +429,23 @@ const hasTextContent = computed(() => {
   return textContent.value.trim().length > 0
 })
 
-const draftPreview = computed(() => textContent.value.trim())
+// textContent stays empty while the composer is collapsed, no editor is mounted to fill it.
+const draftPreview = computed(() => textContent.value.trim() || getTextFromHTML(htmlContent.value))
+
+const isCollapsed = computed(() => isCramped.value || isMinimized.value)
+
+const expandComposer = () => {
+  if (isCramped.value) isEditorFullscreen.value = true
+  else isMinimized.value = false
+}
 
 const attachmentCount = computed(() => mediaFiles.value.length + uploadingFiles.value.length)
 
-const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck = false, statusToSet = null) => {
+const processSend = async (
+  skipContactEmailCheck = false,
+  skipMissingTagsCheck = false,
+  statusToSet = null
+) => {
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
@@ -332,9 +457,7 @@ const processSend = async (skipContactEmailCheck = false, skipMissingTagsCheck =
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
 
-  const currentInbox = inboxStore.inboxes.find(
-    (i) => i.id === conversationStore.current.inbox_id
-  )
+  const currentInbox = inboxStore.inboxes.find((i) => i.id === conversationStore.current.inbox_id)
   if (
     !isPrivate &&
     !skipMissingTagsCheck &&
@@ -517,8 +640,10 @@ watch(
   [loadedMacroID, loadedMacroActions],
   ([id, actions]) => {
     conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    if (id > 0) conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
-    else if (actions.length) conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
+    if (id > 0)
+      conversationStore.setMacro({ id, actions: [...toRaw(actions)] }, MACRO_CONTEXT.REPLY)
+    else if (actions.length)
+      conversationStore.setMacroActions([...toRaw(actions)], MACRO_CONTEXT.REPLY)
   },
   { deep: true }
 )
@@ -539,6 +664,7 @@ watch(
   () => conversationStore.currentCC,
   (newVal) => {
     cc.value = newVal?.join(', ') || ''
+    showCc.value = cc.value.length > 0
   },
   { deep: true, immediate: true }
 )
@@ -554,12 +680,8 @@ watch(
 watch(
   () => conversationStore.currentBCC,
   (newVal) => {
-    const newBcc = newVal?.join(', ') || ''
-    bcc.value = newBcc
-    // Only show BCC field if it has content
-    if (newBcc.length > 0) {
-      showBcc.value = true
-    }
+    bcc.value = newVal?.join(', ') || ''
+    showBcc.value = bcc.value.length > 0
   },
   { deep: true, immediate: true }
 )
@@ -569,7 +691,7 @@ watch(
   () => conversationStore.current?.uuid,
   () => {
     setTimeout(() => {
-      replyBoxContentRef.value?.focus()
+      activeContentRef()?.focus()
     }, 100)
   }
 )

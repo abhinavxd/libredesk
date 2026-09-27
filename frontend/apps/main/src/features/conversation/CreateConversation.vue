@@ -1,7 +1,7 @@
 <template>
   <div>
     <Dialog v-model:open="dialogOpen">
-      <DialogContent class="max-w-5xl h-[90vh] flex flex-col" >
+      <DialogContent class="max-w-5xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {{ $t('conversation.newConversation') }}
@@ -9,7 +9,11 @@
           <DialogDescription />
         </DialogHeader>
 
-        <form @submit="createConversation" novalidate class="flex flex-col flex-1 overflow-hidden">
+        <form
+          @submit="createConversation"
+          novalidate
+          class="flex flex-col flex-1 min-h-0 overflow-y-auto lg:overflow-hidden"
+        >
           <!-- Form Fields Section -->
           <div class="space-y-4 pb-2 flex-shrink-0">
             <div class="space-y-2">
@@ -67,7 +71,7 @@
               </FormField>
 
               <!-- Name Group -->
-              <div class="grid grid-cols-2 gap-4">
+              <div :class="FIELD_GRID_CLASS">
                 <FormField v-slot="{ componentField }" name="first_name">
                   <FormItem>
                     <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
@@ -101,7 +105,7 @@
               </div>
 
               <!-- Subject and Inbox Group -->
-              <div class="grid grid-cols-2 gap-4">
+              <div :class="FIELD_GRID_CLASS">
                 <FormField v-slot="{ componentField }" name="subject">
                   <FormItem>
                     <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
@@ -160,7 +164,7 @@
               </FormField>
 
               <!-- Assignment Group -->
-              <div class="grid grid-cols-2 gap-4">
+              <div :class="FIELD_GRID_CLASS">
                 <!-- Set assigned team -->
                 <FormField v-slot="{ componentField }" name="team_id">
                   <FormItem>
@@ -193,7 +197,7 @@
           </div>
 
           <!-- Message Editor Section -->
-          <div class="flex-1 flex flex-col min-h-0 mt-4">
+          <div class="flex flex-none flex-col min-h-64 mt-4 lg:flex-1 lg:min-h-0">
             <FormField v-slot="{ componentField }" name="content">
               <FormItem class="flex flex-col h-full">
                 <FormLabel>{{ $t('globals.terms.message') }}</FormLabel>
@@ -202,7 +206,9 @@
                     <Editor
                       v-model:htmlContent="componentField.modelValue"
                       @update:htmlContent="(value) => componentField.onChange(value)"
-                      :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
+                      :placeholder="
+                        isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')
+                      "
                       :insertContent="insertContent"
                       :autoFocus="false"
                       :enableInlineImages="true"
@@ -261,6 +267,8 @@
 </template>
 
 <script setup>
+const FIELD_GRID_CLASS = 'grid grid-cols-1 gap-4 sm:grid-cols-2'
+
 import {
   Dialog,
   DialogContent,
@@ -283,7 +291,7 @@ import {
 import { z } from 'zod'
 import { ref, watch, onUnmounted, nextTick, onMounted, computed } from 'vue'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
-import { useConversationStore } from '../../stores/conversation'
+import { useConversationStore } from '@main/stores/conversation'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -310,11 +318,16 @@ import { IdCard } from 'lucide-vue-next'
 import api from '@/api'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
+import { useCommandPalette } from '@/features/command/useCommandPalette'
 
 const dialogOpen = defineModel({
   required: false,
   default: () => false
 })
+const props = defineProps({
+  initialContact: { type: Object, default: null }
+})
+const palette = useCommandPalette()
 
 const inboxStore = useInboxStore()
 const { t } = useI18n()
@@ -375,23 +388,25 @@ onUnmounted(() => {
   clearMediaFiles()
   conversationStore.resetMacro(MACRO_CONTEXT.NEW_CONVERSATION)
   macroStore.setCurrentView(previousMacroView)
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: null,
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.REPLY)
 })
 
 onMounted(() => {
   previousMacroView = macroStore.currentView
   macroStore.setCurrentView('starting_conversation')
-  emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-    command: 'apply-macro-to-new-conversation',
-    open: false
-  })
+  palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+  if (props.initialContact?.email) selectContact(props.initialContact)
   nextTick(() => {
     emailInputRef.value?.$el?.focus()
   })
 })
+
+watch(
+  () => props.initialContact,
+  (contact) => {
+    if (contact?.email) selectContact(contact)
+  }
+)
 
 const form = useForm({
   validationSchema: toTypedSchema(formSchema),

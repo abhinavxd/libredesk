@@ -23,4 +23,4 @@ SET rating = $2,
     feedback = $3,
     meta = COALESCE($4::jsonb, '{}'),
     response_timestamp = NOW()
-WHERE uuid = $1;
+WHERE uuid = $1 AND response_timestamp IS NULL;

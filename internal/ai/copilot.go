@@ -41,7 +41,7 @@ To answer questions about the customer's history or other tickets, use the tools
 )
 
 // GenerateReply drafts a reply to a conversation using the agentic loop (tools included).
-func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string, tctx ToolContext, extra []Tool) (string, error) {
+func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction string, tctx ToolContext, extra []Tool, allowedToolIDs []int, scope AgentRunScope) (models.AgentRunResult, error) {
 	var user strings.Builder
 	if strings.TrimSpace(transcript) != "" {
 		fmt.Fprintf(&user, "Conversation so far:\n%s\n\n", transcript)
@@ -56,11 +56,11 @@ func (m *Manager) GenerateReply(ctx context.Context, transcript, instruction str
 	if len(extra) > 0 {
 		systemPrompt += "\n\n" + replyDraftHistoryToolsPrompt
 	}
-	return m.RunAgentWithTools(ctx, systemPrompt, history, defaultMaxSteps, tctx, nil, true, true, extra)
+	return m.RunAgentWithApprovals(ctx, systemPrompt, history, defaultMaxSteps, tctx, allowedToolIDs, extra, scope)
 }
 
 // Copilot answers an agent's chat message; persona borrows an assistant's voice without changing the tool set.
-func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage, tctx ToolContext, extra []Tool, persona string) (string, error) {
+func (m *Manager) Copilot(ctx context.Context, conversationContext string, history []models.ChatMessage, tctx ToolContext, extra []Tool, persona string, allowedToolIDs []int, scope AgentRunScope) (models.AgentRunResult, error) {
 	msgs := make([]models.ChatMessage, 0, len(history)+1)
 	if strings.TrimSpace(conversationContext) != "" {
 		msgs = append(msgs, models.ChatMessage{
@@ -78,7 +78,7 @@ func (m *Manager) Copilot(ctx context.Context, conversationContext string, histo
 	if strings.TrimSpace(persona) != "" {
 		systemPrompt += "\n\nPersona from the selected assistant - apply it to how you write, but keep the tools and rules above unchanged:\n" + persona
 	}
-	return m.RunAgentWithTools(ctx, systemPrompt, msgs, defaultMaxSteps, tctx, nil, true, true, extra)
+	return m.RunAgentWithApprovals(ctx, systemPrompt, msgs, defaultMaxSteps, tctx, allowedToolIDs, extra, scope)
 }
 
 // Summarize produces a short handover summary of a conversation transcript.

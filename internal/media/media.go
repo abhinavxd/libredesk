@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -260,19 +259,11 @@ func (m *Manager) GetBlob(name string) ([]byte, error) {
 
 // GetURL returns the URL for accessing a media file by its name.
 func (m *Manager) GetURL(uuid, contentType, fileName string) string {
-	// Keep some content types inline. SVG excluded.
-	disposition := "attachment"
-	if contentType != "image/svg+xml" &&
-		(strings.HasPrefix(contentType, "image/") ||
-			strings.HasPrefix(contentType, "video/") ||
-			contentType == "application/pdf") {
-		disposition = "inline"
-	}
-	return m.store.GetURL(uuid, disposition, fileName)
+	return m.store.GetURL(uuid, models.ContentDisposition(contentType), fileName)
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
-	return m.store.GetURL(uuid, "attachment", fileName)
+	return m.store.GetURL(uuid, models.DispositionAttachment, fileName)
 }
 
 // GetSignedURL generates a signed URL for secure media access if the store supports it.
@@ -299,7 +290,7 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 			return u.String()
 		}
 	}
-	return m.store.GetURL(image.ThumbPrefix+uuid, "inline", "")
+	return m.store.GetURL(image.ThumbPrefix+uuid, models.DispositionInline, "" /** fileName **/)
 }
 
 // SignedURLValidator returns the store's signature validator if available.
@@ -415,18 +406,10 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 // For generic types, it uses http.DetectContentType (stdlib) as a fast path,
 // falling back to mimetype library for deeper inspection using magic numbers.
 func (m *Manager) detectContentType(sourceContentType string, content io.ReadSeeker) (string, error) {
-	// Set default if empty
-	if sourceContentType == "" {
-		sourceContentType = "application/octet-stream"
-	}
-
-	// Handle "image/svg+xml; charset=utf-8", keep just the type.
-	if mediaType, _, err := mime.ParseMediaType(sourceContentType); err == nil && mediaType != "" {
-		sourceContentType = mediaType
-	}
+	sourceContentType = models.NormalizeContentType(sourceContentType)
 
 	// Trust source unless it's a generic/useless type
-	if sourceContentType != "application/octet-stream" &&
+	if sourceContentType != models.ContentTypeOctetStream &&
 		sourceContentType != "application/data" &&
 		sourceContentType != "application/binary" {
 		m.lo.Debug("detected media content type from trusted source", "detected_type", sourceContentType)
@@ -443,7 +426,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 
 	// If stdlib gives a useful type, use it.
 	// stdlib defaults to application/octet-stream for unknown types.
-	if detected != "application/octet-stream" {
+	if detected != models.ContentTypeOctetStream {
 		content.Seek(0, io.SeekStart)
 		m.lo.Debug("detected media content type using stdlib", "detected_type", detected, "source_type", sourceContentType)
 		return detected, nil

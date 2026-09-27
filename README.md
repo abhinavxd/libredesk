@@ -16,7 +16,7 @@
 
 <br> Modern, open source, self-hosted omnichannel customer support desk. Live chat, email, and more in a single binary.
 
-![image](https://libredesk.io/hero-dark.png?q=5)
+![image](https://libredesk.io/hero-dark.png?v=1)
 
 
 Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live demo**](https://demo.libredesk.io/).

@@ -11,11 +11,14 @@ import (
 
 const (
 	// Built-in templates names stored in the database.
-	TmplConversationAssigned = "Conversation assigned"
-	TmplSLABreachWarning     = "SLA breach warning"
-	TmplSLABreached          = "SLA breached"
-	TmplMentioned            = "Mentioned in conversation"
-	TmplCSATRequest          = "CSAT request"
+	TmplConversationAssigned  = "Conversation assigned"
+	TmplSLABreachWarning      = "SLA breach warning"
+	TmplSLABreached           = "SLA breached"
+	TmplMentioned             = "Mentioned in conversation"
+	TmplCSATRequest           = "CSAT request"
+	TmplNewReply              = "New reply from contact"
+	TmplNewReplyParticipating = "New reply on participating conversation"
+	TmplConversationReopened  = "Conversation reopened"
 
 	// Built-in templates fetched from memory stored in `static` directory.
 	TmplResetPassword = "reset-password"

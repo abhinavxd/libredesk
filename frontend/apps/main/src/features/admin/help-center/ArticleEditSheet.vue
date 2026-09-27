@@ -5,12 +5,35 @@
         <div class="flex items-center justify-between p-6 border-b bg-card/50">
           <div>
             <SheetTitle>
-              {{ article ? t('helpCenter.editArticle') : t('helpCenter.newArticle') }}
+              {{
+                translationSource
+                  ? t('helpCenter.addTranslation')
+                  : article
+                    ? t('helpCenter.editArticle')
+                    : t('helpCenter.newArticle')
+              }}
             </SheetTitle>
-            <SheetDescription v-if="article" class="mt-1">
-              {{ t('globals.terms.lastUpdated') }}:
-              {{ format(new Date(article.updated_at), 'PPpp') }}
+            <SheetDescription v-if="translationSource" class="mt-1">
+              {{ t('helpCenter.translationOf', { title: translationSource.title }) }}
             </SheetDescription>
+            <div v-if="loadedArticle" class="mt-1 flex items-center gap-3">
+              <SheetDescription>
+                {{ t('globals.terms.lastUpdated') }}:
+                {{ formatDate(loadedArticle.updated_at) }}
+              </SheetDescription>
+              <Button
+                v-if="articleUrl"
+                as="a"
+                variant="link"
+                :href="articleUrl"
+                target="_blank"
+                rel="noopener"
+                class="h-auto gap-1 p-0 font-normal"
+              >
+                {{ t('globals.messages.viewArticle') }}
+                <ExternalLink class="size-3.5" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -50,6 +73,8 @@
                         enableInlineImages
                         linkedModel="help_articles"
                         :toolbarTarget="toolbarSlot"
+                        :accent-color="helpCenterColor"
+                        :accent-color-dark="helpCenterColorDark"
                         class="min-h-[400px] border-0 px-0 shadow-none focus-visible:ring-0"
                       />
                     </div>
@@ -89,6 +114,89 @@
                 </div>
               </div>
 
+              <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
+                <h3 class="font-medium text-sm text-muted-foreground">
+                  {{ t('globals.terms.translation', 2) }}
+                </h3>
+                <p class="text-sm text-muted-foreground">
+                  {{ t('helpCenter.translationsHint') }}
+                </p>
+
+                <div class="space-y-2">
+                  <div v-for="locale in translatedLocales" :key="locale" class="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      class="h-auto min-w-0 flex-1 justify-start gap-3 px-3 py-2.5 text-left font-normal disabled:opacity-100"
+                      :class="{ 'font-medium': locale === loadedArticle.locale }"
+                      :disabled="locale === loadedArticle.locale"
+                      :aria-current="locale === loadedArticle.locale ? 'page' : undefined"
+                      @click="selectTranslationLocale(locale)"
+                    >
+                      <span class="min-w-0 flex-1 truncate">{{ languageName(locale) }}</span>
+                      <span class="text-xs uppercase text-muted-foreground">{{ locale }}</span>
+                      <Check
+                        v-if="locale === loadedArticle.locale"
+                        class="size-4 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <ChevronRight
+                        v-else
+                        class="size-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </Button>
+                    <Tooltip v-if="translatedLocales.length > 1">
+                      <TooltipTrigger as-child>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          class="h-auto shrink-0 text-muted-foreground hover:text-destructive"
+                          :aria-label="t('helpCenter.unlinkTranslation')"
+                          @click="askUnlink(locale)"
+                        >
+                          <Unlink aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {{ t('helpCenter.unlinkTranslation') }}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+
+                <Select
+                  v-if="missingLocales.length"
+                  :model-value="''"
+                  @update:model-value="selectTranslationLocale"
+                >
+                  <SelectTrigger class="w-full">
+                    <div class="flex items-center gap-2">
+                      <Plus class="size-4" aria-hidden="true" />
+                      <SelectValue :placeholder="t('helpCenter.addTranslation')" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem v-for="locale in missingLocales" :key="locale" :value="locale">
+                      {{ languageName(locale) }} ({{ locale }})
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  v-if="missingLocales.length"
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="w-full"
+                  @click="openLinkDialog"
+                >
+                  <Link2 class="mr-2 size-4" aria-hidden="true" />
+                  {{ t('helpCenter.linkExistingArticle') }}
+                </Button>
+              </div>
+
               <div class="space-y-3">
                 <h3 class="font-medium text-sm text-muted-foreground">
                   {{ t('globals.terms.status') }}
@@ -122,6 +230,16 @@
                 <p v-if="localeCollections.length === 0" class="text-sm text-muted-foreground">
                   {{ t('helpCenter.noCollectionsInLanguage') }}
                 </p>
+                <Button
+                  v-if="localeCollections.length === 0 && translationSource"
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  @click="emit('create-translation-collection', { locale: form.values.locale })"
+                >
+                  <Plus class="mr-2 size-4" aria-hidden="true" />
+                  {{ t('helpCenter.newCollection') }}
+                </Button>
 
                 <FormField v-slot="{ componentField }" name="collection_id">
                   <FormItem>
@@ -183,7 +301,7 @@
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="loc in helpCenterLocales" :key="loc" :value="loc">
+                          <SelectItem v-for="loc in selectableLocales" :key="loc" :value="loc">
                             {{ loc }}
                           </SelectItem>
                         </SelectContent>
@@ -256,26 +374,35 @@
                 </FormField>
               </div>
 
-              <div v-if="article" class="space-y-3 text-sm border-t pt-4">
+              <div v-if="loadedArticle" class="space-y-3 text-sm border-t pt-4">
                 <div v-if="loadedArticle?.created_by_name" class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('helpCenter.createdBy') }}</span>
                   <span>{{ loadedArticle.created_by_name }}</span>
                 </div>
-                <div v-if="loadedArticle?.helpful_count !== undefined" class="flex justify-between py-1">
+                <div
+                  v-if="loadedArticle?.helpful_count !== undefined"
+                  class="flex justify-between py-1"
+                >
                   <span class="text-muted-foreground">{{ t('globals.terms.feedback') }}</span>
-                  <span>👍 {{ loadedArticle.helpful_count }} · 👎 {{ loadedArticle.not_helpful_count }}</span>
+                  <span
+                    >👍 {{ loadedArticle.helpful_count }} · 👎
+                    {{ loadedArticle.not_helpful_count }}</span
+                  >
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.createdAt') }}</span>
-                  <span>{{ format(new Date(article.created_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(loadedArticle.created_at) }}</span>
                 </div>
                 <div class="flex justify-between py-1">
                   <span class="text-muted-foreground">{{ t('globals.terms.updatedAt') }}</span>
-                  <span>{{ format(new Date(article.updated_at), 'PPpp') }}</span>
+                  <span>{{ formatDate(loadedArticle.updated_at) }}</span>
                 </div>
-                <div v-if="article.view_count !== undefined" class="flex justify-between py-1">
+                <div
+                  v-if="loadedArticle.view_count !== undefined"
+                  class="flex justify-between py-1"
+                >
                   <span class="text-muted-foreground">{{ t('globals.terms.view', 2) }}</span>
-                  <span>{{ article.view_count.toLocaleString() }}</span>
+                  <span>{{ loadedArticle.view_count.toLocaleString() }}</span>
                 </div>
               </div>
             </div>
@@ -284,6 +411,58 @@
       </div>
     </SheetContent>
   </Sheet>
+
+  <Dialog :open="showLinkDialog" @update:open="showLinkDialog = $event">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ t('helpCenter.linkExistingArticle') }}</DialogTitle>
+        <DialogDescription>{{ t('helpCenter.linkExistingArticleHint') }}</DialogDescription>
+      </DialogHeader>
+
+      <div class="space-y-4">
+        <Spinner v-if="isLoadingLinkable" />
+        <p v-else-if="!linkableArticleItems.length" class="text-sm text-muted-foreground">
+          {{ t('helpCenter.noLinkableArticles') }}
+        </p>
+        <SelectComboBox
+          v-else
+          v-model="linkArticleID"
+          :items="linkableArticleItems"
+          :placeholder="t('placeholders.selectArticle')"
+        />
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" @click="showLinkDialog = false">
+          {{ t('globals.messages.cancel') }}
+        </Button>
+        <Button type="button" :disabled="!linkArticleID || isLinking" @click="confirmLink">
+          {{ t('globals.terms.link') }}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  <AlertDialog :open="showUnlinkDialog" @update:open="showUnlinkDialog = $event">
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogDescription>
+          {{
+            t('helpCenter.unlinkTranslationConfirmation', {
+              language: languageName(unlinkLocale)
+            })
+          }}
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click="confirmUnlink">{{
+          t('globals.messages.unlink')
+        }}</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>
 
 <script setup>
@@ -304,6 +483,24 @@ import {
 import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@shared-ui/components/ui/sheet'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@shared-ui/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@shared-ui/components/ui/alert-dialog'
+import {
   FormControl,
   FormDescription,
   FormField,
@@ -316,14 +513,18 @@ import { useI18n } from 'vue-i18n'
 import Editor from '@main/components/editor/ArticleEditor.vue'
 import { highlightCodeBlocks } from '@main/components/editor/highlightCodeBlocks'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useUserStore } from '@/stores/user'
-import { format } from 'date-fns'
+import { useAppSettingsStore } from '@/stores/appSettings'
+import { format, isValid } from 'date-fns'
+import { Check, ChevronRight, ExternalLink, Link2, Plus, Unlink } from 'lucide-vue-next'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 
-const { t } = useI18n()
+const { t, locale: uiLocale } = useI18n()
 
 const props = defineProps({
   isOpen: {
@@ -346,6 +547,18 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  helpCenterSlug: {
+    type: String,
+    default: ''
+  },
+  helpCenterColor: {
+    type: String,
+    default: ''
+  },
+  helpCenterColorDark: {
+    type: String,
+    default: ''
+  },
   helpCenterLocales: {
     type: Array,
     default: () => ['en']
@@ -353,6 +566,14 @@ const props = defineProps({
   defaultLocale: {
     type: String,
     default: ''
+  },
+  translationSource: {
+    type: Object,
+    default: null
+  },
+  createdCollection: {
+    type: Object,
+    default: null
   },
   submitForm: {
     type: Function,
@@ -364,12 +585,25 @@ const props = defineProps({
   }
 })
 
-defineEmits(['update:open', 'cancel'])
+const emit = defineEmits([
+  'update:open',
+  'cancel',
+  'create-translation',
+  'create-translation-collection',
+  'open-translation'
+])
 const emitter = useEmitter()
 const userStore = useUserStore()
-
+const appSettingsStore = useAppSettingsStore()
 
 const isLoadingArticle = ref(false)
+const showUnlinkDialog = ref(false)
+const unlinkLocale = ref('')
+const showLinkDialog = ref(false)
+const isLinking = ref(false)
+const isLoadingLinkable = ref(false)
+const linkArticleID = ref('')
+const linkableArticles = ref([])
 const availableCollections = ref([])
 const editorText = ref('')
 const toolbarSlot = ref(null)
@@ -382,6 +616,59 @@ const submitLabel = computed(() =>
   props.article ? t('globals.messages.update') : t('globals.messages.create')
 )
 
+const linkedLocales = computed(
+  () =>
+    new Set(
+      (loadedArticle.value?.translations || props.translationSource?.translations || []).map(
+        ({ locale }) => locale
+      )
+    )
+)
+const selectableLocales = computed(() => {
+  if (props.translationSource) {
+    return props.helpCenterLocales.filter((locale) => !linkedLocales.value.has(locale))
+  }
+  if (props.article) {
+    return props.helpCenterLocales.filter(
+      (locale) => locale === loadedArticle.value?.locale || !linkedLocales.value.has(locale)
+    )
+  }
+  return props.helpCenterLocales
+})
+const translationByLocale = computed(
+  () =>
+    new Map(
+      (loadedArticle.value?.translations || []).map((translation) => [
+        translation.locale,
+        translation
+      ])
+    )
+)
+const translatedLocales = computed(() =>
+  props.helpCenterLocales.filter((locale) => translationByLocale.value.has(locale))
+)
+const missingLocales = computed(() =>
+  props.helpCenterLocales.filter((locale) => !translationByLocale.value.has(locale))
+)
+const languageDisplayNames = computed(
+  () => new Intl.DisplayNames([uiLocale.value], { type: 'language' })
+)
+
+const languageName = (locale) => languageDisplayNames.value.of(locale) || locale
+
+const articleUrl = computed(() => {
+  if (!props.helpCenterSlug || loadedArticle.value?.status !== 'published') return ''
+  const root = (appSettingsStore.settings?.['app.root_url'] || window.location.origin).replace(
+    /\/$/,
+    ''
+  )
+  return `${root}/hc/${props.helpCenterSlug}/${loadedArticle.value.locale}/articles/${loadedArticle.value.slug}`
+})
+const formatDate = (value) => {
+  const date = new Date(value)
+  return isValid(date) ? format(date, 'PPpp') : '-'
+}
+
 const toFormValues = () => {
   const article = loadedArticle.value || props.article
   return {
@@ -392,7 +679,12 @@ const toFormValues = () => {
     sort_order: article?.sort_order || 0,
     ai_enabled: article?.ai_enabled || false,
     author_id: String(article?.author_id || (props.article ? '' : userStore.userID) || ''),
-    locale: article?.locale || props.defaultLocale || props.helpCenterLocales?.[0] || 'en',
+    locale:
+      article?.locale ||
+      props.translationSource?.locale ||
+      props.defaultLocale ||
+      selectableLocales.value[0] ||
+      'en',
     excerpt: article?.excerpt || '',
     meta_title: article?.meta_title || '',
     meta_description: article?.meta_description || '',
@@ -442,7 +734,7 @@ const metaDescriptionPlaceholder = computed(() => (form.values.excerpt || '').tr
 // can't fill the form after another article was opened.
 let loadSeq = 0
 watch(
-  () => [props.article, props.collectionId, props.isOpen],
+  () => [props.article, props.collectionId, props.translationSource, props.isOpen],
   async () => {
     if (!props.isOpen) return
     const seq = ++loadSeq
@@ -458,6 +750,15 @@ watch(
     else titleInput.value?.$el?.focus()
   },
   { immediate: true }
+)
+
+watch(
+  () => props.createdCollection,
+  async (collection) => {
+    if (!collection || !props.isOpen) return
+    await fetchAvailableCollections()
+    form.setFieldValue('collection_id', String(collection.id), false)
+  }
 )
 
 const fetchAvailableCollections = async () => {
@@ -486,11 +787,96 @@ const fetchArticle = async () => {
   }
 }
 
+const linkableArticleItems = computed(() =>
+  linkableArticles.value
+    .filter((article) => !translationByLocale.value.has(article.locale))
+    .map((article) => ({
+      label: `${article.title} - ${languageName(article.locale)}`,
+      value: String(article.id)
+    }))
+)
+
+const openLinkDialog = async () => {
+  linkArticleID.value = ''
+  linkableArticles.value = []
+  showLinkDialog.value = true
+  isLoadingLinkable.value = true
+  try {
+    const { data } = await api.getLinkableArticles(props.helpCenterId, loadedArticle.value.locale)
+    linkableArticles.value = data.data || []
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isLoadingLinkable.value = false
+  }
+}
+
+const confirmLink = async () => {
+  isLinking.value = true
+  try {
+    await api.linkArticleTranslation(Number(linkArticleID.value), {
+      translation_of_id: loadedArticle.value.id
+    })
+    loadedArticle.value = await fetchArticle()
+    showLinkDialog.value = false
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('helpCenter.translationLinked')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  } finally {
+    isLinking.value = false
+  }
+}
+
+const askUnlink = (locale) => {
+  unlinkLocale.value = locale
+  showUnlinkDialog.value = true
+}
+
+const confirmUnlink = async () => {
+  showUnlinkDialog.value = false
+  try {
+    await api.unlinkArticleTranslation(translationByLocale.value.get(unlinkLocale.value).id)
+    loadedArticle.value = await fetchArticle()
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('helpCenter.translationUnlinked')
+    })
+  } catch (error) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      variant: 'destructive',
+      description: handleHTTPError(error).message
+    })
+  }
+}
+
+const selectTranslationLocale = (locale) => {
+  if (form.meta.value.dirty) {
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+      description: t('helpCenter.saveBeforeSwitchingTranslation')
+    })
+    return
+  }
+  const translation = translationByLocale.value.get(locale)
+  if (translation) {
+    emit('open-translation', translation)
+    return
+  }
+  emit('create-translation', { article: loadedArticle.value, locale })
+}
+
 const onSubmit = form.handleSubmit(async (values) => {
   props.submitForm({
     ...values,
     content: highlightCodeBlocks(values.content),
-    author_id: values.author_id ? Number(values.author_id) : null
+    author_id: values.author_id ? Number(values.author_id) : null,
+    translation_of_id: props.translationSource?.id || undefined
   })
 })
 </script>

@@ -6,9 +6,49 @@ const messageBody = `Reply body from the palette spec ${stamp}`
 describe('Command palette macros', () => {
   let contentMacroId
   let actionMacroId
+  let inboxId
+  let conversationUuid
 
   before(() => {
     cy.login()
+    cy.api('POST', '/api/v1/inboxes', {
+      name: `Palette Inbox ${stamp}`,
+      channel: 'email',
+      enabled: true,
+      from: `Palette ${stamp} <palette.${stamp}@example.com>`,
+      config: {
+        auth_type: 'password',
+        from: `Palette ${stamp} <palette.${stamp}@example.com>`,
+        smtp: [
+          {
+            host: '127.0.0.1',
+            port: Number(Cypress.env('SMTP_PORT') || 1025),
+            username: '',
+            password: '',
+            auth_protocol: 'none',
+            tls_type: 'none',
+            max_conns: 2,
+            max_msg_retries: 1,
+            idle_timeout: '5s',
+            pool_wait_timeout: '5s'
+          }
+        ],
+        imap: []
+      }
+    }).then((resp) => {
+      inboxId = resp.body.data.id
+      cy.api('POST', '/api/v1/conversations', {
+        inbox_id: inboxId,
+        contact_email: `palette.contact.${stamp}@example.com`,
+        first_name: 'Palette',
+        last_name: `Contact${stamp}`,
+        subject: `Palette conversation ${stamp}`,
+        content: '<p>first message</p>',
+        initiator: 'contact'
+      }).then((convResp) => {
+        conversationUuid = convResp.body.data.uuid
+      })
+    })
     cy.api('POST', '/api/v1/macros', {
       name: contentMacroName,
       message_content: `<p>${messageBody}</p>`,
@@ -38,6 +78,7 @@ describe('Command palette macros', () => {
     cy.login()
     if (contentMacroId) cy.api('DELETE', `/api/v1/macros/${contentMacroId}`)
     if (actionMacroId) cy.api('DELETE', `/api/v1/macros/${actionMacroId}`)
+    if (inboxId) cy.api('DELETE', `/api/v1/inboxes/${inboxId}`, null, { failOnStatusCode: false })
   })
 
   it('serves the compact list without message content', () => {
@@ -84,8 +125,10 @@ describe('Command palette macros', () => {
     cy.intercept('GET', '**/api/v1/macros/search*').as('macroSearch')
     cy.intercept('GET', /\/api\/v1\/macros\/\d+$/).as('macroContent')
 
-    cy.visit('/inboxes/assigned')
-    cy.contains('My inbox').should('be.visible')
+    // Macros apply to a conversation, so the shortcut needs one open.
+    cy.intercept('GET', '**/messages?page=*').as('loadMessages')
+    cy.visit(`/inboxes/all/conversation/${conversationUuid}`)
+    cy.wait('@loadMessages')
 
     // useMagicKeys only sees Ctrl_M when the Control and m keydowns arrive in separate tasks.
     cy.window().then(async (win) => {

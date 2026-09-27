@@ -6,7 +6,7 @@
         <Button
           v-if="isMobile"
           variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
+          class="w-11 h-11 lg:w-8 lg:h-8 p-0 shrink-0 -ml-2 lg:-ml-1"
           :aria-label="t('globals.messages.back')"
           @click="goBackToList"
         >
@@ -18,7 +18,7 @@
         <Button
           v-if="isMobile"
           variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0"
+          :class="MOBILE_ICON_BUTTON_CLASS"
           :aria-label="t('globals.terms.contact')"
           @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
         >
@@ -39,9 +39,11 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 md:px-2 md:py-1 rounded-md text-sm"
+              class="flex h-11 lg:h-8 items-center cursor-pointer"
             >
-              <span class="text-primary-foreground font-medium inline-block">
+              <span
+                class="rounded-md bg-primary px-2.5 py-1 text-xs lg:text-sm font-medium text-primary-foreground"
+              >
                 {{ conversationStore.current?.status }}
               </span>
             </div>
@@ -58,7 +60,11 @@
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
+            <Button
+              variant="ghost"
+              :class="MOBILE_ICON_BUTTON_CLASS"
+              :aria-label="t('globals.messages.moreActions')"
+            >
               <MoreHorizontal class="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -87,7 +93,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
+
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { Clock, MoreHorizontal, ChevronLeft, PanelRight } from 'lucide-vue-next'
@@ -104,7 +112,9 @@ import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents.js'
+import { useCommandPalette } from '@/features/command/useCommandPalette'
+import { SNOOZE_COMMAND } from '@/features/command/providers/useConversationCommands'
 import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
@@ -115,6 +125,7 @@ import { permissions as perms } from '@main/constants/permissions.js'
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
+const palette = useCommandPalette()
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -182,12 +193,18 @@ const summarize = async () => {
 
 const handleUpdateStatus = (status) => {
   if (status === CONVERSATION_DEFAULT_STATUSES.SNOOZED) {
-    emitter.emit(EMITTER_EVENTS.SET_NESTED_COMMAND, {
-      command: 'snooze',
-      open: true
-    })
+    palette.openPalette({ parent: SNOOZE_COMMAND })
     return
   }
   conversationStore.updateStatus(status)
 }
+
+const paletteActions = {
+  [CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT]: downloadTranscript,
+  [CONVERSATION_ACTIONS.SUMMARIZE]: summarize
+}
+const onPaletteAction = (action) => paletteActions[action]?.()
+
+onMounted(() => emitter.on(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
+onUnmounted(() => emitter.off(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
 </script>

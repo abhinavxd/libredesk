@@ -60,6 +60,7 @@
                   <TooltipContent>{{ contactFullName }}</TooltipContent>
                 </Tooltip>
                 <div class="flex items-center gap-1 flex-shrink-0">
+                  <PriorityMarker :priority="conversation.priority" />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <component
@@ -104,7 +105,7 @@
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-success inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-[-2px] mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
@@ -176,6 +177,7 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
+import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'

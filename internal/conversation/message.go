@@ -28,6 +28,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -259,7 +260,7 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 		return nil, fmt.Errorf("fetching conversation: %w", err)
 	}
 
-	sender, err := m.userStore.GetAgent(senderID, "")
+	sender, err := m.userStore.GetAgentCachedOrLoad(senderID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching message sender user: %w", err)
 	}
@@ -455,6 +456,17 @@ func (m *Manager) MarkMessageAsPending(uuid string) error {
 	return nil
 }
 
+// ClearHandoffFormPending clears the handoff form flag on a message and reports whether it was set.
+func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
+	res, err := m.q.ClearMessageHandoffFormPending.Exec(messageUUID)
+	if err != nil {
+		m.lo.Error("error clearing handoff form flag", "message_uuid", messageUUID, "error", err)
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
 	// Best-effort render template variables before saving.
@@ -509,7 +521,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 	}
 
 	// Process post-message hooks (reopen, waiting since, automation, SLA).
-	if err := m.ProcessIncomingMessageHooks(conversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(message, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	}
 
@@ -598,6 +610,29 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 
 // InsertMessage inserts a message and attaches the media to the message.
 func (m *Manager) InsertMessage(message *models.Message) error {
+	tx, err := m.db.Beginx()
+	if err != nil {
+		m.lo.Error("error beginning message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	inlineUUIDs, err := m.InsertMessageTx(tx, message)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	m.AfterMessageInsert(message, inlineUUIDs)
+	return nil
+}
+
+// InsertMessageTx inserts a message inside the caller's transaction; the caller must run AfterMessageInsert once it commits.
+func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]string, error) {
 	if message.Private {
 		message.Status = models.MessageStatusSent
 	}
@@ -622,28 +657,20 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
-	tx, err := m.db.Beginx()
-	if err != nil {
-		m.lo.Error("error beginning message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	defer tx.Rollback()
-
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs); err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	return inlineUUIDs, nil
+}
 
-	if err := tx.Commit(); err != nil {
-		m.lo.Error("error committing message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
+// AfterMessageInsert runs the post-commit side effects of a message insert: participant, last message and broadcast.
+func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []string) {
 	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
@@ -687,8 +714,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 
 	// Trigger webhook for new message created.
 	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
-
-	return nil
 }
 
 // RecordAssigneeUserChange records an activity for a user assignee change.
@@ -699,11 +724,24 @@ func (m *Manager) RecordAssigneeUserChange(conversationUUID string, assigneeID i
 	}
 
 	// Assignment to another user.
-	assignee, err := m.userStore.GetAgent(assigneeID, "")
+	assignee, err := m.userStore.GetAgentCachedOrLoad(assigneeID)
 	if err != nil {
 		return err
 	}
 	return m.InsertConversationActivity(models.ActivityAssignedUserChange, conversationUUID, assignee.FullName(), actor)
+}
+
+// RecordAssigneeUserRemoval records an activity for the removal of a user assignee.
+func (m *Manager) RecordAssigneeUserRemoval(conversationUUID string, assigneeID int, actor umodels.User) error {
+	if assigneeID == actor.ID {
+		return m.InsertConversationActivity(models.ActivitySelfUnassign, conversationUUID, actor.FullName(), actor)
+	}
+
+	assignee, err := m.userStore.GetAgentCachedOrLoad(assigneeID)
+	if err != nil {
+		return err
+	}
+	return m.InsertConversationActivity(models.ActivityAssigneeUserRemoved, conversationUUID, assignee.FullName(), actor)
 }
 
 // RecordAssigneeTeamChange records an activity for a team assignee change.
@@ -788,8 +826,12 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("Assigned to %s by %s", newValue, actorName)
 	case models.ActivityAssignedTeamChange:
 		content = fmt.Sprintf("Assigned to %s team by %s", newValue, actorName)
+	case models.ActivityAssigneeUserRemoved:
+		content = fmt.Sprintf("%s removed %s as assignee", actorName, newValue)
 	case models.ActivitySelfAssign:
 		content = fmt.Sprintf("%s self-assigned this conversation", actorName)
+	case models.ActivitySelfUnassign:
+		content = fmt.Sprintf("%s unassigned themselves", actorName)
 	case models.ActivityPriorityChange:
 		content = fmt.Sprintf("%s set priority to %s", actorName, newValue)
 	case models.ActivityStatusChange:
@@ -894,7 +936,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	m.broadcastMessageToWidgetClients(&msg)
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 		return models.Message{}, fmt.Errorf("processing incoming message hooks: %w", err)
 	}
@@ -1016,7 +1058,7 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
 	// isNewConversation = false since conversation always exists for live chat.
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, false); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 	}
 
@@ -1387,7 +1429,9 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 // ProcessIncomingMessageHooks handles automation rules, webhooks, SLA events, and other post-processing
 // for incoming messages. This allows other channels to insert messages first and then call this
 // function to trigger the necessary hooks.
-func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConversation bool) error {
+func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConversation bool) error {
+	conversationUUID := message.ConversationUUID
+
 	// Start waiting since clock, cleared when agent replies.
 	m.StartConversationWaitingSince(conversationUUID, time.Now())
 
@@ -1408,11 +1452,13 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	}
 
 	// Reopen conversation if it's not Open.
+	var reopened bool
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
 		m.lo.Error("error fetching system user", "error", err)
 	} else {
-		if err := m.ReOpenConversation(conversationUUID, systemUser); err != nil {
+		var err error
+		if reopened, err = m.ReOpenConversation(conversationUUID, systemUser); err != nil {
 			m.lo.Error("error reopening conversation", "error", err)
 		}
 	}
@@ -1425,6 +1471,8 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
+
+		go m.NotifyNewReply(conversation, message, reopened)
 
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
@@ -1468,6 +1516,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
+		ID:               message.ID,
 		UUID:             message.UUID,
 		Status:           message.Status,
 		ConversationUUID: message.ConversationUUID,

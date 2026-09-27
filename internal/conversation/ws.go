@@ -34,9 +34,10 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.Co
 	data := map[string]any{
 		"conversation_uuid": message.ConversationUUID,
 		"uuid":              message.UUID,
+		"id":                message.ID,
 		"type":              message.Type,
 		"preview":           preview,
-		"created_at":        message.CreatedAt.Format(time.RFC3339),
+		"created_at":        message.CreatedAt.Format(time.RFC3339Nano),
 		"sender_type":       message.SenderType,
 		"conversation":      convToBroadcast(conv),
 	}

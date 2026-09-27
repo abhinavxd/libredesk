@@ -33,12 +33,14 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
 	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	notificationchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
@@ -1049,7 +1051,7 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:                 db,
 		Lo:                 initLogger("ai_agent"),
@@ -1057,7 +1059,7 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
 		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
 		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
-	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	}, aiManager, convo, inboxManager, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
@@ -1065,12 +1067,15 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:              db,
+		Lo:              lo,
+		I18n:            i18n,
+		FilterFields:    conversation.ListFilterAllowedFields,
+		FilterRenderers: conversation.ListFilterRenderers,
+		FilterLocation:  convo.FilterLocation,
 	})
 	if err != nil {
 		log.Fatalf("error initializing search manager: %v", err)
@@ -1168,6 +1173,19 @@ func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificati
 	return m
 }
 
+// initNotificationPreference inits the notification preference manager.
+func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.PreferenceManager {
+	m, err := notifier.NewPreferenceManager(notifier.PreferenceManagerOpts{
+		DB:   db,
+		Lo:   initLogger("notification-preference"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification preference manager: %v", err)
+	}
+	return m
+}
+
 // initImporter inits the importer manager.
 func initImporter(i18n *i18n.I18n) *importer.Importer {
 	return importer.New(importer.Opts{
@@ -1176,14 +1194,46 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 	})
 }
 
+func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service) *notifier.EmailQueue {
+	q, err := notifier.NewEmailQueue(notifier.EmailQueueOpts{
+		DB:       db,
+		Outbound: outbound,
+		Lo:       initLogger("notification-email-queue"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification email queue: %v", err)
+	}
+	return q
+}
+
+func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *notifier.PushManager {
+	m, err := notifier.NewPushManager(notifier.PushManagerOpts{
+		DB:          db,
+		Settings:    settings,
+		Lo:          initLogger("push-notification"),
+		I18n:        i18n,
+		RootURL:     ko.String("app.root_url"),
+		Concurrency: ko.MustInt("notification.concurrency"),
+		QueueSize:   ko.MustInt("notification.queue_size"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing push notification manager: %v", err)
+	}
+	return m
+}
+
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+	providers := []notificationchannels.Provider{
+		notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
+	}
+	if emailEnabled {
+		providers = append(providers, notificationchannels.NewEmail(emailQueue))
+	}
+	providers = append(providers, notificationchannels.NewPush(push))
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:        userNotification,
-		Outbound:     outbound,
-		WSHub:        wsHub,
-		EmailEnabled: emailEnabled,
-		Lo:           initLogger("notification-dispatcher"),
+		Pipeline: notificationchannels.NewPipeline(providers...),
+		Prefs:    prefs,
 	})
 }
 
@@ -1269,4 +1319,12 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	}
 
 	return limiter
+}
+
+func initProactive(db *sqlx.DB, i18n *i18n.I18n) *proactive.Manager {
+	manager, err := proactive.New(proactive.Opts{DB: db, I18n: i18n, Lo: initLogger("proactive")})
+	if err != nil {
+		log.Fatalf("error initializing proactive messages: %v", err)
+	}
+	return manager
 }

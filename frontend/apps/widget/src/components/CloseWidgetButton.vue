@@ -3,6 +3,7 @@
     v-if="widgetStore.isMobileFullScreen"
     @click="closeWidget"
     variant="ghost"
+    size="sm"
     :aria-label="$t('globals.messages.closeChat')"
   >
     <X class="w-4 h-4" />
@@ -15,10 +16,5 @@ import { X } from 'lucide-vue-next'
 import { useWidgetStore } from '@widget/store/widget.js'
 
 const widgetStore = useWidgetStore()
-
-// Send message to parent window (widget.js) to close the widget
-const closeWidget = () => {
-  widgetStore.setOpen(false)
-  window.parent.postMessage({ type: 'CLOSE_WIDGET' }, '*')
-}
+const closeWidget = () => widgetStore.closeWidget()
 </script>

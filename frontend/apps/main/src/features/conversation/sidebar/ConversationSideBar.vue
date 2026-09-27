@@ -45,6 +45,7 @@
             <div v-if="conversationStore.current">
               <SelectTagCombobox
                 multiple
+                keep-open-on-select
                 :model-value="conversationStore.current.tags || []"
                 @update:modelValue="onTagsChange"
               />
@@ -152,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Sparkles, Loader2, Plus } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { useConversationStore } from '@/stores/conversation'
@@ -169,7 +170,7 @@ import ConversationInfo from './ConversationInfo.vue'
 import ConversationSideBarContact from '@/features/conversation/sidebar/ConversationSideBarContact.vue'
 import CopilotPanel from '@/features/conversation/sidebar/CopilotPanel.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { useStorage } from '@vueuse/core'
@@ -240,6 +241,13 @@ const suggestTags = async () => {
     isSuggestingTags.value = false
   }
 }
+
+const onPaletteAction = (action) => {
+  if (action === CONVERSATION_ACTIONS.SUGGEST_TAGS) suggestTags()
+}
+
+onMounted(() => emitter.on(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
+onUnmounted(() => emitter.off(EMITTER_EVENTS.CONVERSATION_ACTION, onPaletteAction))
 
 const applySuggestedTag = (tag) => {
   const conv = conversationStore.current

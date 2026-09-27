@@ -121,7 +121,9 @@
 
     // Mention styling — vue-letter scopes classes as msg_XXX_ld-mention
     [class$="_ld-mention"],
-    .ld-mention {
+    [class$="_ld-conversation-reference"],
+    .ld-mention,
+    .ld-conversation-reference {
       background-color: hsl(var(--primary) / 0.1);
       border-radius: 0.25rem;
       padding: 0 0.25rem;
@@ -272,6 +274,15 @@
   }
 }
 
+// Sender colours are only legible against white, so incoming email HTML is not themed.
+.dark .email-light-canvas {
+  @apply p-2 rounded border border-border;
+
+  color-scheme: light;
+  background: #fff;
+  color: #1a1a1a;
+}
+
 .overlay {
   background: hsl(var(--foreground) / 0.5);
 }
@@ -417,6 +428,10 @@
 @layer components {
   .link-style {
     @apply text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors;
+  }
+
+  .drag-ghost {
+    @apply bg-accent/60 opacity-60;
   }
 }
 

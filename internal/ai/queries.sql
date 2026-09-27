@@ -10,6 +10,20 @@ SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE key
 -- name: get-prompts
 SELECT id, created_at, updated_at, key, title FROM ai_prompts ORDER BY title;
 
+-- name: get-prompt-by-id
+SELECT id, created_at, updated_at, key, title, content FROM ai_prompts WHERE id = $1;
+
+-- name: insert-prompt
+INSERT INTO ai_prompts (key, title, content) VALUES ($1, $2, $3)
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: update-prompt
+UPDATE ai_prompts SET title = $2, content = $3, updated_at = now() WHERE id = $1
+RETURNING id, created_at, updated_at, key, title, content;
+
+-- name: delete-prompt
+DELETE FROM ai_prompts WHERE id = $1;
+
 -- name: get-knowledge-base-items
 SELECT id, created_at, updated_at, type, title, content, enabled, source, source_url, embedded_fingerprint FROM ai_knowledge_base ORDER BY updated_at DESC;
 
@@ -43,7 +57,7 @@ WITH RECURSIVE published_collections AS (
 SELECT a.id, a.title, a.content, a.status, a.ai_enabled, a.embedded_fingerprint,
     a.collection_id IN (SELECT id FROM published_collections) AS is_reachable
 FROM help_articles a
-WHERE (a.status = 'published' AND a.ai_enabled) OR a.embedded_fingerprint <> '';
+WHERE (a.status = 'published' AND a.ai_enabled) OR a.embedded_fingerprint != '';
 
 -- name: get-embeddable-help-article
 WITH RECURSIVE published_collections AS (
@@ -89,23 +103,29 @@ SELECT id, name FROM tags ORDER BY id;
 SELECT id, source_type, source_id, chunk_text, embedding, dimensions FROM embeddings;
 
 -- name: get-tools
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools ORDER BY updated_at DESC;
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification, copilot_enabled, generate_reply_enabled, requires_agent_approval FROM ai_tools ORDER BY updated_at DESC;
 
 -- name: get-enabled-tools-by-ids
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE enabled = true AND id = ANY($1);
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification, copilot_enabled, generate_reply_enabled, requires_agent_approval FROM ai_tools WHERE enabled = true AND id = ANY($1);
+
+-- name: get-enabled-copilot-tool-ids
+SELECT id FROM ai_tools WHERE enabled = true AND copilot_enabled = true ORDER BY id;
+
+-- name: get-enabled-generate-reply-tool-ids
+SELECT id FROM ai_tools WHERE enabled = true AND generate_reply_enabled = true ORDER BY id;
 
 -- name: get-tool
-SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification FROM ai_tools WHERE id = $1;
+SELECT id, created_at, updated_at, name, description, url, method, auth, parameters, enabled, requires_verification, copilot_enabled, generate_reply_enabled, requires_agent_approval FROM ai_tools WHERE id = $1;
 
 -- name: get-tool-auth
 SELECT auth FROM ai_tools WHERE id = $1;
 
 -- name: insert-tool
-INSERT INTO ai_tools (name, description, url, method, auth, parameters, enabled, requires_verification)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
+INSERT INTO ai_tools (name, description, url, method, auth, parameters, enabled, requires_verification, copilot_enabled, generate_reply_enabled, requires_agent_approval)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *;
 
 -- name: update-tool
-UPDATE ai_tools SET name = $2, description = $3, url = $4, method = $5, auth = $6, parameters = $7, enabled = $8, requires_verification = $9, updated_at = now()
+UPDATE ai_tools SET name = $2, description = $3, url = $4, method = $5, auth = $6, parameters = $7, enabled = $8, requires_verification = $9, copilot_enabled = $10, generate_reply_enabled = $11, requires_agent_approval = $12, updated_at = now()
 WHERE id = $1 RETURNING *;
 
 -- name: delete-tool

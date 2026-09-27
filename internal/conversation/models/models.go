@@ -46,15 +46,17 @@ var (
 	MessageStatusFailed   = "failed"
 	MessageStatusReceived = "received"
 
-	ActivityStatusChange       = "status_change"
-	ActivityPriorityChange     = "priority_change"
-	ActivityAssignedUserChange = "assigned_user_change"
-	ActivityAssignedTeamChange = "assigned_team_change"
-	ActivitySelfAssign         = "self_assign"
-	ActivityTagAdded           = "tag_added"
-	ActivityTagRemoved         = "tag_removed"
-	ActivitySLASet             = "sla_set"
-	ActivityParticipantAdded   = "participant_added"
+	ActivityStatusChange        = "status_change"
+	ActivityPriorityChange      = "priority_change"
+	ActivityAssignedUserChange  = "assigned_user_change"
+	ActivityAssignedTeamChange  = "assigned_team_change"
+	ActivityAssigneeUserRemoved = "assignee_user_removed"
+	ActivitySelfAssign          = "self_assign"
+	ActivitySelfUnassign        = "self_unassign"
+	ActivityTagAdded            = "tag_added"
+	ActivityTagRemoved          = "tag_removed"
+	ActivitySLASet              = "sla_set"
+	ActivityParticipantAdded    = "participant_added"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
@@ -84,21 +86,25 @@ type ContinuityUnreadMessage struct {
 }
 
 type LastChatMessage struct {
-	Content   string           `db:"content" json:"content"`
-	CreatedAt time.Time        `db:"created_at" json:"created_at"`
-	Author    umodels.ChatUser `db:"author" json:"author"`
+	Attachments attachment.Attachments `db:"attachments" json:"attachments"`
+	Content     string                 `db:"content" json:"content"`
+	CreatedAt   time.Time              `db:"created_at" json:"created_at"`
+	Author      umodels.ChatUser       `db:"author" json:"author"`
 }
 
 type ChatConversation struct {
+	ContactLastSeenAt  time.Time         `db:"contact_last_seen_at" json:"contact_last_seen_at"`
 	CreatedAt          time.Time         `db:"created_at" json:"created_at"`
 	UUID               string            `db:"uuid" json:"uuid"`
 	Status             string            `db:"status" json:"status"`
 	LastChatMessage    LastChatMessage   `db:"last_message" json:"last_message"`
+	UnreadMessages     []ChatMessage     `db:"-" json:"unread_messages,omitempty"`
 	UnreadMessageCount int               `db:"unread_message_count" json:"unread_message_count"`
 	Assignee           *umodels.ChatUser `db:"assignee" json:"assignee"`
 }
 
 type ChatMessage struct {
+	ID               int                    `json:"id"`
 	UUID             string                 `json:"uuid"`
 	Status           string                 `json:"status"`
 	ConversationUUID string                 `json:"conversation_uuid"`

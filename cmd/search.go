@@ -2,100 +2,168 @@ package main
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	searchmanager "github.com/abhinavxd/libredesk/internal/search"
 	smodels "github.com/abhinavxd/libredesk/internal/search/models"
 	"github.com/zerodha/fastglue"
 )
 
 const (
 	minSearchQueryLength = 3
+
+	maxConversationSearchLimit = 1000
+	maxMessageSearchLimit      = 30
+	maxContactSearchLimit      = 15
 )
 
-// handleSearchConversations searches conversations based on the query.
+type searchPageResults struct {
+	Results    any    `json:"results"`
+	PerPage    int    `json:"per_page"`
+	HasMore    bool   `json:"has_more"`
+	NextCursor string `json:"next_cursor"`
+}
+
 func handleSearchConversations(r *fastglue.Request) error {
-	app, user, q, err := searchInputs(r)
+	app, user, term, err := searchTerm(r)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	results, err := app.search.Conversations(q)
+	scope, err := readScope(app, user.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	uuids := make([]string, len(results))
-	for i, c := range results {
-		uuids[i] = c.UUID
-	}
-	allowed, err := app.conversation.FilterAuthorizedListUUIDs(user.ID, uuids)
-	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-	}
-	set := uuidSet(allowed)
-	out := make([]smodels.ConversationResult, 0, len(allowed))
-	for _, c := range results {
-		if _, ok := set[c.UUID]; ok {
-			out = append(out, c)
-		}
-	}
-	return r.SendEnvelope(out)
-}
-
-// handleSearchMessages searches messages based on the query.
-func handleSearchMessages(r *fastglue.Request) error {
-	app, user, q, err := searchInputs(r)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	results, err := app.search.Messages(q)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	uuids := make([]string, len(results))
-	for i, m := range results {
-		uuids[i] = m.ConversationUUID
-	}
-	allowed, err := app.conversation.FilterAuthorizedListUUIDs(user.ID, uuids)
-	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-	}
-	set := uuidSet(allowed)
-	out := make([]smodels.MessageResult, 0, len(allowed))
-	for _, m := range results {
-		if _, ok := set[m.ConversationUUID]; ok {
-			out = append(out, m)
-		}
-	}
-	return r.SendEnvelope(out)
-}
-
-// handleSearchContacts searches contacts based on the query.
-func handleSearchContacts(r *fastglue.Request) error {
-	app, _, q, err := searchInputs(r)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	results, err := app.search.Contacts(q)
+	results, err := app.search.ConversationFirstPage(term, scope, searchLimit(r, maxConversationSearchLimit))
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(results)
 }
 
-func searchInputs(r *fastglue.Request) (*App, amodels.User, string, error) {
-	app := r.Context.(*App)
-	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
-	q := string(r.RequestCtx.QueryArgs().Peek("query"))
-	if len(q) < minSearchQueryLength {
-		return app, user, "", envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
+func handleSearchMessages(r *fastglue.Request) error {
+	app, user, term, err := searchTerm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
-	return app, user, q, nil
+	scope, err := readScope(app, user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, err := app.search.MessageFirstPage(term, scope, searchLimit(r, maxMessageSearchLimit))
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(results)
 }
 
-func uuidSet(uuids []string) map[string]struct{} {
-	s := make(map[string]struct{}, len(uuids))
-	for _, u := range uuids {
-		s[u] = struct{}{}
+func handleSearchContacts(r *fastglue.Request) error {
+	app, _, term, err := searchTerm(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
 	}
-	return s
+	results, err := app.search.Contacts(term, searchLimit(r, maxContactSearchLimit))
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(results)
+}
+
+func handlePaginatedSearchConversations(r *fastglue.Request) error {
+	app, user, q, err := searchInputs(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	scope, err := readScope(app, user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, hasMore, nextCursor, err := app.search.Conversations(q, scope)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(searchPageResults{
+		Results:    results,
+		PerPage:    q.PageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	})
+}
+
+func handlePaginatedSearchMessages(r *fastglue.Request) error {
+	app, user, q, err := searchInputs(r)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	scope, err := readScope(app, user.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	results, hasMore, nextCursor, err := app.search.Messages(q, scope)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(searchPageResults{
+		Results:    results,
+		PerPage:    q.PageSize,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	})
+}
+
+func searchInputs(r *fastglue.Request) (*App, amodels.User, smodels.Query, error) {
+	app, user, term, err := searchTerm(r)
+	if err != nil {
+		return app, user, smodels.Query{}, err
+	}
+	_, pageSize := getPagination(r)
+	query := searchmanager.NormalizeQuery(smodels.Query{
+		Term:     term,
+		Filters:  string(r.RequestCtx.QueryArgs().Peek("filters")),
+		Cursor:   string(r.RequestCtx.QueryArgs().Peek("cursor")),
+		Sort:     smodels.Sort(r.RequestCtx.QueryArgs().Peek("sort")),
+		PageSize: pageSize,
+	})
+	return app, user, query, nil
+}
+
+func searchTerm(r *fastglue.Request) (*App, amodels.User, string, error) {
+	app := r.Context.(*App)
+	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
+	term := string(r.RequestCtx.QueryArgs().Peek("query"))
+	if len(term) < minSearchQueryLength {
+		return app, user, "", envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
+	}
+	return app, user, term, nil
+}
+
+func searchLimit(r *fastglue.Request, max int) int {
+	limit, err := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("limit")))
+	if err != nil || limit < 1 || limit > max {
+		return max
+	}
+	return limit
+}
+
+func readScope(app *App, agentID int) (smodels.ReadScope, error) {
+	agent, err := app.user.GetAgentCachedOrLoad(agentID)
+	if err != nil {
+		return smodels.ReadScope{}, err
+	}
+	if !agent.Enabled {
+		return smodels.ReadScope{}, nil
+	}
+	return smodels.ReadScope{
+		UserID:         agent.ID,
+		TeamIDs:        agent.Teams.IDs(),
+		Read:           slices.Contains(agent.Permissions, authzmodels.PermConversationsRead),
+		ReadAll:        slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAll),
+		ReadAssigned:   slices.Contains(agent.Permissions, authzmodels.PermConversationsReadAssigned),
+		ReadTeamAll:    slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamAll),
+		ReadTeamInbox:  slices.Contains(agent.Permissions, authzmodels.PermConversationsReadTeamInbox),
+		ReadUnassigned: slices.Contains(agent.Permissions, authzmodels.PermConversationsReadUnassigned),
+	}, nil
 }

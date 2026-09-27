@@ -938,7 +938,11 @@ export const useConversationStore = defineStore('conversation', () => {
     if (!messages.data.hasMessage(message.conversation_uuid, message.uuid)) {
       const echoId = message.echo_id
       if (echoId && messages.data.hasMessage(message.conversation_uuid, echoId)) {
-        messages.data.updateMessage(message.conversation_uuid, echoId, { uuid: message.uuid })
+        messages.data.updateMessage(message.conversation_uuid, echoId, {
+          uuid: message.uuid,
+          id: message.id,
+          created_at: message.created_at
+        })
         incrementMessageVersion()
         updateAssigneeLastSeen(message.conversation_uuid)
         return
@@ -947,6 +951,7 @@ export const useConversationStore = defineStore('conversation', () => {
       if (message.type === 'activity') {
         const activityMessage = {
           uuid: message.uuid,
+          id: message.id,
           conversation_uuid: message.conversation_uuid,
           type: 'activity',
           content: message.preview,
@@ -1307,6 +1312,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setMacroActions,
     removeAssignee,
     getListSortField,
+    sortFieldI18nKeys,
     getListStatus,
     statuses,
     priorities,

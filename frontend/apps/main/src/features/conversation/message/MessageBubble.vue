@@ -3,9 +3,15 @@
     <!-- Sender Name -->
     <div
       v-if="!groupWithPrev"
-      class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
+      class="mb-1 flex items-center gap-1.5"
+      :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'"
     >
+      <Avatar class="w-7 h-7 text-xs md:hidden" :class="{ 'order-last': isOutgoing }">
+        <AvatarImage :src="getAvatar" />
+        <AvatarFallback class="font-medium">
+          {{ avatarFallback }}
+        </AvatarFallback>
+      </Avatar>
       <router-link
         v-if="!isOutgoing"
         :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
@@ -39,7 +45,7 @@
         <router-link
           v-if="!groupWithPrev"
           :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -48,11 +54,11 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <div v-else class="w-8 flex-shrink-0" />
+        <div v-else class="w-8 flex-shrink-0 max-md:hidden" />
       </template>
 
       <div
-        class="w-full md:w-4/5"
+        class="w-4/5"
         :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
         style="contain: inline-size"
       >
@@ -105,10 +111,18 @@
               >
                 {{ sanitizedContent }}
               </div>
-              <div v-else ref="messageContentEl" @click="onMessageContentClick">
+              <div
+                v-else
+                ref="messageContentEl"
+                @click="onMessageContentClick"
+                :class="{
+                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
+                }"
+              >
                 <Letter
                   :html="sanitizedContent"
-                  :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                  :allowedSchemas="allowedSchemas"
+                  :rewriteExternalLinks="rewriteMessageLink"
                   :allowed-css-properties="extendedCssProperties"
                   class="mb-1 native-html break-words"
                   :class="{ 'mb-3': message.attachments.length > 0 }"
@@ -201,11 +215,11 @@
 
       <!-- Avatar (right for outgoing) -->
       <template v-if="isOutgoing">
-        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
+        <div v-if="groupWithPrev" class="w-8 flex-shrink-0 max-md:hidden" />
         <router-link
           v-else-if="canManageAI"
           :to="aiAssistantRoute"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -217,7 +231,7 @@
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -226,7 +240,7 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <Avatar v-else class="w-8 h-8">
+        <Avatar v-else class="w-8 h-8 max-md:hidden">
           <AvatarImage :src="getAvatar" />
           <AvatarFallback class="font-medium">
             {{ avatarFallback }}
@@ -236,7 +250,7 @@
     </div>
 
     <!-- Timestamp tooltip -->
-    <div v-if="!groupWithNext" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div v-if="!groupWithNext" :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'">
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
@@ -384,6 +398,14 @@ const avatarFallback = computed(() => {
   const firstName = props.message.author?.first_name ?? (isOutgoing.value ? 'A' : 'U')
   return firstName.toUpperCase().substring(0, 2)
 })
+
+const allowedSchemas = ['cid', 'https', 'http', 'mailto']
+
+// vue-letter skips its own href schema check once a rewrite hook is set.
+const rewriteMessageLink = (href) => {
+  if (href.startsWith('/') && !href.startsWith('//')) return `${window.location.origin}${href}`
+  return allowedSchemas.includes(href.toLowerCase().split(':')[0]) ? href : ''
+}
 
 const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {

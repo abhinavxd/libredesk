@@ -2,7 +2,7 @@
   <div
     role="toolbar"
     :aria-label="t('conversation.bulkActions.toolbar')"
-    class="p-2 flex items-center gap-1 bg-muted/30"
+    class="p-2 flex flex-wrap items-center gap-1 bg-muted/30"
   >
     <Checkbox
       :checked="conversationStore.allSelected"
@@ -115,7 +115,6 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UserPlus, Users, Tag, CircleDot, Loader2, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
@@ -129,17 +128,13 @@ import {
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import SelectTagCombobox from '@main/components/combobox/SelectTagCombobox.vue'
-import { TAG_ACTION } from '@/constants/conversation'
 import { useConversationStore } from '@/stores/conversation'
-import { useEmitter } from '@/composables/useEmitter'
-import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
-import api from '@/api'
+import { useBulkActions } from '@/composables/useBulkActions'
 
 const conversationStore = useConversationStore()
 const { t } = useI18n()
-const emitter = useEmitter()
-const bulkLoading = ref(false)
+const { bulkLoading, bulkAssign, bulkAddTag, bulkUpdateStatus } = useBulkActions()
 
 const { canAssignAgent, canAssignTeam, canUpdateStatus, canUpdateTags } = useBulkActionPermissions()
 
@@ -151,45 +146,7 @@ const toggleSelectAll = () => {
   }
 }
 
-const runBulkAction = async (actionFn) => {
-  const uuids = [...conversationStore.selectedUUIDs]
-  bulkLoading.value = true
-  const results = await Promise.allSettled(uuids.map((uuid) => actionFn(uuid)))
-  bulkLoading.value = false
+const onAssigneeSelect = (assigneeType, item) => bulkAssign(assigneeType, item.value)
 
-  const hasFailures = results.some((r) => r.status === 'rejected')
-
-  conversationStore.clearSelection()
-  conversationStore.fetchFirstPageConversations()
-  conversationStore.fetchSidebarCounts({ force: true })
-
-  if (hasFailures) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      title: t('globals.terms.error', 1),
-      description: t('conversation.bulkActions.failedToast')
-    })
-  } else {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('conversation.bulkActions.successToast')
-    })
-  }
-}
-
-const onAssigneeSelect = (assigneeType, item) => {
-  if (item.value === 'none') {
-    runBulkAction((uuid) => api.removeAssignee(uuid, assigneeType))
-    return
-  }
-  const assigneeId = parseInt(item.value, 10)
-  runBulkAction((uuid) => api.updateAssignee(uuid, assigneeType, { assignee_id: assigneeId }))
-}
-
-const onTagSelect = (item) => {
-  runBulkAction((uuid) => conversationStore.updateConversationTags(uuid, TAG_ACTION.ADD, [item.value]))
-}
-
-const bulkUpdateStatus = (status) => {
-  runBulkAction((uuid) => api.updateConversationStatus(uuid, { status }))
-}
+const onTagSelect = (item) => bulkAddTag(item.value)
 </script>

@@ -5,7 +5,7 @@ import {
   accountNavItems,
   contactNavItems
 } from '../../constants/navigation'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
@@ -32,66 +32,8 @@ import {
   CircleDashed,
   List,
   AtSign,
-  Settings,
-  Clock,
-  Timer,
-  Inbox as InboxIcon,
-  CircleDot,
-  Tag,
-  SlidersHorizontal,
-  Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
-  Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
-  Webhook,
-  Link,
-  BarChart3,
-  CircleUser,
-  Contact,
-  Sparkles,
-  NotebookText,
-  Wrench,
-  Bot,
-  Lightbulb,
-  BookOpen
 } from 'lucide-vue-next'
 
-const navIconMap = {
-  Settings,
-  Clock,
-  Timer,
-  Inbox: InboxIcon,
-  CircleDot,
-  Tag,
-  SlidersHorizontal,
-  Eye,
-  Zap,
-  Workflow,
-  UserRound,
-  UsersRound,
-  Shield,
-  ScrollText,
-  Mail,
-  FileText,
-  KeyRound,
-  Webhook,
-  Link,
-  BarChart3,
-  CircleUser,
-  Contact,
-  Sparkles,
-  NotebookText,
-  Wrench,
-  Bot,
-  Lightbulb,
-  BookOpen
-}
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -118,7 +60,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
-import { useIsMobile } from '@shared-ui/composables'
+import { navIconMap } from '@main/constants/navIcons'
+import { useInboxNavigation } from '@main/composables/useInboxNavigation'
 
 defineProps({
   userTeams: { type: Array, default: () => [] },
@@ -129,8 +72,6 @@ const userStore = useUserStore()
 const conversationStore = useConversationStore()
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
-const router = useRouter()
-const isMobile = useIsMobile()
 const { t } = useI18n()
 const emit = defineEmits(['createView', 'editView', 'deleteView', 'createConversation'])
 
@@ -142,11 +83,18 @@ const isInboxRoute = (path) => {
   return path.startsWith('/inboxes')
 }
 
+const sidebarProviderRef = ref(null)
+
+// An open mobile drawer treats taps on the view form as outside clicks and closes it.
+const closeMobileSidebar = () => sidebarProviderRef.value?.setOpenMobile(false)
+
 const openCreateViewDialog = () => {
+  closeMobileSidebar()
   emit('createView')
 }
 
 const editView = (view) => {
+  closeMobileSidebar()
   emit('editView', view)
 }
 
@@ -163,61 +111,7 @@ const handleDeleteView = () => {
   }
 }
 
-const keepConversationOpen = () =>
-  !isMobile.value &&
-  conversationStore.isConversationOpen &&
-  Boolean(conversationStore.conversation.data?.uuid)
-
-const navigateToInbox = (type) => {
-  if (keepConversationOpen()) {
-    router.push({
-      name: 'inbox-conversation',
-      params: {
-        type,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'inbox',
-      params: { type }
-    })
-  }
-}
-
-const navigateToTeamInbox = (teamID) => {
-  if (keepConversationOpen()) {
-    router.push({
-      name: 'team-inbox-conversation',
-      params: {
-        teamID,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'team-inbox',
-      params: { teamID }
-    })
-  }
-}
-
-const navigateToViewInbox = (viewID) => {
-  if (keepConversationOpen()) {
-    router.push({
-      name: 'view-inbox-conversation',
-      params: {
-        viewID,
-        uuid: conversationStore.conversation.data.uuid
-      }
-    })
-  } else {
-    router.push({
-      name: 'view-inbox',
-      params: { viewID }
-    })
-  }
-}
+const { navigateToInbox, navigateToTeamInbox, navigateToViewInbox } = useInboxNavigation()
 
 const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
 const filteredReportsNavItems = computed(() => filterNavItems(reportsNavItems, userStore.can))
@@ -264,6 +158,7 @@ onMounted(() => {
 
 <template>
   <SidebarProvider
+    ref="sidebarProviderRef"
     style="--sidebar-width: 14rem"
     :default-open="sidebarOpen"
     v-on:update:open="sidebarOpen = $event"

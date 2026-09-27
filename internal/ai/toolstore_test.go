@@ -23,7 +23,7 @@ func newTestManager(t *testing.T) *Manager {
 		t.Fatalf("i18n init: %v", err)
 	}
 	lo := logf.New(logf.Opts{})
-	return &Manager{lo: &lo, i18n: tr, encryptionKey: testEncryptionKey}
+	return &Manager{lo: &lo, i18n: tr, encryptionKey: testEncryptionKey, pendingRuns: make(map[string]*pendingAgentRun)}
 }
 
 func decodeToolAuth(t *testing.T, raw types.JSONText) models.ToolAuth {

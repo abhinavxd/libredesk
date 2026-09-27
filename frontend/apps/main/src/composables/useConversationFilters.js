@@ -26,7 +26,7 @@ export function useConversationFilters () {
         'text': FIELD_OPERATORS.TEXT_AUTOMATION,
         'number': FIELD_OPERATORS.NUMBER,
         'checkbox': FIELD_OPERATORS.BOOLEAN,
-        'date': FIELD_OPERATORS.DATE,
+        'date': FIELD_OPERATORS.DATE_AUTOMATION,
         'link': FIELD_OPERATORS.TEXT_AUTOMATION,
         'list': FIELD_OPERATORS.SELECT,
     }
