@@ -94,6 +94,9 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if !updatedOIDC.Enabled {
+		app.auth.RemoveProvider(id)
+	}
 
 	// Reload the auth manager to update the OIDC providers.
 	if err := reloadAuth(app); err != nil {

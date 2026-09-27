@@ -115,10 +115,10 @@ func (h *Hub) SubscribeOpenConv(client *Client, uuid string) {
 // ListSubscribers returns the union of list-source and open-source subscribers for a conversation.
 func (h *Hub) ListSubscribers(uuid string) []*Client {
 	h.subsMu.RLock()
+	defer h.subsMu.RUnlock()
 	listSet := h.convSubsList[uuid]
 	openSet := h.convSubsOpen[uuid]
 	if len(listSet) == 0 && len(openSet) == 0 {
-		h.subsMu.RUnlock()
 		return nil
 	}
 	union := make(map[*Client]struct{}, len(listSet)+len(openSet))
@@ -128,23 +128,33 @@ func (h *Hub) ListSubscribers(uuid string) []*Client {
 	for c := range openSet {
 		union[c] = struct{}{}
 	}
-	h.subsMu.RUnlock()
 	out := make([]*Client, 0, len(union))
-	authorized := make(map[int]bool)
 	for c := range union {
-		allowed, checked := authorized[c.ID]
-		if !checked && h.conversationStore != nil {
-			uuids, err := h.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{uuid})
-			allowed = err == nil && slices.Contains(uuids, uuid)
-			authorized[c.ID] = allowed
-		}
-		if !allowed {
-			h.removeConversationSub(c, uuid)
-			continue
-		}
 		out = append(out, c)
 	}
 	return out
+}
+
+// RecheckSubscribers drops the conversation's subscribers who can no longer read it, including when the access lookup fails.
+func (h *Hub) RecheckSubscribers(uuid string) {
+	if h.conversationStore == nil {
+		return
+	}
+	allowed := make(map[int]bool)
+	for _, c := range h.ListSubscribers(uuid) {
+		ok, checked := allowed[c.ID]
+		if !checked {
+			uuids, err := h.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{uuid})
+			if err != nil {
+				h.lo.Error("error rechecking conversation subscriber access", "agent_id", c.ID, "uuid", uuid, "error", err)
+			}
+			ok = slices.Contains(uuids, uuid)
+			allowed[c.ID] = ok
+		}
+		if !ok {
+			h.removeConversationSub(c, uuid)
+		}
+	}
 }
 
 // ClearClientSubs drops all of a client's list and open subscriptions.

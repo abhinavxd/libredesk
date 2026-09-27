@@ -24,7 +24,7 @@ func (s *subscriptionAccess) FilterAuthorizedListUUIDs(id int, uuids []string) (
 	return nil, nil
 }
 
-func TestSubscribersRecheckAccess(t *testing.T) {
+func TestRecheckSubscribersDropsRevokedAccess(t *testing.T) {
 	lo := logf.New(logf.Opts{})
 	h := NewHub(&lo, nil /** userStore **/)
 	store := &subscriptionAccess{allowed: map[int]bool{1: true, 2: true}}
@@ -33,10 +33,12 @@ func TestSubscribersRecheckAccess(t *testing.T) {
 	h.SubscribeListReplace(first, []string{"ticket", "ticket"})
 	h.SubscribeOpenConv(first, "ticket")
 	h.SubscribeOpenConv(second, "ticket")
+	h.RecheckSubscribers("ticket")
 	if got := h.ListSubscribers("ticket"); len(got) != 2 {
 		t.Fatalf("expected two unique subscribers, got %d", len(got))
 	}
 	store.allowed[1] = false
+	h.RecheckSubscribers("ticket")
 	if got := h.ListSubscribers("ticket"); len(got) != 1 || got[0] != second {
 		t.Fatalf("revoked subscriber remained: %v", got)
 	}
@@ -44,10 +46,9 @@ func TestSubscribersRecheckAccess(t *testing.T) {
 		t.Fatal("revoked subscriptions were retained")
 	}
 	store.err = errors.New("access lookup failed")
+	h.RecheckSubscribers("ticket")
 	if got := h.ListSubscribers("ticket"); len(got) != 0 {
-		t.Fatal("access lookup error allowed subscribers")
+		t.Fatal("subscriber kept after failed access lookup")
 	}
-	if got := h.ListSubscribers("missing"); len(got) != 0 {
-		t.Fatal("unknown conversation has subscribers")
-	}
+	h.RecheckSubscribers("missing")
 }

@@ -67,7 +67,7 @@ func (m *Manager) DeleteStaleDrafts(ctx context.Context, retentionPeriod time.Du
 	return nil
 }
 
-// resolveDraftInlineCIDs rewrites inline cid: refs to media URLs, resolving only unattached media or media linked to the draft's own conversation.
+// resolveDraftInlineCIDs rewrites inline cid: refs to media URLs, resolving only the user's own unattached uploads or media linked to the draft's own conversation.
 func (m *Manager) resolveDraftInlineCIDs(conversationID, userID int, content string) string {
 	cids := extractInlineContentIDs(content)
 	for _, cid := range cids {

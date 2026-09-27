@@ -31,7 +31,7 @@ const (
 	wsReadDeadline          = 20 * time.Second
 	wsWriteDeadline         = 10 * time.Second
 	wsReadLimitBytes        = 64 * 1024
-	wsMaxJoinAttempts       = 3
+	wsMaxJoinsPerConn       = 10
 
 	// Per-connection minimum intervals between inbound frames of each kind.
 	// The HTTP upgrade is rate-limited, but inbound frames aren't, so a single
@@ -41,7 +41,6 @@ const (
 	wsMinIntervalTyping    = 50 * time.Millisecond
 	wsMinIntervalPageVisit = 1 * time.Second
 	wsMinIntervalPing      = 1 * time.Second
-	wsMinIntervalJoin      = 1 * time.Second
 )
 
 type WidgetMessage struct {
@@ -155,7 +154,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 			switch msg.Type {
 			case WidgetMsgTypeJoin:
 				joinAttempts++
-				if joinAttempts > wsMaxJoinAttempts || !sc.allow(WidgetMsgTypeJoin, wsMinIntervalJoin) {
+				if joinAttempts > wsMaxJoinsPerConn {
 					_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Join limit exceeded"), time.Now().Add(wsWriteDeadline))
 					return
 				}
@@ -170,12 +169,8 @@ func handleWidgetWS(r *fastglue.Request) error {
 				if err != nil {
 					app.lo.Error("error handling widget join", "error", err)
 					sendWidgetError(sc, "Failed to join conversation")
-					if joinAttempts >= wsMaxJoinAttempts {
-						return
-					}
 					continue
 				}
-				joinAttempts = 0
 				client = joinedClient
 				liveChat = joinedLiveChat
 				inboxUUID = joinedInboxUUID

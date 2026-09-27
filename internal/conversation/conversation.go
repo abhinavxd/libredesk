@@ -787,6 +787,8 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 	}
 
 	c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
+	// Reopening unassigns an agent who is away and reassigning.
+	c.wsHub.RecheckSubscribers(conversationUUID)
 
 	if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
 		return true, err

@@ -3,6 +3,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -39,7 +40,7 @@ type userStore interface {
 // OIDCclaim holds OIDC token claims data
 type OIDCclaim struct {
 	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	EmailVerified *bool  `json:"email_verified"`
 	Sub           string `json:"sub"`
 	Picture       string `json:"picture"`
 }
@@ -195,7 +196,7 @@ func (a *Auth) Reload(cfg Config) error {
 		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
-	a.cfg = cfg
+	a.cfg.Providers = cfg.Providers
 	a.oauthCfgs = oauthCfgs
 	a.verifiers = verifiers
 	a.redirectURLs = redirectURLs
@@ -281,10 +282,16 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
-	if !claims.EmailVerified || strings.TrimSpace(claims.Email) == "" {
+	// Entra ID never sends email_verified, so only an explicit false is rejected.
+	if claims.EmailVerified != nil && !*claims.EmailVerified {
+		a.logger.Error("oidc provider marked the email as unverified", "provider_id", providerID, "email", claims.Email)
 		return "", OIDCclaim{}, errors.New("oidc email ownership is not verified")
 	}
-	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
+	if strings.TrimSpace(claims.Email) == "" {
+		a.logger.Error("oidc id_token has no email, check that the provider sends the email claim", "provider_id", providerID)
+		return "", OIDCclaim{}, errors.New("oidc id_token has no email")
+	}
+	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email)
 	return rawIDTk, claims, nil
 }
 
@@ -404,8 +411,12 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 			return models.User{}, simplesessions.ErrInvalidSession
 		}
 		current, err := a.users.GetSessionVersion(userID)
-		if err != nil || version != current {
+		if errors.Is(err, sql.ErrNoRows) || (err == nil && version != current) {
 			return models.User{}, simplesessions.ErrInvalidSession
+		}
+		if err != nil {
+			a.logger.Error("error fetching session version", "user_id", userID, "error", err)
+			return models.User{}, err
 		}
 	}
 

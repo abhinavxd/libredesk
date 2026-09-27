@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"database/sql"
 	"errors"
 	"testing"
 
@@ -71,6 +72,13 @@ func TestSessionsRejectRevokedAndLegacyCookies(t *testing.T) {
 	validate(other, true)
 	validate(login(1, 2), true)
 	validate(login(1, 0), false)
-	users.err = errors.New("database unavailable")
+	users.err = sql.ErrNoRows
 	validate(other, false)
+	users.err = errors.New("database unavailable")
+	r := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}}
+	r.RequestCtx.Request.SetRequestURI("https://app.example.com/")
+	r.RequestCtx.Request.Header.SetCookie("libredesk_session", other)
+	if user, err := a.ValidateSession(r); err == nil || errors.Is(err, simplesessions.ErrInvalidSession) || user.ID != 0 {
+		t.Fatalf("lookup failure must reject without revoking: user=%d err=%v", user.ID, err)
+	}
 }

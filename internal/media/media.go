@@ -239,7 +239,7 @@ func (m *Manager) GetByContentIDs(contentIDs []string, conversationUUID string) 
 	return out, nil
 }
 
-// GetDraftInlineMedia returns media by UUID only if it's unattached or linked to a message in the given conversation.
+// GetDraftInlineMedia returns media by UUID only if the user uploaded it and it is unattached, or it is linked to a message in the given conversation.
 func (m *Manager) GetDraftInlineMedia(uuid string, conversationID, userID int) (models.Media, error) {
 	var media models.Media
 	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID, userID); err != nil {

@@ -25,6 +25,9 @@ func (m *Manager) BroadcastNewConversation(conv *cmodels.ConversationListItem) {
 // BroadcastConvReassignment notifies the union of agents authorized under old and new assignee state, so agents losing access receive the updated payload and their frontend can filter the conv out.
 func (m *Manager) BroadcastConvReassignment(oldConv, newConv *cmodels.ConversationListItem) {
 	m.broadcastConvToAuthorized(newConv, oldConv)
+	if newConv != nil {
+		m.wsHub.RecheckSubscribers(newConv.UUID)
+	}
 }
 
 func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.ConversationListItem, preview string) {
