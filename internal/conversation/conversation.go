@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	htmltemplate "html/template"
 	"io"
 	"slices"
@@ -325,9 +324,9 @@ func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
 }
 
 type queries struct {
-	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
-	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
-	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
+	LockCampaignDelivery          *sqlx.Stmt `query:"lock-campaign-delivery"`
+	CompleteCampaignDelivery      *sqlx.Stmt `query:"complete-campaign-delivery"`
+	AssignProactiveTeam           *sqlx.Stmt `query:"assign-proactive-team"`
 	GetTelegramAutoReplyState     *sqlx.Stmt `query:"get-telegram-auto-reply-state"`
 	RecordTelegramSend            *sqlx.Stmt `query:"record-telegram-send"`
 	SubmitTelegramRating          *sqlx.Stmt `query:"submit-telegram-rating"`
@@ -1426,7 +1425,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		data := notificationTemplateData(conversation, recipient, author)
 		data["Message"] = map[string]any{
 			"UUID":    message.UUID,
-			"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(messageText), "\n", "<br>")),
+			"Content": htmltemplate.HTML(stringutil.PlainTextToHTML(messageText)),
 		}
 		content, subject, err := m.template.RenderStoredEmailTemplate(group.tmpl, data)
 		return subject, content, err

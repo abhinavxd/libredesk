@@ -2,25 +2,21 @@ package user
 
 import (
 	"fmt"
-	"strings"
 	"sync"
+
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 )
 
 var sharedContactMu sync.Mutex
 
 func (u *Manager) SaveSharedContact(firstName, lastName, phone string) (int, error) {
-	phone = strings.Map(func(r rune) rune {
-		if r >= '0' && r <= '9' {
-			return r
-		}
-		return -1
-	}, phone)
+	phone = stringutil.NormalizeWhatsAppPhone(phone)
 	if phone == "" {
 		return 0, fmt.Errorf("contact has no phone number")
 	}
 	sharedContactMu.Lock()
 	defer sharedContactMu.Unlock()
-	password, err := u.generatePassword()
+	password, err := u.newContactPassword()
 	if err != nil {
 		return 0, err
 	}

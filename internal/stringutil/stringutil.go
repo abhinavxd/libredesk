@@ -4,6 +4,7 @@ package stringutil
 import (
 	"crypto/rand"
 	"fmt"
+	gohtml "html"
 	"net/mail"
 	"path"
 	"regexp"
@@ -79,6 +80,10 @@ func WhatsAppPhoneForDialCode(phone, dialCode string) (string, bool) {
 		return "", true
 	}
 	return dialCode + national, true
+}
+
+func PlainTextToHTML(s string) string {
+	return strings.ReplaceAll(gohtml.EscapeString(s), "\n", "<br>")
 }
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.

@@ -114,7 +114,7 @@
               {{ message.meta.reply_to.content || t('globals.terms.attachment') }}
             </button>
             <TelegramMessageCard
-              v-if="message.meta?.telegram_contact || message.meta?.telegram_location"
+              v-if="hasTelegramCard"
               :message="message"
             />
 
@@ -126,7 +126,7 @@
               {{ t('conversation.whatsapp.unsupportedMessage') }}
             </div>
             <div
-              v-else-if="!message.meta?.telegram_contact && !message.meta?.telegram_location"
+              v-else-if="!hasTelegramCard"
               ref="contentWrapperEl"
               class="relative"
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
@@ -544,6 +544,9 @@ const bubbleClasses = computed(() => ({
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
 const isDeleted = computed(() => !!props.message.meta?.deleted_at)
+const hasTelegramCard = computed(
+  () => !!(props.message.meta?.telegram_contact || props.message.meta?.telegram_location)
+)
 const canDeleteNote = computed(
   () =>
     isPrivateMessage.value &&

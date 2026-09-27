@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"mime/multipart"
-	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/image"
@@ -29,18 +26,9 @@ func (c *Client) SendAlbum(ctx context.Context, token string, chatID int64, text
 	if len(files) < 2 || len(files) > MaxAlbumSize || len(options.Buttons) > 0 {
 		return nil, fmt.Errorf("Telegram albums require 2 to 10 attachments and no buttons")
 	}
-	for attempt := 0; ; attempt++ {
-		messages, err := c.sendAlbum(ctx, token, chatID, text, files, options)
-		var apiErr *APIError
-		if attempt >= 2 || !errors.As(err, &apiErr) || apiErr.Code != http.StatusTooManyRequests {
-			return messages, err
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(time.Duration(max(1, apiErr.Parameters.RetryAfter)) * time.Second):
-		}
-	}
+	return withRetry(ctx, func() ([]Message, error) {
+		return c.sendAlbum(ctx, token, chatID, text, files, options)
+	})
 }
 
 func (c *Client) sendAlbum(ctx context.Context, token string, chatID int64, text string, files attachment.Attachments, options SendOptions) ([]Message, error) {
@@ -72,16 +60,7 @@ func (c *Client) sendAlbum(ctx context.Context, token string, chatID int64, text
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	writer.WriteField("chat_id", strconv.FormatInt(chatID, 10))
-	if options.BusinessConnectionID != "" {
-		writer.WriteField("business_connection_id", options.BusinessConnectionID)
-	}
-	if options.ThreadID > 0 {
-		writer.WriteField("message_thread_id", strconv.FormatInt(options.ThreadID, 10))
-	}
-	if options.ReplyToMessageID > 0 {
-		value, _ := json.Marshal(ReplyParameters{MessageID: options.ReplyToMessageID, AllowSendingWithoutReply: true})
-		writer.WriteField("reply_parameters", string(value))
-	}
+	writeOptions(writer, options)
 	value, _ := json.Marshal(media)
 	writer.WriteField("media", string(value))
 	for i, file := range files {

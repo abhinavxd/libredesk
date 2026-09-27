@@ -17,10 +17,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
 	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/telegram"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/volatiletech/null/v9"
@@ -42,8 +40,8 @@ func handleTelegramWebhook(r *fastglue.Request) error {
 	if rec.Channel != telegramChannel.ChannelTelegram {
 		return r.SendErrorEnvelope(http.StatusNotFound, "inbox not found", nil, envelope.NotFoundError)
 	}
-	var cfg telegramChannel.Config
-	if err := json.Unmarshal(rec.Config, &cfg); err != nil {
+	cfg, err := telegramConfigFromRecord(rec)
+	if err != nil {
 		return r.SendErrorEnvelope(http.StatusInternalServerError, "invalid inbox configuration", nil, envelope.GeneralError)
 	}
 	secret := r.RequestCtx.Request.Header.Peek("X-Telegram-Bot-Api-Secret-Token")
@@ -97,7 +95,7 @@ func handleTelegramWebhook(r *fastglue.Request) error {
 		err = app.conversation.SubmitTelegramRating(original.SourceID(rec.ID), rating)
 	} else if edited {
 		formatted, kind := message.FormattedContent()
-		err = app.conversation.UpdateTelegramMessageContent(message.SourceID(rec.ID), formatted, message.Content(), kind, message.EditDate)
+		err = app.conversation.UpdateTelegramMessageContent(rec.ID, strconv.FormatInt(message.Chat.ID, 10), message.SourceID(rec.ID), formatted, message.Content(), kind, message.EditDate)
 	} else {
 		err = ingestTelegramMessage(ctx, app, rec, cfg, *message)
 	}
@@ -226,8 +224,10 @@ func ingestTelegramMessage(ctx context.Context, app *App, rec imodels.Inbox, cfg
 			app.lo.Error("error sending telegram automatic reply", "inbox_id", rec.ID, "source_id", sourceID, "error", err)
 		}
 	}
-	if err := fetchTelegramAvatar(ctx, app, cfg, contactID, message.Chat.ID); err != nil {
-		app.lo.Warn("error fetching telegram avatar", "contact_id", contactID, "error", err)
+	if isNew {
+		if err := fetchTelegramAvatar(ctx, app, cfg, contactID, message.Chat.ID); err != nil {
+			app.lo.Warn("error fetching telegram avatar", "contact_id", contactID, "error", err)
+		}
 	}
 	return nil
 }
@@ -240,7 +240,8 @@ func fetchTelegramAttachment(ctx context.Context, app *App, cfg telegramChannel.
 		}
 		return nil, "", nil
 	}
-	if file.Size > telegram.MaxDownloadBytes {
+	maxBytes := min(int64(telegram.MaxDownloadBytes), int64(app.consts.Load().(*constants).MaxFileUploadSizeMB)*1024*1024)
+	if file.Size > maxBytes {
 		return nil, app.i18n.T("conversation.telegram.fileUnavailable"), nil
 	}
 	info, body, err := app.telegramClient.Download(ctx, cfg.BotToken, file.ID)
@@ -251,15 +252,12 @@ func fetchTelegramAttachment(ctx context.Context, app *App, cfg telegramChannel.
 		}
 		return nil, "", err
 	}
-	if len(body) == 0 {
+	if len(body) == 0 || int64(len(body)) > maxBytes {
 		return nil, app.i18n.T("conversation.telegram.fileUnavailable"), nil
 	}
 	name := file.Name
 	if name == "" {
 		name = filepath.Base(info.Path)
-	}
-	if name == "" || name == "." {
-		name = kind
 	}
 	contentType := file.MIME
 	if contentType == "" {
@@ -267,6 +265,9 @@ func fetchTelegramAttachment(ctx context.Context, app *App, cfg telegramChannel.
 	}
 	if contentType == "" {
 		contentType = http.DetectContentType(body)
+	}
+	if name == "" || name == "." {
+		name = defaultMediaFilename(kind, contentType)
 	}
 	return attachment.Attachments{{Name: name, ContentType: contentType, Content: body, Size: len(body), Disposition: attachment.DispositionAttachment}}, "", nil
 }
@@ -287,15 +288,8 @@ func fetchTelegramAvatar(ctx context.Context, app *App, cfg telegramChannel.Conf
 	if err != nil {
 		return err
 	}
-	resized, err := image.Downscale(image.AvatarMaxDim, bytes.NewReader(content))
+	media, err := saveUserAvatar(app, contactID, "avatar.jpg", "image/jpeg", bytes.NewReader(content), true /** private **/)
 	if err != nil {
-		return err
-	}
-	media, err := app.media.UploadAndInsert("avatar.jpg", "image/jpeg", "", null.StringFrom(mmodels.ModelUser), null.IntFrom(contactID), resized, resized.Len(), null.String{}, []byte("{}"), true)
-	if err != nil {
-		return err
-	}
-	if err := app.user.UpdateAvatar(contactID, "/uploads/"+media.UUID); err != nil {
 		return err
 	}
 	app.conversation.BroadcastContactUpdate(contactID, map[string]any{"avatar_url": app.media.GetSignedURL(media.UUID)})

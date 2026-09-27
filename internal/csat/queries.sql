@@ -21,8 +21,8 @@ WHERE uuid = $1;
 UPDATE csat_responses
 SET rating = CASE WHEN response_timestamp IS NOT NULL THEN rating ELSE $2 END,
     feedback = $3,
-    meta = (COALESCE($4::jsonb, '{}') - 'telegram_feedback_pending'),
+    meta = (COALESCE($4::jsonb, '{}') - 'feedback_pending'),
     response_timestamp = COALESCE(response_timestamp, NOW()),
     updated_at = NOW()
 WHERE uuid = $1 AND (response_timestamp IS NULL
-    OR (meta->>'telegram_feedback_pending' = 'true' AND length(trim($3)) > 0));
+    OR (meta->>'feedback_pending' = 'true' AND length(trim($3)) > 0));

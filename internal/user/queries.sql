@@ -125,7 +125,7 @@ WHERE id = $1;
 UPDATE users
 SET custom_attributes = COALESCE(custom_attributes, '{}'::jsonb) || $2,
 updated_at = now()
-WHERE id = $1;
+WHERE id = $1 AND COALESCE(custom_attributes, '{}'::jsonb) || $2 != COALESCE(custom_attributes, '{}'::jsonb);
 
 -- name: update-avatar
 UPDATE users  

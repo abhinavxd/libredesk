@@ -39,7 +39,7 @@
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
             <span
-              v-for="uuid in row.message.albumMessageUUIDs.slice(1)"
+              v-for="uuid in row.message.albumMessageUUIDs?.slice(1)"
               :key="uuid"
               :data-message-uuid="uuid"
             />
@@ -147,33 +147,36 @@ const handleScrollToBottom = () => {
   scrollToBottom()
 }
 
-const applyOpenScroll = () => {
-  const thread = threadEl.value
-  if (!thread) return
-  const targetUUID = route.query.scrollTo
-  const targetEl = targetUUID ? thread.querySelector(`[data-message-uuid="${targetUUID}"]`) : null
-  if (targetEl) {
-    hasUserScrolled.value = true
-    // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
-    let lastOffset = -1
-    let stableFrames = 0
-    let frames = 0
-    const anchorToTarget = () => {
-      if (!threadEl.value || !targetEl.isConnected) return
-      const offset = targetEl.offsetTop
-      scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
-      stableFrames = offset === lastOffset ? stableFrames + 1 : 0
-      lastOffset = offset
-      if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES)
-        requestAnimationFrame(anchorToTarget)
-    }
-    anchorToTarget()
-    targetEl.classList.add('highlight-mention')
-    setTimeout(() => targetEl.classList.remove('highlight-mention'), HIGHLIGHT_MS)
-  } else {
-    hasUserScrolled.value = false
-    scrollToBottom()
+const scrollToMessage = (uuid) => {
+  const target = threadEl.value?.querySelector(`[data-message-uuid="${CSS.escape(uuid)}"]`)
+  if (!target) return null
+  const row = target.tagName === 'SPAN' ? target.parentElement : target
+  hasUserScrolled.value = true
+  // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
+  let lastOffset = -1
+  let stableFrames = 0
+  let frames = 0
+  const anchorToTarget = () => {
+    if (!threadEl.value || !row.isConnected) return
+    const offset = row.offsetTop
+    scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
+    stableFrames = offset === lastOffset ? stableFrames + 1 : 0
+    lastOffset = offset
+    if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES)
+      requestAnimationFrame(anchorToTarget)
   }
+  anchorToTarget()
+  row.classList.add('highlight-mention')
+  setTimeout(() => row.classList.remove('highlight-mention'), HIGHLIGHT_MS)
+  return row
+}
+
+const applyOpenScroll = () => {
+  if (!threadEl.value) return
+  const targetUUID = route.query.scrollTo
+  if (targetUUID && scrollToMessage(targetUUID)) return
+  hasUserScrolled.value = false
+  scrollToBottom()
 }
 
 const jumpToMessage = async ({ conversation_uuid, uuid }) => {
@@ -186,14 +189,10 @@ const jumpToMessage = async ({ conversation_uuid, uuid }) => {
     if (conversationStore.current.uuid !== conversation_uuid || conversationStore.conversationMessages.length === count) return
   }
   await nextTick()
-  const target = threadEl.value?.querySelector(`[data-message-uuid="${CSS.escape(uuid)}"]`)
-  if (!target) return
-  const row = target.tagName === 'SPAN' ? target.parentElement : target
-  scrollToOffset(Math.max(0, row.offsetTop - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
+  const row = scrollToMessage(uuid)
+  if (!row) return
   row.tabIndex = -1
   row.focus({ preventScroll: true })
-  row.classList.add('highlight-mention')
-  setTimeout(() => row.classList.remove('highlight-mention'), HIGHLIGHT_MS)
 }
 
 const newMessageHandler = (data) => {

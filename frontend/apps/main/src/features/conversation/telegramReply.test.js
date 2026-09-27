@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { buildTelegramReplyParts, groupTelegramAlbums, telegramButtonError } from './telegramReply'
 
@@ -127,17 +128,22 @@ describe('Telegram album timeline', () => {
     expect(parts.map((p) => p.attachments.map((f) => f.id))).toEqual([[1], [2, 3]])
     expect(parts[0].buttons[0].callback_data).toBe('Yes')
   })
+  it('returns messages that are not merged unchanged', () => {
+    const text = { uuid: '1', content: 'Text' }
+    const lone = message('2')
+    const rows = groupTelegramAlbums([text, lone, message('3', { meta: {} })])
+    expect(rows[0]).toBe(text)
+    expect(rows[1]).toBe(lone)
+    expect(rows[0].albumMessageUUIDs).toBeUndefined()
+  })
   it('keeps unrelated messages and missing attachments intact', () => {
-    expect(groupTelegramAlbums([{ uuid: '1', content: 'Text' }])).toEqual([
-      { uuid: '1', content: 'Text', attachments: [], albumMessageUUIDs: ['1'] }
-    ])
     expect(groupTelegramAlbums([message('1'), { uuid: 'text' }, message('2')])).toHaveLength(3)
     expect(
       groupTelegramAlbums([
-        message('1'),
+        message('1', { attachments: undefined }),
         message('2', { attachments: undefined, content: 'Caption', text_content: 'Caption' })
-      ])[0].content
-    ).toBe('Caption')
+      ])[0]
+    ).toMatchObject({ content: 'Caption', attachments: [], albumMessageUUIDs: ['1', '2'] })
   })
 })
 

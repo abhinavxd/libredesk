@@ -25,28 +25,9 @@ var (
 )
 
 func prepareTelegramInbox(ctx context.Context, app *App, inb *imodels.Inbox, id int) error {
-	var cfg telegramChannel.Config
-	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+	cfg, err := telegramConfigFromRecord(*inb)
+	if err != nil {
 		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.invalidConfig"), nil)
-	}
-	for _, message := range []string{cfg.GreetingMessage, cfg.AwayMessage, cfg.CSATMessage} {
-		if utf8.RuneCountInString(message) > telegram.MaxTextLength {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.maxLength", "max", "4096"), nil)
-		}
-	}
-	if cfg.Timezone == "" {
-		cfg.Timezone = "UTC"
-	}
-	if _, err := time.LoadLocation(cfg.Timezone); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.timezone"), nil)
-	}
-	if cfg.BusinessHoursID < 0 || (cfg.AwayMessage != "" && cfg.BusinessHoursID == 0) {
-		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.businessHours"), nil)
-	}
-	if cfg.BusinessHoursID > 0 {
-		if _, err := app.businessHours.Get(cfg.BusinessHoursID); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.businessHours"), nil)
-		}
 	}
 	var previous telegramChannel.Config
 	if id > 0 {
@@ -57,11 +38,35 @@ func prepareTelegramInbox(ctx context.Context, app *App, inb *imodels.Inbox, id 
 		if old.Channel != telegramChannel.ChannelTelegram {
 			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.changeBot"), nil)
 		}
-		if err := json.Unmarshal(old.Config, &previous); err != nil {
+		if previous, err = telegramConfigFromRecord(old); err != nil {
 			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
-		if cfg.BotToken == "" || strings.Contains(cfg.BotToken, stringutil.PasswordDummy) {
-			cfg.BotToken = previous.BotToken
+		merged, err := app.inbox.MergeChannelSecrets(old.Config, inb.Config)
+		if err != nil {
+			return err
+		}
+		inb.Config = merged
+		if cfg, err = telegramConfigFromRecord(*inb); err != nil {
+			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.invalidConfig"), nil)
+		}
+	}
+	for _, message := range []string{cfg.GreetingMessage, cfg.AwayMessage, cfg.CSATMessage} {
+		if utf8.RuneCountInString(message) > telegram.MaxTextLength {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.maxLength", "max", "4096"), nil)
+		}
+	}
+	if cfg.Timezone == "" {
+		cfg.Timezone = "UTC"
+	}
+	if !stringutil.IsValidTimezone(cfg.Timezone) {
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.timezone"), nil)
+	}
+	if cfg.BusinessHoursID < 0 || (cfg.AwayMessage != "" && cfg.BusinessHoursID == 0) {
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.businessHours"), nil)
+	}
+	if cfg.BusinessHoursID > 0 {
+		if _, err := app.businessHours.Get(cfg.BusinessHoursID); err != nil {
+			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.telegram.error.businessHours"), nil)
 		}
 	}
 	cfg.BotToken = strings.TrimSpace(cfg.BotToken)
@@ -95,8 +100,8 @@ func prepareTelegramInbox(ctx context.Context, app *App, inb *imodels.Inbox, id 
 		if existing.ID == id || existing.Channel != telegramChannel.ChannelTelegram {
 			continue
 		}
-		var config telegramChannel.Config
-		if err := json.Unmarshal(existing.Config, &config); err != nil {
+		config, err := telegramConfigFromRecord(existing)
+		if err != nil {
 			return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 		if config.BotID == bot.ID {
@@ -109,14 +114,13 @@ func prepareTelegramInbox(ctx context.Context, app *App, inb *imodels.Inbox, id 
 }
 
 func configureTelegramWebhook(app *App, rec imodels.Inbox) {
-	var cfg telegramChannel.Config
-	if err := json.Unmarshal(rec.Config, &cfg); err != nil {
+	cfg, err := telegramConfigFromRecord(rec)
+	if err != nil {
 		app.telegramHookErrors.Store(rec.ID, app.i18n.T("admin.inbox.telegram.error.invalidConfig"))
 		return
 	}
 	ctx, cancel := context.WithTimeout(app.ctx, 30*time.Second)
 	defer cancel()
-	var err error
 	if !rec.Enabled {
 		err = app.telegramClient.DeleteWebhook(ctx, cfg.BotToken)
 	} else {
@@ -148,4 +152,15 @@ func reconcileTelegramWebhooks(app *App) {
 			configureTelegramWebhook(app, rec)
 		}
 	}
+}
+
+func telegramConfigFromRecord(rec imodels.Inbox) (telegramChannel.Config, error) {
+	if rec.Channel != telegramChannel.ChannelTelegram {
+		return telegramChannel.Config{}, fmt.Errorf("inbox %d is not a telegram inbox", rec.ID)
+	}
+	var cfg telegramChannel.Config
+	if err := json.Unmarshal(rec.Config, &cfg); err != nil {
+		return telegramChannel.Config{}, fmt.Errorf("decoding telegram inbox config: %w", err)
+	}
+	return cfg, nil
 }

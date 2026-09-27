@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"html"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +14,7 @@ import (
 	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/telegram"
 )
 
@@ -39,18 +39,14 @@ func (m *Manager) ProcessTelegramMessage(msg models.Message, isNewConversation b
 	return nil
 }
 
-func (m *Manager) UpdateTelegramMessage(sourceID, content string, editedAt int64) error {
-	return m.UpdateTelegramMessageContent(sourceID, content, content, models.ContentTypeText, editedAt)
-}
-
-func (m *Manager) UpdateTelegramMessageContent(sourceID, content, text, kind string, editedAt int64) error {
+func (m *Manager) UpdateTelegramMessageContent(inboxID int, chatID, sourceID, content, text, kind string, editedAt int64) error {
 	var message struct {
 		UUID             string         `db:"uuid"`
 		ConversationUUID string         `db:"conversation_uuid"`
 		LastMessage      sql.NullString `db:"last_message"`
 		LastInteraction  sql.NullString `db:"last_interaction"`
 	}
-	if err := m.q.UpdateTelegramMessage.Get(&message, sourceID, content, editedAt, text, kind); err != nil {
+	if err := m.q.UpdateTelegramMessage.Get(&message, sourceID, content, editedAt, text, kind, inboxID, chatID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -221,7 +217,7 @@ func (m *Manager) sendTelegramCSAT(actorID int, conv models.Conversation, uuid s
 		content = m.i18n.T("csat.rateYourInteraction")
 	}
 	_, err = m.QueueReply(nil, conv.InboxID, actorID, conv.ContactID, conv.UUID,
-		strings.ReplaceAll(html.EscapeString(content), "\n", "<br>"), nil, nil, nil, map[string]any{"is_csat": true, "is_automated": true, "csat_uuid": uuid, "telegram_buttons": telegram.RatingButtons()})
+		stringutil.PlainTextToHTML(content), nil, nil, nil, map[string]any{"is_csat": true, "is_automated": true, "csat_uuid": uuid, "telegram_buttons": telegram.RatingButtons()})
 	return err
 }
 

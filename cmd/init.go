@@ -832,7 +832,7 @@ func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), 
 			if err := json.Unmarshal(inboxR.Config, &config); err != nil {
 				return nil, err
 			}
-			return telegramChannel.New(telegramChannel.Opts{ID: inboxR.ID, Name: inboxR.Name, Config: config, Client: tgClient, SourceUpdater: sourceUpdater, CSATButtons: sourceUpdater.TelegramCSATButtons, Lo: initLogger("telegram_inbox"), AuthStatus: authStatusHook})
+			return telegramChannel.New(telegramChannel.Opts{ID: inboxR.ID, Name: inboxR.Name, Config: config, Client: tgClient, Store: sourceUpdater, Lo: initLogger("telegram_inbox"), AuthStatus: authStatusHook})
 		case inbox.ChannelWhatsApp:
 			return initWhatsAppInbox(inboxR, msgStore, waClient, sourceUpdater)
 		default:

@@ -87,20 +87,12 @@
               :key="identity.channel + identity.identifier"
               class="flex items-center gap-1.5 text-xs text-muted-foreground"
             >
-              <WhatsAppIcon v-if="identity.channel === 'whatsapp'" class="size-3.5 flex-shrink-0" />
-              <TelegramIcon v-else-if="identity.channel === 'telegram'" class="size-4 shrink-0" />
-              <IdCardIcon v-else size="14" class="flex-shrink-0" />
-              {{
-                identity.channel === 'telegram' && contact.custom_attributes?.telegram_username
-                  ? '@' +
-                    contact.custom_attributes.telegram_username +
-                    ' (' +
-                    identity.identifier +
-                    ')'
-                  : identity.channel === 'whatsapp'
-                    ? '+' + identity.identifier
-                    : identity.identifier
-              }}
+              <component
+                :is="CHANNEL_ICONS[identity.channel] || IdCardIcon"
+                class="shrink-0"
+                :class="identity.channel === 'telegram' ? 'size-4' : 'size-3.5'"
+              />
+              {{ formatChannelIdentity(identity, contact) }}
             </div>
 
             <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -204,8 +196,8 @@ import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'
 import ContactNotes from '@/features/contact/ContactNotes.vue'
-import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
-import WhatsAppIcon from '@/components/icons/WhatsAppIcon.vue'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
+import { formatChannelIdentity } from '@main/utils/channel-identity'
 import { createFormSchema } from '@/features/contact/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS, CONTACT_ACTIONS } from '@/constants/emitterEvents'

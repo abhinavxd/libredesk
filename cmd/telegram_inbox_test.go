@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	businesshours "github.com/abhinavxd/libredesk/internal/business_hours"
 	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/setting"
@@ -36,7 +37,7 @@ func TestPrepareTelegramInbox(t *testing.T) {
 		{"overflow hours", `{"bot_token":"123:secret"}`, 2147483648, "hours"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rec := imodels.Inbox{Config: json.RawMessage(tc.config), ReopenWindowHours: tc.hours}
+			rec := imodels.Inbox{Channel: telegramChannel.ChannelTelegram, Config: json.RawMessage(tc.config), ReopenWindowHours: tc.hours}
 			err := prepareTelegramInbox(t.Context(), app, &rec, 0)
 			if err == nil || !strings.Contains(strings.ToLower(err.Error()), tc.want) {
 				t.Fatalf("error=%v", err)
@@ -176,4 +177,28 @@ func TestConfigureTelegramWebhook(t *testing.T) {
 	}
 	db.Close()
 	reconcileTelegramWebhooks(app)
+}
+
+func TestTelegramInboxMessageSettings(t *testing.T) {
+	app, db, rec := newTelegramIntegrationApp(t)
+	app.businessHours, _ = businesshours.New(businesshours.Opts{DB: db, Lo: app.lo, I18n: app.i18n})
+	for _, cfg := range []telegramChannel.Config{
+		{GreetingMessage: strings.Repeat("x", 4097)},
+		{Timezone: "Invalid/Zone"},
+		{AwayMessage: "Closed"},
+		{BusinessHoursID: -1},
+		{AwayMessage: "Closed", BusinessHoursID: 999999},
+	} {
+		cfg.BotToken = "123:secret"
+		rec.Config, _ = json.Marshal(cfg)
+		if err := prepareTelegramInbox(t.Context(), app, &rec, 0); err == nil {
+			t.Fatalf("accepted %+v", cfg)
+		}
+	}
+	var id int
+	db.Get(&id, `INSERT INTO business_hours (name,is_always_open,hours,holidays) VALUES ('Always',true,'{}','[]') RETURNING id`)
+	rec.Config, _ = json.Marshal(telegramChannel.Config{BotToken: "123:secret", BusinessHoursID: id, Timezone: "UTC"})
+	if err := prepareTelegramInbox(t.Context(), app, &rec, 0); err == nil {
+		t.Fatal("invalid getMe response accepted")
+	}
 }

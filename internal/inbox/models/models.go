@@ -17,6 +17,8 @@ const (
 	AuthTypeOAuth2   = "oauth2"
 )
 
+var ChannelSecretFields = []string{"access_token", "app_secret", "webhook_verify_token", "bot_token", "secret_token"}
+
 // Inbox represents a inbox record in DB.
 type Inbox struct {
 	ID                 int             `db:"id" json:"id"`
@@ -153,7 +155,7 @@ func (m *Inbox) ClearPasswords() error {
 			return err
 		}
 		dummy := strings.Repeat(stringutil.PasswordDummy, 10)
-		for _, field := range []string{"access_token", "app_secret", "webhook_verify_token", "bot_token", "secret_token"} {
+		for _, field := range ChannelSecretFields {
 			if v, ok := cfg[field].(string); ok && v != "" {
 				cfg[field] = dummy
 			}

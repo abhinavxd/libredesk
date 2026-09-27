@@ -1280,7 +1280,9 @@ WITH edited AS (
         updated_at = NOW()
     FROM conversations c
     JOIN inboxes i ON i.id = c.inbox_id
-    WHERE (m.source_id = $1 OR m.meta->'telegram_source_ids' ? $1) AND m.conversation_id = c.id
+    WHERE c.inbox_id = $6
+        AND c.contact_id = (SELECT contact_id FROM contact_channel_identities WHERE channel = 'telegram' AND identifier = $7)
+        AND m.conversation_id = c.id AND (m.source_id = $1 OR m.meta->'telegram_source_ids' ? $1)
         AND i.channel = 'telegram' AND i.deleted_at IS NULL
         AND m.type IN ('incoming', 'outgoing') AND m.private = false
         AND COALESCE((m.meta->>'telegram_edit_date')::bigint, 0) < $3
@@ -1326,7 +1328,7 @@ WHERE uuid = $1;
 -- name: submit-telegram-rating
 UPDATE csat_responses r
 SET rating = $2, response_timestamp = NOW(), updated_at = NOW(),
-    meta = COALESCE(r.meta, '{}'::jsonb) || '{"telegram_feedback_pending":true}'::jsonb
+    meta = COALESCE(r.meta, '{}'::jsonb) || '{"feedback_pending":true}'::jsonb
 FROM conversation_messages m
 JOIN conversations c ON c.id = m.conversation_id
 JOIN inboxes i ON i.id = c.inbox_id

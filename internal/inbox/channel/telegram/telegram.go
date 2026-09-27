@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/telegram"
@@ -17,8 +15,9 @@ import (
 
 const ChannelTelegram = "telegram"
 
-type SourceIDUpdater interface {
+type Store interface {
 	RecordTelegramSend(messageUUID string, sourceIDs []string) error
+	TelegramCSATButtons(uuid string) ([]telegram.Button, error)
 }
 
 type Config struct {
@@ -43,36 +42,28 @@ type SendMeta struct {
 }
 
 type Opts struct {
-	ID            int
-	Name          string
-	Config        Config
-	Client        *telegram.Client
-	CSATButtons   func(string) ([]telegram.Button, error)
-	SourceUpdater SourceIDUpdater
-	Lo            *logf.Logger
-	AuthStatus    func(int, bool)
+	ID         int
+	Name       string
+	Config     Config
+	Client     *telegram.Client
+	Store      Store
+	Lo         *logf.Logger
+	AuthStatus func(int, bool)
 }
 
 type Telegram struct {
-	id            int
-	name          string
-	config        Config
-	client        *telegram.Client
-	csatButtons   func(string) ([]telegram.Button, error)
-	sourceUpdater SourceIDUpdater
-	lo            *logf.Logger
-	authStatus    func(int, bool)
+	opts Opts
 }
 
 func New(opts Opts) (*Telegram, error) {
-	if opts.Config.BotToken == "" || opts.Config.SecretToken == "" || opts.Client == nil || opts.SourceUpdater == nil || opts.Lo == nil {
+	if opts.Config.BotToken == "" || opts.Config.SecretToken == "" || opts.Client == nil || opts.Store == nil || opts.Lo == nil {
 		return nil, fmt.Errorf("telegram credentials, client, logger and message store are required")
 	}
-	return &Telegram{id: opts.ID, name: opts.Name, config: opts.Config, client: opts.Client, sourceUpdater: opts.SourceUpdater, csatButtons: opts.CSATButtons, lo: opts.Lo, authStatus: opts.AuthStatus}, nil
+	return &Telegram{opts: opts}, nil
 }
 
-func (t *Telegram) Identifier() int               { return t.id }
-func (t *Telegram) Name() string                  { return t.name }
+func (t *Telegram) Identifier() int               { return t.opts.ID }
+func (t *Telegram) Name() string                  { return t.opts.Name }
 func (t *Telegram) Channel() string               { return ChannelTelegram }
 func (t *Telegram) FromAddress() string           { return "" }
 func (t *Telegram) ReplyToAddress() string        { return "" }
@@ -91,55 +82,40 @@ func (t *Telegram) Send(message models.OutboundMessage) error {
 		return fmt.Errorf("missing telegram recipient")
 	}
 	text := message.Content
-	plain := text
 	options := telegram.SendOptions{Buttons: meta.Telegram.Buttons, ReplyToMessageID: meta.Telegram.ReplyToMessageID, BusinessConnectionID: meta.Telegram.BusinessConnectionID, ThreadID: meta.Telegram.ThreadID}
 	if meta.Telegram.CSATUUID != "" {
-		if t.csatButtons == nil {
-			return fmt.Errorf("CSAT survey is unavailable")
-		}
 		var err error
-		options.Buttons, err = t.csatButtons(meta.Telegram.CSATUUID)
+		options.Buttons, err = t.opts.Store.TelegramCSATButtons(meta.Telegram.CSATUUID)
 		if err != nil {
 			return err
 		}
 	}
 	if message.ContentType == models.ContentTypeHTML {
-		text, plain = telegram.FormatHTML(text)
+		text, _ = telegram.FormatHTML(text)
 		options.ParseMode = "HTML"
 	} else if message.TextContent != "" {
 		text = message.TextContent
-		plain = text
-	}
-	limit := telegram.MaxTextLength
-	if len(message.Attachments) > 0 {
-		limit = telegram.MaxCaptionLength
-	}
-	if utf8.RuneCountInString(plain) > limit {
-		return fmt.Errorf("Telegram message exceeds %d characters", limit)
-	}
-	if strings.TrimSpace(plain) == "" && len(message.Attachments) == 0 {
-		return fmt.Errorf("message has no content")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var sent []telegram.Message
 	var err error
 	if len(message.Attachments) > 1 {
-		sent, err = t.client.SendAlbum(ctx, t.config.BotToken, meta.Telegram.ChatID, text, message.Attachments, options)
+		sent, err = t.opts.Client.SendAlbum(ctx, t.opts.Config.BotToken, meta.Telegram.ChatID, text, message.Attachments, options)
 	} else {
 		var id int64
-		id, err = t.client.Send(ctx, t.config.BotToken, meta.Telegram.ChatID, text, message.Attachments, options)
+		id, err = t.opts.Client.Send(ctx, t.opts.Config.BotToken, meta.Telegram.ChatID, text, message.Attachments, options)
 		sent = []telegram.Message{{ID: id}}
 	}
 	if err != nil {
 		var apiErr *telegram.APIError
-		if t.authStatus != nil && errors.As(err, &apiErr) && apiErr.Code == http.StatusUnauthorized {
-			t.authStatus(t.id, false)
+		if t.opts.AuthStatus != nil && errors.As(err, &apiErr) && apiErr.Code == http.StatusUnauthorized {
+			t.opts.AuthStatus(t.opts.ID, false)
 		}
 		return err
 	}
-	if t.authStatus != nil {
-		t.authStatus(t.id, true)
+	if t.opts.AuthStatus != nil {
+		t.opts.AuthStatus(t.opts.ID, true)
 	}
 	if len(sent) != max(1, len(message.Attachments)) {
 		return fmt.Errorf("Telegram returned an incomplete message response")
@@ -149,13 +125,10 @@ func (t *Telegram) Send(message models.OutboundMessage) error {
 		if item.ID <= 0 {
 			return fmt.Errorf("Telegram returned no message ID")
 		}
-		sources[i] = telegram.SourceID(t.id, meta.Telegram.ChatID, item.ID)
-		if meta.Telegram.BusinessConnectionID != "" {
-			sources[i] = telegram.BusinessSourceID(t.id, meta.Telegram.BusinessConnectionID, meta.Telegram.ChatID, item.ID)
-		}
+		sources[i] = telegram.Message{ID: item.ID, Chat: telegram.Chat{ID: meta.Telegram.ChatID}, BusinessConnectionID: meta.Telegram.BusinessConnectionID}.SourceID(t.opts.ID)
 	}
-	if err := t.sourceUpdater.RecordTelegramSend(message.UUID, sources); err != nil {
-		t.lo.Error("error storing telegram message ids", "message_uuid", message.UUID, "error", err)
+	if err := t.opts.Store.RecordTelegramSend(message.UUID, sources); err != nil {
+		t.opts.Lo.Error("error storing telegram message ids", "message_uuid", message.UUID, "error", err)
 	}
 	return nil
 }

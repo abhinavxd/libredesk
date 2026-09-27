@@ -662,9 +662,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		if isWhatsAppTemplate {
 			contentType = models.ContentTypeText
 		}
-	}
-
-	if inboxRecord.Channel == inbox.ChannelTelegram {
+	case inbox.ChannelTelegram:
 		if err := m.prepareTelegramOutbound(inboxRecord, conversationUUID, content, media, metaMap); err != nil {
 			return models.Message{}, err
 		}

@@ -1,3 +1,5 @@
+import { getTextFromHTML } from '@shared-ui/utils/string'
+
 export const TELEGRAM_CHANNEL = 'telegram'
 export const TELEGRAM_MAX_BUTTONS = 10
 export const TELEGRAM_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
@@ -59,7 +61,7 @@ export function buildTelegramReplyParts(content, files, buttons = []) {
     parts.at(-1).attachments.push(file)
     family = kind
   }
-  if (content.replace(/<[^>]*>/g, '').trim()) {
+  if (getTextFromHTML(content)) {
     parts.unshift({ content, attachments: [], buttons: keyboard })
   } else if (keyboard.length && parts[0].attachments.length > 1) {
     const first = parts[0].attachments.shift()
@@ -72,8 +74,9 @@ export function buildTelegramReplyParts(content, files, buttons = []) {
 
 export function groupTelegramAlbums(messages) {
   const result = []
+  const albums = new Set()
   for (const message of messages) {
-    const previous = result.at(-1)
+    let previous = result.at(-1)
     const id = message.meta?.telegram_media_group_id
     if (
       id &&
@@ -84,6 +87,15 @@ export function groupTelegramAlbums(messages) {
       previous.sender_id === message.sender_id &&
       previous.type === message.type
     ) {
+      if (!albums.has(previous)) {
+        previous = {
+          ...previous,
+          attachments: [...(previous.attachments || [])],
+          albumMessageUUIDs: [previous.uuid]
+        }
+        albums.add(previous)
+        result[result.length - 1] = previous
+      }
       previous.attachments.push(...(message.attachments || []))
       if (message.content) {
         const html = previous.content_type === 'html' || message.content_type === 'html'
@@ -97,11 +109,7 @@ export function groupTelegramAlbums(messages) {
       }
       previous.albumMessageUUIDs.push(message.uuid)
     } else {
-      result.push({
-        ...message,
-        attachments: [...(message.attachments || [])],
-        albumMessageUUIDs: [message.uuid]
-      })
+      result.push(message)
     }
   }
   return result

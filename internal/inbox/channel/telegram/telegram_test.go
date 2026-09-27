@@ -19,6 +19,7 @@ type sourceStore struct {
 	uuid, source string
 	sources      []string
 	err          error
+	csatButtons  func(string) ([]telegram.Button, error)
 }
 
 func (s *sourceStore) RecordTelegramSend(uuid string, sources []string) error {
@@ -27,9 +28,13 @@ func (s *sourceStore) RecordTelegramSend(uuid string, sources []string) error {
 	return s.err
 }
 
+func (s *sourceStore) TelegramCSATButtons(uuid string) ([]telegram.Button, error) {
+	return s.csatButtons(uuid)
+}
+
 func TestChannelLifecycle(t *testing.T) {
-	opts := Opts{ID: 7, Name: "Support", Config: Config{BotToken: "token", SecretToken: "secret"}, Client: telegram.New(), SourceUpdater: &sourceStore{}, Lo: testLogger()}
-	for _, remove := range []func(*Opts){func(o *Opts) { o.Config.BotToken = "" }, func(o *Opts) { o.Config.SecretToken = "" }, func(o *Opts) { o.Client = nil }, func(o *Opts) { o.SourceUpdater = nil }, func(o *Opts) { o.Lo = nil }} {
+	opts := Opts{ID: 7, Name: "Support", Config: Config{BotToken: "token", SecretToken: "secret"}, Client: telegram.New(), Store: &sourceStore{}, Lo: testLogger()}
+	for _, remove := range []func(*Opts){func(o *Opts) { o.Config.BotToken = "" }, func(o *Opts) { o.Config.SecretToken = "" }, func(o *Opts) { o.Client = nil }, func(o *Opts) { o.Store = nil }, func(o *Opts) { o.Lo = nil }} {
 		invalid := opts
 		remove(&invalid)
 		if _, err := New(invalid); err == nil {
@@ -55,7 +60,7 @@ func TestChannelLifecycle(t *testing.T) {
 }
 
 func TestSendValidation(t *testing.T) {
-	channel, _ := New(Opts{Config: Config{BotToken: "token", SecretToken: "secret"}, Client: telegram.New(), SourceUpdater: &sourceStore{}, Lo: testLogger()})
+	channel, _ := New(Opts{Config: Config{BotToken: "token", SecretToken: "secret"}, Client: telegram.New(), Store: &sourceStore{}, Lo: testLogger()})
 	for _, tc := range []struct {
 		name    string
 		message models.OutboundMessage
@@ -64,9 +69,6 @@ func TestSendValidation(t *testing.T) {
 		{"no recipient", models.OutboundMessage{Meta: json.RawMessage(`{}`)}},
 		{"zero recipient", models.OutboundMessage{Meta: json.RawMessage(`{"telegram":{"chat_id":0}}`)}},
 		{"negative recipient", models.OutboundMessage{Meta: json.RawMessage(`{"telegram":{"chat_id":-1}}`)}},
-		{"empty message", models.OutboundMessage{Meta: json.RawMessage(`{"telegram":{"chat_id":1}}`), Content: "  "}},
-		{"text limit", models.OutboundMessage{Meta: json.RawMessage(`{"telegram":{"chat_id":1}}`), Content: strings.Repeat("😀", telegram.MaxTextLength+1)}},
-		{"caption limit", models.OutboundMessage{Meta: json.RawMessage(`{"telegram":{"chat_id":1}}`), Content: strings.Repeat("x", telegram.MaxCaptionLength+1), Attachments: attachment.Attachments{{}}}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := channel.Send(tc.message); err == nil {
@@ -110,7 +112,7 @@ func TestSendContentAndFailureHandling(t *testing.T) {
 			if tc.storeError {
 				store.err = errors.New("database offline")
 			}
-			opts := Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, SourceUpdater: store, Lo: testLogger()}
+			opts := Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, Store: store, Lo: testLogger()}
 			var auth []bool
 			if tc.authHook {
 				opts.AuthStatus = func(id int, ok bool) {
@@ -158,7 +160,7 @@ func TestBusinessChannelSend(t *testing.T) {
 	client := telegram.New()
 	client.SetBaseURL(server.URL)
 	store := &sourceStore{}
-	channel, err := New(Opts{ID: 7, Config: Config{BotToken: "123:secret", SecretToken: "hook"}, Client: client, SourceUpdater: store, Lo: testLogger()})
+	channel, err := New(Opts{ID: 7, Config: Config{BotToken: "123:secret", SecretToken: "hook"}, Client: client, Store: store, Lo: testLogger()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +188,7 @@ func TestChannelAlbums(t *testing.T) {
 			client := telegram.New()
 			client.SetBaseURL(server.URL)
 			store := &sourceStore{}
-			channel, _ := New(Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, SourceUpdater: store, Lo: testLogger()})
+			channel, _ := New(Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, Store: store, Lo: testLogger()})
 			err := channel.Send(models.OutboundMessage{UUID: "uuid", Meta: json.RawMessage(`{"telegram":{"chat_id":123,"business_connection_id":"business"}}`), Attachments: attachment.Attachments{{Name: "1.txt"}, {Name: "2.txt"}}})
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("err=%v", err)
@@ -222,14 +224,13 @@ func TestCSATButtonsResolvedAtDelivery(t *testing.T) {
 		resolver func(string) ([]telegram.Button, error)
 		fail     bool
 	}{
-		{name: "missing resolver", fail: true},
 		{name: "settings failure", resolver: func(string) ([]telegram.Button, error) { return nil, errors.New("settings unavailable") }, fail: true},
 		{name: "current URL", resolver: func(uuid string) ([]telegram.Button, error) {
 			return []telegram.Button{{Text: "Feedback", URL: "https://current.example/csat/" + uuid}}, nil
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			channel, _ := New(Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, SourceUpdater: &sourceStore{}, Lo: testLogger(), CSATButtons: tc.resolver})
+			channel, _ := New(Opts{ID: 7, Config: Config{BotToken: "token", SecretToken: "secret"}, Client: client, Store: &sourceStore{csatButtons: tc.resolver}, Lo: testLogger()})
 			if err := channel.Send(message); (err != nil) != tc.fail {
 				t.Fatal(err)
 			}

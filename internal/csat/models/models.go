@@ -23,7 +23,7 @@ type CSATResponse struct {
 
 func (c CSATResponse) FeedbackPending() bool {
 	var meta struct {
-		Pending bool `json:"telegram_feedback_pending"`
+		Pending bool `json:"feedback_pending"`
 	}
 	_ = json.Unmarshal(c.Meta, &meta)
 	return c.ResponseTimestamp.Valid && meta.Pending

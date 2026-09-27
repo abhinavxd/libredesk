@@ -78,28 +78,12 @@
       :key="identity.channel + identity.identifier"
       class="flex gap-2 items-center"
     >
-      <WhatsAppIcon
-        v-if="identity.channel === 'whatsapp'"
-        class="size-4 text-muted-foreground flex-shrink-0"
-      />
-      <TelegramIcon
-        v-else-if="identity.channel === 'telegram'"
+      <component
+        :is="CHANNEL_ICONS[identity.channel] || IdCard"
         class="size-4 shrink-0 text-muted-foreground"
       />
-      <IdCard v-else size="16" class="text-muted-foreground flex-shrink-0" />
       <span class="sidebar-value break-all">
-        {{
-          identity.channel === 'telegram' &&
-          conversation?.contact?.custom_attributes?.telegram_username
-            ? '@' +
-              conversation.contact.custom_attributes.telegram_username +
-              ' (' +
-              identity.identifier +
-              ')'
-            : identity.channel === 'whatsapp'
-              ? '+' + identity.identifier
-              : identity.identifier
-        }}
+        {{ formatChannelIdentity(identity, conversation.contact) }}
       </span>
     </div>
 
@@ -158,8 +142,8 @@ import {
   ShieldQuestion
 } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
-import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
+import { formatChannelIdentity } from '@main/utils/channel-identity'
 import countries from '@shared-ui/constants/countries.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'

@@ -97,19 +97,9 @@ func (c *Client) DeleteWebhook(ctx context.Context, token string) error {
 }
 
 func (c *Client) Send(ctx context.Context, token string, chatID int64, text string, attachments attachment.Attachments, options SendOptions) (int64, error) {
-	for attempt := 0; ; attempt++ {
-		id, err := c.send(ctx, token, chatID, text, attachments, options)
-		var apiErr *APIError
-		if attempt >= 2 || !errors.As(err, &apiErr) || apiErr.Code != http.StatusTooManyRequests {
-			return id, err
-		}
-		delay := time.Duration(max(1, apiErr.Parameters.RetryAfter)) * time.Second
-		select {
-		case <-ctx.Done():
-			return 0, ctx.Err()
-		case <-time.After(delay):
-		}
-	}
+	return withRetry(ctx, func() (int64, error) {
+		return c.send(ctx, token, chatID, text, attachments, options)
+	})
 }
 
 func (c *Client) Download(ctx context.Context, token, fileID string) (File, []byte, error) {
@@ -181,16 +171,7 @@ func (c *Client) send(ctx context.Context, token string, chatID int64, text stri
 	writer := multipart.NewWriter(&body)
 	writer.WriteField("chat_id", strconv.FormatInt(chatID, 10))
 	writer.WriteField("caption", text)
-	if options.ReplyToMessageID > 0 {
-		reply, _ := json.Marshal(ReplyParameters{MessageID: options.ReplyToMessageID, AllowSendingWithoutReply: true})
-		writer.WriteField("reply_parameters", string(reply))
-	}
-	if options.BusinessConnectionID != "" {
-		writer.WriteField("business_connection_id", options.BusinessConnectionID)
-	}
-	if options.ThreadID > 0 {
-		writer.WriteField("message_thread_id", strconv.FormatInt(options.ThreadID, 10))
-	}
+	writeOptions(writer, options)
 	if options.ParseMode != "" {
 		writer.WriteField("parse_mode", options.ParseMode)
 	}
@@ -246,6 +227,35 @@ func (c *Client) request(ctx context.Context, token, method, contentType string,
 		return json.Unmarshal(response.Result, result)
 	}
 	return nil
+}
+
+func withRetry[T any](ctx context.Context, send func() (T, error)) (T, error) {
+	for attempt := 0; ; attempt++ {
+		result, err := send()
+		var apiErr *APIError
+		if attempt >= 2 || !errors.As(err, &apiErr) || apiErr.Code != http.StatusTooManyRequests {
+			return result, err
+		}
+		select {
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		case <-time.After(time.Duration(max(1, apiErr.Parameters.RetryAfter)) * time.Second):
+		}
+	}
+}
+
+func writeOptions(writer *multipart.Writer, options SendOptions) {
+	if options.BusinessConnectionID != "" {
+		writer.WriteField("business_connection_id", options.BusinessConnectionID)
+	}
+	if options.ThreadID > 0 {
+		writer.WriteField("message_thread_id", strconv.FormatInt(options.ThreadID, 10))
+	}
+	if options.ReplyToMessageID > 0 {
+		reply, _ := json.Marshal(ReplyParameters{MessageID: options.ReplyToMessageID, AllowSendingWithoutReply: true})
+		writer.WriteField("reply_parameters", string(reply))
+	}
 }
 
 func redactError(err error, token string) error {

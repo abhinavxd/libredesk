@@ -473,7 +473,7 @@ func (m *Manager) MergeChannelSecrets(current, update json.RawMessage) (json.Raw
 		m.lo.Error("error unmarshalling channel update config", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token", "bot_token", "secret_token"} {
+	for _, fieldName := range imodels.ChannelSecretFields {
 		val, _ := updateCfg[fieldName].(string)
 		if val == "" || strings.Contains(val, stringutil.PasswordDummy) {
 			if existing, ok := currentCfg[fieldName].(string); ok {
@@ -700,7 +700,7 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
-	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token", "bot_token", "secret_token"} {
+	for _, fieldName := range imodels.ChannelSecretFields {
 		if value, ok := cfg[fieldName].(string); ok && value != "" && !crypto.IsEncrypted(value) {
 			encrypted, err := crypto.Encrypt(value, m.encryptionKey)
 			if err != nil {
@@ -776,7 +776,7 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
-	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token", "bot_token", "secret_token"} {
+	for _, fieldName := range imodels.ChannelSecretFields {
 		if value, ok := cfg[fieldName].(string); ok && crypto.IsEncrypted(value) {
 			decrypted, err := crypto.Decrypt(value, m.encryptionKey)
 			if err != nil {

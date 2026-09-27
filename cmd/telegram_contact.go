@@ -6,6 +6,7 @@ import (
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
+	"github.com/abhinavxd/libredesk/internal/telegram"
 	"github.com/zerodha/fastglue"
 )
 
@@ -30,11 +31,7 @@ func handleSaveTelegramContact(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, "Permission denied", nil))
 	}
 	var meta struct {
-		Contact *struct {
-			FirstName string `json:"first_name"`
-			LastName  string `json:"last_name"`
-			Phone     string `json:"phone_number"`
-		} `json:"telegram_contact"`
+		Contact *telegram.Contact `json:"telegram_contact"`
 	}
 	if err := json.Unmarshal(message.Meta, &meta); err != nil {
 		return sendErrorEnvelope(r, err)

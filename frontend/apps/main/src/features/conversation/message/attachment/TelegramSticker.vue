@@ -34,6 +34,7 @@
 </template>
 <script setup>
 import { ref, shallowRef, watch } from 'vue'
+import { useElementVisibility } from '@vueuse/core'
 import { Pause, Play } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
@@ -45,15 +46,23 @@ const container = ref(null)
 const animation = shallowRef(null)
 const failed = ref(false)
 const playing = ref(false)
+const visible = useElementVisibility(container)
+const seen = ref(false)
 const toggle = () => {
   playing.value = !playing.value
-  if (playing.value) animation.value.play()
-  else animation.value.pause()
 }
+watch(visible, (isVisible) => {
+  if (isVisible) seen.value = true
+})
+watch([animation, playing, visible], ([player, isPlaying, isVisible]) => {
+  if (!player) return
+  if (isPlaying && isVisible) player.play()
+  else player.pause()
+})
 watch(
-  [() => props.attachment.url, container],
-  async ([url, element], _, onCleanup) => {
-    if (!element) return
+  [() => props.attachment.url, container, seen],
+  async ([url, element, wasSeen], _, onCleanup) => {
+    if (!element || !wasSeen) return
     const abort = new AbortController()
     let player
     onCleanup(() => {
@@ -75,7 +84,7 @@ watch(
         container: element,
         renderer: 'canvas',
         loop: true,
-        autoplay: playing.value,
+        autoplay: false,
         animationData: data
       })
       animation.value = player

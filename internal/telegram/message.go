@@ -38,6 +38,12 @@ type Location struct {
 	Longitude float64 `json:"longitude"`
 }
 
+type Contact struct {
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Phone     string `json:"phone_number"`
+}
+
 type Venue struct {
 	Location Location `json:"location"`
 	Title    string   `json:"title"`
@@ -70,11 +76,7 @@ type Message struct {
 	Sticker              *File     `json:"sticker"`
 	VideoNote            *File     `json:"video_note"`
 	Location             *Location `json:"location"`
-	Contact              *struct {
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Phone     string `json:"phone_number"`
-	} `json:"contact"`
+	Contact              *Contact  `json:"contact"`
 }
 
 type CallbackQuery struct {
@@ -166,11 +168,7 @@ func MessageIDFromSource(sourceID string, inboxID int, chatID int64, businessID 
 	if err != nil || id <= 0 {
 		return 0, fmt.Errorf("invalid telegram reply reference")
 	}
-	expected := SourceID(inboxID, chatID, id)
-	if businessID != "" {
-		expected = BusinessSourceID(inboxID, businessID, chatID, id)
-	}
-	if sourceID != expected {
+	if sourceID != (Message{ID: id, Chat: Chat{ID: chatID}, BusinessConnectionID: businessID}).SourceID(inboxID) {
 		return 0, fmt.Errorf("telegram reply belongs to another chat")
 	}
 	return id, nil
