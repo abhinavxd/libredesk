@@ -17,14 +17,14 @@
         aria-hidden="true"
       />
       <h3 class="text-lg font-medium">{{ title }}</h3>
-      <Badge v-if="badge" variant="secondary" class="ml-2">{{ badge }}</Badge>
+      <BetaBadge v-if="badge" class="ml-2">{{ badge }}</BetaBadge>
     </div>
     <p class="text-sm text-muted-foreground">{{ subTitle }}</p>
   </Card>
 </template>
 
 <script setup>
-import { Badge } from '@shared-ui/components/ui/badge'
+import BetaBadge from '@main/components/BetaBadge.vue'
 import { Card } from '@shared-ui/components/ui/card'
 
 const props = defineProps({

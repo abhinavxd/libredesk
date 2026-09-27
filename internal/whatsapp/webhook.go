@@ -167,11 +167,15 @@ func (p *WebhookPayload) ExtractMessages() []ParsedMessage {
 			if c.Field != "messages" {
 				continue
 			}
-			contactName := ""
-			if len(c.Value.Contacts) > 0 {
-				contactName = c.Value.Contacts[0].Profile.Name
+			namesByWAID := make(map[string]string, len(c.Value.Contacts))
+			for _, ct := range c.Value.Contacts {
+				namesByWAID[ct.WAID] = ct.Profile.Name
 			}
 			for _, m := range c.Value.Messages {
+				contactName, ok := namesByWAID[m.From]
+				if !ok && len(c.Value.Contacts) == 1 {
+					contactName = c.Value.Contacts[0].Profile.Name
+				}
 				pm := ParsedMessage{
 					From:          m.From,
 					ID:            m.ID,

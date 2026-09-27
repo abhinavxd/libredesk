@@ -20,7 +20,7 @@ import (
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -91,7 +91,7 @@ func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.
 		return err
 	}
 
-	// The message_status enum collapses delivered/read into sent; the full lifecycle lives in meta.
+	// The message_status enum collapses delivered/read into sent. The full lifecycle lives in meta.
 	dbStatus := models.MessageStatusSent
 	if metaStatus == WhatsAppStatusFailed {
 		dbStatus = models.MessageStatusFailed
@@ -227,7 +227,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		return content, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// The channel identity is the wa_id Meta routes by; the phone columns are display data an agent may edit freely.
+	// The channel identity is the wa_id Meta routes by. The phone columns are display data an agent may edit freely.
 	toPhone, err := m.userStore.GetChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp)
 	if err != nil {
 		return content, err
@@ -244,7 +244,11 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		if dialCode == "" {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
 		}
-		toPhone = stringutil.NormalizeWhatsAppPhone(dialCode + contact.PhoneNumber.String)
+		var matchesCountry bool
+		toPhone, matchesCountry = stringutil.WhatsAppPhoneForDialCode(contact.PhoneNumber.String, dialCode)
+		if !matchesCountry {
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
+		}
 		if toPhone == "" {
 			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
 		}
@@ -283,6 +287,9 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		}
 		if t.HeaderType.Valid && !slices.Contains(sendableTemplateHeaderTypes, strings.ToUpper(t.HeaderType.String)) {
 			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateHeaderUnsupported", "type", strings.ToUpper(t.HeaderType.String)), nil)
+		}
+		if !t.SupportsTextContent() {
+			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.templateUnsupported"), nil)
 		}
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language
@@ -324,13 +331,13 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) error {
 	if strings.TrimSpace(content) == "" && !hasAttachments {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageContentRequired"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageOrAttachmentRequired"), nil)
 	}
 	limit := whatsAppMaxTextLength
 	if hasAttachments {
 		limit = whatsAppMaxCaptionLength
 	}
-	if utf8.RuneCountInString(stringutil.HTML2Text(content)) > limit {
+	if utf8.RuneCountInString(stringutil.HTML2WhatsApp(content)) > limit {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(limit)), nil)
 	}
 	return nil
@@ -366,7 +373,7 @@ func (m *Manager) validateTemplateParams(t wtmodels.Template, params map[string]
 	return nil
 }
 
-// renderTemplateBody fills {{name}} placeholders from "body:"+name params; unmatched ones stay verbatim so missing params show in the timeline.
+// renderTemplateBody fills {{name}} placeholders from "body:"+name params. Unmatched ones stay verbatim so missing params show in the timeline.
 func renderTemplateBody(body string, params map[string]string) string {
 	if body == "" || len(params) == 0 {
 		return body

@@ -65,8 +65,10 @@
   <!-- Create conversation dialog -->
   <CreateConversation
     v-if="openCreateConversationDialog"
+    ref="createConversationRef"
     v-model="openCreateConversationDialog"
     :initial-contact="createConversationContact"
+    :start-minimized="createConversationMinimized"
   />
 
   <KeyboardShortcutsDialog v-model:open="showShortcuts" />
@@ -92,6 +94,7 @@ import { useTagStore } from './stores/tag'
 import { useCustomAttributeStore } from './stores/customAttributes'
 import { useIdleDetection } from './composables/useIdleDetection'
 import { useNotificationStore } from './stores/notification'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 import { useViewStore } from './stores/view'
 import { useKeyboardShortcutsDialog } from './composables/useKeyboardShortcutsDialog'
 import KeyboardShortcutsDialog from './components/KeyboardShortcutsDialog.vue'
@@ -104,6 +107,7 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
+import { hasNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
@@ -122,6 +126,7 @@ import NotificationBell from '@main/components/sidebar/NotificationBell.vue'
 import PrimaryNavItems from '@main/components/sidebar/PrimaryNavItems.vue'
 import { useIsMobile } from '@shared-ui/composables'
 import api from '@main/api'
+import { usePushNotifications } from '@/composables/usePushNotifications'
 
 const route = useRoute()
 const emitter = useEmitter()
@@ -161,10 +166,15 @@ const viewStore = useViewStore()
 const { open: showShortcuts } = useKeyboardShortcutsDialog()
 const view = ref({})
 const openCreateViewForm = ref(false)
-const openCreateConversationDialog = ref(false)
+const hasSavedDraft = hasNewConversationDraft(window.localStorage)
+const openCreateConversationDialog = ref(hasSavedDraft)
 const createConversationContact = ref(null)
+const createConversationMinimized = ref(hasSavedDraft)
+const createConversationRef = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
+const aiPromptStore = useAiPromptStore()
+const pushNotifications = usePushNotifications()
 
 // Update browser tab title with unread notification count.
 // Watch both unreadCount and route so the prefix is preserved after navigation.
@@ -195,6 +205,8 @@ onMounted(() => {
 
 const openCreateConversation = ({ contact = null } = {}) => {
   createConversationContact.value = contact
+  createConversationMinimized.value = false
+  createConversationRef.value?.restore()
   openCreateConversationDialog.value = true
 }
 
@@ -214,8 +226,15 @@ const initStores = async () => {
     inboxStore.fetchInboxes(),
     slaStore.fetchSlas(),
     tagStore.fetchTags(),
-    customAttributeStore.fetchCustomAttributes()
+    customAttributeStore.fetchCustomAttributes(),
+    aiPromptStore.fetchPrompts(),
+    refreshPushSubscription()
   ])
+}
+
+const refreshPushSubscription = async () => {
+  const { data } = await api.getNotificationPreferences()
+  await pushNotifications.refresh(data.data.vapid_public_key, data.data.push_endpoints)
 }
 
 const createView = () => {

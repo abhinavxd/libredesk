@@ -109,21 +109,21 @@ func TestEmptyFiltersNoClause(t *testing.T) {
 }
 
 func TestContainsOnPlainColumnIsILike(t *testing.T) {
-	q, args, err := build(t, `[{"model":"users","field":"email","operator":"contains","value":"gmail"}]`)
+	q, args, err := build(t, `[{"model":"users","field":"email","operator":"contains","value":"50%_off\\today"}]`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(q, "users.email ILIKE $1") {
+	if !strings.Contains(q, `users.email ILIKE $1 ESCAPE '\'`) {
 		t.Fatalf("expected ILIKE for contains, got: %s", q)
 	}
-	if args[0] != "%gmail%" {
-		t.Fatalf("expected wrapped pattern, got: %v", args[0])
+	if args[0] != `%50\%\_off\\today%` {
+		t.Fatalf("expected escaped and wrapped pattern, got: %v", args[0])
 	}
 	q, _, err = build(t, `[{"model":"users","field":"email","operator":"not contains","value":"gmail"}]`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(q, "users.email NOT ILIKE $1") {
+	if !strings.Contains(q, `users.email NOT ILIKE $1 ESCAPE '\'`) {
 		t.Fatalf("expected NOT ILIKE for not contains, got: %s", q)
 	}
 }

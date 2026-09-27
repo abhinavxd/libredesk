@@ -3,31 +3,34 @@
     <div class="flex justify-between mb-5">
       <div></div>
       <div class="flex justify-end mb-4">
-        <Button
-          @click="navigateToNewTemplate"
-          :disabled="templateType !== 'email_outgoing'"
-        >
-          {{
-            $t('globals.messages.newTemplate')
-          }}
+        <Button @click="navigateToNewTemplate" :disabled="templateType !== 'email_outgoing'">
+          {{ $t('globals.messages.newTemplate') }}
         </Button>
       </div>
     </div>
     <div>
       <Tabs default-value="email_outgoing" v-model="templateType">
-        <TabsList class="grid w-full grid-cols-2 mb-5">
-          <TabsTrigger value="email_outgoing">
+        <TabsList class="flex w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-5 sm:grid sm:grid-cols-2">
+          <TabsTrigger value="email_outgoing" :class="TEMPLATE_TAB_CLASS">
             {{ $t('admin.template.outgoingEmailTemplates') }}
           </TabsTrigger>
-          <TabsTrigger value="email_notification">
+          <TabsTrigger value="email_notification" :class="TEMPLATE_TAB_CLASS">
             {{ $t('admin.template.emailNotificationTemplates') }}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="email_outgoing">
-          <DataTable :columns="createOutgoingEmailTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable
+            :columns="createOutgoingEmailTableColumns(t)"
+            :data="templates"
+            :loading="isLoading"
+          />
         </TabsContent>
         <TabsContent value="email_notification">
-          <DataTable :columns="createEmailNotificationTableColumns(t)" :data="templates" :loading="isLoading" />
+          <DataTable
+            :columns="createEmailNotificationTableColumns(t)"
+            :data="templates"
+            :loading="isLoading"
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -35,22 +38,24 @@
 </template>
 
 <script setup>
+const TEMPLATE_TAB_CLASS = 'shrink-0 sm:min-w-0'
+
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import {
   createOutgoingEmailTableColumns,
   createEmailNotificationTableColumns
-} from '../../../features/admin/templates/dataTableColumns.js'
+} from '@main/features/admin/templates/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useStorage } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../../api'
+import api from '@main/api'
 
 const templateType = useStorage('templateType', 'email_outgoing')
 const { t } = useI18n()

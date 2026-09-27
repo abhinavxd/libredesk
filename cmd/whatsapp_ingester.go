@@ -23,7 +23,7 @@ const (
 	whatsAppEnqueueTimeout = 5 * time.Second
 )
 
-// whatsAppJob is the durable envelope persisted to the stream; Body is the raw Meta POST body, parsed in the worker.
+// whatsAppJob is the durable envelope persisted to the stream. Body is the raw Meta POST body, parsed in the worker.
 type whatsAppJob struct {
 	InboxID int             `json:"inbox_id"`
 	Body    json.RawMessage `json:"body"`
@@ -35,7 +35,7 @@ type WhatsAppIngester struct {
 	sourceLocks *keyedLock
 }
 
-// keyedLock serializes work per string key; entries are refcounted and dropped once the last holder releases.
+// keyedLock serializes work per string key. Entries are refcounted and dropped once the last holder releases.
 type keyedLock struct {
 	mu      sync.Mutex
 	entries map[string]*keyedLockEntry
@@ -69,7 +69,7 @@ func newWhatsAppIngester(app *App) (*WhatsAppIngester, error) {
 // Run consumes the stream until Close is called.
 func (i *WhatsAppIngester) Run() { i.queue.Run() }
 
-// Close stops the queue and waits for in-flight work; un-acked deliveries stay durable for the next start.
+// Close stops the queue and waits for in-flight work. Un-acked deliveries stay durable for the next start.
 func (i *WhatsAppIngester) Close() { i.queue.Close() }
 
 // Enqueue durably stores a raw webhook body for the inbox.
@@ -88,7 +88,7 @@ func (i *WhatsAppIngester) lockSender(from string) func() {
 	return i.sourceLocks.lock(from)
 }
 
-// handle returns nil for an unparseable job so it is dropped rather than retried forever; a processing error keeps the entry pending for retry.
+// handle returns nil for an unparseable job so it is dropped rather than retried forever. A processing error keeps the entry pending for retry.
 func (i *WhatsAppIngester) handle(app *App) streamqueue.Handler {
 	return func(ctx context.Context, payload []byte) error {
 		var job whatsAppJob

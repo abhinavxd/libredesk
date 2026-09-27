@@ -70,6 +70,8 @@ provideSidebarContext({
   setOpenMobile,
   toggleSidebar,
 });
+
+defineExpose({ setOpenMobile });
 </script>
 
 <template>

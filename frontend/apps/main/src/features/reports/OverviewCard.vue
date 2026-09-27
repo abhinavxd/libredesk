@@ -11,7 +11,7 @@
         class="flex flex-col items-center gap-1 text-center"
       >
         <span :class="valueClass">{{ item }}</span>
-        <span class="text-xs text-muted-foreground uppercase tracking-wider">{{ labels[key] }}</span>
+        <span class="text-xs text-muted-foreground">{{ labels[key] }}</span>
       </div>
     </div>
   </div>

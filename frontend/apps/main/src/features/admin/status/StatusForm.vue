@@ -16,7 +16,7 @@
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger class="w-full">
-              <SelectValue :placeholder="$t('globals.messages.selectCategory')" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>

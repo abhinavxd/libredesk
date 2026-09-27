@@ -34,7 +34,7 @@
         >
           <div
             v-for="row in messageRows"
-            :key="row.message.uuid"
+            :key="row.message.render_key || row.message.uuid"
             :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >

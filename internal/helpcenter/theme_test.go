@@ -94,7 +94,8 @@ func TestNormalizeThemeDropsUnsafeValues(t *testing.T) {
 		"header": {"background_type": "wat", "background_color": "notacolor"},
 		"layout": {"collections": "wat", "columns": 5},
 		"cards": {"icon_position": "wat"},
-		"announcement": {"text": "", "link_url": "https://example.com", "link_label": "Go"}
+		"announcement": {"text": "", "link_url": "https://example.com", "link_label": "Go"},
+		"footer": {"background_color_dark": "black", "text_color_dark": "#eeeeee"}
 	}`))
 	if err != nil {
 		t.Fatalf("normalizeTheme: %v", err)
@@ -118,8 +119,46 @@ func TestNormalizeThemeDropsUnsafeValues(t *testing.T) {
 	if got.Cards.IconPosition != cardIconPositions[0] {
 		t.Errorf("icon_position = %q, want %q", got.Cards.IconPosition, cardIconPositions[0])
 	}
+	if got.Footer.BackgroundColorDark != "" || got.Footer.TextColorDark != "#eeeeee" {
+		t.Errorf("footer = %+v, want the bad dark background dropped and the dark text kept", got.Footer)
+	}
 	if got.Announcement != (models.AnnouncementTheme{}) {
 		t.Errorf("announcement = %+v, want cleared when the text is empty", got.Announcement)
+	}
+}
+
+func TestNormalizeThemeColorScheme(t *testing.T) {
+	tests := []struct {
+		name          string
+		raw           string
+		wantScheme    string
+		wantColorDark string
+		wantLogoDark  string
+	}{
+		{"no theme saved", ``, models.ColorSchemeLight, defaultAccentColor, ""},
+		{"null theme", `null`, models.ColorSchemeLight, defaultAccentColor, ""},
+		{"saved before dark mode", `{"color": "#112233", "logo_url": "/uploads/a.png"}`, models.ColorSchemeLight, "#112233", ""},
+		{"unknown scheme", `{"color_scheme": "auto"}`, models.ColorSchemeLight, defaultAccentColor, ""},
+		{"system kept", `{"color_scheme": "system", "color_dark": "#445566"}`, models.ColorSchemeSystem, "#445566", ""},
+		{"dark kept", `{"color_scheme": "dark"}`, models.ColorSchemeDark, defaultAccentColor, ""},
+		{"bad dark color", `{"color": "#112233", "color_dark": "blue"}`, models.ColorSchemeLight, "#112233", ""},
+		{"dark logo kept", `{"logo_url_dark": "/uploads/dark.png"}`, models.ColorSchemeLight, defaultAccentColor, "/uploads/dark.png"},
+		{"unsafe dark logo", `{"logo_url_dark": "javascript:alert(1)"}`, models.ColorSchemeLight, defaultAccentColor, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw, err := normalizeTheme(json.RawMessage(tt.raw))
+			if err != nil {
+				t.Fatalf("normalizeTheme: %v", err)
+			}
+			var got models.Theme
+			if err := json.Unmarshal(raw, &got); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if got.ColorScheme != tt.wantScheme || got.ColorDark != tt.wantColorDark || got.LogoURLDark != tt.wantLogoDark {
+				t.Errorf("got scheme %q, dark color %q, dark logo %q; want %q, %q, %q", got.ColorScheme, got.ColorDark, got.LogoURLDark, tt.wantScheme, tt.wantColorDark, tt.wantLogoDark)
+			}
+		})
 	}
 }
 

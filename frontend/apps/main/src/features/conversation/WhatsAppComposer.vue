@@ -1,31 +1,26 @@
 <template>
   <div>
     <div
-      v-if="!windowOpen"
+      v-if="messageType !== 'private_note' && !windowOpen"
       class="mx-2 mt-2 box p-3 flex items-center justify-between gap-3 border-destructive/40 bg-destructive/5"
     >
       <div class="flex items-start gap-2 text-sm">
         <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
-        <div>
-          <p class="font-medium">{{ $t('conversation.whatsapp.windowClosed.title') }}</p>
-          <p class="text-muted-foreground text-xs">
-            {{ $t('conversation.whatsapp.windowClosed.description') }}
-          </p>
-        </div>
+        <p class="font-medium">{{ $t('conversation.whatsapp.windowClosed.title') }}</p>
       </div>
       <Button size="sm" variant="outline" @click="openTemplatePicker">
         {{ $t('globals.messages.sendTemplate') }}
       </Button>
     </div>
     <div
-      v-else-if="windowClosingSoon"
+      v-else-if="messageType !== 'private_note' && windowClosingSoon"
       class="mx-2 mt-2 box px-3 py-2 flex items-center gap-2 text-sm border-border"
     >
       <Lightbulb class="size-4 text-muted-foreground shrink-0" />
       <span>{{ $t('conversation.whatsapp.windowClosing', { time: windowExpiresIn }) }}</span>
     </div>
 
-    <ReplyBox />
+    <ReplyBox v-model:messageType="messageType" />
 
     <Dialog v-model:open="pickerOpen">
       <DialogContent class="sm:max-w-xl">
@@ -41,6 +36,7 @@
           :url-button-params="urlButtonParams"
           :rendered-preview="renderedPreview"
           :is-fetching="isFetchingTemplates"
+          autofocus
           @pick="pickTemplate"
           @back="selectedTemplate = null"
           @update:param="(key, v) => (templateParams[key] = v)"
@@ -86,6 +82,7 @@ const CLOSING_SOON_MS = 4 * 60 * 60 * 1000
 const { t } = useI18n()
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
+const messageType = ref('reply')
 
 const nowTick = ref(Date.now())
 let tickerHandle = setInterval(() => {
@@ -144,7 +141,14 @@ watch(
   }
 )
 
+watch(messageType, (type) => {
+  if (type !== 'private_note') return
+  pickerOpen.value = false
+  selectedTemplate.value = null
+})
+
 const openTemplatePicker = async () => {
+  if (messageType.value === 'private_note') return
   pickerOpen.value = true
   await fetchTemplates(conversationStore.current?.inbox_id)
 }

@@ -17,37 +17,45 @@
         </Select>
       </div>
 
-      <div class="flex items-center gap-1">
+      <nav class="flex items-center gap-1" :aria-label="t('globals.terms.pagination')">
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="EDGE_PAGE_BUTTON_CLASS"
+          :aria-label="t('globals.messages.firstPage')"
           :disabled="page <= 1"
           @click="goToPage(1)"
         >
-          <ChevronsLeft class="h-4 w-4" />
+          <ChevronsLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="PAGE_BUTTON_CLASS"
+          :aria-label="t('globals.messages.previousPage')"
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
-          <ChevronLeft class="h-4 w-4" />
+          <ChevronLeft class="h-4 w-4" aria-hidden="true" />
         </Button>
 
         <div class="flex items-center bg-muted rounded-lg p-1">
           <template v-for="pageNumber in visiblePages" :key="pageNumber">
             <span
               v-if="pageNumber === '...'"
+              aria-hidden="true"
               class="flex items-center justify-center h-7 w-7 text-sm text-muted-foreground select-none"
             >
               ...
             </span>
             <button
               v-else
+              type="button"
               @click="goToPage(pageNumber)"
+              :aria-label="`${t('globals.terms.page')} ${pageNumber}`"
+              :aria-current="pageNumber === page ? 'page' : undefined"
               class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               :class="
                 pageNumber === page
@@ -61,29 +69,36 @@
         </div>
 
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="PAGE_BUTTON_CLASS"
+          :aria-label="t('globals.messages.nextPage')"
           :disabled="page >= totalPages"
           @click="goToPage(page + 1)"
         >
-          <ChevronRight class="h-4 w-4" />
+          <ChevronRight class="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
+          type="button"
           variant="ghost"
           size="sm"
-          class="h-8 w-8 p-0"
+          :class="EDGE_PAGE_BUTTON_CLASS"
+          :aria-label="t('globals.messages.lastPage')"
           :disabled="page >= totalPages"
           @click="goToPage(totalPages)"
         >
-          <ChevronsRight class="h-4 w-4" />
+          <ChevronsRight class="h-4 w-4" aria-hidden="true" />
         </Button>
-      </div>
+      </nav>
     </div>
   </div>
 </template>
 
 <script setup>
+const EDGE_PAGE_BUTTON_CLASS = 'hidden h-8 w-8 p-0 sm:inline-flex'
+const PAGE_BUTTON_CLASS = 'h-8 w-8 p-0'
+
 import { computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import {

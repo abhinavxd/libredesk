@@ -1,5 +1,5 @@
 <template>
-  <FormField v-slot="{ componentField }" :name="countryCodeName">
+  <FormField v-slot="{ componentField, handleChange, meta }" :name="countryCodeName">
     <FormItem>
       <FormLabel class="flex items-center">
         {{ label || t('globals.terms.phoneNumber') }}
@@ -9,7 +9,7 @@
         <div class="shrink-0">
           <FormControl>
             <ComboBox
-              v-bind="componentField"
+              v-bind="fieldBinding(componentField, handleChange, meta)"
               :items="allCountries"
               :placeholder="t('globals.terms.select')"
               :buttonClass="'w-auto rounded-r-none border-r-0'"
@@ -38,12 +38,19 @@
         </div>
 
         <div class="flex-1 min-w-0">
-          <FormField v-slot="{ componentField: phoneField }" :name="phoneNumberName">
+          <FormField
+            v-slot="{
+              componentField: phoneField,
+              handleChange: handlePhoneChange,
+              meta: phoneMeta
+            }"
+            :name="phoneNumberName"
+          >
             <FormItem>
               <FormControl>
                 <Input
                   type="tel"
-                  v-bind="phoneField"
+                  v-bind="fieldBinding(phoneField, handlePhoneChange, phoneMeta)"
                   :placeholder="placeholder"
                   class="rounded-l-none"
                   inputmode="tel"
@@ -63,16 +70,26 @@
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from './ui/form'
 import { Input } from './ui/input'
 import ComboBox from './ui/combobox/ComboBox.vue'
-import { countryCallingOptions as allCountries } from '../constants/countries.js'
+import { countryCallingOptions as allCountries } from '@shared-ui/constants/countries.js'
 import { useI18n } from 'vue-i18n'
 
-defineProps({
+const props = defineProps({
   countryCodeName: { type: String, default: 'phone_number_country_code' },
   phoneNumberName: { type: String, default: 'phone_number' },
   label: { type: String, default: '' },
   placeholder: { type: String, default: '' },
-  required: { type: Boolean, default: false }
+  required: { type: Boolean, default: false },
+  deferValidation: { type: Boolean, default: false }
 })
 
 const { t } = useI18n()
+
+const fieldBinding = (componentField, handleChange, meta) => {
+  if (!props.deferValidation) return componentField
+  return {
+    name: componentField.name,
+    modelValue: componentField.modelValue,
+    'onUpdate:modelValue': (value) => handleChange(value, meta.validated)
+  }
+}
 </script>

@@ -12,6 +12,8 @@ const state = {
   phoneNumbers: new Set(),
   failSend: 0,
   failValidate: false,
+  failTemplateEdit: false,
+  failTemplateDelete: false,
   counter: 0
 }
 
@@ -145,9 +147,11 @@ const handle = async (req, res) => {
       return json(res, 200, { id, status: 'PENDING', category: body?.category })
     }
     if (req.method === 'DELETE') {
+      if (state.failTemplateDelete) return metaError(res, 400, 'Template deletion refused')
       const name = url.searchParams.get('name')
+      const templateID = url.searchParams.get('hsm_id')
       for (const [id, tmpl] of state.templates) {
-        if (tmpl.name === name) state.templates.delete(id)
+        if (tmpl.name === name && (!templateID || id === templateID)) state.templates.delete(id)
       }
       return json(res, 200, { success: true })
     }
@@ -157,6 +161,7 @@ const handle = async (req, res) => {
   if (parts.length === 1) {
     const id = parts[0]
     if (req.method === 'POST') {
+      if (state.failTemplateEdit) return metaError(res, 400, 'Template edit refused')
       const tmpl = state.templates.get(id)
       if (tmpl) state.templates.set(id, { ...tmpl, ...body, status: 'PENDING' })
       return json(res, 200, { success: true })
@@ -200,9 +205,29 @@ export const control = {
     state.phoneNumbers.clear()
     state.failSend = 0
     state.failValidate = false
+    state.failTemplateEdit = false
+    state.failTemplateDelete = false
     return null
   },
   requests: () => state.requests,
+  failTemplateEdit(on) {
+    state.failTemplateEdit = Boolean(on)
+    return null
+  },
+  failTemplateDelete(on) {
+    state.failTemplateDelete = Boolean(on)
+    return null
+  },
+  putTemplate(template) {
+    state.templates.set(template.id, template)
+    return null
+  },
+  setTemplateStatus({ id, status }) {
+    const template = state.templates.get(id)
+    if (!template) throw new Error('Template not found')
+    template.status = status
+    return null
+  },
   failSend(n) {
     state.failSend = n
     return null

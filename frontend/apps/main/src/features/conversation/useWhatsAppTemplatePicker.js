@@ -4,10 +4,12 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import api from '@main/api'
-import { extractPlaceholders, placeholderLabel } from './whatsappTemplate.js'
+import {
+  extractPlaceholders,
+  placeholderLabel,
+  supportsWhatsAppTemplateContent
+} from './whatsappTemplate.js'
 
-// Media-header templates need a media ID the dashboard can't supply, AUTHENTICATION templates need OTP button params, and libredesk_csat_* names are reserved for surveys.
-const SENDABLE_HEADER_TYPES = ['', 'NONE', 'TEXT']
 const RESERVED_NAME_PREFIX = 'libredesk_csat_'
 
 export function useWhatsAppTemplatePicker() {
@@ -21,9 +23,8 @@ export function useWhatsAppTemplatePicker() {
     templates.value.filter(
       (tmpl) =>
         tmpl.status === 'APPROVED' &&
-        tmpl.category !== 'AUTHENTICATION' &&
         !tmpl.name.startsWith(RESERVED_NAME_PREFIX) &&
-        SENDABLE_HEADER_TYPES.includes(tmpl.header_type || '')
+        supportsWhatsAppTemplateContent(tmpl)
     )
   )
 
@@ -83,7 +84,7 @@ export function useWhatsAppTemplatePicker() {
   const isFetchingTemplates = ref(false)
   let fetchSeq = 0
 
-  const fetchTemplates = async (inboxID) => {
+  const fetchTemplates = async (inboxID, { templateId, params = {} } = {}) => {
     reset()
     // Bumping the sequence invalidates any in-flight request, so a slow response for a previously selected inbox can't land.
     const seq = ++fetchSeq
@@ -93,6 +94,13 @@ export function useWhatsAppTemplatePicker() {
       const resp = await api.getWhatsAppTemplates(inboxID)
       if (seq !== fetchSeq) return
       templates.value = resp.data.data || []
+      const template = approvedTemplates.value.find((tmpl) => tmpl.id === templateId)
+      if (template) {
+        pickTemplate(template)
+        for (const key of allParamKeys.value) {
+          templateParams[key] = params[key] ?? ''
+        }
+      }
     } catch (error) {
       if (seq !== fetchSeq) return
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

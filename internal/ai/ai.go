@@ -60,11 +60,13 @@ type Manager struct {
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
 	// indexReady is closed once the boot-time index load finishes; Search blocks on it.
-	indexReady  chan struct{}
-	reindexMu   sync.Mutex
-	reconcileMu sync.Mutex
-	genMu       sync.Mutex
-	gen         map[genKey]uint64
+	indexReady   chan struct{}
+	reindexMu    sync.Mutex
+	reconcileMu  sync.Mutex
+	genMu        sync.Mutex
+	gen          map[genKey]uint64
+	pendingRunMu sync.Mutex
+	pendingRuns  map[string]*pendingAgentRun
 	// tagGen is bumped on every tag vector purge; an in-flight tag reindex only commits if its gen is still current.
 	tagGen atomic.Uint64
 	// embedSem caps concurrent background embed jobs.
@@ -98,6 +100,10 @@ type queries struct {
 	UpdateProviderConfig         *sqlx.Stmt `query:"update-provider-config"`
 	GetPrompt                    *sqlx.Stmt `query:"get-prompt"`
 	GetPrompts                   *sqlx.Stmt `query:"get-prompts"`
+	GetPromptByID                *sqlx.Stmt `query:"get-prompt-by-id"`
+	InsertPrompt                 *sqlx.Stmt `query:"insert-prompt"`
+	UpdatePrompt                 *sqlx.Stmt `query:"update-prompt"`
+	DeletePrompt                 *sqlx.Stmt `query:"delete-prompt"`
 	GetKnowledgeBaseItems        *sqlx.Stmt `query:"get-knowledge-base-items"`
 	GetKnowledgeBaseItem         *sqlx.Stmt `query:"get-knowledge-base-item"`
 	KnowledgeBaseItemExists      *sqlx.Stmt `query:"knowledge-base-item-exists"`
@@ -119,6 +125,8 @@ type queries struct {
 	GetTools                     *sqlx.Stmt `query:"get-tools"`
 	GetTool                      *sqlx.Stmt `query:"get-tool"`
 	GetEnabledToolsByIDs         *sqlx.Stmt `query:"get-enabled-tools-by-ids"`
+	GetEnabledCopilotToolIDs     *sqlx.Stmt `query:"get-enabled-copilot-tool-ids"`
+	GetEnabledGenerateToolIDs    *sqlx.Stmt `query:"get-enabled-generate-reply-tool-ids"`
 	GetToolAuth                  *sqlx.Stmt `query:"get-tool-auth"`
 	InsertTool                   *sqlx.Stmt `query:"insert-tool"`
 	UpdateTool                   *sqlx.Stmt `query:"update-tool"`
@@ -146,6 +154,7 @@ func New(opts Opts) (*Manager, error) {
 		index:         newEmbeddingIndex(),
 		indexReady:    make(chan struct{}),
 		gen:           make(map[genKey]uint64),
+		pendingRuns:   make(map[string]*pendingAgentRun),
 		embedSem:      make(chan struct{}, maxConcurrentEmbeds),
 		httpClient: &http.Client{
 			Timeout:   20 * time.Second,
@@ -240,6 +249,59 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return prompts, nil
+}
+
+// GetPromptByID returns a prompt with its content for the admin editor.
+func (m *Manager) GetPromptByID(id int) (models.Prompt, error) {
+	var p models.Prompt
+	if err := m.q.GetPromptByID.Get(&p, id); err != nil {
+		if err == sql.ErrNoRows {
+			return p, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error fetching prompt", "error", err)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return p, nil
+}
+
+// CreatePrompt stores a new editor prompt; the key is derived from the title and never changes.
+func (m *Manager) CreatePrompt(title, content string) (models.Prompt, error) {
+	var p models.Prompt
+	if err := m.validatePrompt(title, content); err != nil {
+		return p, err
+	}
+	key := strings.ReplaceAll(stringutil.GenerateSlug(title), "-", "_")
+	if err := m.q.InsertPrompt.Get(&p, key, strings.TrimSpace(title), strings.TrimSpace(content)); err != nil {
+		if dbutil.IsUniqueViolationError(err) {
+			return p, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+		}
+		m.lo.Error("error creating prompt", "error", err)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return p, nil
+}
+
+func (m *Manager) UpdatePrompt(id int, title, content string) (models.Prompt, error) {
+	var p models.Prompt
+	if err := m.validatePrompt(title, content); err != nil {
+		return p, err
+	}
+	if err := m.q.UpdatePrompt.Get(&p, id, strings.TrimSpace(title), strings.TrimSpace(content)); err != nil {
+		if err == sql.ErrNoRows {
+			return p, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		}
+		m.lo.Error("error updating prompt", "error", err)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return p, nil
+}
+
+func (m *Manager) DeletePrompt(id int) error {
+	if _, err := m.q.DeletePrompt.Exec(id); err != nil {
+		m.lo.Error("error deleting prompt", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
 }
 
 // GetProviderConfig returns the sanitized config for a provider type (no API key).
@@ -346,6 +408,16 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 	if cfg.Dimensions > 0 && len(vec) != cfg.Dimensions {
 		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.testDimensionsMismatch",
 			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
+	}
+	return nil
+}
+
+func (m *Manager) validatePrompt(title, content string) error {
+	if strings.TrimSpace(title) == "" {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.title")), nil)
+	}
+	if strings.TrimSpace(content) == "" {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
 	}
 	return nil
 }

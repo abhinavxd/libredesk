@@ -118,12 +118,11 @@ const channels = [
     title: t('globals.terms.liveChat'),
     subTitle: t('admin.inbox.createLiveChatInbox'),
     onClick: selectLiveChatChannel,
-    icon: MessageCircle,
-    badge: t('globals.terms.beta')
+    icon: MessageCircle
   },
   {
     title: t('globals.terms.whatsapp'),
-    subTitle: t('admin.inbox.createWhatsAppInbox'),
+    subTitle: t('admin.inbox.help.whatsapp'),
     onClick: selectWhatsAppChannel,
     icon: WhatsAppIcon,
     badge: t('globals.terms.beta')

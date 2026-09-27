@@ -4,7 +4,7 @@
       <p class="sidebar-label">{{ $t('globals.terms.inbox', 1) }}</p>
       <div class="flex items-center gap-1.5">
         <component
-          :is="channelIcons[conversation.inbox_channel] || Mail"
+          :is="channelIcon"
           class="size-3.5 text-muted-foreground flex-shrink-0"
         />
         <p class="sidebar-value break-all">{{ conversation.inbox_name }}</p>
@@ -133,11 +133,10 @@
 </template>
 
 <script setup>
-import TelegramIcon from '@main/components/icons/TelegramIcon.vue'
-import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import { ref, computed } from 'vue'
 import { format } from 'date-fns'
-import { Mail, MessageSquare } from 'lucide-vue-next'
+import { Mail } from 'lucide-vue-next'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
 import SlaBadge from '@/features/sla/SlaBadge.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import CustomAttributes from '@/features/conversation/sidebar/CustomAttributes.vue'
@@ -154,6 +153,8 @@ const { t } = useI18n()
 const customAttributeStore = useCustomAttributeStore()
 const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
+
+const channelIcon = computed(() => CHANNEL_ICONS[conversation.value?.inbox_channel] || Mail)
 customAttributeStore.fetchCustomAttributes()
 
 const feedbackExpanded = ref(false)
@@ -174,11 +175,5 @@ const updateCustomAttributes = async (attributes) => {
     })
     conversationStore.current.custom_attributes = previousAttributes
   }
-}
-const channelIcons = {
-  email: Mail,
-  livechat: MessageSquare,
-  whatsapp: WhatsAppIcon,
-  telegram: TelegramIcon
 }
 </script>

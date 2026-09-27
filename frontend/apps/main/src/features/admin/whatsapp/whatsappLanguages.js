@@ -1,4 +1,4 @@
-// Meta's supported template language codes (Supported Languages, updated 2026-05-21); the label carries both the name and the code so search matches either.
+// Meta's supported template language codes (Supported Languages, updated 2026-05-21). The label carries both the name and the code so search matches either.
 export const WHATSAPP_TEMPLATE_LANGUAGES = [
   { value: 'af', label: 'Afrikaans - af' },
   { value: 'sq', label: 'Albanian - sq' },

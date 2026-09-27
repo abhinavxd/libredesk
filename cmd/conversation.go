@@ -53,6 +53,8 @@ type createConversationRequest struct {
 	AssignedAgentID        int               `json:"agent_id"`
 	AssignedTeamID         int               `json:"team_id"`
 	Email                  string            `json:"contact_email"`
+	CC                     []string          `json:"cc"`
+	BCC                    []string          `json:"bcc"`
 	FirstName              string            `json:"first_name"`
 	LastName               string            `json:"last_name"`
 	ExternalUserID         string            `json:"external_user_id"`
@@ -61,13 +63,18 @@ type createConversationRequest struct {
 	Content                string            `json:"content"`
 	Attachments            []int             `json:"attachments"`
 	Initiator              string            `json:"initiator"` // "contact" | "agent"
-	SourceID               string            `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact-initiated only.
+	SourceID               string            `json:"source_id"` // RFC 5322 Message-ID of the inbound message. Stored on the created contact message so replies thread on it. Contact-initiated only.
 	CustomAttributes       map[string]any    `json:"custom_attributes"`
 	ContactID              int               `json:"contact_id"`
 	PhoneNumber            string            `json:"phone_number"`
 	PhoneNumberCountryCode string            `json:"phone_number_country_code"`
 	WhatsAppTemplateID     int               `json:"whatsapp_template_id"`
 	WhatsAppTemplateParams map[string]string `json:"whatsapp_template_params"`
+}
+
+type whatsAppOpenConversationResponse struct {
+	Exists bool   `json:"exists"`
+	UUID   string `json:"uuid"`
 }
 
 // handleGetAllConversations retrieves all conversations.
@@ -445,8 +452,10 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	var readInboxID int
-	var readSourceID string
+	var (
+		readInboxID  int
+		readSourceID string
+	)
 	if conv.InboxChannel == whatsappChannel.ChannelWhatsApp {
 		readInboxID, readSourceID, err = app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID)
 		if err != nil {
@@ -910,44 +919,45 @@ func handleCreateConversation(r *fastglue.Request) error {
 		contactID = contact.ID
 	}
 
-	var (
-		conversationID   int
-		conversationUUID string
-		createdNew       = true
-	)
-
 	subject, appendRefNum := req.Subject, true
 	if channel == whatsappChannel.ChannelWhatsApp {
 		subject, appendRefNum = "", false
+		// A contact gets one open WhatsApp conversation per inbox. The lock keeps an incoming message from creating one between this check and the create below.
 		defer lockWhatsAppConversation(contactID, req.InboxID)()
-		// WhatsApp is one thread per contact; reuse the open conversation instead of creating a parallel one.
-		if id, uuid, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID); lookupErr == nil {
-			if _, err := enforceConversationAccess(app, uuid, user); err != nil {
-				return sendErrorEnvelope(r, err)
+		_, openUUID, lookupErr := app.conversation.GetLatestOpenConversationForContact(contactID, req.InboxID)
+		switch {
+		case lookupErr == nil:
+			accessibleUUID, accessErr := accessibleConversationUUID(app, openUUID, user)
+			if accessErr != nil {
+				return sendErrorEnvelope(r, accessErr)
 			}
-			conversationID, conversationUUID, createdNew = id, uuid, false
-		} else if !errors.Is(lookupErr, sql.ErrNoRows) {
-			app.lo.Error("error finding open whatsapp conversation", "error", lookupErr)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			messageKey := "conversation.whatsapp.error.conversationExistsNoAccess"
+			var data map[string]any
+			if accessibleUUID != "" {
+				messageKey = "conversation.whatsapp.error.conversationExists"
+				data = map[string]any{"conversation_uuid": accessibleUUID}
+			}
+			return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.T(messageKey), data))
+		case !errors.Is(lookupErr, sql.ErrNoRows):
+			return sendErrorEnvelope(r, lookupErr)
 		}
 	}
 
-	if createdNew {
-		conversationID, conversationUUID, err = app.conversation.CreateConversation(
-			contactID,
-			req.InboxID,
-			"",         /** last_message **/
-			time.Now(), /** last_message_at **/
-			subject,
-			appendRefNum,
-			nil,
-			req.CustomAttributes,
-			0, 0,
-		)
-		if err != nil {
-			app.lo.Error("error creating conversation", "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-		}
+	conversationID, conversationUUID, err := app.conversation.CreateConversation(
+		contactID,
+		req.InboxID,
+		"",         /** last_message **/
+		time.Now(), /** last_message_at **/
+		subject,
+		appendRefNum,
+		nil, /** meta **/
+		req.CustomAttributes,
+		0, /** max_conversations **/
+		0, /** rate_limit_window **/
+	)
+	if err != nil {
+		app.lo.Error("error creating conversation", "error", err)
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 
 	// Get media for the attachment ids, skip any already associated with a model.
@@ -957,16 +967,14 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Team assignment clears the assigned agent.
-	if createdNew {
-		if req.AssignedTeamID > 0 {
-			app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
-		}
-		if req.AssignedAgentID > 0 {
-			app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
-		}
+	if req.AssignedTeamID > 0 {
+		app.conversation.UpdateConversationTeamAssignee(conversationUUID, req.AssignedTeamID, user)
+	}
+	if req.AssignedAgentID > 0 {
+		app.conversation.UpdateConversationUserAssignee(conversationUUID, req.AssignedAgentID, user)
 	}
 
-	// WhatsApp is always an agent-initiated template; email follows the initiator.
+	// WhatsApp is always an agent-initiated template. Email follows the initiator.
 	agentInitiated := true
 	var sendErr error
 	switch {
@@ -975,9 +983,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 		if len(req.WhatsAppTemplateParams) > 0 {
 			meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 		}
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "", nil, nil, nil, meta)
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "" /** content **/, nil /** to **/, nil /** cc **/, nil /** bcc **/, meta)
 	case req.Initiator == umodels.UserTypeAgent:
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, nil, nil, map[string]any{})
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, map[string]any{})
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
 		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID)
@@ -986,11 +994,8 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 	if sendErr != nil {
 		app.lo.Error("error sending first message of new conversation", "conversation_uuid", conversationUUID, "error", sendErr)
-		// Roll back only a conversation we created, not a reused one.
-		if createdNew {
-			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
-				app.lo.Error("error deleting conversation", "error", err)
-			}
+		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
+			app.lo.Error("error deleting conversation", "error", err)
 		}
 		// Only envelope errors carry a message that is safe to show the agent.
 		if _, ok := sendErr.(envelope.Error); ok {
@@ -1000,7 +1005,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 	}
 
 	// Contact-initiated conversations get this event from the incoming message hooks.
-	if agentInitiated && createdNew {
+	if agentInitiated {
 		if c, err := app.conversation.GetConversation(0, conversationUUID, ""); err == nil {
 			app.webhook.TriggerEvent(wmodels.EventConversationCreated, c)
 		}
@@ -1008,6 +1013,39 @@ func handleCreateConversation(r *fastglue.Request) error {
 
 	conversation, _ := app.conversation.GetConversation(conversationID, "", "")
 	return r.SendEnvelope(conversation)
+}
+
+// handleGetWhatsAppOpenConversation returns the open conversation a contact already has in a WhatsApp inbox. UUID is empty when the agent cannot access it.
+func handleGetWhatsAppOpenConversation(r *fastglue.Request) error {
+	var (
+		app          = r.Context.(*App)
+		auser        = r.RequestCtx.UserValue("user").(amodels.User)
+		contactID, _ = strconv.Atoi(r.RequestCtx.UserValue("contact_id").(string))
+		inboxID, _   = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("inbox_id")))
+	)
+
+	if contactID <= 0 || inboxID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+	}
+
+	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
+	resp := whatsAppOpenConversationResponse{}
+	_, uuid, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
+	switch {
+	case err == nil:
+		resp.Exists = true
+		resp.UUID, err = accessibleConversationUUID(app, uuid, user)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	case !errors.Is(err, sql.ErrNoRows):
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(resp)
 }
 
 func validateCreateConversationRequest(req createConversationRequest, app *App) (string, error) {
@@ -1052,6 +1090,11 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		if !stringutil.ValidEmail(req.Email) {
 			return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
 		}
+		for _, addr := range append(req.CC, req.BCC...) {
+			if !stringutil.ValidEmail(addr) {
+				return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+			}
+		}
 		if req.Initiator != umodels.UserTypeContact && req.Initiator != umodels.UserTypeAgent {
 			return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
@@ -1089,7 +1132,7 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 	}
 	dialCode := countries.DialCodeForISO(req.PhoneNumberCountryCode)
 	if dialCode == "" {
-		return 0, envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryCodeInvalid"), nil)
+		return 0, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.pickValidPhoneCountry"), nil)
 	}
 	local, err := localPhoneNumber(app, req.PhoneNumber, dialCode)
 	if err != nil {
@@ -1114,17 +1157,27 @@ func resolveWhatsAppContact(app *App, req createConversationRequest) (int, error
 
 // localPhoneNumber returns the digits after the country dial code, accepting numbers typed with a leading + or 00.
 func localPhoneNumber(app *App, phone, dialCode string) (string, error) {
-	trimmed := strings.TrimSpace(phone)
-	digits := stringutil.NormalizeWhatsAppPhone(trimmed)
-	if strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00") {
-		digits = strings.TrimPrefix(digits, "00")
-		if !strings.HasPrefix(digits, dialCode) {
-			return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneCountryMismatch"), nil)
+	phone, matchesCountry := stringutil.WhatsAppPhoneForDialCode(phone, dialCode)
+	if !matchesCountry {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.phoneCountryMismatch"), nil)
+	}
+	if phone == "" {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPhone"), nil)
+	}
+	local := strings.TrimPrefix(phone, dialCode)
+	if local == "" {
+		return "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPhone"), nil)
+	}
+	return local, nil
+}
+
+func accessibleConversationUUID(app *App, uuid string, user umodels.User) (string, error) {
+	if _, err := enforceConversationAccess(app, uuid, user); err != nil {
+		var accessErr envelope.Error
+		if errors.As(err, &accessErr) && accessErr.ErrorType == envelope.PermissionError {
+			return "", nil
 		}
-		digits = strings.TrimPrefix(digits, dialCode)
+		return "", err
 	}
-	if digits == "" {
-		return "", envelope.NewError(envelope.InputError, app.i18n.T("conversation.whatsapp.error.phoneInvalid"), nil)
-	}
-	return digits, nil
+	return uuid, nil
 }

@@ -26,7 +26,7 @@ export function useConversationFilters () {
         'text': FIELD_OPERATORS.TEXT_AUTOMATION,
         'number': FIELD_OPERATORS.NUMBER,
         'checkbox': FIELD_OPERATORS.BOOLEAN,
-        'date': FIELD_OPERATORS.DATE,
+        'date': FIELD_OPERATORS.DATE_AUTOMATION,
         'link': FIELD_OPERATORS.TEXT_AUTOMATION,
         'list': FIELD_OPERATORS.SELECT,
     }
@@ -244,6 +244,11 @@ export function useConversationFilters () {
         },
         hours_since_resolved: {
             label: t('globals.messages.hoursSinceResolved'),
+            type: FIELD_TYPE.NUMBER,
+            operators: FIELD_OPERATORS.NUMBER
+        },
+        hours_since_last_resolved: {
+            label: t('globals.messages.hoursSinceLastResolved'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },

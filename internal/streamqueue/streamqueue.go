@@ -1,4 +1,4 @@
-// Package streamqueue is a durable, at-least-once work queue backed by Redis Streams; handlers MUST be idempotent.
+// Package streamqueue is a durable, at-least-once work queue backed by Redis Streams. Handlers MUST be idempotent.
 package streamqueue
 
 import (
@@ -30,7 +30,7 @@ const (
 	origIDField  = "orig_id"
 )
 
-// Handler processes one entry; a non-nil error leaves the entry pending for retry, nil acknowledges it.
+// Handler processes one entry. A non-nil error leaves the entry pending for retry, nil acknowledges it.
 type Handler func(ctx context.Context, payload []byte) error
 
 // Opts configures a Queue. Redis, Stream, Group, Handler and Logger are required.
@@ -128,7 +128,7 @@ func (q *Queue) Run() {
 	q.wg.Wait()
 }
 
-// Close stops consuming and waits for in-flight handlers to finish; un-acked entries stay durable for the next start.
+// Close stops consuming and waits for in-flight handlers to finish. Un-acked entries stay durable for the next start.
 func (q *Queue) Close() {
 	q.startMu.Lock()
 	q.cancel()

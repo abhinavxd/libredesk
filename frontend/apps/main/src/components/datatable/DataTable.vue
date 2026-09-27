@@ -1,20 +1,19 @@
 <template>
   <div class="w-full space-y-3">
-    <div v-if="searchable" class="relative max-w-xs">
-      <Search class="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
-        v-model="globalFilter"
-        :placeholder="searchPlaceholder || t('globals.terms.search')"
-        class="pl-8"
-      />
-    </div>
+    <SearchInput
+      v-if="searchable"
+      v-model="globalFilter"
+      class="max-w-xs"
+      :placeholder="searchPlaceholder || t('globals.terms.search')"
+      :clear-label="t('globals.messages.clearSearch')"
+    />
 
     <div
       ref="scrollContainer"
       class="relative overflow-auto rounded-lg border border-border bg-card shadow-sm"
       :style="{ maxHeight }"
     >
-      <table class="w-full caption-bottom text-sm">
+      <table class="w-full caption-bottom text-sm sm:w-max sm:min-w-full">
         <TableHeader class="sticky top-0 z-10 bg-card">
           <TableRow
             v-for="headerGroup in table.getHeaderGroups()"
@@ -22,12 +21,13 @@
             class="border-b border-border bg-muted/40 hover:bg-muted/40"
           >
             <TableHead
-              v-for="header in headerGroup.headers"
+              v-for="(header, headerIndex) in headerGroup.headers"
               :key="header.id"
-              class="h-11 px-4 text-center text-sm font-medium text-muted-foreground"
+              class="h-11 px-4 text-center text-sm font-medium text-muted-foreground sm:whitespace-nowrap"
               :class="{
                 'group cursor-pointer select-none transition-colors hover:text-foreground':
-                  header.column.getCanSort()
+                  header.column.getCanSort(),
+                'max-sm:hidden': isHiddenOnPhone(header.column.id, headerIndex)
               }"
               @click="header.column.getToggleSortingHandler()?.($event)"
             >
@@ -64,10 +64,13 @@
               class="group/row border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30 data-[state=selected]:bg-muted"
             >
               <TableCell
-                v-for="cell in rows[virtualRow.index].getVisibleCells()"
+                v-for="(cell, cellIndex) in rows[virtualRow.index].getVisibleCells()"
                 :key="cell.id"
-                class="px-4 py-3 text-center text-sm"
-                :class="cell.column.id === 'actions' ? actionCellClass : ''"
+                class="px-4 py-3 text-center text-sm sm:whitespace-nowrap"
+                :class="[
+                  cell.column.id === 'actions' ? actionCellClass : '',
+                  isHiddenOnPhone(cell.column.id, cellIndex) && 'max-sm:hidden'
+                ]"
               >
                 <FlexRender :render="cell.column.columnDef.cell" :props="cell.getContext()" />
               </TableCell>
@@ -112,7 +115,8 @@ import {
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
-import { ArrowUpDown, ChevronDown, ChevronUp, Ghost, Search } from 'lucide-vue-next'
+import { ArrowUpDown, ChevronDown, ChevronUp, Ghost } from 'lucide-vue-next'
+import SearchInput from '@shared-ui/components/SearchInput.vue'
 import {
   TableBody,
   TableCell,
@@ -120,13 +124,15 @@ import {
   TableHeader,
   TableRow
 } from '@shared-ui/components/ui/table'
-import { Input } from '@shared-ui/components/ui/input'
 
 const { t } = useI18n()
 
 // Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
 const actionCellClass =
   'transition-opacity duration-150 can-hover:opacity-0 can-hover:group-hover/row:opacity-100 focus-within:!opacity-100 [&:has([data-state=open])]:!opacity-100 max-md:[&_button]:size-11'
+
+const isHiddenOnPhone = (columnId, index) =>
+  (index > 1 && columnId !== 'actions') || ['created_at', 'updated_at'].includes(columnId)
 
 const props = defineProps({
   columns: Array,
@@ -205,7 +211,7 @@ const rowVirtualizer = useVirtualizer({
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems())
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize())
-const paddingTop = computed(() => (virtualRows.value[0]?.start ?? 0))
+const paddingTop = computed(() => virtualRows.value[0]?.start ?? 0)
 const paddingBottom = computed(() => {
   const last = virtualRows.value[virtualRows.value.length - 1]
   return last ? totalSize.value - last.end : 0

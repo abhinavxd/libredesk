@@ -3,9 +3,15 @@
     <!-- Sender Name -->
     <div
       v-if="!groupWithPrev"
-      class="mb-1 flex items-center gap-1"
-      :class="isOutgoing ? 'pr-2 md:pr-[47px]' : 'pl-10 md:pl-[47px]'"
+      class="mb-1 flex items-center gap-1.5"
+      :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'"
     >
+      <Avatar class="w-7 h-7 text-xs md:hidden" :class="{ 'order-last': isOutgoing }">
+        <AvatarImage :src="getAvatar" />
+        <AvatarFallback class="font-medium">
+          {{ avatarFallback }}
+        </AvatarFallback>
+      </Avatar>
       <router-link
         v-if="!isOutgoing"
         :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
@@ -39,7 +45,7 @@
         <router-link
           v-if="!groupWithPrev"
           :to="{ name: 'contact-detail', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -48,11 +54,11 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <div v-else class="w-8 flex-shrink-0" />
+        <div v-else class="w-8 flex-shrink-0 max-md:hidden" />
       </template>
 
       <div
-        class="w-full md:w-4/5"
+        class="w-4/5"
         :class="{
           'flex justify-end items-center gap-2': isOutgoing,
           'flex items-start gap-2': !isOutgoing && canQuoteReply
@@ -136,10 +142,14 @@
                 v-else-if="message.content_type !== 'text' && sanitizedContent"
                 ref="messageContentEl"
                 @click="onMessageContentClick"
+                :class="{
+                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
+                }"
               >
                 <Letter
                   :html="sanitizedContent"
-                  :allowedSchemas="['cid', 'https', 'http', 'mailto']"
+                  :allowedSchemas="allowedSchemas"
+                  :rewriteExternalLinks="rewriteMessageLink"
                   :allowed-css-properties="extendedCssProperties"
                   class="mb-1 native-html break-words"
                   :class="{ 'mb-3': message.attachments.length > 0 }"
@@ -209,22 +219,29 @@
             <!-- Status Icons (outgoing only) -->
             <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
               <Lock :size="12" v-if="isPrivateMessage" class="text-muted-foreground" />
-              <Tooltip v-if="isReadByContact">
-                <TooltipTrigger>
-                  <CheckCheck :size="14" class="text-success" />
+              <Tooltip v-if="deliveryStatus">
+                <TooltipTrigger :aria-label="deliveryStatusLabel">
+                  <CheckCheck
+                    v-if="deliveryStatus === 'delivered' || deliveryStatus === 'read'"
+                    :size="14"
+                    :class="deliveryStatus === 'read' ? 'text-success' : 'text-muted-foreground'"
+                    aria-hidden="true"
+                  />
+                  <Check v-else :size="14" class="text-success" aria-hidden="true" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{{ t('globals.terms.read') }}</p>
+                  <p>{{ deliveryStatusLabel }}</p>
                 </TooltipContent>
               </Tooltip>
-              <Tooltip v-else-if="isDelivered">
-                <TooltipTrigger>
-                  <Check :size="14" class="text-success" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('globals.terms.sent') }}</p>
-                </TooltipContent>
-              </Tooltip>
+              <span
+                v-if="deliveryStatus"
+                class="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                {{ deliveryStatusLabel }}
+              </span>
               <Tooltip v-if="message.meta?.continuity_emailed">
                 <TooltipTrigger>
                   <Mail :size="12" class="text-muted-foreground" />
@@ -270,8 +287,12 @@
 
       <!-- Avatar (right for outgoing) -->
       <template v-if="isOutgoing">
-        <div v-if="groupWithPrev" class="w-8 flex-shrink-0" />
-        <router-link v-else-if="canManageAI" :to="aiAssistantRoute" class="flex-shrink-0">
+        <div v-if="groupWithPrev" class="w-8 flex-shrink-0 max-md:hidden" />
+        <router-link
+          v-else-if="canManageAI"
+          :to="aiAssistantRoute"
+          class="flex-shrink-0 max-md:hidden"
+        >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
             <AvatarFallback class="font-medium">
@@ -282,7 +303,7 @@
         <router-link
           v-else-if="canManageUsers"
           :to="{ name: 'edit-agent', params: { id: message.author?.id } }"
-          class="flex-shrink-0"
+          class="flex-shrink-0 max-md:hidden"
         >
           <Avatar class="cursor-pointer w-8 h-8 hover:opacity-80 transition-opacity">
             <AvatarImage :src="getAvatar" />
@@ -291,7 +312,7 @@
             </AvatarFallback>
           </Avatar>
         </router-link>
-        <Avatar v-else class="w-8 h-8">
+        <Avatar v-else class="w-8 h-8 max-md:hidden">
           <AvatarImage :src="getAvatar" />
           <AvatarFallback class="font-medium">
             {{ avatarFallback }}
@@ -301,7 +322,7 @@
     </div>
 
     <!-- Timestamp tooltip -->
-    <div v-if="!groupWithNext" :class="isOutgoing ? 'pr-[47px]' : 'pl-[47px]'">
+    <div v-if="!groupWithNext" :class="isOutgoing ? 'md:pr-[47px]' : 'md:pl-[47px]'">
       <Tooltip>
         <TooltipTrigger>
           <span class="text-muted-foreground text-xs mt-1">
@@ -383,8 +404,12 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { permissions as perms } from '@main/constants/permissions.js'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
+import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
+// The sanitizer has no strikethrough tag, so these are rewritten to a styled span it keeps.
+const STRIKE_OPEN_TAG = /<(s|del|strike)(?=[\s>])[^>]*>/gi
+const STRIKE_CLOSE_TAG = /<\/(s|del|strike)\s*>/gi
 
 const COLLAPSE_THRESHOLD_PX = 400
 
@@ -483,11 +508,23 @@ const avatarFallback = computed(() => {
   return firstName.toUpperCase().substring(0, 2)
 })
 
+const allowedSchemas = ['cid', 'https', 'http', 'mailto']
+
+// vue-letter skips its own href schema check once a rewrite hook is set.
+const rewriteMessageLink = (href) => {
+  if (href.startsWith('/') && !href.startsWith('//')) return `${window.location.origin}${href}`
+  return allowedSchemas.includes(href.toLowerCase().split(':')[0]) ? href : ''
+}
+
 const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {
     return t('globals.messages.pleaseRateConversation')
   }
-  return props.message.content || ''
+  const content = props.message.content || ''
+  if (props.message.content_type === 'text') return content
+  return content
+    .replace(STRIKE_OPEN_TAG, '<span style="text-decoration: line-through">')
+    .replace(STRIKE_CLOSE_TAG, '</span>')
 })
 
 const nonInlineAttachments = computed(() =>
@@ -512,15 +549,13 @@ const canDeleteNote = computed(
     !isDeleted.value &&
     (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
 )
-const isDelivered = computed(
-  () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
+const deliveryStatus = computed(() =>
+  getMessageDeliveryStatus(props.message, props.direction, convStore.current)
 )
-const isReadByContact = computed(() => {
-  const conversation = convStore.current
-  const lastSeenAt = conversation?.contact_last_seen_at
-  const isLiveChat = conversation?.inbox_channel === 'livechat'
-  if (!isDelivered.value || !lastSeenAt || !isLiveChat) return false
-  return new Date(props.message.created_at) <= new Date(lastSeenAt)
+const deliveryStatusLabel = computed(() => {
+  if (deliveryStatus.value === 'read') return t('globals.terms.read')
+  if (deliveryStatus.value === 'delivered') return t('globals.terms.delivered')
+  return t('globals.terms.sent')
 })
 const showRetry = computed(
   () =>

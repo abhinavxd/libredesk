@@ -8,36 +8,20 @@
       <span>{{ $t('admin.inbox.whatsapp.tokenInvalid') }}</span>
     </div>
 
-    <div class="grid grid-cols-2 gap-4">
-      <FormField v-slot="{ componentField }" name="name">
-        <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="" v-bind="componentField" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="reopen_window_hours">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.reopenWindow') }}</FormLabel>
-          <FormControl>
-            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.reopenWindow.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
+    <FormField v-slot="{ componentField }" name="name">
+      <FormItem>
+        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="" v-bind="componentField" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
         <SwitchField
           :title="$t('globals.terms.enabled')"
-          :description="$t('admin.inbox.whatsapp.enabled.description')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -69,6 +53,21 @@
         <span>{{ $t('admin.inbox.csatSurveys.description_3') }}</span>
       </p>
     </FormField>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormField v-slot="{ componentField }" name="reopen_window_hours">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.reopenWindow') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" placeholder="48" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>
+            {{ $t('admin.inbox.reopenWindow.description') }}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </div>
 
     <div v-show="csatEnabled" class="box p-4 space-y-4">
       <div>
@@ -124,13 +123,9 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.phone_number_id">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.phoneNumberID') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.phoneNumberID') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.phoneNumberID.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.phoneNumberID.description') }}
@@ -143,11 +138,7 @@
           <FormItem>
             <FormLabel>{{ $t('admin.inbox.whatsapp.wabaID') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.wabaID.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -187,11 +178,8 @@
           <FormItem>
             <FormLabel>{{ $t('globals.terms.apiVersion') }}</FormLabel>
             <FormControl>
-              <Input type="text" placeholder="v25.0" v-bind="componentField" />
+              <Input type="text" placeholder="v26.0" v-bind="componentField" />
             </FormControl>
-            <FormDescription>
-              {{ $t('admin.inbox.whatsapp.apiVersion.description') }}
-            </FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>
@@ -208,13 +196,9 @@
       <div class="grid grid-cols-2 gap-4">
         <FormField v-slot="{ componentField }" name="config.webhook_verify_token">
           <FormItem>
-            <FormLabel>{{ $t('admin.inbox.whatsapp.verifyToken') }}</FormLabel>
+            <FormLabel>{{ $t('globals.terms.webhookVerifyToken') }}</FormLabel>
             <FormControl>
-              <Input
-                type="text"
-                :placeholder="t('admin.inbox.whatsapp.verifyToken.placeholder')"
-                v-bind="componentField"
-              />
+              <Input type="text" v-bind="componentField" />
             </FormControl>
             <FormDescription>
               {{ $t('admin.inbox.whatsapp.verifyToken.description') }}
@@ -319,7 +303,7 @@ const form = useForm({
       access_token: '',
       app_secret: '',
       webhook_verify_token: '',
-      api_version: 'v25.0',
+      api_version: 'v26.0',
       csat_template_language: DEFAULT_CSAT_TEMPLATE_LANGUAGE,
       csat_template_body: DEFAULT_CSAT_TEMPLATE_BODY,
       csat_template_button_text: DEFAULT_CSAT_TEMPLATE_BUTTON_TEXT

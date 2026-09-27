@@ -21,7 +21,7 @@ import (
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
-	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp_template/models"
+	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -29,8 +29,9 @@ import (
 
 const (
 	whatsAppDefaultContactName = "Contact"
-	// Retry window for a status whose message row is missing; older events reference a wamid that will never exist locally.
-	whatsAppStatusNotFoundGrace = 10 * time.Minute
+	// Retry window for a status whose message row is missing. Older events reference a wamid that will never exist locally.
+	// Must exceed whatsAppReclaimMinIdle, since the first retry only happens after that idle period.
+	whatsAppStatusNotFoundGrace = 30 * time.Minute
 
 	whatsAppMediaAttemptTimeout = 3 * time.Minute
 	whatsAppMediaMaxAttempts    = 3
@@ -123,7 +124,7 @@ func handleWhatsAppWebhookEvent(r *fastglue.Request) error {
 	return r.SendEnvelope(map[string]string{"status": "ok"})
 }
 
-// processWhatsAppPayload applies every message/status/template event in one delivery; returning an error retries the whole delivery.
+// processWhatsAppPayload applies every message/status/template event in one delivery. Returning an error retries the whole delivery.
 func processWhatsAppPayload(ctx context.Context, app *App, inboxID int, payload *whatsapp.WebhookPayload) error {
 	var errs []error
 
@@ -188,6 +189,11 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return applyWhatsAppSystemEvent(app, m)
 	}
 
+	if ing := app.ingester(); ing != nil {
+		unlock := ing.lockSender(m.From)
+		defer unlock()
+	}
+
 	// Meta posts all events of an app to one callback URL, so the URL's inbox ID is not authoritative.
 	inbRec, cfg, err := resolveWhatsAppInbox(app, inboxID, m.PhoneNumberID)
 	if errors.Is(err, errNoEnabledWhatsAppInbox) {
@@ -202,6 +208,18 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 
 	app.lo.Debug("ingesting whatsapp message", "wa_message_id", m.ID, "type", m.Type, "media_id", m.MediaID, "mime", m.MediaMimeType, "context_id", m.ContextID)
 
+	contactID, err := upsertWhatsAppContact(app, m)
+	if err != nil {
+		return fmt.Errorf("resolving contact: %w", err)
+	}
+	contact, err := app.user.GetContactOrVisitor(contactID, "" /** email **/)
+	if err != nil {
+		return fmt.Errorf("checking contact: %w", err)
+	}
+	if !contact.Enabled {
+		return nil
+	}
+
 	// Skip the media download up front when the message is already ingested (retries, Meta redeliveries).
 	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
 		return fmt.Errorf("repairing duplicate: %w", err)
@@ -209,7 +227,6 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return nil
 	}
 
-	// Download media before taking the per-sender lock; a slow CDN must not stall other senders' workers.
 	attachments, err := fetchWhatsAppAttachments(ctx, app, cfg, m)
 	if err != nil {
 		return fmt.Errorf("downloading whatsapp media: %w", err)
@@ -218,43 +235,26 @@ func ingestWhatsAppMessage(ctx context.Context, app *App, inboxID int, m whatsap
 		return ctx.Err()
 	}
 
-	// No unique constraint backs source_id, so this lock across the check and insert is the only duplicate guard.
-	if ing := app.ingester(); ing != nil {
-		unlock := ing.lockSender(m.From)
-		defer unlock()
-	}
-
-	if exists, err := app.conversation.AdvanceWhatsAppWindowForMessage(m.ID, m.Timestamp); err != nil {
-		return fmt.Errorf("repairing duplicate: %w", err)
-	} else if exists {
-		return nil
-	}
-
-	contactID, err := upsertWhatsAppContact(app, m)
-	if err != nil {
-		return fmt.Errorf("resolving contact: %w", err)
-	}
-
 	defer lockWhatsAppConversation(contactID, inboxID)()
 
 	isNewConversation := false
 	conversationID, conversationUUID, err := app.conversation.GetLatestOpenConversationForContact(contactID, inboxID)
 	if errors.Is(err, sql.ErrNoRows) && inbRec.ReopenWindowHours > 0 {
-		// Reuse a recently-resolved conversation; the message insert hook reopens it.
+		// Reuse a recently-resolved conversation. The message insert hook reopens it.
 		conversationID, conversationUUID, err = app.conversation.GetReopenableConversationForContact(contactID, inboxID, inbRec.ReopenWindowHours)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		conversationID, conversationUUID, err = app.conversation.CreateConversation(
 			contactID,
 			inboxID,
-			textPreview(m),
-			time.Now(),
-			"",
-			false,
-			nil,
-			nil,
-			0,
-			0,
+			textPreview(m), /** last_message **/
+			time.Now(),     /** last_message_at **/
+			"",             /** subject **/
+			false,          /** append_ref_num_to_subject **/
+			nil,            /** meta **/
+			nil,            /** custom_attributes **/
+			0,              /** max_conversations **/
+			0,              /** rate_limit_window **/
 		)
 		if err != nil {
 			return fmt.Errorf("creating conversation: %w", err)
@@ -329,7 +329,7 @@ func buildInboundMeta(app *App, m whatsapp.ParsedMessage) json.RawMessage {
 	return raw
 }
 
-// fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored; any other error propagates for a queue retry.
+// fetchWhatsAppAttachments returns (nil, nil) on a permanent (4xx) failure so a placeholder is stored. Any other error propagates for a queue retry.
 func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel.Config, m whatsapp.ParsedMessage) (attachment.Attachments, error) {
 	if m.MediaID == "" || app.whatsappClient == nil {
 		return nil, nil
@@ -410,7 +410,7 @@ func fetchWhatsAppAttachments(ctx context.Context, app *App, cfg whatsappChannel
 func isPermanentMediaError(err error) bool {
 	var me *whatsapp.MetaAPIError
 	if errors.As(err, &me) {
-		// 408 and 429 are 4xx but retryable; 401/403 recover once the operator replaces the token; 5xx are transient.
+		// 408 and 429 are 4xx but retryable. 401/403 recover once the operator replaces the token. 5xx are transient.
 		if me.StatusCode == http.StatusRequestTimeout || me.StatusCode == http.StatusTooManyRequests ||
 			me.StatusCode == http.StatusUnauthorized || me.StatusCode == http.StatusForbidden {
 			return false
@@ -565,7 +565,7 @@ func resolveWhatsAppInbox(app *App, urlInboxID int, phoneNumberID string) (imode
 	return imodels.Inbox{}, whatsappChannel.Config{}, errNoEnabledWhatsAppInbox
 }
 
-// forEachEnabledWhatsAppInbox invokes fn with each enabled WhatsApp inbox's record and decoded config; returning false stops iteration.
+// forEachEnabledWhatsAppInbox invokes fn with each enabled WhatsApp inbox's record and decoded config. Returning false stops iteration.
 func forEachEnabledWhatsAppInbox(app *App, fn func(rec imodels.Inbox, cfg whatsappChannel.Config) bool) error {
 	inboxes, err := app.inbox.GetAll()
 	if err != nil {
@@ -588,7 +588,7 @@ func forEachEnabledWhatsAppInbox(app *App, fn func(rec imodels.Inbox, cfg whatsa
 	return nil
 }
 
-// whatsAppConfigForInbox prefers the running inbox's in-memory config; the DB fallback covers disabled or unregistered inboxes.
+// whatsAppConfigForInbox prefers the running inbox's in-memory config. The DB fallback covers disabled or unregistered inboxes.
 func whatsAppConfigForInbox(app *App, inboxID int) (whatsappChannel.Config, error) {
 	if inb, err := app.inbox.Get(inboxID); err == nil {
 		if wa, ok := inb.(interface{ Config() whatsappChannel.Config }); ok {
@@ -613,7 +613,7 @@ func whatsAppConfigFromRecord(rec imodels.Inbox) (whatsappChannel.Config, error)
 	return cfg, nil
 }
 
-// markWhatsAppMessageRead sends a read receipt to Meta for an inbound message; best-effort, logs and swallows failures.
+// markWhatsAppMessageRead sends a read receipt to Meta for an inbound message. Best-effort, logs and swallows failures.
 func markWhatsAppMessageRead(app *App, inboxID int, sourceID string) {
 	if app.whatsappClient == nil || sourceID == "" {
 		return

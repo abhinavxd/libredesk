@@ -73,7 +73,7 @@
         <TooltipContent>{{ $t('globals.messages.addButton') }}</TooltipContent>
       </Tooltip>
       <slot name="audio-recorder" />
-      <Tooltip v-if="isWhatsApp">
+      <Tooltip v-if="showWhatsAppTemplate">
         <TooltipTrigger as-child>
           <Toggle
             :class="ICON_BUTTON_CLASS"
@@ -178,6 +178,7 @@ const props = defineProps({
   isWhatsApp: Boolean,
   showAddButton: Boolean,
   disableAddButton: Boolean,
+  showWhatsAppTemplate: Boolean,
   isSending: Boolean,
   isGenerating: Boolean,
   enableSend: Boolean,

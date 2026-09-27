@@ -97,6 +97,12 @@ const getInboxes = async () => {
 }
 
 // Columns for the data table
+const CHANNEL_LABEL_KEYS = {
+  email: 'globals.terms.email',
+  livechat: 'globals.terms.liveChat',
+  whatsapp: 'globals.terms.whatsapp'
+}
+
 const columns = [
   {
     accessorKey: 'name',
@@ -134,7 +140,8 @@ const columns = [
       return h('div', { class: 'text-center' }, t('globals.terms.channel'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('channel'))
+      const channel = row.getValue('channel')
+      return h('div', { class: 'text-center' }, CHANNEL_LABEL_KEYS[channel] ? t(CHANNEL_LABEL_KEYS[channel], 1) : channel)
     }
   },
   {

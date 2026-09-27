@@ -186,7 +186,7 @@ func TestMakeConversationsCountQueryEmptyTeamIDs(t *testing.T) {
 
 func TestViewFiltersValidateAgainstListFields(t *testing.T) {
 	filters := `[{"model":"conversations","field":"inbox_id","operator":"equals","value":"1"}]`
-	if err := dbutil.ValidateFilters(filters, conversationListAllowedFields, conversationFilterRenderers); err != nil {
+	if err := dbutil.ValidateFilters(filters, ListFilterAllowedFields, ListFilterRenderers); err != nil {
 		t.Fatalf("expected valid filters, got %v", err)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
 )
 
 const defaultMaxSteps = 5
@@ -17,13 +16,34 @@ func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []m
 
 // RunAgentWithTools runs the tool-calling loop; allowedToolIDs restricts custom tools to that set (empty loads none), appendWorkspaceInstructions folds the workspace admin instructions into the system prompt.
 func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, allowedToolIDs []int, appendWorkspaceInstructions, includeBuiltinSearch bool, extra []Tool) (string, error) {
+	run, err := m.newAgentRun(systemPrompt, history, maxSteps, tctx, allowedToolIDs, appendWorkspaceInstructions, includeBuiltinSearch, extra, AgentRunScope{}, false)
+	if err != nil {
+		return "", err
+	}
+	res, err := m.continueAgentRun(ctx, run)
+	if err != nil {
+		return "", err
+	}
+	return res.Content, nil
+}
+
+// RunAgentWithApprovals runs the tool-calling loop for agent surfaces; a custom tool flagged for approval pauses the run until the agent approves or declines it.
+func (m *Manager) RunAgentWithApprovals(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, allowedToolIDs []int, extra []Tool, scope AgentRunScope) (models.AgentRunResult, error) {
+	run, err := m.newAgentRun(systemPrompt, history, maxSteps, tctx, allowedToolIDs, true, true, extra, scope, true)
+	if err != nil {
+		return models.AgentRunResult{}, err
+	}
+	return m.continueAgentRun(ctx, run)
+}
+
+func (m *Manager) newAgentRun(systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext, allowedToolIDs []int, appendWorkspaceInstructions, includeBuiltinSearch bool, extra []Tool, scope AgentRunScope, approvals bool) (*pendingAgentRun, error) {
 	if maxSteps <= 0 {
 		maxSteps = defaultMaxSteps
 	}
 
 	cfg, err := m.getProviderConfig(models.ProviderTypeCompletion)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
 	if instructions := strings.TrimSpace(cfg.Instructions); appendWorkspaceInstructions && instructions != "" {
@@ -35,10 +55,10 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 
 	registry, defs, err := m.buildToolRegistry(tctx, allowedToolIDs, includeBuiltinSearch, extra)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	messages := make([]models.ChatMessage, 0, len(history)+2)
+	messages := make([]models.ChatMessage, 0, len(history)+1)
 	if systemPrompt != "" {
 		messages = append(messages, models.ChatMessage{Role: models.RoleSystem, Content: systemPrompt})
 	}
@@ -55,47 +75,15 @@ func (m *Manager) RunAgentWithTools(ctx context.Context, systemPrompt string, hi
 	m.lo.Debug("ai run starting", "model", cfg.Model, "vision", cfg.Vision, "max_steps", maxSteps, "history_messages", len(history), "images", imageCount, "tools", len(defs), "tool_names", strings.Join(toolNames, ","))
 	m.lo.Debug("ai run system prompt", "prompt", systemPrompt)
 
-	for step := 0; step < maxSteps; step++ {
-		m.lo.Debug("ai run step", "step", step, "messages", len(messages))
-		res, err := m.chatCompletion(ctx, client, models.ChatCompletionPayload{Messages: messages, Tools: defs})
-		if err != nil {
-			return "", err
-		}
-		m.lo.Debug("ai run model response", "step", step, "content_len", len(res.Content), "tool_calls", len(res.ToolCalls), "content", res.Content, "prompt_tokens", res.Usage.PromptTokens, "completion_tokens", res.Usage.CompletionTokens)
-
-		if len(res.ToolCalls) == 0 {
-			m.lo.Debug("ai run final answer", "answer", res.Content)
-			return stripCodeFence(res.Content), nil
-		}
-
-		messages = append(messages, models.ChatMessage{
-			Role:      models.RoleAssistant,
-			Content:   res.Content,
-			ToolCalls: res.ToolCalls,
-		})
-
-		for _, tc := range res.ToolCalls {
-			result := m.executeToolCall(ctx, registry, tc)
-			messages = append(messages, models.ChatMessage{
-				Role:       models.RoleTool,
-				ToolCallID: tc.ID,
-				Name:       tc.Function.Name,
-				Content:    result,
-			})
-		}
-	}
-
-	// Step budget exhausted, force a final answer by omitting tools.
-	res, err := m.chatCompletion(ctx, client, models.ChatCompletionPayload{Messages: messages})
-	if err != nil {
-		return "", err
-	}
-	if strings.TrimSpace(res.Content) == "" {
-		m.lo.Warn("agent produced no answer within the step budget", "max_steps", maxSteps)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("ai.noAnswerWithinSteps"), nil)
-	}
-	m.lo.Debug("ai run final answer", "answer", res.Content, "forced", true)
-	return stripCodeFence(res.Content), nil
+	return &pendingAgentRun{
+		Scope:       scope,
+		Client:      client,
+		Definitions: defs,
+		Registry:    registry,
+		Messages:    messages,
+		MaxSteps:    maxSteps,
+		Approvals:   approvals,
+	}, nil
 }
 
 func (m *Manager) executeToolCall(ctx context.Context, registry map[string]Tool, tc models.ToolCall) string {

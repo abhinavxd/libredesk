@@ -112,7 +112,7 @@ func (c *Client) SendText(ctx context.Context, acc Account, toPhone, body, reply
 	return c.sendMessage(ctx, acc, payload)
 }
 
-// SendMedia sends a media message; mediaType is one of image, video, audio, document, sticker.
+// SendMedia sends a media message. MediaType is one of image, video, audio, document, sticker.
 func (c *Client) SendMedia(ctx context.Context, acc Account, toPhone, mediaType, mediaID, caption, filename, replyToID string) (string, error) {
 	media := map[string]any{"id": mediaID}
 	if caption != "" && (mediaType == "image" || mediaType == "video" || mediaType == "document") {
@@ -265,7 +265,7 @@ func (c *Client) UploadMedia(ctx context.Context, acc Account, content []byte, c
 	}
 	req.Header.Set("Authorization", "Bearer "+acc.AccessToken)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.mediaClient().Do(req)
 	if err != nil {
 		return "", fmt.Errorf("uploading media: %w", err)
 	}
@@ -334,7 +334,7 @@ func (c *Client) DeleteTemplate(ctx context.Context, acc Account, name, metaTemp
 	return err
 }
 
-// EditTemplate updates an existing template's content by Meta template ID; Meta resets it to pending review. Name and language cannot be changed this way.
+// EditTemplate updates an existing template's content by Meta template ID. Meta resets it to pending review. Name and language cannot be changed this way.
 func (c *Client) EditTemplate(ctx context.Context, acc Account, metaTemplateID string, t TemplateEdit) error {
 	endpoint := fmt.Sprintf("%s/%s/%s", c.baseURL, acc.Version(), metaTemplateID)
 	_, err := c.doRequest(ctx, http.MethodPost, endpoint, t, acc)

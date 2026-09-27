@@ -24,14 +24,14 @@ func TestConfigAccount(t *testing.T) {
 		WABAID:        "WABA1",
 		AccessToken:   "TOKEN",
 		AppSecret:     "SECRET",
-		APIVersion:    "v25.0",
+		APIVersion:    "v26.0",
 	}
 	acc := cfg.Account()
-	if acc.PhoneNumberID != "PN1" || acc.WABAID != "WABA1" || acc.AccessToken != "TOKEN" || acc.AppSecret != "SECRET" || acc.APIVersion != "v25.0" {
+	if acc.PhoneNumberID != "PN1" || acc.WABAID != "WABA1" || acc.AccessToken != "TOKEN" || acc.AppSecret != "SECRET" || acc.APIVersion != "v26.0" {
 		t.Fatalf("unexpected account: %+v", acc)
 	}
 	// The CSAT fields are libredesk-side and must not leak into Meta calls.
-	if acc.Version() != "v25.0" {
+	if acc.Version() != "v26.0" {
 		t.Fatalf("unexpected version %q", acc.Version())
 	}
 }
@@ -471,15 +471,16 @@ func TestParseSendMeta(t *testing.T) {
 }
 
 func TestTextBody(t *testing.T) {
-	if got := textBody(models.OutboundMessage{TextContent: "plain", Content: "<p>html</p>"}); got != "plain" {
+	if got := textBody(models.OutboundMessage{ContentType: models.ContentTypeText, TextContent: "plain", Content: "plain"}); got != "plain" {
 		t.Fatalf("expected the stored text content, got %q", got)
 	}
-	got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hello <b>there</b></p>"})
-	if strings.Contains(got, "<") {
-		t.Fatalf("expected HTML to be flattened, got %q", got)
+	// The stored text content is flattened. HTML replies must be re-rendered so WhatsApp formatting survives.
+	got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hello <b>there</b></p><ul><li><p>one</p></li></ul>", TextContent: "hello there\n\none"})
+	if got != "hello *there*\n\n- one" {
+		t.Fatalf("expected WhatsApp formatting, got %q", got)
 	}
-	if !strings.Contains(got, "hello") {
-		t.Fatalf("expected the text to survive, got %q", got)
+	if got := textBody(models.OutboundMessage{ContentType: models.ContentTypeHTML, Content: "<p>hi</p>"}); got != "hi" {
+		t.Fatalf("expected flattened HTML, got %q", got)
 	}
 }
 
@@ -497,7 +498,7 @@ func testInbox(t *testing.T, handler http.HandlerFunc, updater SourceIDUpdater) 
 	inb, err := New(nil, Opts{
 		ID:            7,
 		Name:          "WA Inbox",
-		Config:        Config{PhoneNumberID: "PN1", WABAID: "WABA1", AccessToken: "TOKEN", APIVersion: "v25.0"},
+		Config:        Config{PhoneNumberID: "PN1", WABAID: "WABA1", AccessToken: "TOKEN", APIVersion: "v26.0"},
 		Client:        client,
 		Lo:            testLogger(),
 		SourceUpdater: updater,
@@ -609,7 +610,7 @@ func TestSendDoesNotRetryATransportFailure(t *testing.T) {
 		t.Fatal("expected the transport failure to surface")
 	}
 	if got := atomic.LoadInt32(&attempts); got != 1 {
-		t.Fatalf("a dropped connection may already have been accepted by Meta; expected one attempt, got %d", got)
+		t.Fatalf("a dropped connection may already have been accepted by Meta. Expected one attempt, got %d", got)
 	}
 }
 

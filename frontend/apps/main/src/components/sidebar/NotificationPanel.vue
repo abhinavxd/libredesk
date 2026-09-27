@@ -62,9 +62,9 @@
           <div class="flex gap-2.5">
             <!-- Icon based on notification type -->
             <component
-              :is="getNotificationIcon(notification.notification_type)"
+              :is="getNotificationStyle(notification.notification_type).icon"
               class="flex-shrink-0 h-4 w-4 mt-0.5"
-              :class="getNotificationIconClass(notification.notification_type)"
+              :class="getNotificationStyle(notification.notification_type).class"
             />
 
             <!-- Content -->
@@ -119,6 +119,17 @@
         </Button>
       </div>
     </div>
+
+    <div class="flex justify-end border-t border-border p-1">
+      <router-link
+        :to="{ name: 'account-notifications' }"
+        :class="buttonVariants({ variant: 'ghost', size: 'sm' })"
+        @click="emit('close')"
+      >
+        <Settings aria-hidden="true" />
+        <span>{{ t('notification.settings') }}</span>
+      </router-link>
+    </div>
   </div>
 </template>
 
@@ -132,12 +143,15 @@ import {
   CheckCheck,
   X,
   Trash2,
+  Settings,
   AtSign,
   UserPlus,
+  MessageSquare,
+  RotateCcw,
   AlertTriangle,
   AlertCircle
 } from 'lucide-vue-next'
-import { Button } from '@shared-ui/components/ui/button'
+import { Button, buttonVariants } from '@shared-ui/components/ui/button'
 import { Skeleton } from '@shared-ui/components/ui/skeleton'
 import { useNotificationStore } from '@main/stores/notification'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
@@ -149,24 +163,22 @@ const { t } = useI18n()
 const notificationStore = useNotificationStore()
 
 
-const getNotificationIcon = (type) => {
-  const icons = {
-    mention: AtSign,
-    assignment: UserPlus,
-    sla_warning: AlertTriangle,
-    sla_breach: AlertCircle
-  }
-  return icons[type] || Bell
+const notificationStyles = {
+  mention: { icon: AtSign, class: 'text-primary' },
+  assignment: { icon: UserPlus, class: 'text-accent-foreground' },
+  new_reply: { icon: MessageSquare, class: 'text-primary' },
+  new_reply_participating: { icon: MessageSquare, class: 'text-primary' },
+  conversation_reopened: { icon: RotateCcw, class: 'text-accent-foreground' }
 }
 
-const getNotificationIconClass = (type) => {
-  const classes = {
-    mention: 'text-primary',
-    assignment: 'text-accent-foreground',
-    sla_warning: 'text-destructive',
-    sla_breach: 'text-destructive'
+const getNotificationStyle = (type) => {
+  if (type?.startsWith('sla_')) {
+    return {
+      icon: type.endsWith('_breach') ? AlertCircle : AlertTriangle,
+      class: 'text-destructive'
+    }
   }
-  return classes[type] || 'text-muted-foreground'
+  return notificationStyles[type] || { icon: Bell, class: 'text-muted-foreground' }
 }
 
 const handleNotificationClick = async (notification) => {

@@ -10,7 +10,7 @@ import (
 // placeholderPattern matches {{1}} / {{name}} placeholders inside template text.
 var placeholderPattern = regexp.MustCompile(`\{\{([A-Za-z0-9_]+)\}\}`)
 
-// TemplateSendParts is the runtime context for a template send; Params is keyed by placeholder name, with button_url_<i> reserved for URL button parameters.
+// TemplateSendParts is the runtime context for a template send. Params is keyed by placeholder name, with button_url_<i> reserved for URL button parameters.
 type TemplateSendParts struct {
 	HeaderType    string
 	HeaderContent string
@@ -19,7 +19,7 @@ type TemplateSendParts struct {
 	Params        map[string]string
 }
 
-// BuildSendComponents returns the components array for a template send; components without parameters are omitted so Meta uses the approved text.
+// BuildSendComponents returns the components array for a template send. Components without parameters are omitted so Meta uses the approved text.
 func BuildSendComponents(p TemplateSendParts) []map[string]any {
 	var out []map[string]any
 
@@ -40,7 +40,7 @@ func BuildSendComponents(p TemplateSendParts) []map[string]any {
 	return out
 }
 
-// OrderedPlaceholders returns the distinct {{...}} names in text; all-numeric sets sort ascending to match Meta's positional mapping.
+// OrderedPlaceholders returns the distinct {{...}} names in text. All-numeric sets sort ascending to match Meta's positional mapping.
 func OrderedPlaceholders(text string) []string {
 	if text == "" {
 		return nil

@@ -58,7 +58,7 @@ func TestValidateCredentials(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	// A token scoped to only the number must not pass the WABA check.
-	want := []string{"/v25.0/PN1", "/v25.0/WABA1/phone_numbers"}
+	want := []string{"/v26.0/PN1", "/v26.0/WABA1/phone_numbers"}
 	if strings.Join(paths, ",") != strings.Join(want, ",") {
 		t.Fatalf("expected %v, got %v", want, paths)
 	}
@@ -104,7 +104,7 @@ func TestValidateCredentialsFailsOnWABA(t *testing.T) {
 func TestSendText(t *testing.T) {
 	var body map[string]any
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v25.0/PN1/messages" {
+		if r.Method != http.MethodPost || r.URL.Path != "/v26.0/PN1/messages" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer "+testToken {
@@ -263,7 +263,7 @@ func TestSendMessageWithUndecodableResponse(t *testing.T) {
 func TestSubscribeWebhook(t *testing.T) {
 	var bodies []string
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v25.0/WABA1/subscribed_apps" {
+		if r.URL.Path != "/v26.0/WABA1/subscribed_apps" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 		raw, _ := io.ReadAll(r.Body)
@@ -438,7 +438,7 @@ func TestUploadMedia(t *testing.T) {
 		gotContent  string
 	)
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v25.0/PN1/media" {
+		if r.URL.Path != "/v26.0/PN1/media" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
@@ -519,7 +519,7 @@ func TestFetchTemplatesPaginates(t *testing.T) {
 		if page == 1 {
 			writeJSON(w, 200, map[string]any{
 				"data":   []map[string]any{{"id": "1", "name": "first"}},
-				"paging": map[string]any{"next": srv.URL + "/v25.0/WABA1/message_templates?after=cursor"},
+				"paging": map[string]any{"next": srv.URL + "/v26.0/WABA1/message_templates?after=cursor"},
 			})
 			return
 		}
@@ -557,7 +557,7 @@ func TestFetchTemplatesStopsAtPageCap(t *testing.T) {
 		pages++
 		writeJSON(w, 200, map[string]any{
 			"data":   []map[string]any{{"id": fmt.Sprint(pages), "name": "t"}},
-			"paging": map[string]any{"next": srv.URL + "/v25.0/WABA1/message_templates?after=loop"},
+			"paging": map[string]any{"next": srv.URL + "/v26.0/WABA1/message_templates?after=loop"},
 		})
 	})
 	srv = s
@@ -595,7 +595,7 @@ func TestFetchTemplatesErrors(t *testing.T) {
 func TestSubmitTemplate(t *testing.T) {
 	var body map[string]any
 	c, _ := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v25.0/WABA1/message_templates" {
+		if r.Method != http.MethodPost || r.URL.Path != "/v26.0/WABA1/message_templates" {
 			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
 		decode(t, r, &body)
@@ -699,7 +699,7 @@ func TestEditTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotPath != "/v25.0/TID9" {
+	if gotPath != "/v26.0/TID9" {
 		t.Fatalf("unexpected path %q", gotPath)
 	}
 	if _, ok := body["name"]; ok {
@@ -783,7 +783,7 @@ func TestCheckAuthenticatedHost(t *testing.T) {
 	c.SetBaseURL("https://graph.facebook.com")
 
 	allowed := []string{
-		"https://graph.facebook.com/v25.0/x",
+		"https://graph.facebook.com/v26.0/x",
 		"https://lookaside.fbsbx.com/media",
 		"https://scontent.xx.fbcdn.net/file",
 		"https://mmg.whatsapp.net/file",
@@ -797,7 +797,7 @@ func TestCheckAuthenticatedHost(t *testing.T) {
 	}
 
 	rejected := []string{
-		"http://graph.facebook.com/v25.0/x",
+		"http://graph.facebook.com/v26.0/x",
 		"https://evil.com/x",
 		"https://notfacebook.com/x",
 		"https://facebook.com.evil.com/x",

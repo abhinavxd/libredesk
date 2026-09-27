@@ -81,6 +81,7 @@ const groups = computed(() => [
     items: [
       { label: t('actions.openMacros'), keys: [mod, 'M'] },
       { label: t('shortcuts.toggleReplyType'), keys: [mod, 'P'] },
+      { label: t('shortcuts.minimizeReplyBox'), keys: [alt, 'M'] },
       { label: t('actions.sendReply'), keys: ['Ctrl', 'Enter'] },
       { label: t('globals.terms.bold'), keys: [mod, 'B'] },
       { label: t('globals.terms.italic'), keys: [mod, 'I'] }

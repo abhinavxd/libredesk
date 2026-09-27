@@ -27,6 +27,7 @@ var frontendPickerTimezones = []string{
 	"Europe/Istanbul",
 	"Asia/Dubai",
 	"Asia/Kolkata",
+	"Asia/Kathmandu",
 	"Asia/Bangkok",
 	"Asia/Singapore",
 	"Asia/Shanghai",

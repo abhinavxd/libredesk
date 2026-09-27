@@ -3,7 +3,7 @@ package whatsapp
 
 import "time"
 
-const DefaultAPIVersion = "v25.0"
+const DefaultAPIVersion = "v26.0"
 
 // Account holds the per-inbox Meta Graph API credentials, already decrypted at the call site.
 type Account struct {
@@ -95,7 +95,7 @@ type TemplateSubmission struct {
 	Components      []TemplateComponent `json:"components"`
 }
 
-// TemplateEdit is the payload sent to Meta when editing a template; name and language are immutable on Meta so they are omitted.
+// TemplateEdit is the payload sent to Meta when editing a template. Name and language are immutable on Meta so they are omitted.
 type TemplateEdit struct {
 	Category        string              `json:"category,omitempty"`
 	ParameterFormat string              `json:"parameter_format,omitempty"`

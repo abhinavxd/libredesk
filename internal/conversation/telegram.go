@@ -34,7 +34,7 @@ func (m *Manager) ProcessTelegramMessage(msg models.Message, isNewConversation b
 		return err
 	}
 	if msg.Type == models.MessageIncoming {
-		return m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation)
+		return m.ProcessIncomingMessageHooks(msg, isNewConversation)
 	}
 	return nil
 }
@@ -148,7 +148,7 @@ func (m *Manager) prepareTelegramOutbound(inboxRecord imodels.Inbox, conversatio
 	}
 	_, text := telegram.FormatHTML(content)
 	if strings.TrimSpace(text) == "" && len(media) == 0 {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageContentRequired"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageOrAttachmentRequired"), nil)
 	}
 	limit := telegram.MaxTextLength
 	if len(media) > 0 {

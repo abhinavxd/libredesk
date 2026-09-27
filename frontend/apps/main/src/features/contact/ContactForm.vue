@@ -1,7 +1,7 @@
 <template>
   <form @submit.prevent="onSubmit" class="space-y-8">
-    <div class="flex flex-wrap gap-6">
-      <div class="flex-1">
+    <div :class="FIELD_GRID_CLASS">
+      <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="first_name">
           <FormItem class="flex flex-col">
             <FormLabel class="flex items-center">{{ t('globals.terms.firstName') }}</FormLabel>
@@ -11,7 +11,7 @@
         </FormField>
       </div>
 
-      <div class="flex-1">
+      <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="last_name">
           <FormItem class="flex flex-col">
             <FormLabel class="flex items-center">{{ t('globals.terms.lastName') }}</FormLabel>
@@ -28,8 +28,8 @@
       ></FormItem>
     </FormField>
 
-    <div class="flex flex-wrap gap-6">
-      <div class="flex-1">
+    <div :class="FIELD_GRID_CLASS">
+      <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="email">
           <FormItem class="flex flex-col">
             <FormLabel class="flex items-center">{{ t('globals.terms.email') }}</FormLabel>
@@ -39,13 +39,13 @@
         </FormField>
       </div>
 
-      <div class="flex flex-col flex-1">
+      <div :class="FIELD_COLUMN_CLASS">
         <PhoneNumberInput />
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-6">
-      <div class="flex-1">
+    <div :class="FIELD_GRID_CLASS">
+      <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="country">
           <FormItem class="flex flex-col">
             <FormLabel class="flex items-center">{{ t('globals.terms.country') }}</FormLabel>
@@ -74,18 +74,20 @@
           </FormItem>
         </FormField>
       </div>
-      <div class="flex-1"></div>
     </div>
 
     <div v-if="userStore.can('contacts:write')">
       <Button type="submit" :isLoading="formLoading" :disabled="formLoading">
-        {{ t('contact.updateContact') }}
+        {{ submitLabel || t('contact.updateContact') }}
       </Button>
     </div>
   </form>
 </template>
 
 <script setup>
+const FIELD_COLUMN_CLASS = 'min-w-0'
+const FIELD_GRID_CLASS = 'grid gap-6 sm:grid-cols-2'
+
 import {
   FormField,
   FormItem,
@@ -99,9 +101,9 @@ import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
 import { countryOptions } from '@shared-ui/constants/countries.js'
 import { useI18n } from 'vue-i18n'
-import { useUserStore } from '../../stores/user'
+import { useUserStore } from '@main/stores/user'
 
-defineProps(['formLoading', 'onSubmit'])
+defineProps(['formLoading', 'onSubmit', 'submitLabel'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
