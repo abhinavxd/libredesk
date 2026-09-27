@@ -46,35 +46,43 @@ func (b BusinessHours) IsOpen(now time.Time, loc *time.Location) (bool, error) {
 			return false, fmt.Errorf("decoding holidays: %w", err)
 		}
 	}
-	for _, holiday := range holidays {
-		if holiday.Date == local.Format(time.DateOnly) {
-			return false, nil
-		}
-	}
 	var schedule map[string]WorkingHours
 	if err := json.Unmarshal(b.Hours, &schedule); err != nil {
 		return false, fmt.Errorf("decoding working hours: %w", err)
 	}
-	day, ok := schedule[local.Weekday().String()]
-	if !ok {
-		return false, nil
-	}
-	open, err := time.Parse("15:04", day.Open)
-	if err != nil {
-		return false, fmt.Errorf("parsing opening time: %w", err)
-	}
-	close, err := time.Parse("15:04", day.Close)
-	if err != nil {
-		return false, fmt.Errorf("parsing closing time: %w", err)
-	}
-	start, end := open.Hour()*60+open.Minute(), close.Hour()*60+close.Minute()
 	minute := local.Hour()*60 + local.Minute()
-	switch {
-	case start == end:
-		return false, nil
-	case start < end:
-		return minute >= start && minute < end, nil
-	default:
-		return minute >= start || minute < end, nil
+	start, end, err := dayWindow(schedule, holidays, local)
+	if err != nil {
+		return false, err
 	}
+	if start < end && minute >= start && minute < end || start > end && minute >= start {
+		return true, nil
+	}
+	start, end, err = dayWindow(schedule, holidays, local.AddDate(0, 0, -1))
+	if err != nil {
+		return false, err
+	}
+	return start > end && minute < end, nil
+}
+
+// dayWindow returns the opening and closing minute of the interval that opens on day, or equal values when it has none.
+func dayWindow(schedule map[string]WorkingHours, holidays []Holiday, day time.Time) (int, int, error) {
+	for _, holiday := range holidays {
+		if holiday.Date == day.Format(time.DateOnly) {
+			return 0, 0, nil
+		}
+	}
+	hours, ok := schedule[day.Weekday().String()]
+	if !ok {
+		return 0, 0, nil
+	}
+	open, err := time.Parse("15:04", hours.Open)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing opening time: %w", err)
+	}
+	close, err := time.Parse("15:04", hours.Close)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing closing time: %w", err)
+	}
+	return open.Hour()*60 + open.Minute(), close.Hour()*60 + close.Minute(), nil
 }

@@ -112,6 +112,20 @@ func ingestTelegramMessage(ctx context.Context, app *App, rec imodels.Inbox, cfg
 	}
 	identifier := strconv.FormatInt(message.Chat.ID, 10)
 	defer telegramChatLocks.lock(identifier)()
+	contact := umodels.User{Type: umodels.UserTypeContact, FirstName: message.From.FirstName, LastName: message.From.LastName}
+	if message.Outgoing() {
+		contact.FirstName = message.Chat.FirstName
+		contact.LastName = message.Chat.LastName
+	}
+	contactID, err := app.user.UpsertContactByChannelIdentity(telegramChannel.ChannelTelegram, identifier, &contact)
+	if err != nil {
+		return err
+	}
+	if stored, err := app.user.GetContactOrVisitor(contactID, "" /** email **/); err != nil {
+		return err
+	} else if !stored.Enabled {
+		return nil
+	}
 	sourceID := message.SourceID(rec.ID)
 	if exists, err := app.conversation.MessageExists(sourceID); err != nil {
 		return err
@@ -129,15 +143,6 @@ func ingestTelegramMessage(ctx context.Context, app *App, rec imodels.Inbox, cfg
 		return err
 	}
 	if err := ctx.Err(); err != nil {
-		return err
-	}
-	contact := umodels.User{Type: umodels.UserTypeContact, FirstName: message.From.FirstName, LastName: message.From.LastName}
-	if message.Outgoing() {
-		contact.FirstName = message.Chat.FirstName
-		contact.LastName = message.Chat.LastName
-	}
-	contactID, err := app.user.UpsertContactByChannelIdentity(telegramChannel.ChannelTelegram, identifier, &contact)
-	if err != nil {
 		return err
 	}
 	attributes := map[string]any{}
