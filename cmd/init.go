@@ -1362,6 +1362,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 		{"widget", 100},
 		{"auth", 30},
 		{"public", 100},
+		{"portal", 120},
 		{"media", 300},
 	}
 
