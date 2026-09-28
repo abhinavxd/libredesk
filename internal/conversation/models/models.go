@@ -201,7 +201,6 @@ type Conversation struct {
 	InboxChannel              string                 `db:"inbox_channel" json:"inbox_channel"`
 	Tags                      null.JSON              `db:"tags" json:"tags"`
 	Meta                      json.RawMessage        `db:"meta" json:"meta"`
-	IncomingTo                []string               `db:"-" json:"-"`
 	CustomAttributes          json.RawMessage        `db:"custom_attributes" json:"custom_attributes"`
 	LastMessageAt             null.Time              `db:"last_message_at" json:"last_message_at"`
 	LastMessage               null.String            `db:"last_message" json:"last_message"`
@@ -225,6 +224,7 @@ type Conversation struct {
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+	IncomingTo                []string               `db:"-" json:"-"`
 }
 
 type ConversationContact struct {
