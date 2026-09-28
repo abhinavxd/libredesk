@@ -6,7 +6,7 @@ export function stripConvUUID (email) {
     return email.replace(/\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@/i, '@')
 }
 
-export function computeRecipientsFromMessage (message, contactEmail, inboxEmail, inboxReplyTo = '') {
+export function computeRecipientsFromMessage (message, contactEmail, ownedAddresses = []) {
     const meta = message?.meta || {}
     const isIncoming = message.type === 'incoming'
 
@@ -41,7 +41,7 @@ export function computeRecipientsFromMessage (message, contactEmail, inboxEmail,
         }
     }
 
-    const inboxAddresses = [inboxEmail, inboxReplyTo]
+    const inboxAddresses = (Array.isArray(ownedAddresses) ? ownedAddresses : [ownedAddresses])
         .filter(Boolean)
         .map(e => e.toLowerCase())
     const clean = list =>

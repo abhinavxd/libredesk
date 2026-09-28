@@ -23,6 +23,27 @@
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <FormField
+              v-if="fromOptions.length > 1"
+              v-slot="{ componentField: sendFromField }"
+              name="send_from"
+            >
+              <Select v-bind="sendFromField">
+                <SelectTrigger
+                  :class="ROW_INPUT_CLASS"
+                  :aria-label="t('globals.terms.fromEmailAddress', 1)"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="address in fromOptions" :key="address" :value="address">
+                      {{ address }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
           <FormMessage :class="ROW_MESSAGE_CLASS" />
         </FormItem>
@@ -278,6 +299,7 @@ import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useInboxStore } from '@main/stores/inbox'
+import { sendableAddresses } from '@main/utils/email-sender'
 import { useUserStore } from '@main/stores/user'
 import {
   Select,
@@ -398,6 +420,7 @@ const formSchema = z.object({
     }),
   team_id: z.any().optional(),
   agent_id: z.any().optional(),
+  send_from: z.string().optional(),
   contact_email: z.string().email(t('validation.invalidEmail')),
   cc: emailListSchema,
   bcc: emailListSchema,
@@ -430,6 +453,7 @@ const form = useForm({
     inbox_id: null,
     team_id: null,
     agent_id: userStore.userID ? String(userStore.userID) : null,
+    send_from: '',
     subject: '',
     content: '',
     contact_email: '',
@@ -439,6 +463,21 @@ const form = useForm({
     last_name: ''
   }
 })
+
+const fromOptions = computed(() => {
+  const inbox = inboxStore.inboxes.find((item) => String(item.id) === String(form.values.inbox_id))
+  return inbox ? sendableAddresses(inbox.from, inbox.aliases) : []
+})
+
+watch(
+  fromOptions,
+  (options) => {
+    if (!options.includes(form.values.send_from)) {
+      form.setFieldValue('send_from', options[0] || '', false)
+    }
+  },
+  { immediate: true }
+)
 
 watch(emailQuery, (newVal) => {
   form.setFieldValue('contact_email', newVal, form.submitCount.value > 0)

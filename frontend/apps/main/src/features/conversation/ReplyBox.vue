@@ -90,6 +90,8 @@
           v-model:to="to"
           v-model:cc="cc"
           v-model:bcc="bcc"
+          :sendFrom="sendFrom"
+          @update:sendFrom="pickSender"
           v-model:emailErrors="emailErrors"
           v-model:messageType="messageType"
           v-model:showCc="showCc"
@@ -156,6 +158,8 @@
         v-model:to="to"
         v-model:cc="cc"
         v-model:bcc="bcc"
+        :sendFrom="sendFrom"
+        @update:sendFrom="pickSender"
         v-model:emailErrors="emailErrors"
         v-model:messageType="messageType"
         v-model:showCc="showCc"
@@ -339,6 +343,8 @@ const isGenerating = ref(false)
 const to = ref('')
 const cc = ref('')
 const bcc = ref('')
+const sendFrom = ref('')
+const senderPickedFor = ref(null)
 const showCc = ref(false)
 const showBcc = ref(false)
 const emailErrors = ref([])
@@ -595,6 +601,7 @@ const processSend = async (
     if (parsedTo.length) meta.to = parsedTo
     if (parsedCC.length) meta.cc = parsedCC
     if (parsedBCC.length) meta.bcc = parsedBCC
+    if (!isPrivate && sendFrom.value) meta.send_from = sendFrom.value
 
     const isWhatsAppReply =
       !isPrivate && conversationStore.current.inbox_channel === WHATSAPP_CHANNEL
@@ -630,7 +637,8 @@ const processSend = async (
           cc: parsedCC,
           bcc: parsedBCC,
           to: parsedTo,
-          echo_id: isPrivate ? '' : tempUUIDs[i]
+          echo_id: isPrivate ? '' : tempUUIDs[i],
+          send_from: isPrivate ? '' : sendFrom.value
         })
 
         if (isPrivate && response?.data?.data) {
@@ -702,6 +710,23 @@ watch(
     }
   },
   { deep: true }
+)
+
+const pickSender = (value) => {
+  sendFrom.value = value
+  senderPickedFor.value = currentConversationUUID.value
+}
+
+// Keep the agent's own sender pick while it is still allowed, since currentFrom changes whenever a new message arrives.
+watch(
+  [currentConversationUUID, () => conversationStore.currentFrom],
+  ([uuid, value]) => {
+    const picked =
+      senderPickedFor.value === uuid &&
+      conversationStore.currentFromOptions.includes(sendFrom.value)
+    if (!picked) sendFrom.value = value || ''
+  },
+  { immediate: true }
 )
 
 // Reset first so a loaded draft never inherits the previous conversation's macro (drafts store no message_content).

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	conversationmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -19,29 +20,37 @@ const (
 	ChannelEmail = "email"
 )
 
+var _ inbox.EmailInbox = (*Email)(nil)
+
 // Email represents the email inbox with multiple SMTP servers and IMAP clients.
 type Email struct {
-	id                   int
-	name                 string
-	smtpPools            []*smtppool.Pool
-	smtpPoolsMu          sync.RWMutex
-	smtpPoolsToken       string
-	smtpCfg              []models.SMTPConfig
-	imapCfg              []models.IMAPConfig
-	oauth                *models.OAuthConfig
-	oauthMu              sync.RWMutex
-	authType             string
-	headers              map[string]string
-	lo                   *logf.Logger
-	from                 string
-	fromNameTemplate     string
-	replyTo              string
-	enablePlusAddressing bool
-	messageStore         inbox.MessageStore
-	userStore            inbox.UserStore
-	wg                   sync.WaitGroup
-	tokenRefreshCallback TokenRefreshCallback
-	authStatusCallback   AuthStatusCallback
+	id                        int
+	uuid                      string
+	name                      string
+	smtpPools                 []*smtppool.Pool
+	smtpPoolsMu               sync.RWMutex
+	smtpPoolsToken            string
+	smtpCfg                   []models.SMTPConfig
+	imapCfg                   []models.IMAPConfig
+	oauth                     *models.OAuthConfig
+	oauthMu                   sync.RWMutex
+	authType                  string
+	headers                   map[string]string
+	lo                        *logf.Logger
+	from                      string
+	primary                   string
+	receiveAddresses          map[string]struct{}
+	sendAddresses             map[string]struct{}
+	addressesMu               sync.RWMutex
+	fromNameTemplate          string
+	replyTo                   string
+	enablePlusAddressing      bool
+	messageStore              inbox.MessageStore
+	userStore                 inbox.UserStore
+	wg                        sync.WaitGroup
+	tokenRefreshCallback      TokenRefreshCallback
+	aliasVerificationCallback func(context.Context, string, string) error
+	authStatusCallback        AuthStatusCallback
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
@@ -53,13 +62,16 @@ type AuthStatusCallback func(inboxID int, ok bool)
 
 // Opts holds the options required for the email inbox.
 type Opts struct {
-	ID                   int
-	Name                 string
-	Headers              map[string]string
-	Config               models.Config
-	Lo                   *logf.Logger
-	TokenRefreshCallback TokenRefreshCallback // Optional callback for token refresh
-	AuthStatusCallback   AuthStatusCallback
+	ID                        int
+	UUID                      string
+	Name                      string
+	Aliases                   models.EmailAliases
+	Headers                   map[string]string
+	Config                    models.Config
+	Lo                        *logf.Logger
+	TokenRefreshCallback      TokenRefreshCallback // Optional callback for token refresh
+	AliasVerificationCallback func(context.Context, string, string) error
+	AuthStatusCallback        AuthStatusCallback
 }
 
 // New returns a new instance of the email inbox.
@@ -74,25 +86,55 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		poolsToken = opts.Config.OAuth.AccessToken
 	}
 
+	primary, err := inbox.NormalizeEmailAddress(opts.Config.From)
+	receiveSet := make(map[string]struct{})
+	sendSet := make(map[string]struct{})
+	if err != nil {
+		if opts.Lo != nil {
+			opts.Lo.Warn("could not normalize email inbox from address; address ownership will be empty", "from", opts.Config.From, "error", err)
+		}
+	} else {
+		receiveSet[primary] = struct{}{}
+		sendSet[primary] = struct{}{}
+	}
+	for _, alias := range opts.Aliases {
+		address, err := inbox.NormalizeEmailAddress(alias.Email)
+		if err != nil {
+			if opts.Lo != nil {
+				opts.Lo.Warn("could not normalize email alias; address ownership will exclude it", "alias", alias.Email, "error", err)
+			}
+			continue
+		}
+		receiveSet[address] = struct{}{}
+		if alias.VerificationStatus == models.AliasVerificationVerified {
+			sendSet[address] = struct{}{}
+		}
+	}
+
 	e := &Email{
-		id:                   opts.ID,
-		name:                 opts.Name,
-		headers:              opts.Headers,
-		from:                 opts.Config.From,
-		fromNameTemplate:     opts.Config.FromNameTemplate,
-		replyTo:              opts.Config.ReplyTo,
-		smtpCfg:              opts.Config.SMTP,
-		imapCfg:              opts.Config.IMAP,
-		lo:                   opts.Lo,
-		smtpPools:            pools,
-		smtpPoolsToken:       poolsToken,
-		messageStore:         store,
-		userStore:            userStore,
-		oauth:                opts.Config.OAuth,
-		authType:             opts.Config.AuthType,
-		enablePlusAddressing: opts.Config.EnablePlusAddressing,
-		tokenRefreshCallback: opts.TokenRefreshCallback,
-		authStatusCallback:   opts.AuthStatusCallback,
+		id:                        opts.ID,
+		uuid:                      opts.UUID,
+		name:                      opts.Name,
+		headers:                   opts.Headers,
+		from:                      opts.Config.From,
+		primary:                   primary,
+		receiveAddresses:          receiveSet,
+		sendAddresses:             sendSet,
+		fromNameTemplate:          opts.Config.FromNameTemplate,
+		replyTo:                   opts.Config.ReplyTo,
+		smtpCfg:                   opts.Config.SMTP,
+		imapCfg:                   opts.Config.IMAP,
+		lo:                        opts.Lo,
+		smtpPools:                 pools,
+		smtpPoolsToken:            poolsToken,
+		messageStore:              store,
+		userStore:                 userStore,
+		oauth:                     opts.Config.OAuth,
+		authType:                  opts.Config.AuthType,
+		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
+		tokenRefreshCallback:      opts.TokenRefreshCallback,
+		aliasVerificationCallback: opts.AliasVerificationCallback,
+		authStatusCallback:        opts.AuthStatusCallback,
 	}
 	return e, nil
 }
@@ -100,6 +142,63 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 // Identifier returns the unique identifier of the inbox which is the database ID.
 func (e *Email) Identifier() int {
 	return e.id
+}
+
+// PrimaryAddress returns the normalized primary email address.
+func (e *Email) PrimaryAddress() string {
+	return e.primary
+}
+
+// ReceivesAddress reports whether the address is configured to receive mail.
+func (e *Email) ReceivesAddress(value string) bool {
+	return e.hasAddress(e.receiveAddresses, value)
+}
+
+// SendsAddress reports whether the address is currently authorized for From.
+func (e *Email) SendsAddress(value string) bool {
+	return e.hasAddress(e.sendAddresses, value)
+}
+
+func (e *Email) hasAddress(set map[string]struct{}, value string) bool {
+	address, err := inbox.NormalizeEmailAddress(value)
+	if err != nil {
+		return false
+	}
+	e.addressesMu.RLock()
+	defer e.addressesMu.RUnlock()
+	_, ok := set[address]
+	return ok
+}
+
+// SetAliasSendable allows or blocks an alias as a From address.
+func (e *Email) SetAliasSendable(value string, send bool) {
+	address, err := inbox.NormalizeEmailAddress(value)
+	if err != nil {
+		return
+	}
+	e.addressesMu.Lock()
+	defer e.addressesMu.Unlock()
+	if send {
+		if e.sendAddresses == nil {
+			e.sendAddresses = make(map[string]struct{})
+		}
+		e.sendAddresses[address] = struct{}{}
+	} else {
+		delete(e.sendAddresses, address)
+	}
+}
+
+// StartAliasVerification sends a verification message using this inbox's SMTP pool.
+func (e *Email) StartAliasVerification(alias, token string) error {
+	return e.Send(conversationmodels.OutboundMessage{
+		From:                   alias,
+		To:                     []string{e.PrimaryAddress()},
+		Subject:                "libredesk alias verification",
+		ContentType:            conversationmodels.ContentTypeText,
+		Content:                "This message verifies the sending capability of a libredesk email alias.",
+		SourceID:               "alias-verification-" + token,
+		AliasVerificationToken: token,
+	})
 }
 
 // Receive starts reading incoming messages for each IMAP client.

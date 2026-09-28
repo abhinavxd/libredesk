@@ -21,6 +21,7 @@ const (
 	headerReferences              = "References"
 	headerInReplyTo               = "In-Reply-To"
 	headerLibredeskLoopPrevention = "X-Libredesk-Loop-Prevention"
+	headerAliasVerification       = "X-Libredesk-Alias-Verification"
 	headerLibredeskConversationID = "X-Libredesk-Conversation-UUID"
 	headerAutoreply               = "X-Autoreply"
 	headerAutoSubmitted           = "Auto-Submitted"
@@ -159,15 +160,23 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		Headers:     textproto.MIMEHeader{},
 	}
 
-	// Set libredesk loop prevention header to from address.
 	emailAddress, err := stringutil.ExtractEmail(m.From)
 	if err != nil {
 		e.lo.Error("failed to extract email address from the 'from' header", "error", err)
 		return fmt.Errorf("failed to extract email address from 'From' header: %w", err)
 	}
-	email.Headers.Set(headerLibredeskLoopPrevention, emailAddress)
+	// Loop identity is the inbox UUID, shared by the primary address and all aliases.
+	email.Headers.Set(headerLibredeskLoopPrevention, e.uuid)
+	if m.AliasVerificationToken != "" {
+		email.Headers.Set(headerAliasVerification, m.AliasVerificationToken)
+	}
 
-	if rt := resolveReplyTo(m.ReplyTo, e.replyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
+	// Replies from an alias go back to that alias, so the inbox Reply-To only applies to the primary address.
+	inboxReplyTo := e.replyTo
+	if !strings.EqualFold(emailAddress, e.PrimaryAddress()) {
+		inboxReplyTo = ""
+	}
+	if rt := resolveReplyTo(m.ReplyTo, inboxReplyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
 		email.Headers.Set("Reply-To", rt)
 		e.lo.Debug("reply-to header set", "reply_to", rt)
 	}
@@ -222,6 +231,9 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		serverCount = len(e.smtpPools)
 		server      *smtppool.Pool
 	)
+	if serverCount == 0 {
+		return fmt.Errorf("no SMTP servers configured for inbox %d", e.Identifier())
+	}
 	if serverCount > 1 {
 		server = e.smtpPools[rand.Intn(serverCount)]
 	} else {

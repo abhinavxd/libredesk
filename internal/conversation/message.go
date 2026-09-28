@@ -23,6 +23,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -174,7 +175,20 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	outbound := message.ToOutbound()
 
 	if inb.Channel() == inbox.ChannelEmail {
-		outbound.From = m.emailFromAddress(inb, message)
+		emailInbox, ok := inb.(inbox.EmailInbox)
+		if !ok {
+			handleError(errors.New("email inbox does not expose its sender addresses"), "invalid email inbox")
+			return
+		}
+		selected := message.SendFrom()
+		if selected == "" {
+			selected = emailInbox.PrimaryAddress()
+		}
+		if !emailInbox.SendsAddress(selected) {
+			handleError(errors.New("message sender address is no longer owned by the inbox"), "invalid email sender")
+			return
+		}
+		outbound.From = m.emailFromAddress(inb, message, selected)
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -593,7 +607,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 }
 
 // QueueReply queues a reply message in a conversation.
-func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, metaMap map[string]interface{}) (models.Message, error) {
+func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID int, conversationUUID, content string, to, cc, bcc []string, sendFrom string, metaMap map[string]interface{}) (models.Message, error) {
 	var (
 		message = models.Message{}
 	)
@@ -621,6 +635,11 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	)
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
+		sendFrom, err = m.resolveSendFrom(conversationUUID, inboxRecord, sendFrom)
+		if err != nil {
+			return models.Message{}, err
+		}
+		metaMap["send_from"] = sendFrom
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
 		to = stringutil.RemoveEmpty(to)
 		cc = stringutil.RemoveEmpty(cc)
@@ -1700,8 +1719,12 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 
 // emailFromAddress returns the From header, applying the inbox from-name template for agent senders
 // Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
-func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) string {
+// emailFromAddress keeps the inbox From (with its display name) for the primary address and uses the bare alias otherwise.
+func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message, sender string) string {
 	from := inb.FromAddress()
+	if emailInbox, ok := inb.(inbox.EmailInbox); ok && sender != emailInbox.PrimaryAddress() {
+		from = sender
+	}
 
 	tpl := inb.FromNameTemplate()
 	if tpl == "" || message.SenderType != models.SenderTypeAgent {
@@ -1752,4 +1775,34 @@ func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message) stri
 	}
 	addr.Name = name
 	return addr.String()
+}
+
+func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.Inbox, requested string) (string, error) {
+	sendable, err := inbox.SendableEmailAddresses(inboxRecord.From, inboxRecord.Aliases)
+	if err != nil {
+		m.lo.Error("error resolving inbox sender addresses", "inbox_id", inboxRecord.ID, "error", err)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	if requested != "" {
+		normalized, err := inbox.NormalizeEmailAddress(requested)
+		if err != nil || !slices.Contains(sendable, normalized) {
+			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.senderAddressNotAllowed"), nil)
+		}
+		return normalized, nil
+	}
+
+	var latest models.Message
+	if err := m.q.GetLatestPublicEmailMessage.Get(&latest, conversationUUID); err != nil && err != sql.ErrNoRows {
+		m.lo.Error("error fetching latest message for sender address", "conversation_uuid", conversationUUID, "error", err)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	previous := latest.SendFrom()
+	if latest.Type == models.MessageIncoming {
+		previous = latest.InboxAddress()
+	}
+	if normalized, err := inbox.NormalizeEmailAddress(previous); err == nil && slices.Contains(sendable, normalized) {
+		return normalized, nil
+	}
+	return sendable[0], nil
 }

@@ -301,7 +301,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
 
-	toggledInbox, err := app.inbox.Toggle(id)
+	toggledInbox, err := app.inbox.Toggle(r.RequestCtx, id)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -340,6 +340,25 @@ func handleDeleteInbox(r *fastglue.Request) error {
 		go repointWhatsAppWebhookAfterDelete(app, deleted)
 	}
 	return r.SendEnvelope(true)
+}
+
+// handleVerifySendForInboxAlias starts send-as verification for an inbox alias.
+func handleVerifySendForInboxAlias(r *fastglue.Request) error {
+	app := r.Context.(*App)
+	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	if err != nil || id == 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	var request struct {
+		Email string `json:"email"`
+	}
+	if err := r.Decode(&request, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+	}
+	if err := app.inbox.StartAliasVerification(r.RequestCtx, id, request.Email); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(map[string]string{"status": imodels.AliasVerificationPending})
 }
 
 // repointWhatsAppWebhookAfterDelete moves a shared WABA's callback to a surviving inbox, else Meta keeps posting every WABA event to the deleted inbox's dead URL.
@@ -448,11 +467,7 @@ func whatsAppCSATTemplate(app *App, inboxID int) (wtmodels.Template, bool) {
 
 // validateInbox validates the inbox
 func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
-	// Validate from address only for email channels.
 	if inbox.Channel == "email" {
-		if _, err := mail.ParseAddress(inbox.From); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidFromAddress"), nil)
-		}
 		var cfg imodels.Config
 		if len(inbox.Config) > 0 {
 			if err := json.Unmarshal(inbox.Config, &cfg); err == nil && cfg.ReplyTo != "" {
