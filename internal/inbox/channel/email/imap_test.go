@@ -3,10 +3,13 @@ package email
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
 )
@@ -905,5 +908,21 @@ func TestMimeParser_Charsets(t *testing.T) {
 				t.Errorf("subject: got %q, want %q", envelope.GetHeader("Subject"), tt.wantSubject)
 			}
 		})
+	}
+}
+
+// TestBuildSearchCriteria ensures messages flagged \Deleted are excluded from the
+// IMAP search so they aren't re-imported after being expunged on the server while
+// Libredesk was offline.
+func TestBuildSearchCriteria(t *testing.T) {
+	since := time.Now().Add(-24 * time.Hour)
+
+	criteria := buildSearchCriteria(since)
+
+	if !criteria.Since.Equal(since) {
+		t.Errorf("Since: got %v, want %v", criteria.Since, since)
+	}
+	if !slices.Contains(criteria.NotFlag, imap.FlagDeleted) {
+		t.Errorf("NotFlag: expected %v to contain %v", criteria.NotFlag, imap.FlagDeleted)
 	}
 }
