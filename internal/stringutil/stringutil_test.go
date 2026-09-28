@@ -212,6 +212,48 @@ func TestExtractConvUUID(t *testing.T) {
 	}
 }
 
+func TestRemoveConvPlusAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		email    string
+		expected string
+	}{
+		{
+			name:     "conversation plus address",
+			email:    "support+conv-13216cf7-6626-4b0d-a938-46ce65a20701@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "uppercase conversation plus address",
+			email:    "support+conv-13216CF7-6626-4B0D-A938-46CE65A20701@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "no plus addressing",
+			email:    "support@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "non-conv plus addressing",
+			email:    "support+sales@domain.com",
+			expected: "support+sales@domain.com",
+		},
+		{
+			name:     "short non-UUID",
+			email:    "support+conv-21321@domain.com",
+			expected: "support+conv-21321@domain.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := RemoveConvPlusAddress(tt.email); result != tt.expected {
+				t.Errorf("RemoveConvPlusAddress(%q) = %q, want %q", tt.email, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestExtractReferenceNumber(t *testing.T) {
 	tests := []struct {
 		name     string

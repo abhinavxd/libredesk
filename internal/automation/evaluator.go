@@ -166,6 +166,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 				return false
 			}
 			valueToCompare = previous
+		case models.ConversationIncomingTo:
+			return evaluateRecipientRule(conversation.IncomingTo, rule)
 		default:
 			e.lo.Error("error unrecognized conversation field", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
 			return false
@@ -310,4 +312,54 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 	}
 	e.lo.Debug("conversation automation rule status", "has_met", conditionMet, "conversation_uuid", conversation.UUID)
 	return conditionMet
+}
+
+func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
+	negative := rule.Operator == models.RuleOperatorNotEqual || rule.Operator == models.RuleOperatorNotContains
+	ruleValue := strings.ToLower(strings.TrimSpace(rule.Value))
+
+	for _, recipient := range recipients {
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			continue
+		}
+		if rule.Operator == models.RuleOperatorSet {
+			return true
+		}
+		if rule.Operator == models.RuleOperatorNotSet {
+			return false
+		}
+		recipient = strings.ToLower(recipient)
+
+		var matched bool
+		switch rule.Operator {
+		case models.RuleOperatorEquals, models.RuleOperatorNotEqual:
+			matched = recipient == ruleValue
+		case models.RuleOperatorContains, models.RuleOperatorNotContains:
+			recipient = strings.Join(strings.Fields(recipient), " ")
+			for candidate := range strings.SplitSeq(ruleValue, ",") {
+				candidate = strings.Join(strings.Fields(candidate), " ")
+				if candidate == "" {
+					continue
+				}
+				if strings.Contains(recipient, candidate) {
+					matched = true
+					break
+				}
+			}
+		default:
+			return false
+		}
+		if matched {
+			return !negative
+		}
+	}
+
+	if rule.Operator == models.RuleOperatorSet {
+		return false
+	}
+	if rule.Operator == models.RuleOperatorNotSet {
+		return true
+	}
+	return negative
 }

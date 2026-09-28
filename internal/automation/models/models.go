@@ -55,6 +55,7 @@ const (
 	ConversationHoursSinceResolved     = "hours_since_resolved"
 	ConversationHoursSinceLastResolved = "hours_since_last_resolved"
 	ConversationInbox                  = "inbox"
+	ConversationIncomingTo             = "to"
 	ContactEmail                       = "contact_email"
 
 	ConversationPreviousStatus       = "previous_status"

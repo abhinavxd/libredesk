@@ -1163,6 +1163,7 @@
   "globals.terms.footer": "Footer",
   "globals.terms.from": "From",
   "globals.terms.fromEmailAddress": "From email address | From email addresses",
+  "globals.terms.toEmailAddress": "To email address | To email addresses",
   "globals.terms.general": "General",
   "globals.terms.good": "Good",
   "globals.terms.google": "Google",
