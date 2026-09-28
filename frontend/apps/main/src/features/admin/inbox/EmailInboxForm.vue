@@ -158,7 +158,7 @@
                 >
                   <div class="sm:col-start-1 sm:row-start-2">
                     <span
-                      v-if="field.value?.verification_status"
+                      v-if="savedAliasStatus(field.value)"
                       class="flex items-center gap-1.5 text-xs"
                       :class="aliasStatus(field.value).class || 'text-muted-foreground'"
                       role="status"
@@ -179,7 +179,7 @@
                     variant="outline"
                     size="sm"
                     class="min-h-9 shrink-0 sm:col-start-2 sm:row-start-1"
-                    :disabled="!verifyAlias || !field.value?.verification_status"
+                    :disabled="!verifyAlias || !savedAliasStatus(field.value)"
                     @click="handleVerifyAlias(field.value)"
                   >
                     {{ $t(aliasStatus(field.value).action) }}
@@ -1111,24 +1111,14 @@ const addAlias = async () => {
   formEl.value?.querySelector('[data-alias-row]:last-child input')?.focus()
 }
 
-const aliasStatus = (alias) => ALIAS_STATUS[alias?.verification_status] || ALIAS_STATUS.not_verified
+const savedAliasStatus = (alias) =>
+  props.aliasVerificationState[alias?.email?.trim().toLowerCase()]?.verification_status
+const aliasStatus = (alias) => ALIAS_STATUS[savedAliasStatus(alias)] || ALIAS_STATUS.not_verified
 
 const handleVerifyAlias = (alias) => {
   if (!alias?.email || !props.verifyAlias) return
   props.verifyAlias(alias.email)
 }
-
-watch(
-  () => props.aliasVerificationState,
-  (states) => {
-    for (const [index, alias] of (form.values.aliases || []).entries()) {
-      const state = states[alias.email?.trim().toLowerCase()]
-      if (!state) continue
-      form.setFieldValue(`aliases[${index}].verification_status`, state.verification_status, false)
-    }
-  },
-  { deep: true, immediate: true }
-)
 
 const oauthProvider = computed(() => {
   const provider = form.values.oauth?.provider

@@ -208,6 +208,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		autoReply          bool
 		isLoop             bool
 		verificationToken  string
+		ownVerification    bool
 		uid                imap.UID
 		extractedMessageID string
 	}
@@ -239,6 +240,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			autoReply          bool
 			isLoop             bool
 			verificationToken  string
+			ownVerification    bool
 			uid                imap.UID
 			extractedMessageID string
 		)
@@ -272,6 +274,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 					isLoop = true
 				}
 				verificationToken = strings.TrimSpace(envelope.GetHeader(headerAliasVerification))
+				ownVerification = strings.EqualFold(strings.TrimSpace(envelope.GetHeader(headerLibredeskLoopPrevention)), e.uuid)
 
 				// Extract Message-Id from raw headers as fallback for problematic Message IDs
 				extractedMessageID = extractMessageIDFromHeaders(envelope)
@@ -292,7 +295,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, uid: uid, autoReply: autoReply, isLoop: isLoop, verificationToken: verificationToken, extractedMessageID: extractedMessageID})
+		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, uid: uid, autoReply: autoReply, isLoop: isLoop, verificationToken: verificationToken, ownVerification: ownVerification, extractedMessageID: extractedMessageID})
 	}
 
 	// Now process each collected message.
@@ -305,8 +308,11 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		default:
 		}
 
-		// Checked before loop prevention: verification mail carries this inbox's own loop header.
+		// Verification mail carries its sender inbox's loop header. Other inboxes polling the same mailbox leave it for that inbox.
 		if msgData.verificationToken != "" {
+			if !msgData.ownVerification {
+				continue
+			}
 			if err := e.processAliasVerification(ctx, msgData.env, msgData.verificationToken); err != nil {
 				e.lo.Error("error processing alias verification", "error", err, "inbox_id", inboxID)
 			}
