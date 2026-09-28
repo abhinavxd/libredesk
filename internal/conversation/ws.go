@@ -25,6 +25,7 @@ func (m *Manager) BroadcastNewConversation(conv *cmodels.ConversationListItem) {
 // BroadcastConvReassignment notifies the union of agents authorized under old and new assignee state, so agents losing access receive the updated payload and their frontend can filter the conv out.
 func (m *Manager) BroadcastConvReassignment(oldConv, newConv *cmodels.ConversationListItem) {
 	m.broadcastConvToAuthorized(newConv, oldConv)
+	m.retainAuthorizedSubscribers(newConv)
 }
 
 func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.ConversationListItem, preview string) {
@@ -169,6 +170,14 @@ func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationL
 		Type: wsmodels.MessageTypeNewConversation,
 		Data: convToBroadcast(conv),
 	})
+}
+
+// retainAuthorizedSubscribers drops live-update subscriptions of agents who can no longer read the conversation.
+func (m *Manager) retainAuthorizedSubscribers(conv *cmodels.ConversationListItem) {
+	if conv == nil {
+		return
+	}
+	m.wsHub.RetainSubscribers(conv.UUID, m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID))
 }
 
 // broadcastToUsers broadcasts a message to a list of users, if the list is empty it broadcasts to all users.

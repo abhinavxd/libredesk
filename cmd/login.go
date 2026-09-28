@@ -53,10 +53,11 @@ func handleLogin(r *fastglue.Request) error {
 	}
 
 	if err := app.auth.SaveSession(amodels.User{
-		ID:        user.ID,
-		Email:     user.Email.String,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
+		SessionVersion: user.SessionVersion,
+		ID:             user.ID,
+		Email:          user.Email.String,
+		FirstName:      user.FirstName,
+		LastName:       user.LastName,
 	}, r); err != nil {
 		app.lo.Error("error saving session", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))

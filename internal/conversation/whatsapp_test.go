@@ -34,7 +34,7 @@ type whatsAppReplyTemplates struct {
 	template wtmodels.Template
 }
 
-func (whatsAppReplyMedia) LinkMessageMediaTx(*sqlx.Tx, int, []mmodels.Media, []string) error {
+func (whatsAppReplyMedia) LinkMessageMediaTx(*sqlx.Tx, int, []mmodels.Media, []string, int) error {
 	return nil
 }
 

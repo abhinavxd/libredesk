@@ -612,7 +612,7 @@ func promptAndHashPassword(ctx context.Context) ([]byte, error) {
 
 // updateSystemUserPassword updates the password of the system user in the database.
 func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
-	_, err := db.Exec(`UPDATE users SET password = $1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
+	_, err := db.Exec(`UPDATE users SET password = $1, session_version = session_version + 1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
 	if err != nil {
 		return fmt.Errorf("failed to update system user password: %v", err)
 	}

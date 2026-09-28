@@ -919,7 +919,7 @@ func initSSRFControl() ssrf.Control {
 }
 
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control, users *user.Manager) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -929,7 +929,7 @@ func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ss
 
 	secure := !ko.Bool("app.server.disable_secure_cookies")
 	sessionLifetime := ko.Duration("app.server.session_lifetime")
-	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo, dialControl)
+	auth, err := auth_.New(auth_.Config{Providers: providers, SecureCookies: secure, SessionLifetime: sessionLifetime}, i18n, rd, lo, dialControl, users)
 	if err != nil {
 		log.Fatalf("error initializing auth: %v", err)
 	}

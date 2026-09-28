@@ -13,6 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/fasthttp/websocket"
+	"github.com/google/uuid"
 	"github.com/zerodha/fastglue"
 )
 
@@ -31,6 +32,7 @@ const (
 	wsReadDeadline          = 20 * time.Second
 	wsWriteDeadline         = 10 * time.Second
 	wsReadLimitBytes        = 64 * 1024
+	wsMaxJoinsPerConn       = 10
 
 	// Per-connection minimum intervals between inbound frames of each kind.
 	// The HTTP upgrade is rate-limited, but inbound frames aren't, so a single
@@ -120,10 +122,11 @@ func handleWidgetWS(r *fastglue.Request) error {
 		sc := &safeConn{conn: conn}
 
 		var (
-			client    *livechat.Client
-			liveChat  *livechat.LiveChat
-			inboxUUID string
-			userID    int
+			client       *livechat.Client
+			liveChat     *livechat.LiveChat
+			inboxUUID    string
+			userID       int
+			joinAttempts int
 		)
 
 		defer func() {
@@ -151,6 +154,11 @@ func handleWidgetWS(r *fastglue.Request) error {
 
 			switch msg.Type {
 			case WidgetMsgTypeJoin:
+				joinAttempts++
+				if joinAttempts > wsMaxJoinsPerConn {
+					_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "Join limit exceeded"), time.Now().Add(wsWriteDeadline))
+					return
+				}
 				// Clean up previous client on re-join.
 				if client != nil && liveChat != nil {
 					liveChat.RemoveClient(client)
@@ -211,6 +219,11 @@ func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, client
 	var joinData WidgetInboxJoinRequest
 	if err := json.Unmarshal(data, &joinData); err != nil {
 		return nil, nil, "", 0, fmt.Errorf("invalid join data: %w", err)
+	}
+
+	// Numeric inbox IDs are guessable, widgets always join by inbox UUID.
+	if _, err := uuid.Parse(joinData.InboxID); err != nil {
+		return nil, nil, "", 0, fmt.Errorf("inbox not found")
 	}
 
 	inbox, err := app.inbox.GetDBRecord(joinData.InboxID)

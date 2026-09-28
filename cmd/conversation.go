@@ -375,7 +375,10 @@ func handleGetConversation(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	prev, _ := app.conversation.GetContactPreviousConversations(conv.ContactID, 10)
+	prev, err := app.conversation.GetContactPreviousConversations(conv.ContactID, 10, user)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
 	return r.SendEnvelope(conv)
 }
@@ -943,6 +946,11 @@ func handleCreateConversation(r *fastglue.Request) error {
 		}
 	}
 
+	media, err := getUnassociatedMedia(app, req.Attachments, auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+
 	conversationID, conversationUUID, err := app.conversation.CreateConversation(
 		contactID,
 		req.InboxID,
@@ -958,12 +966,6 @@ func handleCreateConversation(r *fastglue.Request) error {
 	if err != nil {
 		app.lo.Error("error creating conversation", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
-	}
-
-	// Get media for the attachment ids, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
-	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
 	// Team assignment clears the assigned agent.
@@ -988,7 +990,7 @@ func handleCreateConversation(r *fastglue.Request) error {
 		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, map[string]any{})
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
-		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID)
+		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID, auser.ID)
 	default:
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}

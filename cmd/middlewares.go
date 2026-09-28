@@ -187,17 +187,9 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
 
-		// Validate session.
-		user, err := app.auth.ValidateSession(r)
+		user, err := validatePageSession(r, app)
 		if err != nil {
-			// Session is not valid, destroy it and redirect to login.
-			if err != simplesessions.ErrInvalidSession {
-				app.lo.Error("error validating session", "error", err)
-				return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
-			}
-			if err := app.auth.DestroySession(r); err != nil {
-				app.lo.Error("error destroying session", "error", err)
-			}
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 
 		// User is authenticated.
@@ -220,10 +212,8 @@ func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandle
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
 
-		// Validate session.
-		user, err := app.auth.ValidateSession(r)
+		user, err := validatePageSession(r, app)
 		if err != nil {
-			app.lo.Error("error validating session", "error", err)
 			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSessionClearCookie"), nil, envelope.GeneralError)
 		}
 
@@ -305,4 +295,20 @@ func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHa
 		r.RequestCtx.SetUserValue("auth_method", authMethodSignedURL)
 		return handler(r)
 	}
+}
+
+// validatePageSession returns the session user and clears a revoked or expired session.
+func validatePageSession(r *fastglue.Request, app *App) (models.User, error) {
+	user, err := app.auth.ValidateSession(r)
+	if err == nil {
+		return user, nil
+	}
+	if err != simplesessions.ErrInvalidSession {
+		app.lo.Error("error validating session", "error", err)
+		return user, err
+	}
+	if err := app.auth.DestroySession(r); err != nil {
+		app.lo.Error("error destroying session", "error", err)
+	}
+	return user, nil
 }
