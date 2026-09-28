@@ -50,11 +50,15 @@ type Email struct {
 	wg                        sync.WaitGroup
 	tokenRefreshCallback      TokenRefreshCallback
 	aliasVerificationCallback func(context.Context, string, string) error
+	authStatusCallback        AuthStatusCallback
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
 // It receives the inbox ID and the updated config with new tokens.
 type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
+
+// AuthStatusCallback reports the provider's latest verdict on the inbox credentials. Ok=true clears a previously flagged failure.
+type AuthStatusCallback func(inboxID int, ok bool)
 
 // Opts holds the options required for the email inbox.
 type Opts struct {
@@ -67,6 +71,7 @@ type Opts struct {
 	Lo                        *logf.Logger
 	TokenRefreshCallback      TokenRefreshCallback // Optional callback for token refresh
 	AliasVerificationCallback func(context.Context, string, string) error
+	AuthStatusCallback        AuthStatusCallback
 }
 
 // New returns a new instance of the email inbox.
@@ -129,6 +134,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback:      opts.TokenRefreshCallback,
 		aliasVerificationCallback: opts.AliasVerificationCallback,
+		authStatusCallback:        opts.AuthStatusCallback,
 	}
 	return e, nil
 }
@@ -282,6 +288,7 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	if err != nil {
 		e.oauthMu.Unlock()
 		e.lo.Error("Failed to refresh OAuth token", "inbox_id", e.Identifier(), "error", err)
+		e.flagAuthError()
 		return nil, false, fmt.Errorf("OAuth token expired and refresh failed for inbox %d: %w", e.Identifier(), err)
 	}
 
@@ -299,7 +306,20 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	}
 
 	e.lo.Info("Successfully refreshed OAuth token", "inbox_id", e.Identifier())
+	e.clearAuthError()
 	return oauthCopy, true, nil
+}
+
+func (e *Email) flagAuthError() {
+	if e.authStatusCallback != nil {
+		e.authStatusCallback(e.Identifier(), false)
+	}
+}
+
+func (e *Email) clearAuthError() {
+	if e.authStatusCallback != nil {
+		e.authStatusCallback(e.Identifier(), true)
+	}
 }
 
 // closeSMTPPool closes the smtp pool.

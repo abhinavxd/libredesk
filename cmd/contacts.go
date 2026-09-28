@@ -81,6 +81,9 @@ func handleGetContact(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if identities, err := app.user.GetChannelIdentities(id); err == nil {
+		c.ChannelIdentities = identities
+	}
 	return r.SendEnvelope(c)
 }
 
@@ -315,6 +318,7 @@ func handleBlockContact(r *fastglue.Request) error {
 	return r.SendEnvelope(contact)
 }
 
+// contactFromForm parses and validates the contact fields from a multipart request, returning the raw form for avatar files.
 func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) {
 	var app = r.Context.(*App)
 
@@ -341,10 +345,10 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 	}
 
 	email := value("email")
-	if email == "" {
-		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "email"), nil)
+	if email == "" && value("phone_number") == "" {
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.T("contact.emailOrPhoneRequired"), nil)
 	}
-	if !stringutil.ValidEmail(email) {
+	if email != "" && !stringutil.ValidEmail(email) {
 		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
 	}
 	firstName := value("first_name")
@@ -355,7 +359,7 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 	return models.User{
 		FirstName:              firstName,
 		LastName:               value("last_name"),
-		Email:                  null.StringFrom(email),
+		Email:                  optional("email"),
 		AvatarURL:              optional("avatar_url"),
 		PhoneNumber:            optional("phone_number"),
 		PhoneNumberCountryCode: optional("phone_number_country_code"),

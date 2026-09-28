@@ -122,6 +122,8 @@ queue_size = 2000
 [automation]
 # Number of workers processing automation rules
 worker_count = 10
+# Applies to conversation creation dates. Zero or negative values use 90 days.
+time_trigger_lookback_days = 90
 
 [ai_agent]
 # Number of workers running autonomous AI assistant responses

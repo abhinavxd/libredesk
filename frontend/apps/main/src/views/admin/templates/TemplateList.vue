@@ -4,7 +4,7 @@
       <div></div>
       <div class="flex justify-end mb-4">
         <Button @click="navigateToNewTemplate" :disabled="templateType !== 'email_outgoing'">
-          {{ $t('template.new') }}
+          {{ $t('globals.messages.newTemplate') }}
         </Button>
       </div>
     </div>

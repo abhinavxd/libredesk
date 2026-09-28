@@ -5,6 +5,8 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { useUserStore } from '@/stores/user'
 import api from '@/api'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
+import { useCommandPalette } from '@main/features/command/useCommandPalette'
 import { permissions as perms } from '@/constants/permissions.js'
 
 export const useMacroStore = defineStore('macroStore', () => {
@@ -15,7 +17,13 @@ export const useMacroStore = defineStore('macroStore', () => {
     let contentFetches = {}
     const emitter = useEmitter()
     const userStore = useUserStore()
-    const currentView = ref('')
+    const replyView = ref('')
+    const palette = useCommandPalette()
+    const currentView = computed(() =>
+        palette.macroContext.value === MACRO_CONTEXT.NEW_CONVERSATION
+            ? 'starting_conversation'
+            : replyView.value
+    )
     let searchSeq = 0
 
     // actionPermissions is a map of action names to their corresponding permissions that a user must have to perform the action.
@@ -97,7 +105,7 @@ export const useMacroStore = defineStore('macroStore', () => {
     }
 
     const setCurrentView = (view) => {
-        currentView.value = view
+        replyView.value = view
     }
 
     return {

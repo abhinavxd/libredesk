@@ -25,10 +25,19 @@ export const createFormSchema = (t) => z.object({
     country: z.string().optional().nullable(),
     avatar_url: z.string().optional().nullable(),
     email: z
-        .string({
-            required_error: t('globals.messages.required'),
-        })
+        .string()
         .email({
             message: t('validation.invalidEmail'),
-        }),
+        })
+        .or(z.literal(''))
+        .optional()
+        .nullable(),
+}).superRefine((data, ctx) => {
+    if (!data.email && !data.phone_number) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: t('contact.emailOrPhoneRequired'),
+            path: ['email']
+        })
+    }
 })

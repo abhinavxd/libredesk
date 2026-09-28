@@ -54,7 +54,7 @@
         <span class="tabular-nums">#{{ referenceNumber }}</span>
         <span v-if="item.inbox_name" class="inline-flex items-center gap-1.5 min-w-0">
           <component
-            :is="item.inbox_channel === 'livechat' ? MessageSquare : Mail"
+            :is="channelIcon"
             :class="METADATA_ICON_CLASS"
             aria-hidden="true"
           />
@@ -86,12 +86,13 @@
 <script setup>
 import { computed } from 'vue'
 import { format } from 'date-fns'
-import { Mail, MessageSquare, Tag, UserRound, UsersRound } from 'lucide-vue-next'
+import { Mail, Tag, UserRound, UsersRound } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
 import HighlightedText from './HighlightedText.vue'
 
 const METADATA_ICON_CLASS = 'w-3.5 h-3.5 shrink-0'
@@ -126,6 +127,7 @@ const snippet = computed(
 const timestamp = computed(() =>
   isConversation.value ? props.item.last_message_at || props.item.created_at : props.item.created_at
 )
+const channelIcon = computed(() => CHANNEL_ICONS[props.item.inbox_channel] || Mail)
 const contactName = computed(() => fullName(props.item.contact))
 const senderName = computed(() => fullName(props.item.sender) || contactName.value)
 const assigneeName = computed(() => fullName(props.item.assignee))

@@ -1,5 +1,12 @@
 <template>
   <form ref="formEl" @submit="onSubmit" novalidate class="w-full space-y-6">
+    <div
+      v-if="initialValues?.token_invalid"
+      class="box border-destructive/40 bg-destructive/5 p-3 text-sm flex items-start gap-2"
+    >
+      <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
+      <span>{{ $t('admin.inbox.authenticationFailed') }}</span>
+    </div>
     <div v-show="!showFormFields" class="space-y-4">
       <div class="space-y-2">
         <h3 class="text-lg font-semibold">{{ $t('admin.inbox.oauth.chooseSetupMethod') }}</h3>
@@ -934,7 +941,8 @@ import {
   Mail,
   Lightbulb,
   Plus,
-  Trash2
+  Trash2,
+  TriangleAlert
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'

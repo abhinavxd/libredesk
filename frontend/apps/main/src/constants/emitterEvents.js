@@ -6,6 +6,7 @@ export const EMITTER_EVENTS = {
     NEW_MESSAGE: 'new-message',
     CONVERSATION_SIDEBAR_TOGGLE: 'conversation-sidebar-toggle',
     SCROLL_TO_MESSAGE: 'scroll-to-message',
+    WHATSAPP_TEMPLATE_PICKER_OPEN: 'whatsapp-template-picker-open',
     COPILOT_INSERT_REPLY: 'copilot-insert-reply',
     OPEN_CREATE_CONVERSATION: 'open-create-conversation',
     OPEN_VIEW_FORM: 'open-view-form',
