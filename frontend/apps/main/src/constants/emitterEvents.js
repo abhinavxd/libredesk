@@ -13,19 +13,20 @@ export const EMITTER_EVENTS = {
     REPLY_BOX_FOCUS: 'reply-box-focus',
     REPLY_BOX_SET_TYPE: 'reply-box-set-type',
     REPLY_BOX_TOGGLE_MINIMIZE: 'reply-box-toggle-minimize',
+    REPLY_TO_MESSAGE: 'reply-to-message',
     CONVERSATION_ACTION: 'conversation-action',
     CONTACT_ACTION: 'contact-action'
 }
 
 export const CONVERSATION_ACTIONS = {
-    DOWNLOAD_TRANSCRIPT: 'download-transcript',
-    SUGGEST_TAGS: 'suggest-tags',
-    SUMMARIZE: 'summarize'
+  DOWNLOAD_TRANSCRIPT: 'download-transcript',
+  SUGGEST_TAGS: 'suggest-tags',
+  SUMMARIZE: 'summarize'
 }
 
 export const CONTACT_ACTIONS = {
-    TOGGLE_BLOCK: 'toggle-block',
-    EXPORT: 'export',
-    DELETE: 'delete',
-    ADD_NOTE: 'add-note'
+  TOGGLE_BLOCK: 'toggle-block',
+  EXPORT: 'export',
+  DELETE: 'delete',
+  ADD_NOTE: 'add-note'
 }

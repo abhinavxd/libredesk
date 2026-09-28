@@ -59,7 +59,10 @@
 
       <div
         class="w-4/5"
-        :class="{ 'flex justify-end items-center gap-2': isOutgoing }"
+        :class="{
+          'flex justify-end items-center gap-2': isOutgoing,
+          'flex items-start gap-2': !isOutgoing && canQuoteReply
+        }"
         style="contain: inline-size"
       >
         <!-- Delete note menu (private notes, appears on hover, left of bubble) -->
@@ -85,10 +88,7 @@
           </DropdownMenu>
         </div>
 
-        <div
-          class="flex flex-col justify-end message-bubble"
-          :class="bubbleClasses"
-        >
+        <div class="flex flex-col justify-end message-bubble" :class="bubbleClasses">
           <div v-if="isDeleted" class="text-sm italic text-muted-foreground">
             {{ message.content }}
           </div>
@@ -98,6 +98,26 @@
 
             <hr class="mb-2 border-muted-foreground/20" v-if="showEnvelope" />
 
+            <button
+              v-if="message.meta?.reply_to"
+              type="button"
+              :disabled="!message.meta.reply_to.uuid"
+              :aria-label="t('globals.messages.goToMessage')"
+              class="mb-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-left text-sm text-muted-foreground line-clamp-2 break-words enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              @click="
+                emitter.emit(EMITTER_EVENTS.SCROLL_TO_MESSAGE, {
+                  conversation_uuid: message.conversation_uuid,
+                  uuid: message.meta.reply_to.uuid
+                })
+              "
+            >
+              {{ message.meta.reply_to.content || t('globals.terms.attachment') }}
+            </button>
+            <TelegramMessageCard
+              v-if="hasTelegramCard"
+              :message="message"
+            />
+
             <!-- Message Content -->
             <div
               v-if="message.meta?.wa_unsupported"
@@ -106,7 +126,7 @@
               {{ t('conversation.whatsapp.unsupportedMessage') }}
             </div>
             <div
-              v-else
+              v-else-if="!hasTelegramCard"
               ref="contentWrapperEl"
               class="relative"
               :class="{ 'max-h-[400px] overflow-hidden': isExpandable && !isExpanded }"
@@ -170,11 +190,25 @@
               @click="toggleQuote"
               class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-foreground rounded-md transition-colors duration-200"
             >
-              {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
+              {{
+                showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText')
+              }}
             </div>
 
             <!-- Attachments -->
-            <BubbleAttachmentPreview :attachments="nonInlineAttachments" />
+            <BubbleAttachmentPreview
+              :attachments="nonInlineAttachments"
+              :channel="convStore.current?.inbox_channel"
+            />
+
+            <div v-if="message.meta?.telegram_buttons?.length" class="flex flex-wrap gap-2 mt-2">
+              <span
+                v-for="(button, index) in message.meta.telegram_buttons"
+                :key="index"
+                class="min-w-0 max-w-full rounded-md border border-border bg-background/60 px-3 py-1 text-sm break-words"
+                >{{ button.text }}</span
+              >
+            </div>
 
             <!-- CSAT Response -->
             <CSATResponseDisplay :message="message" />
@@ -233,6 +267,22 @@
             </div>
           </template>
         </div>
+        <Tooltip v-if="canQuoteReply">
+          <TooltipTrigger as-child>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              class="shrink-0 self-center text-muted-foreground transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100 focus-visible:!opacity-100 max-md:size-11"
+              :class="{ 'order-first': isOutgoing }"
+              :aria-label="t('globals.terms.reply')"
+              @click="quoteReply"
+            >
+              <Reply aria-hidden="true" class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('globals.terms.reply') }}</TooltipContent>
+        </Tooltip>
       </div>
 
       <!-- Avatar (right for outgoing) -->
@@ -296,7 +346,9 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction variant="destructive" @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
+        <AlertDialogAction variant="destructive" @click="deleteNote">{{
+          t('globals.messages.delete')
+        }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -316,7 +368,8 @@ import {
   CircleAlert,
   Maximize2,
   Trash2,
-  MoreHorizontal
+  MoreHorizontal,
+  Reply
 } from 'lucide-vue-next'
 import {
   DropdownMenu,
@@ -343,9 +396,14 @@ import { Letter } from 'vue-letter'
 import { allowedCssProperties } from 'lettersanitizer'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import BubbleAttachmentPreview from '@main/features/conversation/message/attachment/BubbleAttachmentPreview.vue'
+import { TELEGRAM_CHANNEL } from '@main/features/conversation/telegramReply'
 import MessageEnvelope from './MessageEnvelope.vue'
 import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
+import TelegramMessageCard from './TelegramMessageCard.vue'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { permissions as perms } from '@main/constants/permissions.js'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
 
@@ -397,6 +455,22 @@ const convStore = useConversationStore()
 const { t } = useI18n()
 const userStore = useUserStore()
 
+const emitter = useEmitter()
+const canQuoteReply = computed(
+  () =>
+    convStore.current?.inbox_channel === TELEGRAM_CHANNEL &&
+    !props.message.meta?.telegram_callback &&
+    !props.message.private &&
+    !props.message.meta?.deleted_at &&
+    ['received', 'sent'].includes(props.message.status) &&
+    userStore.can(perms.MESSAGES_WRITE)
+)
+const quoteReply = () =>
+  emitter.emit(EMITTER_EVENTS.REPLY_TO_MESSAGE, {
+    uuid: props.message.uuid,
+    conversationUUID: convStore.current.uuid,
+    content: props.message.text_content || props.message.content || ''
+  })
 const alertOpen = ref(false)
 
 const deleteNote = () => {
@@ -470,6 +544,9 @@ const bubbleClasses = computed(() => ({
 
 const isPrivateMessage = computed(() => isOutgoing.value && props.message.private)
 const isDeleted = computed(() => !!props.message.meta?.deleted_at)
+const hasTelegramCard = computed(
+  () => !!(props.message.meta?.telegram_contact || props.message.meta?.telegram_location)
+)
 const canDeleteNote = computed(
   () =>
     isPrivateMessage.value &&
@@ -484,7 +561,12 @@ const deliveryStatusLabel = computed(() => {
   if (deliveryStatus.value === 'delivered') return t('globals.terms.delivered')
   return t('globals.terms.sent')
 })
-const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
+const showRetry = computed(
+  () =>
+    isOutgoing.value &&
+    props.message.status === 'failed' &&
+    props.message.sender_id === userStore.userID
+)
 
 const sendFailureReason = computed(() =>
   props.message.status === 'failed' ? props.message.meta?.provider_failure_reason : null

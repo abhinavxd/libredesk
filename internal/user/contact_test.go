@@ -414,3 +414,36 @@ func TestResolveContactConcurrent(t *testing.T) {
 	race(models.ContactSync, "race-sync@example.com", "")
 	race(models.ContactSync, "race-sync-ext@example.com", "ext-race-sync")
 }
+
+func TestSaveCustomAttributesSkipsUnchanged(t *testing.T) {
+	u, db := newTestManager(t)
+	c := newContact("attrs@example.com", "", "Attr", "")
+	resolve(t, u, c, models.ContactSync)
+	updatedAt := func() string {
+		var ts string
+		if err := db.Get(&ts, `SELECT updated_at::text FROM users WHERE id = $1`, c.ID); err != nil {
+			t.Fatal(err)
+		}
+		return ts
+	}
+	if err := u.SaveCustomAttributes(c.ID, map[string]any{"plan": "pro", "nested": map[string]any{"x": 1, "y": 2}}, false); err != nil {
+		t.Fatal(err)
+	}
+	before := updatedAt()
+	if err := u.SaveCustomAttributes(c.ID, map[string]any{"plan": "pro"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if updatedAt() != before {
+		t.Fatal("unchanged attributes rewrote the row")
+	}
+	if err := u.SaveCustomAttributes(c.ID, map[string]any{"nested": map[string]any{"x": 1}}, false); err != nil {
+		t.Fatal(err)
+	}
+	var nested string
+	if err := db.Get(&nested, `SELECT custom_attributes->>'nested' FROM users WHERE id = $1`, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if nested != `{"x": 1}` {
+		t.Fatalf("nested attribute not replaced: %s", nested)
+	}
+}

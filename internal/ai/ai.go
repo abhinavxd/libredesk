@@ -8,7 +8,6 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"html"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -520,7 +519,7 @@ func ensureHTMLFragment(s string) string {
 	if htmlTagRe.MatchString(s) {
 		return s
 	}
-	return strings.ReplaceAll(html.EscapeString(s), "\n", "<br>")
+	return stringutil.PlainTextToHTML(s)
 }
 
 // stripCodeFence unwraps a whole-response ```lang fence, which models add around HTML output despite being told not to.

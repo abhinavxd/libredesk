@@ -183,8 +183,8 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
-		if inb.Channel() == inbox.ChannelWhatsApp {
-			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
+		if inb.Channel() == inbox.ChannelWhatsApp || inb.Channel() == inbox.ChannelTelegram {
+			m.RecordProviderSendFailure(message.UUID, err.Error())
 		}
 		handleError(err, "error sending message")
 		return
@@ -315,7 +315,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
-	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp:
+	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp, inbox.ChannelTelegram:
 		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
@@ -661,6 +661,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		// A rendered template body is plain text. Storing it as HTML drops its line breaks in the timeline.
 		if isWhatsAppTemplate {
 			contentType = models.ContentTypeText
+		}
+	case inbox.ChannelTelegram:
+		if err := m.prepareTelegramOutbound(inboxRecord, conversationUUID, content, media, metaMap); err != nil {
+			return models.Message{}, err
 		}
 	}
 

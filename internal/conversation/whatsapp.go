@@ -114,7 +114,7 @@ func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.
 	return nil
 }
 
-func (m *Manager) RecordWhatsAppSendFailure(messageUUID, errorMsg string) error {
+func (m *Manager) RecordProviderSendFailure(messageUUID, errorMsg string) error {
 	if messageUUID == "" || errorMsg == "" {
 		return nil
 	}
@@ -123,11 +123,11 @@ func (m *Manager) RecordWhatsAppSendFailure(messageUUID, errorMsg string) error 
 		"provider_failed_at":      time.Now().UTC().Format(time.RFC3339),
 		"provider_failure_reason": errorMsg,
 	}
-	return m.mergeWhatsAppMeta(m.q.MergeMessageMetaByUUID, messageUUID, patch)
+	return m.mergeProviderMeta(m.q.MergeMessageMetaByUUID, messageUUID, patch)
 }
 
-// mergeWhatsAppMeta is a no-op on an unmatched key.
-func (m *Manager) mergeWhatsAppMeta(stmt *sqlx.Stmt, key string, patch map[string]any) error {
+// mergeProviderMeta is a no-op on an unmatched key.
+func (m *Manager) mergeProviderMeta(stmt *sqlx.Stmt, key string, patch map[string]any) error {
 	patchBytes, err := json.Marshal(patch)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 	}
 
 	if m.whatsAppWindowOpen(conversation.ContactID, conversation.InboxID) {
-		content := m.i18n.Ts("conversation.whatsapp.csatMessage", "link", csatURL)
+		content := m.i18n.Ts("csat.requestMessage", "link", csatURL)
 		if m.whatsappTemplate != nil {
 			if tmpl, err := m.whatsappTemplate.GetByName(conversation.InboxID, wtmodels.CSATTemplateName(conversation.InboxID)); err == nil && tmpl.BodyContent != "" {
 				content = tmpl.BodyContent + "\n" + csatURL

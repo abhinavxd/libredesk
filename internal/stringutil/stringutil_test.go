@@ -573,3 +573,9 @@ func TestNormalizeMessageID(t *testing.T) {
 		})
 	}
 }
+
+func TestPlainTextToHTML(t *testing.T) {
+	if got := PlainTextToHTML("a < b\n\"c\" & d"); got != "a &lt; b<br>&#34;c&#34; &amp; d" {
+		t.Fatalf("got %q", got)
+	}
+}

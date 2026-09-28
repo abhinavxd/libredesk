@@ -125,7 +125,7 @@ WHERE id = $1;
 UPDATE users
 SET custom_attributes = COALESCE(custom_attributes, '{}'::jsonb) || $2,
 updated_at = now()
-WHERE id = $1;
+WHERE id = $1 AND COALESCE(custom_attributes, '{}'::jsonb) || $2 != COALESCE(custom_attributes, '{}'::jsonb);
 
 -- name: update-avatar
 UPDATE users  
@@ -598,3 +598,17 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
+
+-- name: save-shared-contact
+WITH existing AS (
+    SELECT id FROM users
+    WHERE type = 'contact' AND deleted_at IS NULL
+        AND regexp_replace(phone_number, '[^0-9]', '', 'g') = $1
+    ORDER BY id LIMIT 1
+), inserted AS (
+    INSERT INTO users (type, first_name, last_name, phone_number, password)
+    SELECT 'contact', $2, $3, '+' || $1, $4
+    WHERE NOT EXISTS (SELECT 1 FROM existing)
+    RETURNING id
+)
+SELECT id FROM existing UNION ALL SELECT id FROM inserted;

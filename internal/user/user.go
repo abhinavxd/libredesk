@@ -111,6 +111,7 @@ type queries struct {
 	GetContactByEmailWithoutExtID    *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
 	IsEmailBlocked                   *sqlx.Stmt `query:"is-email-blocked"`
 	SetExternalUserID                *sqlx.Stmt `query:"set-external-user-id"`
+	SaveSharedContact                *sqlx.Stmt `query:"save-shared-contact"`
 	SetContactPhoneIfMissing         *sqlx.Stmt `query:"set-contact-phone-if-missing"`
 	UpdateContactNameIfDefault       *sqlx.Stmt `query:"update-contact-name-if-default"`
 	GetContactIDByChannelIdentity    *sqlx.Stmt `query:"get-contact-id-by-channel-identity"`

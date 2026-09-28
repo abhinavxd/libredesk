@@ -56,6 +56,23 @@
         </TooltipTrigger>
         <TooltipContent>{{ $t('globals.messages.addEmoji') }}</TooltipContent>
       </Tooltip>
+      <Tooltip v-if="showAddButton">
+        <TooltipTrigger as-child>
+          <Toggle
+            type="button"
+            :class="ICON_BUTTON_CLASS"
+            variant="outline"
+            :aria-label="$t('globals.messages.addButton')"
+            :disabled="disableAddButton"
+            :pressed="false"
+            @click="emit('addButton')"
+          >
+            <SquarePlus aria-hidden="true" class="h-4 w-4" />
+          </Toggle>
+        </TooltipTrigger>
+        <TooltipContent>{{ $t('globals.messages.addButton') }}</TooltipContent>
+      </Tooltip>
+      <slot name="audio-recorder" />
       <Tooltip v-if="showWhatsAppTemplate">
         <TooltipTrigger as-child>
           <Toggle
@@ -130,7 +147,7 @@ import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Paperclip, Smile, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
+import { Paperclip, Smile, SquarePlus, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -153,12 +170,14 @@ const attachmentInput = ref(null)
 // const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
 const emojiPickerRef = ref(null)
-const emit = defineEmits(['emojiSelect', 'generateReply'])
+const emit = defineEmits(['emojiSelect', 'generateReply', 'addButton'])
 
 // Using defineProps for props that don't need two-way binding
 const props = defineProps({
   isFullscreen: Boolean,
   isWhatsApp: Boolean,
+  showAddButton: Boolean,
+  disableAddButton: Boolean,
   showWhatsAppTemplate: Boolean,
   isSending: Boolean,
   isGenerating: Boolean,

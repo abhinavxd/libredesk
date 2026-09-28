@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	htmltemplate "html/template"
 	"io"
 	"slices"
@@ -325,9 +324,17 @@ func (m *Manager) SetWhatsAppTemplateStore(s WhatsAppTemplateStore) {
 }
 
 type queries struct {
-	LockCampaignDelivery     *sqlx.Stmt `query:"lock-campaign-delivery"`
-	CompleteCampaignDelivery *sqlx.Stmt `query:"complete-campaign-delivery"`
-	AssignProactiveTeam      *sqlx.Stmt `query:"assign-proactive-team"`
+	LockCampaignDelivery          *sqlx.Stmt `query:"lock-campaign-delivery"`
+	CompleteCampaignDelivery      *sqlx.Stmt `query:"complete-campaign-delivery"`
+	AssignProactiveTeam           *sqlx.Stmt `query:"assign-proactive-team"`
+	GetTelegramAutoReplyState     *sqlx.Stmt `query:"get-telegram-auto-reply-state"`
+	RecordTelegramSend            *sqlx.Stmt `query:"record-telegram-send"`
+	SubmitTelegramRating          *sqlx.Stmt `query:"submit-telegram-rating"`
+	GetTelegramReplyUUID          *sqlx.Stmt `query:"get-telegram-reply-uuid"`
+	GetTelegramReplyTarget        *sqlx.Stmt `query:"get-telegram-reply-target"`
+	GetTelegramConversation       *sqlx.Stmt `query:"get-telegram-conversation"`
+	GetTelegramConversationTarget *sqlx.Stmt `query:"get-telegram-conversation-target"`
+	UpdateTelegramMessage         *sqlx.Stmt `query:"update-telegram-message"`
 	// Conversation queries.
 	GetConversationUUID                 *sqlx.Stmt `query:"get-conversation-uuid"`
 	GetConversationInboxContact         *sqlx.Stmt `query:"get-conversation-inbox-contact"`
@@ -1418,7 +1425,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 		data := notificationTemplateData(conversation, recipient, author)
 		data["Message"] = map[string]any{
 			"UUID":    message.UUID,
-			"Content": htmltemplate.HTML(strings.ReplaceAll(html.EscapeString(messageText), "\n", "<br>")),
+			"Content": htmltemplate.HTML(stringutil.PlainTextToHTML(messageText)),
 		}
 		content, subject, err := m.template.RenderStoredEmailTemplate(group.tmpl, data)
 		return subject, content, err
@@ -1896,6 +1903,10 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 		return m.sendWhatsAppCSAT(actorUserID, conversation, csatResp.UUID, m.csatStore.MakePublicURL(appRootURL, csatResp.UUID))
+	}
+
+	if inb.Channel == inbox.ChannelTelegram {
+		return m.sendTelegramCSAT(actorUserID, conversation, csatResp.UUID)
 	}
 
 	meta := map[string]any{

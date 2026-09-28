@@ -1,14 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
@@ -179,39 +177,11 @@ func campaignWithinHours(app *App, c proactive.Campaign, now time.Time, loc *tim
 	if err != nil {
 		return false, envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
 	}
-	if hours.IsAlwaysOpen {
-		return true, nil
-	}
-	local := now.In(loc)
-	var holidays []bhmodels.Holiday
-	var working map[string]bhmodels.WorkingHours
-	if err := json.Unmarshal(hours.Holidays, &holidays); err != nil {
+	open, err := hours.IsOpen(now, loc)
+	if err != nil {
 		return false, campaignInputError(app)
 	}
-	if err := json.Unmarshal(hours.Hours, &working); err != nil {
-		return false, campaignInputError(app)
-	}
-	for _, holiday := range holidays {
-		if holiday.Date == local.Format(time.DateOnly) {
-			return false, nil
-		}
-	}
-	day, ok := working[local.Weekday().String()]
-	if !ok {
-		return false, nil
-	}
-	clock := local.Format("15:04")
-	return withinWorkingHours(clock, day), nil
-}
-
-func withinWorkingHours(clock string, day bhmodels.WorkingHours) bool {
-	if day.Open == day.Close {
-		return false
-	}
-	if day.Open < day.Close {
-		return clock >= day.Open && clock < day.Close
-	}
-	return clock >= day.Open || clock < day.Close
+	return open, nil
 }
 
 func campaignSender(app *App, id int) (umodels.User, error) {

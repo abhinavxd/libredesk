@@ -37,7 +37,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 		})
 	}
 
-	if csat.ResponseTimestamp.Valid {
+	if csat.ResponseTimestamp.Valid && !csat.FeedbackPending() {
 		return app.tmpl.RenderWebPage(r.RequestCtx, "info", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Title":   app.i18n.T("globals.messages.thankYou"),
@@ -59,7 +59,9 @@ func handleShowCSAT(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title": app.i18n.T("csat.pageTitle"),
 			"CSAT": map[string]interface{}{
-				"UUID": csat.UUID,
+				"UUID":            csat.UUID,
+				"Rating":          csat.Rating,
+				"FeedbackPending": csat.FeedbackPending(),
 			},
 			"Conversation": map[string]interface{}{
 				"Subject":         conversation.Subject.String,

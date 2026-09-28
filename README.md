@@ -14,7 +14,7 @@
     width="250">
 </picture>
 
-<br> Open source, self-hosted customer support software for email, live chat, and WhatsApp. Distributed as a single binary.
+<br> Open source, self-hosted customer support software for email, live chat, WhatsApp, and Telegram. Distributed as a single binary.
 
 ![image](https://libredesk.io/hero-dark.png?v=1)
 
@@ -25,9 +25,10 @@ Visit [libredesk.io](https://libredesk.io) for more info. Check out the [**live 
 
 ### Inbox and channels
 
-- **Shared inbox:** Handle email, live chat, and WhatsApp conversations in one place.
+- **Shared inbox:** Handle email, live chat, WhatsApp, and Telegram conversations in one place.
 - **Live chat:** Add a real-time chat widget to your website.
 - **WhatsApp:** Connect a number through the Meta Cloud API.
+- **Telegram:** Connect a Telegram bot to receive private messages and send replies.
 - **Inbox organization:** Use teams, tags, custom statuses, custom attributes, snoozing, and search.
 
 ### Help center and AI

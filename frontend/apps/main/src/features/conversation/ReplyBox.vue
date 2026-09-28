@@ -76,7 +76,11 @@
         ]"
         @escapeKeyDown="isEditorFullscreen = false"
         :hide-close-button="true"
+        :aria-describedby="undefined"
       >
+        <DialogTitle class="sr-only">
+          {{ $t(messageType === 'reply' ? 'globals.terms.reply' : 'globals.terms.privateNote') }}
+        </DialogTitle>
         <ReplyBoxContent
           v-if="isEditorFullscreen"
           ref="fullscreenContentRef"
@@ -95,6 +99,10 @@
           v-model:showCc="showCc"
           v-model:showBcc="showBcc"
           v-model:mentions="mentions"
+          v-model:telegramButtons="telegramButtons"
+          :telegram-buttons-validated="telegramButtonsValidated"
+          :quotedReply="replyTarget"
+          @clearQuotedReply="replyTarget = null"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
           @sendAndSetStatus="processSendAndSetStatus"
@@ -161,6 +169,10 @@
         v-model:showCc="showCc"
         v-model:showBcc="showBcc"
         v-model:mentions="mentions"
+        v-model:telegramButtons="telegramButtons"
+        :telegram-buttons-validated="telegramButtonsValidated"
+        :quotedReply="replyTarget"
+        @clearQuotedReply="replyTarget = null"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @minimize="toggleMinimize"
         @send="processSend"
@@ -184,7 +196,10 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getTextFromHTML } from '@shared-ui/utils/string'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { WHATSAPP_CHANNEL, isWhatsAppWindowOpen } from '@main/features/conversation/whatsappTemplate'
+import {
+  WHATSAPP_CHANNEL,
+  isWhatsAppWindowOpen
+} from '@main/features/conversation/whatsappTemplate'
 import { useUserStore } from '@main/stores/user'
 import { useDraftManager } from '@main/composables/useDraftManager'
 import api from '@main/api'
@@ -202,7 +217,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Dialog, DialogContent } from '@shared-ui/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@shared-ui/components/ui/dialog'
 import { Button } from '@shared-ui/components/ui/button'
 import ToolApprovalDetails from '@/features/conversation/ToolApprovalDetails.vue'
 import { Pencil, Paperclip } from 'lucide-vue-next'
@@ -212,6 +227,13 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
+import { useStorage } from '@vueuse/core'
+import {
+  TELEGRAM_CHANNEL,
+  TELEGRAM_MAX_UPLOAD_BYTES,
+  buildTelegramReplyParts,
+  telegramButtonError
+} from './telegramReply'
 import { UserTypeAgent } from '@/constants/user'
 import { permissions as perms } from '@main/constants/permissions.js'
 
@@ -269,8 +291,18 @@ function buildWhatsAppReplyParts(content, files) {
   return parts
 }
 
-function validateWhatsAppFiles(files) {
+function validateChannelFiles(files) {
   if (messageType.value === 'private_note') return files
+  if (conversationStore.current?.inbox_channel === TELEGRAM_CHANNEL) {
+    return files.filter((file) => {
+      if (file.size <= TELEGRAM_MAX_UPLOAD_BYTES) return true
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('conversation.telegram.error.fileTooLarge')
+      })
+      return false
+    })
+  }
   if (conversationStore.current?.inbox_channel !== WHATSAPP_CHANNEL) return files
   const valid = []
   for (const file of files) {
@@ -291,20 +323,34 @@ function validateWhatsAppFiles(files) {
 }
 
 const handleFileUpload = (event) => {
-  const files = validateWhatsAppFiles(Array.from(event.target.files))
+  const files = validateChannelFiles(Array.from(event.target.files))
   if (files.length) _handleFileUpload({ target: { files } })
 }
 
 const uploadFiles = (files) => {
-  const valid = validateWhatsAppFiles(Array.from(files))
+  const valid = validateChannelFiles(Array.from(files))
   if (valid.length) _uploadFiles(valid)
 }
 
+const telegramButtons = ref([])
+const telegramButtonsValidated = ref(false)
+const replyDrafts = useStorage(`telegram-reply-drafts:${userStore.userID}`, {})
+const replyTarget = computed({
+  get: () => replyDrafts.value[conversationStore.current?.uuid] || null,
+  set: (value) => {
+    const uuid = conversationStore.current?.uuid
+    if (!uuid) return
+    if (value) replyDrafts.value[uuid] = { uuid: value.uuid, content: value.content }
+    else delete replyDrafts.value[uuid]
+  }
+})
 const messageType = defineModel('messageType', { default: 'reply' })
 const currentConversationUUID = computed(() => conversationStore.current?.uuid || null)
 watch(
   currentConversationUUID,
   async (uuid, prevUuid) => {
+    telegramButtons.value = []
+    telegramButtonsValidated.value = false
     if (prevUuid) conversationStore.setSelectedDraftType(prevUuid, messageType.value)
     if (!uuid) {
       messageType.value = defaultMessageType.value
@@ -452,6 +498,18 @@ const focusFromPalette = () => {
   activeContentRef()?.focus()
 }
 
+const setReplyTarget = (message) => {
+  if (
+    !canSendReply.value ||
+    message.conversationUUID !== currentConversationUUID.value ||
+    conversationStore.current?.inbox_channel !== TELEGRAM_CHANNEL
+  )
+    return
+  replyTarget.value = message
+  messageType.value = 'reply'
+  nextTick(focusFromPalette)
+}
+
 const toggleMinimize = () => {
   // Unmounting the editor mid AI rewrite drops the result and leaves isGenerating stuck.
   if (isCramped.value || isEditorFullscreen.value || isGenerating.value) return
@@ -460,6 +518,7 @@ const toggleMinimize = () => {
 }
 
 onMounted(() => {
+  emitter.on(EMITTER_EVENTS.REPLY_TO_MESSAGE, setReplyTarget)
   emitter.on(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.on(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
   emitter.on(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
@@ -467,6 +526,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  emitter.off(EMITTER_EVENTS.REPLY_TO_MESSAGE, setReplyTarget)
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
@@ -498,7 +558,6 @@ const processSend = async (
   statusToSet = null
 ) => {
   let hasMessageSendingErrored = false
-  isEditorFullscreen.value = false
 
   const html = htmlContent.value
   if (hasPendingInlineUpload(html)) return
@@ -507,6 +566,16 @@ const processSend = async (
   const isPrivate = messageType.value === 'private_note'
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
+  if (!isPrivate && conversationStore.current.inbox_channel === TELEGRAM_CHANNEL) {
+    telegramButtonsValidated.value = true
+    if (telegramButtonError(telegramButtons.value)) {
+      await nextTick()
+      activeContentRef()?.focusTelegramButtonError()
+      return
+    }
+  }
+
+  isEditorFullscreen.value = false
 
   const currentInbox = inboxStore.inboxes.find((i) => i.id === conversationStore.current.inbox_id)
   if (
@@ -598,8 +667,14 @@ const processSend = async (
 
     const isWhatsAppReply =
       !isPrivate && conversationStore.current.inbox_channel === WHATSAPP_CHANNEL
-    const parts =
-      isWhatsAppReply && mediaFiles.value.length
+    const isTelegramReply = !isPrivate && conversationStore.current.inbox_channel === TELEGRAM_CHANNEL
+    const sentReplyTarget = isTelegramReply ? replyTarget.value : null
+    if (sentReplyTarget)
+      meta.reply_to = { uuid: sentReplyTarget.uuid, content: sentReplyTarget.content }
+    const sentButtons = isTelegramReply ? telegramButtons.value : []
+    const parts = isTelegramReply
+      ? buildTelegramReplyParts(savedContent, mediaFiles.value, sentButtons)
+      : isWhatsAppReply && mediaFiles.value.length
         ? buildWhatsAppReplyParts(savedContent, mediaFiles.value)
         : [{ content: savedContent, attachments: mediaFiles.value }]
 
@@ -611,7 +686,7 @@ const processSend = async (
         author,
         part.attachments,
         i === 0 ? textContent.value : '',
-        meta
+        { ...meta, ...(part.buttons?.length ? { telegram_buttons: part.buttons } : {}) }
       )
     )
 
@@ -630,7 +705,9 @@ const processSend = async (
           cc: parsedCC,
           bcc: parsedBCC,
           to: parsedTo,
-          echo_id: isPrivate ? '' : tempUUIDs[i]
+          echo_id: isPrivate ? '' : tempUUIDs[i],
+          reply_to_message_uuid: sentReplyTarget?.uuid || '',
+          telegram_buttons: part.buttons || []
         })
 
         if (isPrivate && response?.data?.data) {
@@ -654,6 +731,12 @@ const processSend = async (
 
     if (!hasMessageSendingErrored) {
       notificationStore.markAssignmentAsReadForConversation(convUUID)
+      if (sentReplyTarget && replyTarget.value?.uuid === sentReplyTarget.uuid)
+        replyTarget.value = null
+      if (telegramButtons.value === sentButtons) {
+        telegramButtons.value = []
+        telegramButtonsValidated.value = false
+      }
     }
   }
 

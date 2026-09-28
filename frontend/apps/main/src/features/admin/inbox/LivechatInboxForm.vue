@@ -618,7 +618,7 @@
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField }" name="config.greeting_message">
                   <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.greetingMessage') }}</FormLabel>
+                    <FormLabel>{{ $t('globals.messages.greetingMessage') }}</FormLabel>
                     <FormControl>
                       <Textarea
                         v-bind="componentField"
