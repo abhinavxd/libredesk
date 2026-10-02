@@ -26,10 +26,13 @@ func (a *automationBusinessHours) IsOpen(teamID int, at time.Time) (bool, error)
 		timezone string
 	)
 	if teamID != 0 {
-		if t, err := a.team.Get(teamID); err == nil {
-			hoursID, timezone = t.BusinessHoursID.Int, t.Timezone
+		t, err := a.team.Get(teamID)
+		if err != nil {
+			return false, fmt.Errorf("fetching team %d: %w", teamID, err)
 		}
+		hoursID, timezone = t.BusinessHoursID.Int, t.Timezone
 	}
+	// Each value falls back to the helpdesk default on its own.
 	if hoursID == 0 || timezone == "" {
 		raw, err := a.settings.GetByPrefix("app")
 		if err != nil {
@@ -39,9 +42,13 @@ func (a *automationBusinessHours) IsOpen(teamID int, at time.Time) (bool, error)
 		if err := json.Unmarshal([]byte(raw), &out); err != nil {
 			return false, fmt.Errorf("parsing settings: %w", err)
 		}
-		idStr, _ := out["app.business_hours_id"].(string)
-		hoursID, _ = strconv.Atoi(idStr)
-		timezone, _ = out["app.timezone"].(string)
+		if hoursID == 0 {
+			idStr, _ := out["app.business_hours_id"].(string)
+			hoursID, _ = strconv.Atoi(idStr)
+		}
+		if timezone == "" {
+			timezone, _ = out["app.timezone"].(string)
+		}
 	}
 	if hoursID == 0 || timezone == "" {
 		return false, fmt.Errorf("business hours or timezone not configured")
@@ -54,6 +61,11 @@ func (a *automationBusinessHours) IsOpen(teamID int, at time.Time) (bool, error)
 	if err != nil {
 		return false, err
 	}
+	return isOpenAt(hours, at.In(loc))
+}
+
+// isOpenAt reports whether the business hours are open at local, which must already be in the schedule's timezone.
+func isOpenAt(hours bhmodels.BusinessHours, local time.Time) (bool, error) {
 	if hours.IsAlwaysOpen {
 		return true, nil
 	}
@@ -69,15 +81,24 @@ func (a *automationBusinessHours) IsOpen(teamID int, at time.Time) (bool, error)
 	if err := json.Unmarshal(hours.Hours, &working); err != nil {
 		return false, err
 	}
-	local := at.In(loc)
-	for _, h := range holidays {
-		if h.Date == local.Format(time.DateOnly) {
-			return false, nil
+	isHoliday := func(t time.Time) bool {
+		for _, h := range holidays {
+			if h.Date == t.Format(time.DateOnly) {
+				return true
+			}
+		}
+		return false
+	}
+	clock := local.Format("15:04")
+	if !isHoliday(local) {
+		if day, ok := working[local.Weekday().String()]; ok && withinWorkingHours(clock, day) {
+			return true, nil
 		}
 	}
-	day, ok := working[local.Weekday().String()]
-	if !ok {
-		return false, nil
+	// A range that crosses midnight keeps the previous day open into this morning.
+	prev := local.AddDate(0, 0, -1)
+	if day, ok := working[prev.Weekday().String()]; ok && !isHoliday(prev) && day.Open > day.Close && clock < day.Close {
+		return true, nil
 	}
-	return withinWorkingHours(local.Format("15:04"), day), nil
+	return false, nil
 }
