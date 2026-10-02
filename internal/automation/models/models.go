@@ -57,6 +57,10 @@ const (
 	ConversationInbox                  = "inbox"
 	ConversationIncomingTo             = "to"
 	ContactEmail                       = "contact_email"
+	ConversationBusinessHoursStatus    = "business_hours_status"
+
+	BusinessHoursOpen   = "open"
+	BusinessHoursClosed = "closed"
 
 	ConversationPreviousStatus       = "previous_status"
 	ConversationPreviousPriority     = "previous_priority"

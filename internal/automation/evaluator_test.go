@@ -2,6 +2,7 @@ package automation
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -1832,4 +1833,38 @@ func TestMoreThanTwoGroups_RuleSkipped(t *testing.T) {
 	engine.evalConversationRules(rules, createTestConversation(), nil)
 
 	assert.Equal(t, 0, mockStore.callCount, "rules with more than 2 groups must be skipped entirely")
+}
+
+type mockBusinessHours struct {
+	open bool
+	err  error
+}
+
+func (m mockBusinessHours) IsOpen(int, time.Time) (bool, error) { return m.open, m.err }
+
+func TestEvaluateRuleBusinessHoursStatus(t *testing.T) {
+	conv := createTestConversation()
+	rule := func(op, val string) models.RuleDetail {
+		return models.RuleDetail{Field: models.ConversationBusinessHoursStatus, Operator: op, Value: val}
+	}
+	tests := []struct {
+		name    string
+		checker businessHoursChecker
+		rule    models.RuleDetail
+		want    bool
+	}{
+		{"closed matches closed", mockBusinessHours{open: false}, rule(models.RuleOperatorEquals, "closed"), true},
+		{"open does not match closed", mockBusinessHours{open: true}, rule(models.RuleOperatorEquals, "closed"), false},
+		{"open matches open", mockBusinessHours{open: true}, rule(models.RuleOperatorEquals, "open"), true},
+		{"not equals open when closed", mockBusinessHours{open: false}, rule(models.RuleOperatorNotEqual, "open"), true},
+		{"checker error never matches", mockBusinessHours{err: errors.New("boom")}, rule(models.RuleOperatorNotEqual, "open"), false},
+		{"no checker never matches", nil, rule(models.RuleOperatorNotEqual, "open"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := createTestEngine(&mockConversationStore{})
+			e.businessHours = tt.checker
+			assert.Equal(t, tt.want, e.evaluateRule(tt.rule, conv, nil))
+		})
+	}
 }

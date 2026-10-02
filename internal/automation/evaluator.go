@@ -166,6 +166,23 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 				return false
 			}
 			valueToCompare = previous
+		case models.ConversationBusinessHoursStatus:
+			if e.businessHours == nil {
+				return false
+			}
+			var teamID int
+			if conversation.AssignedTeamID.Valid {
+				teamID = conversation.AssignedTeamID.Int
+			}
+			open, err := e.businessHours.IsOpen(teamID, time.Now())
+			if err != nil {
+				e.lo.Error("error checking business hours, skipping rule", "conversation_uuid", conversation.UUID, "error", err)
+				return false
+			}
+			valueToCompare = models.BusinessHoursClosed
+			if open {
+				valueToCompare = models.BusinessHoursOpen
+			}
 		case models.ConversationIncomingTo:
 			return evaluateRecipientRule(conversation.IncomingTo, rule)
 		default:
