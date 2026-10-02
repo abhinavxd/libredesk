@@ -202,6 +202,15 @@ export function useConversationFilters () {
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
+        business_hours_status: {
+            label: t('admin.automation.businessHoursStatus'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.BOOLEAN,
+            options: [
+                { label: t('admin.automation.businessHoursOpen'), value: 'open' },
+                { label: t('admin.automation.businessHoursClosed'), value: 'closed' }
+            ]
+        },
         inbox: {
             label: t('globals.terms.inbox'),
             type: FIELD_TYPE.SELECT,
@@ -259,6 +268,15 @@ export function useConversationFilters () {
             label: t('globals.messages.hoursSinceLastResolved'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
+        },
+        business_hours_status: {
+            label: t('admin.automation.businessHoursStatus'),
+            type: FIELD_TYPE.SELECT,
+            operators: FIELD_OPERATORS.BOOLEAN,
+            options: [
+                { label: t('admin.automation.businessHoursOpen'), value: 'open' },
+                { label: t('admin.automation.businessHoursClosed'), value: 'closed' }
+            ]
         },
         inbox: {
             label: t('globals.terms.inbox'),
