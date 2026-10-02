@@ -7,30 +7,42 @@
       :class="{ 'mb-4': !isFullscreen, 'border-b border-border pb-4': isFullscreen }"
     >
       <Tabs v-model="messageType" class="rounded-lg">
-        <TabsList class="rounded-lg border bg-muted/50 p-0.5">
+        <TabsList>
           <TabsTrigger
             v-if="canSendReply"
             value="reply"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
           <TabsTrigger
             v-if="canSendPrivateNote"
             value="private_note"
-            :class="TAB_TRIGGER_CLASS"
+            class="max-md:py-2.5"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <Button
-        class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
-        variant="ghost"
-        @click="toggleFullscreen"
-      >
-        <component :is="isFullscreen ? Minimize2 : Maximize2" />
-      </Button>
+      <div class="flex items-center">
+        <Button
+          v-if="!isFullscreen"
+          type="button"
+          class="text-muted-foreground"
+          variant="ghost"
+          :aria-label="t('globals.terms.collapse')"
+          @click="emit('minimize')"
+        >
+          <Minus class="translate-y-1" />
+        </Button>
+        <Button
+          class="text-muted-foreground max-md:h-11 max-md:w-11 max-md:p-0"
+          variant="ghost"
+          @click="toggleFullscreen"
+        >
+          <component :is="isFullscreen ? Minimize2 : Maximize2" />
+        </Button>
+      </div>
     </div>
 
     <!-- To, CC, and BCC fields -->
@@ -40,7 +52,7 @@
         v-if="messageType === 'reply'"
       >
         <div class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">TO:</label>
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.to') }}</label>
           <Input
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
@@ -48,29 +60,68 @@
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
+          <Button
+            v-if="!showCc"
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            @click="showRecipientField('cc')"
+          >
+            {{ $t('replyBox.cc') }}
+          </Button>
+          <Button
+            v-if="!showBcc"
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            @click="showRecipientField('bcc')"
+          >
+            {{ $t('replyBox.bcc') }}
+          </Button>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">CC:</label>
+        <div v-if="showCc" class="flex items-center gap-2">
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.cc') }}</label>
           <Input
+            ref="ccInputRef"
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
-          <Button size="sm" @click="toggleBcc" variant="secondary">
-            {{ showBcc ? $t('replyBox.removeBCC') : $t('replyBox.bcc') }}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            :aria-label="t('replyBox.removeCC')"
+            @click="hideRecipientField('cc')"
+          >
+            <X class="w-4 h-4" />
           </Button>
         </div>
         <div v-if="showBcc" class="flex items-center gap-2">
-          <label class="w-12 text-xs font-semibold tracking-wide text-muted-foreground">BCC:</label>
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.bcc') }}</label>
           <Input
+            ref="bccInputRef"
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            :class="RECIPIENT_TOGGLE_CLASS"
+            :aria-label="t('replyBox.removeBCC')"
+            @click="hideRecipientField('bcc')"
+          >
+            <X class="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
@@ -91,7 +142,6 @@
         v-model:textContent="textContent"
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
-        :aiPrompts="aiPrompts"
         :insertContent="insertContent"
         :autoFocus="true"
         :disabled="isDraftLoading"
@@ -100,7 +150,7 @@
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
         :getConversationSuggestions="getConversationSuggestions"
-        @aiPromptSelected="handleAiPromptSelected"
+        @aiGenerationChange="emit('aiGenerationChange', $event)"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
@@ -129,6 +179,8 @@
     <ReplyBoxMenuBar
       class="mt-2"
       :isFullscreen="isFullscreen"
+      :isWhatsApp="isWhatsAppReply"
+      :showWhatsAppTemplate="isWhatsAppReply"
       :handleFileUpload="handleFileUpload"
       :isSending="isSending"
       :enableSend="enableSend"
@@ -145,18 +197,17 @@
 <script setup>
 const RECIPIENT_INPUT_CLASS =
   'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
-
-const TAB_TRIGGER_CLASS =
-  'rounded-md px-3 py-1 text-sm transition-colors duration-150 max-md:py-2.5 data-[state=active]:bg-card data-[state=active]:shadow-sm'
+const RECIPIENT_TOGGLE_CLASS = 'shrink-0 px-2 text-muted-foreground'
 
 import { ref, computed, nextTick, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
-import { Maximize2, Minimize2 } from 'lucide-vue-next'
+import { Maximize2, Minimize2, Minus, X } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useConversationStore } from '@main/stores/conversation'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
@@ -181,6 +232,7 @@ const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
+const showCc = defineModel('showCc', { default: false })
 const showBcc = defineModel('showBcc', { default: false })
 const emailErrors = defineModel('emailErrors', { default: () => [] })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -248,10 +300,6 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  aiPrompts: {
-    type: Array,
-    required: true
-  },
   isSending: {
     type: Boolean,
     required: true
@@ -286,32 +334,50 @@ const props = defineProps({
 
 const emit = defineEmits([
   'toggleFullscreen',
+  'minimize',
   'send',
   'sendAndSetStatus',
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
   'filesDropped',
-  'aiPromptSelected',
+  'aiGenerationChange',
   'generateReply'
 ])
 
 const conversationStore = useConversationStore()
+const isWhatsAppReply = computed(
+  () =>
+    conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL &&
+    messageType.value !== 'private_note'
+)
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
 const insertContent = ref(null)
 const editorRef = ref(null)
+const ccInputRef = ref(null)
+const bccInputRef = ref(null)
 
-const toggleBcc = async () => {
-  showBcc.value = !showBcc.value
+const showRecipientField = async (field) => {
+  if (field === 'cc') showCc.value = true
+  else showBcc.value = true
   await nextTick()
-  // If hiding BCC field, clear the content and validate email bcc so it doesn't show errors.
-  if (!showBcc.value) {
+  const input = field === 'cc' ? ccInputRef.value : bccInputRef.value
+  input?.$el?.focus()
+}
+
+// A hidden field must stay empty, its address would still be sent otherwise.
+const hideRecipientField = async (field) => {
+  if (field === 'cc') {
+    showCc.value = false
+    cc.value = ''
+  } else {
+    showBcc.value = false
     bcc.value = ''
-    await nextTick()
-    validateEmails()
   }
+  await nextTick()
+  validateEmails()
 }
 
 const toggleFullscreen = () => {
@@ -398,10 +464,6 @@ const handleEmojiSelect = (emoji) => {
   insertContent.value = undefined
   // Force reactivity so the user can select the same emoji multiple times
   nextTick(() => (insertContent.value = emoji))
-}
-
-const handleAiPromptSelected = (key) => {
-  emit('aiPromptSelected', key)
 }
 
 // Watch and update macro view based on message type this filters our macros.

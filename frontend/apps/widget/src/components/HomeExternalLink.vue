@@ -1,13 +1,13 @@
 <template>
   <a :href="link.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
-    <Card class="hover:bg-accent transition-colors cursor-pointer rounded-md">
-      <CardContent class="p-4">
-        <div class="flex justify-between items-center">
-          <span class="text-sm text-foreground font-medium">
-            {{ link.text }}
-          </span>
-          <ExternalLink size="18" class="text-muted-foreground" />
-        </div>
+    <Card
+      class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+    >
+      <CardContent class="flex items-center gap-3 p-4">
+        <span class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">
+          {{ link.text }}
+        </span>
+        <ExternalLink size="15" class="shrink-0 text-muted-foreground" aria-hidden="true" />
       </CardContent>
     </Card>
   </a>

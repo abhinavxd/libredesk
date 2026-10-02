@@ -106,10 +106,15 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string, meta j
 		meta = json.RawMessage(`{}`)
 	}
 
-	_, err = m.q.Update.Exec(uuid, score, feedback, meta)
+	res, err := m.q.Update.Exec(uuid, score, feedback, meta)
 	if err != nil {
 		m.lo.Error("error updating CSAT", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	// The UPDATE is guarded by response_timestamp IS NULL, so a concurrent
+	// request that already recorded a response updates zero rows here.
+	if n, _ := res.RowsAffected(); n == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
 	}
 	return nil
 }

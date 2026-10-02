@@ -5,6 +5,43 @@ import (
 	"time"
 )
 
+func TestWhatsAppPhoneForDialCode(t *testing.T) {
+	tests := []struct {
+		name        string
+		phone       string
+		dialCode    string
+		want        string
+		wantMatches bool
+	}{
+		{"national", "98765 43210", "91", "919876543210", true},
+		{"international plus", "+1 (555) 000-1111", "1", "15550001111", true},
+		{"international double zero", "0091 98765 43210", "91", "919876543210", true},
+		{"national starts with dial code", "9198765432", "91", "919198765432", true},
+		{"international mismatch", "+1 555 000 1111", "91", "", false},
+		{"national trunk zero", "07700 900123", "44", "447700900123", true},
+		{"international with bracketed trunk zero", "+44 (0) 7700 900123", "44", "447700900123", true},
+		{"italy keeps leading zero", "06 1234 5678", "39", "390612345678", true},
+		{"italy international keeps leading zero", "+39 06 1234 5678", "39", "390612345678", true},
+		{"congo keeps leading zero", "06 123 4567", "242", "242061234567", true},
+		{"congo international keeps leading zero", "+242 06 123 4567", "242", "242061234567", true},
+		{"congo double zero prefix keeps national zero", "00242 06 123 4567", "242", "242061234567", true},
+		{"congo mismatched country", "+243 06 123 4567", "242", "", false},
+		{"dial code only", "+44", "44", "", true},
+		{"trunk zero only", "0", "44", "", true},
+		{"empty", "", "91", "", true},
+		{"punctuation", "+ - ", "91", "", true},
+		{"missing dial code", "9876543210", "", "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, matches := WhatsAppPhoneForDialCode(tc.phone, tc.dialCode)
+			if got != tc.want || matches != tc.wantMatches {
+				t.Fatalf("got (%q, %v), want (%q, %v)", got, matches, tc.want, tc.wantMatches)
+			}
+		})
+	}
+}
+
 func TestRemoveItemByValue(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -170,6 +207,48 @@ func TestExtractConvUUID(t *testing.T) {
 			result := ExtractConvUUID(tt.email)
 			if result != tt.expected {
 				t.Errorf("ExtractConvUUID(%q) = %q, want %q", tt.email, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRemoveConvPlusAddress(t *testing.T) {
+	tests := []struct {
+		name     string
+		email    string
+		expected string
+	}{
+		{
+			name:     "conversation plus address",
+			email:    "support+conv-13216cf7-6626-4b0d-a938-46ce65a20701@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "uppercase conversation plus address",
+			email:    "support+conv-13216CF7-6626-4B0D-A938-46CE65A20701@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "no plus addressing",
+			email:    "support@domain.com",
+			expected: "support@domain.com",
+		},
+		{
+			name:     "non-conv plus addressing",
+			email:    "support+sales@domain.com",
+			expected: "support+sales@domain.com",
+		},
+		{
+			name:     "short non-UUID",
+			email:    "support+conv-21321@domain.com",
+			expected: "support+conv-21321@domain.com",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result := RemoveConvPlusAddress(tt.email); result != tt.expected {
+				t.Errorf("RemoveConvPlusAddress(%q) = %q, want %q", tt.email, result, tt.expected)
 			}
 		})
 	}

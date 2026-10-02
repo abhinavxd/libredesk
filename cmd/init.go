@@ -33,12 +33,15 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
 	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
+	notificationchannels "github.com/abhinavxd/libredesk/internal/notification/channels"
 	emailnotifier "github.com/abhinavxd/libredesk/internal/notification/providers/email"
 	"github.com/abhinavxd/libredesk/internal/oidc"
 	"github.com/abhinavxd/libredesk/internal/ratelimit"
@@ -54,6 +57,8 @@ import (
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
 	"github.com/abhinavxd/libredesk/internal/webhook"
+	whatsappapi "github.com/abhinavxd/libredesk/internal/whatsapp"
+	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp/template"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
@@ -648,9 +653,10 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:                      db,
+		Lo:                      lo,
+		I18n:                    i18n,
+		TimeTriggerLookbackDays: ko.Int("automation.time_trigger_lookback_days"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing automation engine: %v", err)
@@ -694,7 +700,7 @@ func initNotifier() *notifier.Service {
 }
 
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
-func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager) (inbox.Inbox, error) {
+func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager, authStatusHook email.AuthStatusCallback) (inbox.Inbox, error) {
 	var config imodels.Config
 
 	// Load JSON data into Koanf.
@@ -746,6 +752,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		Config:               config,
 		Lo:                   initLogger("email_inbox"),
 		TokenRefreshCallback: tokenRefreshCallback,
+		AuthStatusCallback:   authStatusHook,
 	})
 
 	if err != nil {
@@ -787,14 +794,39 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	return inbox, nil
 }
 
+// initWhatsAppInbox initializes a WhatsApp Cloud API inbox.
+func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, client *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater) (inbox.Inbox, error) {
+	var config whatsappChannel.Config
+	if err := json.Unmarshal(inboxRecord.Config, &config); err != nil {
+		return nil, fmt.Errorf("unmarshalling whatsapp config for inbox %q: %w", inboxRecord.Name, err)
+	}
+
+	inb, err := whatsappChannel.New(msgStore, whatsappChannel.Opts{
+		ID:            inboxRecord.ID,
+		Name:          inboxRecord.Name,
+		Config:        config,
+		Client:        client,
+		Lo:            initLogger("whatsapp_inbox"),
+		SourceUpdater: sourceUpdater,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error: %w", inboxRecord.Channel, inboxRecord.Name, err)
+	}
+
+	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+	return inb, nil
+}
+
 // makeInboxInitializer creates an inbox initializer function.
-func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String)) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
+func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
 		switch inboxR.Channel {
 		case inbox.ChannelEmail:
-			return initEmailInbox(inboxR, msgStore, usrStore, mgr)
+			return initEmailInbox(inboxR, msgStore, usrStore, mgr, authStatusHook)
 		case inbox.ChannelLiveChat:
 			return initLiveChatInbox(inboxR, msgStore, usrStore, signAvatarURL)
+		case inbox.ChannelWhatsApp:
+			return initWhatsAppInbox(inboxR, msgStore, waClient, sourceUpdater)
 		default:
 			return nil, fmt.Errorf("unknown inbox channel: %s", inboxR.Channel)
 		}
@@ -804,21 +836,71 @@ func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String)) 
 // reloadInbox reloads a single inbox by ID using the signal-aware context.
 func reloadInbox(app *App, id int) error {
 	app.lo.Info("reloading inbox", "id", id)
-	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL))
+	app.inboxAuthErrors.Delete(id)
+	if err := ensureWhatsAppIngester(app); err != nil {
+		app.lo.Error("error starting whatsapp ingester after an inbox change", "id", id, "error", err)
+	}
+	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.conversation, makeInboxAuthStatusHook(app)))
 }
 
 // startInboxes registers the active inboxes and starts receiver for each.
-func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String)) {
+func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) {
 	mgr.SetMessageStore(msgStore)
 	mgr.SetUserStore(usrStore)
 
-	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL)); err != nil {
+	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL, waClient, sourceUpdater, authStatusHook)); err != nil {
 		log.Fatalf("error initializing inboxes: %v", err)
 	}
 
 	if err := mgr.Start(ctx); err != nil {
 		log.Fatalf("error starting inboxes: %v", err)
 	}
+}
+
+// initWhatsAppClient constructs the shared Meta Graph API client.
+func initWhatsAppClient() *whatsappapi.Client {
+	client := whatsappapi.New(initLogger("whatsapp_client"))
+	// Points the client at a stand-in Graph API. Tests set it, production leaves it empty.
+	if url := strings.TrimSpace(ko.String("whatsapp.api_url")); url != "" {
+		log.Printf("WARNING: whatsapp api_url is overridden to %s, no message will reach Meta", url)
+		client.SetBaseURL(url)
+	}
+	return client
+}
+
+// inboxAccountResolver resolves per-inbox Meta credentials for the template manager.
+type inboxAccountResolver struct {
+	inbox *inbox.Manager
+}
+
+func (r *inboxAccountResolver) WhatsAppAccount(inboxID int) (whatsappapi.Account, error) {
+	rec, err := r.inbox.GetDBRecord(inboxID)
+	if err != nil {
+		return whatsappapi.Account{}, err
+	}
+	if rec.Channel != whatsappChannel.ChannelWhatsApp {
+		return whatsappapi.Account{}, fmt.Errorf("inbox %d is not whatsapp", inboxID)
+	}
+	var cfg whatsappChannel.Config
+	if err := json.Unmarshal(rec.Config, &cfg); err != nil {
+		return whatsappapi.Account{}, fmt.Errorf("decoding whatsapp config: %w", err)
+	}
+	return cfg.Account(), nil
+}
+
+// initWhatsAppTemplates wires the WhatsApp template manager.
+func initWhatsAppTemplates(db *sqlx.DB, i18n *i18n.I18n, client *whatsappapi.Client, inboxMgr *inbox.Manager) *whatsappTemplate.Manager {
+	mgr, err := whatsappTemplate.New(whatsappTemplate.Opts{
+		Lo:       initLogger("whatsapp_template"),
+		DB:       db,
+		I18n:     i18n,
+		Client:   client,
+		Resolver: &inboxAccountResolver{inbox: inboxMgr},
+	})
+	if err != nil {
+		log.Fatalf("error initializing whatsapp template manager: %v", err)
+	}
+	return mgr
 }
 
 // initAuthz initializes authorization enforcer.
@@ -1044,7 +1126,7 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:                 db,
 		Lo:                 initLogger("ai_agent"),
@@ -1052,7 +1134,7 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 		QueueSize:          cmp.Or(ko.Int("ai_agent.queue_size"), 1000),
 		MaxSteps:           min(max(cmp.Or(ko.Int("ai_agent.max_steps"), 6), 1), 20),
 		MaxHistoryMessages: min(max(cmp.Or(ko.Int("ai_agent.max_history_messages"), 30), 5), 100),
-	}, aiManager, convo, mediaManager, settingManager, userManager, notifierService, rdb)
+	}, aiManager, convo, inboxManager, mediaManager, settingManager, userManager, notifierService, rdb)
 	if err != nil {
 		log.Fatalf("error initializing AI agent manager: %v", err)
 	}
@@ -1060,12 +1142,15 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
+		DB:              db,
+		Lo:              lo,
+		I18n:            i18n,
+		FilterFields:    conversation.ListFilterAllowedFields,
+		FilterRenderers: conversation.ListFilterRenderers,
+		FilterLocation:  convo.FilterLocation,
 	})
 	if err != nil {
 		log.Fatalf("error initializing search manager: %v", err)
@@ -1163,6 +1248,19 @@ func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificati
 	return m
 }
 
+// initNotificationPreference inits the notification preference manager.
+func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.PreferenceManager {
+	m, err := notifier.NewPreferenceManager(notifier.PreferenceManagerOpts{
+		DB:   db,
+		Lo:   initLogger("notification-preference"),
+		I18n: i18n,
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification preference manager: %v", err)
+	}
+	return m
+}
+
 // initImporter inits the importer manager.
 func initImporter(i18n *i18n.I18n) *importer.Importer {
 	return importer.New(importer.Opts{
@@ -1171,14 +1269,46 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 	})
 }
 
+func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service) *notifier.EmailQueue {
+	q, err := notifier.NewEmailQueue(notifier.EmailQueueOpts{
+		DB:       db,
+		Outbound: outbound,
+		Lo:       initLogger("notification-email-queue"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing notification email queue: %v", err)
+	}
+	return q
+}
+
+func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *notifier.PushManager {
+	m, err := notifier.NewPushManager(notifier.PushManagerOpts{
+		DB:          db,
+		Settings:    settings,
+		Lo:          initLogger("push-notification"),
+		I18n:        i18n,
+		RootURL:     ko.String("app.root_url"),
+		Concurrency: ko.MustInt("notification.concurrency"),
+		QueueSize:   ko.MustInt("notification.queue_size"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing push notification manager: %v", err)
+	}
+	return m
+}
+
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, outbound *notifier.Service, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
+	providers := []notificationchannels.Provider{
+		notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
+	}
+	if emailEnabled {
+		providers = append(providers, notificationchannels.NewEmail(emailQueue))
+	}
+	providers = append(providers, notificationchannels.NewPush(push))
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		InApp:        userNotification,
-		Outbound:     outbound,
-		WSHub:        wsHub,
-		EmailEnabled: emailEnabled,
-		Lo:           initLogger("notification-dispatcher"),
+		Pipeline: notificationchannels.NewPipeline(providers...),
+		Prefs:    prefs,
 	})
 }
 
@@ -1264,4 +1394,12 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	}
 
 	return limiter
+}
+
+func initProactive(db *sqlx.DB, i18n *i18n.I18n) *proactive.Manager {
+	manager, err := proactive.New(proactive.Opts{DB: db, I18n: i18n, Lo: initLogger("proactive")})
+	if err != nil {
+		log.Fatalf("error initializing proactive messages: %v", err)
+	}
+	return manager
 }

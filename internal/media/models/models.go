@@ -2,6 +2,9 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
+	"mime"
+	"strings"
 	"time"
 
 	"github.com/volatiletech/null/v9"
@@ -13,7 +16,11 @@ const (
 	ModelUser         = "users"
 	ModelHelpArticles = "help_articles"
 
-	DispositionInline = "inline"
+	DispositionInline     = "inline"
+	DispositionAttachment = "attachment"
+
+	ContentTypeOctetStream = "application/octet-stream"
+	ContentTypePDF         = "application/pdf"
 )
 
 // IsPublicModel reports whether media linked to the model type is served without authentication.
@@ -41,4 +48,25 @@ type Media struct {
 	// Pseudo fields
 	URL     string `json:"url"`
 	Content []byte `json:"-"`
+}
+
+// NormalizeContentType returns the lowercased type/subtype of a Content-Type value, or application/octet-stream if it does not parse.
+func NormalizeContentType(contentType string) string {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if (err != nil && !errors.Is(err, mime.ErrInvalidMediaParameter)) || !strings.Contains(mediaType, "/") {
+		return ContentTypeOctetStream
+	}
+	return mediaType
+}
+
+// ContentDisposition returns inline for images, video and PDF. XML types such as SVG can run scripts and are always attachments.
+func ContentDisposition(contentType string) string {
+	contentType = NormalizeContentType(contentType)
+	if strings.HasSuffix(contentType, "+xml") {
+		return DispositionAttachment
+	}
+	if strings.HasPrefix(contentType, "image/") || strings.HasPrefix(contentType, "video/") || contentType == ContentTypePDF {
+		return DispositionInline
+	}
+	return DispositionAttachment
 }

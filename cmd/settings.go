@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
@@ -57,10 +58,13 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	}
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
+	if !httputil.IsValidHTTPURL(req.RootURL) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.general.rootURL.valid"), nil, envelope.InputError)
+	}
 
-	// Get current language before update.
 	app.Lock()
 	oldLang := ko.String("app.lang")
+	oldRootURL := ko.String("app.root_url")
 	app.Unlock()
 
 	if err := app.setting.Update(req); err != nil {
@@ -86,6 +90,11 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 		app.lo.Error("error reloading templates", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
+
+	if strings.TrimRight(oldRootURL, "/") != req.RootURL {
+		go reconcileWhatsAppRootURL(app)
+	}
+
 	return r.SendEnvelope(true)
 }
 

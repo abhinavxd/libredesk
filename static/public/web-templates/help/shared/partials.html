@@ -26,6 +26,13 @@
                 </div>
 {{ end }}
 
+{{ define "hc-theme-toggle" }}
+                <button type="button" class="hc-theme-btn" data-hc-theme aria-label="{{ .L.T "globals.messages.toggleTheme" }}">
+                    <svg class="hc-theme-sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4" stroke-linecap="round"/></svg>
+                    <svg class="hc-theme-moon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M17 11.3A7.5 7.5 0 0 1 8.7 3a7.5 7.5 0 1 0 8.3 8.3Z" stroke-linejoin="round"/></svg>
+                </button>
+{{ end }}
+
 {{ define "hc-search-icon" }}<svg{{ with . }} class="{{ . }}"{{ end }} viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="m18 18-4.5-4.5" stroke-linecap="round" /></svg>{{ end }}
 
 {{ define "hc-article-toc" }}
@@ -88,4 +95,112 @@
 <span class="hc-avatars">
     {{ range . }}{{ if .Avatar }}<img class="hc-avatar" src="{{ .Avatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial" aria-hidden="true">{{ printf "%.1s" .Name }}</span>{{ end }}{{ end }}
 </span>
+{{ end }}
+
+{{ define "hc-theme-script" }}
+<script>
+(function () {
+    var root = document.documentElement;
+    document.querySelectorAll('[data-hc-theme]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var dark = root.classList.toggle('hc-dark');
+            try { localStorage.setItem('libredesk-hc-theme', dark ? 'dark' : 'light'); } catch (e) {}
+        });
+    });
+})();
+</script>
+{{ end }}
+
+{{ define "hc-embed-open" }}
+{{ template "hc-head" . }}
+<body class="hc-embed{{ if eq .Data.HelpCenter.Template "docs" }} hcd{{ end }}">
+    <main id="hc-main">
+{{ end }}
+
+{{ define "hc-embed-close" }}
+    </main>
+    {{ if gt (len .Data.LocaleLinks) 1 }}
+    <div class="hc-embed-langs">
+        <label for="hc-embed-lang">{{ .L.T "globals.terms.language" }}</label>
+        <select id="hc-embed-lang">
+            {{ range .Data.LocaleLinks }}<option value="{{ .Path }}"{{ if eq .Locale $.Data.HelpCenter.CurrentLocale }} selected{{ end }}>{{ .Locale }}</option>{{ end }}
+        </select>
+    </div>
+    {{ end }}
+    <a class="hc-embed-open" data-hc-embed-exit href="{{ .Data.HelpCenter.BaseURL }}{{ if .Data.CanonicalPath }}{{ .Data.CanonicalPath }}{{ else }}{{ .Data.HelpCenter.BasePath }}{{ end }}" target="_blank" rel="noopener noreferrer">
+        {{ .L.T "globals.messages.openInHelpCenter" }}
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+    </a>
+    <script>
+    (function () {
+        var theme = new URLSearchParams(location.search).get('theme');
+        var embedded = function (href) {
+            var url = new URL(href, location.href);
+            url.searchParams.set('embed', '1');
+            if (theme) url.searchParams.set('theme', theme);
+            return url.href;
+        };
+
+        var select = document.getElementById('hc-embed-lang');
+        if (select) select.addEventListener('change', function () { location.href = embedded(select.value); });
+
+        // Navigating to a page without embed=1 would show the full site inside the widget panel.
+        var keepEmbedded = function () {
+            document.querySelectorAll('a[href]:not([data-hc-embed-exit])').forEach(function (link) {
+                var href = link.getAttribute('href');
+                if (!href || href.charAt(0) === '#' || /^[a-z]+:/i.test(href) && !/^https?:/i.test(href)) return;
+                var url = new URL(link.href, location.href);
+                if (url.origin !== location.origin) {
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    return;
+                }
+                if (url.searchParams.get('embed') !== '1' || (theme && url.searchParams.get('theme') !== theme)) link.href = embedded(link.href);
+            });
+        };
+        keepEmbedded();
+        new MutationObserver(keepEmbedded).observe(document.body, { childList: true, subtree: true });
+
+        // The parent sizes this iframe to the document height, so the widget panel owns scrolling.
+        document.addEventListener('click', function (event) {
+            var link = event.target.closest('a[href^="#"]');
+            if (!link) return;
+            var id = decodeURIComponent(link.getAttribute('href').slice(1));
+            var target = id && document.getElementById(id);
+            if (!target) return;
+            event.preventDefault();
+            var top = target.getBoundingClientRect().top + window.scrollY;
+            parent.postMessage({ source: 'libredesk-hc-embed', type: 'scroll', top: Math.max(top - 12, 0) }, '*');
+            if (history.replaceState) history.replaceState(null, '', '#' + id);
+        });
+
+        var last = 0;
+        var report = function () {
+            var height = Math.ceil(document.body.getBoundingClientRect().height);
+            if (height === last) return;
+            last = height;
+            parent.postMessage({ source: 'libredesk-hc-embed', type: 'height', height: height }, '*');
+        };
+        parent.postMessage({ source: 'libredesk-hc-embed', type: 'loaded' }, '*');
+        new ResizeObserver(report).observe(document.body);
+        report();
+    })();
+    </script>
+    {{ if .Data.HelpCenter.CustomJS }}<script>{{ .Data.HelpCenter.CustomJS }}</script>{{ end }}
+</body>
+</html>
+{{ end }}
+
+{{ define "hc-livechat-widget" }}
+{{ if .Data.HelpCenter.WidgetInboxUUID }}
+<script>
+(function () {
+    window.LibredeskSettings = { baseURL: {{ .Data.HelpCenter.WidgetRootURL }}, inboxID: {{ .Data.HelpCenter.WidgetInboxUUID }} };
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = {{ .Data.HelpCenter.WidgetRootURL }} + '/widget.js';
+    document.head.appendChild(s);
+})();
+</script>
+{{ end }}
 {{ end }}

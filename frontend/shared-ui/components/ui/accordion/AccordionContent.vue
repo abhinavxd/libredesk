@@ -6,6 +6,8 @@ import { cn } from '../../../lib/utils'
 const props = defineProps({
   asChild: { type: Boolean, required: false },
   as: { type: null, required: false },
+  // Keeps closed sections mounted, so form fields inside them stay registered.
+  forceMount: { type: Boolean, required: false },
   class: { type: null, required: false }
 })
 
@@ -19,7 +21,11 @@ const delegatedProps = computed(() => {
 <template>
   <AccordionContent
     v-bind="delegatedProps"
-    class="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    :class="
+      props.forceMount
+        ? 'text-sm data-[state=closed]:hidden'
+        : 'overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down'
+    "
   >
     <div :class="cn('pb-4 pt-0', props.class)">
       <slot />

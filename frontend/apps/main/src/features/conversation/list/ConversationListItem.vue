@@ -11,7 +11,6 @@
         }"
       >
         <div class="flex items-start gap-2">
-          <!-- Avatar with channel indicator (checkbox overlays on hover / when selecting) -->
           <div class="relative flex-shrink-0 w-10 h-10">
             <div
               class="transition-opacity"
@@ -60,10 +59,11 @@
                   <TooltipContent>{{ contactFullName }}</TooltipContent>
                 </Tooltip>
                 <div class="flex items-center gap-1 flex-shrink-0">
+                  <PriorityMarker :priority="conversation.priority" />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <component
-                        :is="conversation.inbox_channel === 'livechat' ? MessageSquare : Mail"
+                        :is="channelIcon"
                         class="w-3 h-3 text-muted-foreground"
                         role="img"
                         :aria-label="conversation.inbox_name"
@@ -104,7 +104,7 @@
                 </template>
                 <template v-else>
                   <Reply
-                    class="text-success inline-block align-text-bottom mr-0.5"
+                    class="text-success inline-block align-[-2px] mr-0.5"
                     :size="14"
                     v-if="conversation.last_message_sender === 'agent'"
                   />{{ trimmedLastMessage }}
@@ -167,7 +167,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, MessageSquare, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import { Mail, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import {
   ContextMenu,
@@ -176,6 +177,7 @@ import {
   ContextMenuTrigger
 } from '@shared-ui/components/ui/context-menu'
 import SlaBadge from '@main/features/sla/SlaBadge.vue'
+import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
@@ -203,6 +205,8 @@ const props = defineProps({
 const handleMarkAsUnread = () => {
   conversationStore.markAsUnread(props.conversation.uuid)
 }
+
+const channelIcon = computed(() => CHANNEL_ICONS[props.conversation.inbox_channel] || Mail)
 
 const conversationRoute = computed(() => {
   const baseRoute = route.params.teamID

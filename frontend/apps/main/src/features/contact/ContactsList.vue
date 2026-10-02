@@ -49,10 +49,9 @@
         <Button
           v-if="userStore.can('contacts:write')"
           size="sm"
-          class="flex items-center h-8 gap-1 ml-auto"
+          class="flex items-center h-8 ml-auto"
           @click="showCreateDialog = true"
         >
-          <UserPlus size="16" />
           {{ $t('contact.new') }}
         </Button>
       </div>
@@ -140,7 +139,7 @@ import {
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
-import { ArrowDownWideNarrow, IdCardIcon, UserPlus } from 'lucide-vue-next'
+import { ArrowDownWideNarrow, IdCardIcon } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'

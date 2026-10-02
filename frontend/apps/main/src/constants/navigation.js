@@ -108,6 +108,12 @@ export const adminNavItems = [
         permission: 'inboxes:manage',
         isTitleKeyPlural: true,
         icon: 'Inbox'
+      },
+      {
+        titleKey: 'admin.whatsappTemplates.title',
+        href: '/admin/whatsapp/templates',
+        permission: 'inboxes:manage',
+        icon: 'WhatsApp'
       }
     ]
   },
@@ -265,6 +271,12 @@ export const accountNavItems = [
     titleKey: 'globals.terms.profile',
     href: '/account/profile',
     icon: 'CircleUser'
+  },
+  {
+    titleKey: 'globals.terms.notification',
+    href: '/account/notifications',
+    isTitleKeyPlural: true,
+    icon: 'Bell'
   }
 ]
 

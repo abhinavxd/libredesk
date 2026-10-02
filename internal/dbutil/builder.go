@@ -16,6 +16,8 @@ var ErrTooManyGroups = errors.New("too many filter groups")
 
 var dateOnlyRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+var likePatternEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
 var valueRequiredOperators = map[string]bool{
 	"equals":       true,
 	"not equals":   true,
@@ -171,6 +173,10 @@ func ValidateFilters(filtersJSON string, allowedFields AllowedFields, renderers 
 	next := 1
 	_, err = buildNode(root, &args, &next, allowedFields, renderers, 0, "UTC")
 	return err
+}
+
+func ContainsPattern(value string) string {
+	return "%" + likePatternEscaper.Replace(value) + "%"
 }
 
 // parseFilters accepts either a legacy flat array of leaves or a {logic, rules} group object.
@@ -398,13 +404,13 @@ func buildLeaf(f FilterNode, args *[]any, next *int, allowedFields AllowedFields
 		*next += 2
 		return cond, nil
 	case "contains", "ilike":
-		cond := fmt.Sprintf("%s ILIKE $%d", field, *next)
-		*args = append(*args, "%"+f.Value+"%")
+		cond := fmt.Sprintf("%s ILIKE $%d ESCAPE '\\'", field, *next)
+		*args = append(*args, ContainsPattern(f.Value))
 		*next++
 		return cond, nil
 	case "not contains":
-		cond := fmt.Sprintf("%s NOT ILIKE $%d", field, *next)
-		*args = append(*args, "%"+f.Value+"%")
+		cond := fmt.Sprintf("%s NOT ILIKE $%d ESCAPE '\\'", field, *next)
+		*args = append(*args, ContainsPattern(f.Value))
 		*next++
 		return cond, nil
 	default:

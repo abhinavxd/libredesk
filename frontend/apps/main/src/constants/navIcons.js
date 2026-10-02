@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   Bot,
   BookOpen,
   CircleDot,
@@ -29,10 +30,12 @@ import {
   Wrench,
   Zap
 } from 'lucide-vue-next'
+import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 
 // Icon names referenced by string in navigation.js.
 export const navIconMap = {
   BarChart3,
+  Bell,
   Bot,
   BookOpen,
   CircleDot,
@@ -60,5 +63,6 @@ export const navIconMap = {
   Webhook,
   Workflow,
   Wrench,
-  Zap
+  Zap,
+  WhatsApp: WhatsAppIcon
 }

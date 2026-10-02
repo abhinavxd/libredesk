@@ -10,7 +10,7 @@
     <ConversationBulkActionToolbar v-if="hasSelection && canBulkAct" />
 
     <!-- Filters (hidden when bulk selecting) -->
-    <div v-else class="p-2 flex justify-between items-center">
+    <div v-else class="p-2 flex flex-wrap justify-between items-center">
       <!-- Status dropdown-menu, hidden when a view is selected as views are pre-filtered -->
       <DropdownMenu v-if="!route.params.viewID">
         <DropdownMenuTrigger asChild>

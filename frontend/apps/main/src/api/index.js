@@ -67,8 +67,8 @@ const updateCustomAttribute = (id, data) =>
     }
   })
 const deleteCustomAttribute = (id) => http.delete(`/api/v1/custom-attributes/${id}`)
-const searchConversations = (params) => http.get('/api/v1/conversations/search', { params })
-const searchMessages = (params) => http.get('/api/v1/messages/search', { params })
+const searchConversations = (params) => http.get('/api/v1/search/conversations', { params })
+const searchMessages = (params) => http.get('/api/v1/search/messages', { params })
 const searchContacts = (params) => http.get('/api/v1/contacts/search', { params })
 const getEmailNotificationSettings = () => http.get('/api/v1/settings/notifications/email')
 const updateEmailNotificationSettings = (data) =>
@@ -421,6 +421,25 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
+
+const getWhatsAppTemplates = (inboxId) =>
+  http.get('/api/v1/whatsapp/templates', { params: { inbox_id: inboxId } })
+const getWhatsAppTemplate = (id) => http.get(`/api/v1/whatsapp/templates/${id}`)
+const updateWhatsAppTemplate = (id, data) =>
+  http.put(`/api/v1/whatsapp/templates/${id}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const createWhatsAppTemplate = (data) =>
+  http.post('/api/v1/whatsapp/templates', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteWhatsAppTemplate = (id) => http.delete(`/api/v1/whatsapp/templates/${id}`)
+const syncWhatsAppTemplates = (inboxId) =>
+  http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`, {})
+const getWhatsAppOpenConversation = (contactId, inboxId) =>
+  http.get(`/api/v1/whatsapp/contacts/${contactId}/open-conversation`, {
+    params: { inbox_id: inboxId }
+  })
 const saveDraft = (uuid, type, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
@@ -517,6 +536,10 @@ const aiGenerateReply = (data) => http.post('/api/v1/ai/generate-reply', data, {
 const aiSummarizeConversation = (data) => http.post('/api/v1/ai/summarize', data, { timeout: AI_TIMEOUT })
 const aiSuggestTags = (data) => http.post('/api/v1/ai/suggest-tags', data, { timeout: AI_TIMEOUT })
 const aiCopilot = (data) => http.post('/api/v1/ai/copilot', data, { timeout: AI_TIMEOUT })
+const approveAIToolRun = (id) =>
+  http.post(`/api/v1/ai/tool-runs/${id}/approve`, {}, { timeout: AI_TIMEOUT })
+const declineAIToolRun = (id) =>
+  http.post(`/api/v1/ai/tool-runs/${id}/decline`, {}, { timeout: AI_TIMEOUT })
 const getCopilotMessages = (conversationUUID) =>
   http.get('/api/v1/ai/copilot/messages', { params: { conversation_uuid: conversationUUID } })
 const clearCopilotMessages = (conversationUUID) =>
@@ -528,10 +551,10 @@ const createHelpCenter = (data) => http.post('/api/v1/help-centers', data)
 const updateHelpCenter = (id, data) => http.put(`/api/v1/help-centers/${id}`, data)
 const deleteHelpCenter = (id) => http.delete(`/api/v1/help-centers/${id}`)
 const toggleHelpCenter = (id) => http.put(`/api/v1/help-centers/${id}/toggle`)
-const previewHelpCenter = (id, data, page) =>
+const previewHelpCenter = (id, data, page, theme) =>
   http.post(`/api/v1/help-centers/${id}/preview`, data, {
     responseType: 'text',
-    params: page ? { page } : {}
+    params: { ...(page ? { page } : {}), ...(theme ? { theme } : {}) }
   })
 const getHelpCenterTree = (id, locale) =>
   http.get(`/api/v1/help-centers/${id}/tree`, { params: locale ? { locale } : {} })
@@ -556,6 +579,12 @@ const updateArticle = (id, data) => http.put(`/api/v1/articles/${id}`, data)
 const deleteArticle = (collectionId, id) =>
   http.delete(`/api/v1/collections/${collectionId}/articles/${id}`)
 const updateArticleStatus = (id, data) => http.put(`/api/v1/articles/${id}/status`, data)
+const unlinkArticleTranslation = (id) => http.put(`/api/v1/articles/${id}/unlink-translation`)
+const linkArticleTranslation = (id, data) => http.put(`/api/v1/articles/${id}/link-translation`, data)
+const getLinkableArticles = (helpCenterId, excludeLocale) =>
+  http.get(`/api/v1/help-centers/${helpCenterId}/linkable-articles`, {
+    params: { exclude_locale: excludeLocale }
+  })
 const getHelpCenterInsights = (id) => http.get(`/api/v1/help-centers/${id}/insights`)
 const getContactNotes = (id) => http.get(`/api/v1/contacts/${id}/notes`)
 const createContactNote = (id, data) => http.post(`/api/v1/contacts/${id}/notes`, data, {
@@ -623,8 +652,15 @@ const markNotificationAsRead = (id) => http.put(`/api/v1/notifications/${id}/rea
 const markAllNotificationsAsRead = () => http.put('/api/v1/notifications/read-all')
 const deleteNotification = (id) => http.delete(`/api/v1/notifications/${id}`)
 const deleteAllNotifications = () => http.delete('/api/v1/notifications')
+const getNotificationPreferences = () => http.get('/api/v1/notifications/preferences')
+const updateNotificationPreferences = (data) => http.put('/api/v1/notifications/preferences', data)
+const createPushSubscription = (data) => http.post('/api/v1/notifications/push-subscriptions', data)
+const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/push-subscriptions', { data: { endpoint } })
+
+const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaign-stats`, { params })
 
 export default {
+ getCampaignStats,
   login,
   deleteUser,
   importAgents,
@@ -714,6 +750,13 @@ export default {
   updateInbox,
   deleteInbox,
   toggleInbox,
+  getWhatsAppTemplates,
+  getWhatsAppTemplate,
+  updateWhatsAppTemplate,
+  createWhatsAppTemplate,
+  deleteWhatsAppTemplate,
+  syncWhatsAppTemplates,
+  getWhatsAppOpenConversation,
   createTeam,
   updateTeam,
   getSettings,
@@ -804,6 +847,9 @@ export default {
   updateArticle,
   deleteArticle,
   updateArticleStatus,
+  unlinkArticleTranslation,
+  linkArticleTranslation,
+  getLinkableArticles,
   getHelpCenterInsights,
   getAIFaqSuggestions,
   approveAIFaqSuggestion,
@@ -814,6 +860,8 @@ export default {
   aiSummarizeConversation,
   aiSuggestTags,
   aiCopilot,
+  approveAIToolRun,
+  declineAIToolRun,
   getCopilotMessages,
   clearCopilotMessages,
   searchConversations,
@@ -861,5 +909,9 @@ export default {
   markAllNotificationsAsRead,
   deleteNotification,
   deleteAllNotifications,
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  createPushSubscription,
+  deletePushSubscription,
   getContactPageVisits
 }

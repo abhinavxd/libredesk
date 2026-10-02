@@ -22,11 +22,13 @@ import (
 	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -77,23 +79,16 @@ func (m *Manager) Run(ctx context.Context, incomingQWorkers, outgoingQWorkers, s
 		case <-ctx.Done():
 			return
 		case <-dbScanner.C:
-			var (
-				pendingMessages = []models.Message{}
-				messageIDs      = m.getOutgoingProcessingMessageIDs()
-			)
+			pendingMessages := []models.Message{}
+			processingConversationIDs := m.getOutgoingProcessingConversationIDs()
 
-			// Get pending outgoing messages and skip the currently processing message ids.
-			if err := m.q.GetOutgoingPendingMessages.Select(&pendingMessages, pq.Array(messageIDs)); err != nil {
+			if err := m.q.GetOutgoingPendingMessages.Select(&pendingMessages, pq.Array(processingConversationIDs)); err != nil {
 				m.lo.Error("error fetching pending messages from db", "error", err)
 				continue
 			}
 
-			// Prepare and push the message to the outgoing queue.
 			for _, message := range pendingMessages {
-				// Put the message ID in the processing map.
-				m.outgoingProcessingMessages.Store(message.ID, message.ID)
-
-				// Push the message to the outgoing message queue.
+				m.outgoingProcessingMessages.Store(message.ID, message.ConversationID)
 				m.outgoingMessageQueue <- message
 			}
 		}
@@ -188,6 +183,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Send message
 	err = inb.Send(outbound)
 	if err != nil && err != livechat.ErrClientNotConnected {
+		if inb.Channel() == inbox.ChannelWhatsApp {
+			m.RecordWhatsAppSendFailure(message.UUID, err.Error())
+		}
 		handleError(err, "error sending message")
 		return
 	}
@@ -317,8 +315,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
-	case inbox.ChannelLiveChat:
-		// Live chat doesn't use templates for rendering messages.
+	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp:
 		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
@@ -414,9 +411,14 @@ func (m *Manager) SignAttachmentURLs(attachments attachment.Attachments) {
 
 // UpdateMessageStatus updates the status of a message.
 func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
-	if _, err := m.q.UpdateMessageStatus.Exec(status, messageUUID); err != nil {
+	res, err := m.q.UpdateMessageStatus.Exec(status, messageUUID)
+	if err != nil {
 		m.lo.Error("error updating message status", "message_uuid", messageUUID, "error", err)
 		return err
+	}
+	// The sent-onto-failed guard can make this a no-op. A status that wasn't applied must not be broadcast.
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil
 	}
 
 	// Broadcast message status update to all conversation subscribers.
@@ -433,13 +435,100 @@ func (m *Manager) UpdateMessageStatus(messageUUID string, status string) error {
 	return nil
 }
 
-// MarkMessageAsPending updates message status to `Pending`, enqueuing it for sending.
+func (m *Manager) UpdateMessageSourceID(messageUUID, sourceID string) error {
+	if messageUUID == "" || sourceID == "" {
+		return nil
+	}
+	if _, err := m.q.UpdateMessageSourceIDByUUID.Exec(messageUUID, sourceID); err != nil {
+		m.lo.Error("error updating message source id", "message_uuid", messageUUID, "error", err)
+		return err
+	}
+	return nil
+}
+
+// UpdateConversationLastInboundAt advances the clock gating business-initiated messages (WhatsApp 24h window).
+func (m *Manager) UpdateConversationLastInboundAt(conversationID int, at time.Time) error {
+	if at.IsZero() {
+		at = time.Now()
+	}
+	var row struct {
+		ContactID int `db:"contact_id"`
+		InboxID   int `db:"inbox_id"`
+	}
+	if err := m.q.UpdateConversationLastInboundAt.QueryRow(conversationID, at).Scan(&row.ContactID, &row.InboxID); err != nil {
+		m.lo.Error("error updating conversation last_inbound_at", "conversation_id", conversationID, "error", err)
+		return err
+	}
+	var windowAt sql.NullTime
+	if err := m.q.GetContactWindowInboundAt.Get(&windowAt, row.ContactID, row.InboxID); err != nil {
+		m.lo.Error("error fetching contact window for broadcast", "contact_id", row.ContactID, "inbox_id", row.InboxID, "error", err)
+		return nil
+	}
+	if !windowAt.Valid {
+		return nil
+	}
+	var uuids []string
+	if err := m.q.GetConversationUUIDsByContactInbox.Select(&uuids, row.ContactID, row.InboxID); err != nil {
+		m.lo.Error("error fetching contact's conversations for broadcast", "contact_id", row.ContactID, "inbox_id", row.InboxID, "error", err)
+		return nil
+	}
+	for _, uuid := range uuids {
+		m.BroadcastConversationUpdate(uuid, map[string]any{"contact_last_inbound_at": windowAt.Time.Format(time.RFC3339)})
+	}
+	return nil
+}
+
+// GetLatestOpenConversationForContact returns the most recent non-resolved conversation for a (contact, inbox) pair, or sql.ErrNoRows.
+func (m *Manager) GetLatestOpenConversationForContact(contactID, inboxID int) (int, string, error) {
+	var row struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	if err := m.q.GetLatestOpenConversationByContact.Get(&row, contactID, inboxID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, "", err
+		}
+		m.lo.Error("error fetching open conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return row.ID, row.UUID, nil
+}
+
+// GetReopenableConversationForContact returns the most recent resolved conversation for a (contact, inbox) pair last resolved within windowHours, or sql.ErrNoRows.
+func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, windowHours int) (int, string, error) {
+	var row struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	if err := m.q.GetReopenableConversationByContact.Get(&row, contactID, inboxID, windowHours); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, "", err
+		}
+		m.lo.Error("error fetching reopenable conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return row.ID, row.UUID, nil
+}
+
 func (m *Manager) MarkMessageAsPending(uuid string) error {
-	if err := m.UpdateMessageStatus(uuid, models.MessageStatusPending); err != nil {
+	if _, err := m.q.MarkMessagePendingForRetry.Exec(uuid); err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
 	}
+	conversationUUID, _ := m.getConversationUUIDFromMessageUUID(uuid)
+	m.BroadcastMessageUpdate(conversationUUID, uuid, map[string]any{"status": models.MessageStatusPending})
 	return nil
+}
+
+// ClearHandoffFormPending clears the handoff form flag on a message and reports whether it was set.
+func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
+	res, err := m.q.ClearMessageHandoffFormPending.Exec(messageUUID)
+	if err != nil {
+		m.lo.Error("error clearing handoff form flag", "message_uuid", messageUUID, "error", err)
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // SendPrivateNote inserts a private message in a conversation.
@@ -496,7 +585,7 @@ func (m *Manager) CreateContactMessage(media []mmodels.Media, contactID int, con
 	}
 
 	// Process post-message hooks (reopen, waiting since, automation, SLA).
-	if err := m.ProcessIncomingMessageHooks(conversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(message, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", conversationUUID, "error", err)
 	}
 
@@ -519,7 +608,17 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
 	}
 
-	var sourceID string
+	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
+	if !isWhatsAppTemplate {
+		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
+			content = m.template.RenderString(data, content)
+		}
+	}
+
+	var (
+		sourceID    string
+		contentType = models.ContentTypeHTML
+	)
 	switch inboxRecord.Channel {
 	case inbox.ChannelEmail:
 		// Add `to`, `cc`, and `bcc` recipients to meta map.
@@ -543,6 +642,26 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			m.lo.Error("error generating source message id", "error", err)
 			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
+	case inbox.ChannelWhatsApp:
+		// Meta accepts one media per message, so a multi-attachment reply must be sent as separate messages.
+		if len(media) > 1 {
+			return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.oneAttachment"), nil)
+		}
+		// Reject unsendable media here. Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
+		for _, md := range media {
+			if reason := whatsappChannel.RejectMediaReason(md.Filename, md.ContentType, md.Size); reason != "" {
+				return models.Message{}, envelope.NewError(envelope.InputError, reason, nil)
+			}
+		}
+		rendered, err := m.prepareWhatsAppOutbound(inboxRecord, conversationUUID, content, len(media) > 0, metaMap)
+		if err != nil {
+			return models.Message{}, err
+		}
+		content = rendered
+		// A rendered template body is plain text. Storing it as HTML drops its line breaks in the timeline.
+		if isWhatsAppTemplate {
+			contentType = models.ContentTypeText
+		}
 	}
 
 	// Marshal meta.
@@ -550,11 +669,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	if err != nil {
 		m.lo.Error("error marshalling message meta map to JSON", "error", err)
 		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	// Best-effort render template variables before saving so agents see rendered content immediately.
-	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
 	}
 
 	// Insert the message into the database
@@ -565,10 +679,10 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 		SenderType:        models.SenderTypeAgent,
 		Status:            models.MessageStatusPending,
 		Content:           content,
-		ContentType:       models.ContentTypeHTML,
+		ContentType:       contentType,
 		Private:           false,
 		Media:             media,
-		SourceID:          null.StringFrom(sourceID),
+		SourceID:          null.NewString(sourceID, sourceID != ""),
 		MessageReceiverID: contactID,
 		Meta:              metaJSON,
 	}
@@ -580,6 +694,29 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 
 // InsertMessage inserts a message and attaches the media to the message.
 func (m *Manager) InsertMessage(message *models.Message) error {
+	tx, err := m.db.Beginx()
+	if err != nil {
+		m.lo.Error("error beginning message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	inlineUUIDs, err := m.InsertMessageTx(tx, message)
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		m.lo.Error("error committing message insert transaction", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	m.AfterMessageInsert(message, inlineUUIDs)
+	return nil
+}
+
+// InsertMessageTx inserts a message inside the caller's transaction; the caller must run AfterMessageInsert once it commits.
+func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]string, error) {
 	if message.Private {
 		message.Status = models.MessageStatusSent
 	}
@@ -604,28 +741,20 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
-	tx, err := m.db.Beginx()
-	if err != nil {
-		m.lo.Error("error beginning message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	defer tx.Rollback()
-
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs); err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	return inlineUUIDs, nil
+}
 
-	if err := tx.Commit(); err != nil {
-		m.lo.Error("error committing message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
+// AfterMessageInsert runs the post-commit side effects of a message insert: participant, last message and broadcast.
+func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []string) {
 	// Add this user as a participant if not already present.
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
@@ -669,8 +798,6 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 
 	// Trigger webhook for new message created.
 	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
-
-	return nil
 }
 
 // RecordAssigneeUserChange records an activity for a user assignee change.
@@ -801,6 +928,8 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 		content = fmt.Sprintf("%s set %s SLA policy", actorName, newValue)
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
+	case models.ActivityCSATNotSent:
+		content = m.i18n.T("conversation.whatsapp.csatNotSent")
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}
@@ -893,7 +1022,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	m.broadcastMessageToWidgetClients(&msg)
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, isNewConversation); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, isNewConversation); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
 		return models.Message{}, fmt.Errorf("processing incoming message hooks: %w", err)
 	}
@@ -1015,8 +1144,32 @@ func (m *Manager) ProcessIncomingLiveChatMessage(msg models.Message) (models.Mes
 
 	// Process post-message hooks (automation rules, webhooks, SLA, etc.).
 	// isNewConversation = false since conversation always exists for live chat.
-	if err := m.ProcessIncomingMessageHooks(msg.ConversationUUID, false); err != nil {
+	if err := m.ProcessIncomingMessageHooks(msg, false); err != nil {
 		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+
+	return msg, nil
+}
+
+// ProcessIncomingWhatsAppMessage inserts an inbound message and advances the 24h window clock.
+func (m *Manager) ProcessIncomingWhatsAppMessage(msg models.Message, isNewConversation bool, inboundAt time.Time) (models.Message, error) {
+	if err := m.uploadMessageAttachments(&msg); err != nil {
+		return models.Message{}, fmt.Errorf("uploading whatsapp attachments: %w", err)
+	}
+
+	if err := m.InsertMessage(&msg); err != nil {
+		return models.Message{}, err
+	}
+
+	// Hooks run even if the window update fails: the message is stored, so the queue retry only repairs the window.
+	windowErr := m.UpdateConversationLastInboundAt(msg.ConversationID, inboundAt)
+
+	if err := m.ProcessIncomingMessageHooks(msg, isNewConversation); err != nil {
+		m.lo.Error("error processing incoming message hooks", "conversation_uuid", msg.ConversationUUID, "error", err)
+	}
+
+	if windowErr != nil {
+		return models.Message{}, windowErr
 	}
 
 	return msg, nil
@@ -1031,6 +1184,20 @@ func (m *Manager) MessageExists(messageID string) (bool, error) {
 		}
 		m.lo.Error("error fetching message from db", "error", err)
 		return false, err
+	}
+	return true, nil
+}
+
+func (m *Manager) AdvanceWhatsAppWindowForMessage(messageID string, inboundAt time.Time) (bool, error) {
+	conversationID, err := m.messageExistsBySourceID([]string{messageID})
+	if errors.Is(err, errConversationNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := m.UpdateConversationLastInboundAt(conversationID, inboundAt); err != nil {
+		return true, err
 	}
 	return true, nil
 }
@@ -1183,7 +1350,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 			attachment.Size,
 			null.StringFrom(attachment.Disposition),
 			[]byte("{}"), /** meta **/
-			true,          /** private **/
+			true,         /** private **/
 		)
 		if err != nil {
 			m.lo.Error("failed to upload attachment", "name", attachment.Name, "content_type", attachment.ContentType, "size", attachment.Size, "content_id", contentID, "disposition", attachment.Disposition, "conversation_uuid", message.ConversationUUID, "message_source_id", message.SourceID.String, "error", err)
@@ -1194,7 +1361,7 @@ func (m *Manager) uploadMessageAttachments(message *models.Message) error {
 		attachmentExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(attachment.Name)), ".")
 		if slices.Contains(image.Exts, attachmentExt) && image.IsImageByContent(bytes.NewReader(attachment.Content)) {
 			if err := m.uploadThumbnailForMedia(media, attachment.Content); err != nil {
-				m.lo.Error("error uploading thumbnail", "error", err)
+				m.lo.Warn("skipping thumbnail, unsupported image format", "error", err)
 			}
 		}
 
@@ -1346,12 +1513,11 @@ func (m *Manager) attachAttachmentsToMessage(message *models.Message) error {
 	return nil
 }
 
-// getOutgoingProcessingMessageIDs returns the IDs of outgoing messages currently being processed.
-func (m *Manager) getOutgoingProcessingMessageIDs() []int {
-	var out = make([]int, 0)
-	m.outgoingProcessingMessages.Range(func(key, _ any) bool {
-		if k, ok := key.(int); ok {
-			out = append(out, k)
+func (m *Manager) getOutgoingProcessingConversationIDs() []int {
+	out := make([]int, 0)
+	m.outgoingProcessingMessages.Range(func(_, value any) bool {
+		if conversationID, ok := value.(int); ok {
+			out = append(out, conversationID)
 		}
 		return true
 	})
@@ -1386,14 +1552,29 @@ func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) e
 // ProcessIncomingMessageHooks handles automation rules, webhooks, SLA events, and other post-processing
 // for incoming messages. This allows other channels to insert messages first and then call this
 // function to trigger the necessary hooks.
-func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConversation bool) error {
+func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConversation bool) error {
+	conversationUUID := message.ConversationUUID
+
 	// Start waiting since clock, cleared when agent replies.
 	m.StartConversationWaitingSince(conversationUUID, time.Now())
 
 	// Handle new conversation events.
 	if isNewConversation {
+		var recipients struct {
+			To []string `json:"to"`
+		}
+		if len(message.Meta) > 0 {
+			if err := json.Unmarshal(message.Meta, &recipients); err != nil {
+				m.lo.Warn("error reading incoming message recipients", "conversation_uuid", conversationUUID, "error", err)
+			}
+		}
+		for i, addr := range recipients.To {
+			recipients.To[i] = stringutil.RemoveConvPlusAddress(addr)
+		}
+
 		conversation, err := m.GetConversation(0, conversationUUID, "")
 		if err == nil {
+			conversation.IncomingTo = recipients.To
 			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
 			m.automation.EvaluateNewConversationRules(conversation)
 		}
@@ -1407,11 +1588,13 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	}
 
 	// Reopen conversation if it's not Open.
+	var reopened bool
 	systemUser, err := m.userStore.GetSystemUser()
 	if err != nil {
 		m.lo.Error("error fetching system user", "error", err)
 	} else {
-		if err := m.ReOpenConversation(conversationUUID, systemUser); err != nil {
+		var err error
+		if reopened, err = m.ReOpenConversation(conversationUUID, systemUser); err != nil {
 			m.lo.Error("error reopening conversation", "error", err)
 		}
 	}
@@ -1424,6 +1607,8 @@ func (m *Manager) ProcessIncomingMessageHooks(conversationUUID string, isNewConv
 	} else {
 		// Trigger automations on incoming message event.
 		m.automation.EvaluateConversationUpdateRules(conversation, amodels.EventConversationMessageIncoming, previousValues, umodels.User{ID: conversation.ContactID})
+
+		go m.NotifyNewReply(conversation, message, reopened)
 
 		// If assigned to an AI assistant, let it respond to this inbound customer message.
 		if m.aiAgent != nil && conversation.AssignedUserID.Valid {
@@ -1467,6 +1652,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 	m.SignAttachmentURLs(message.Attachments)
 	m.SignAvatarURL(&message.Author.AvatarURL)
 	liveChatInbox.BroadcastMessageToClients(message.ConversationUUID, conversation.ContactID, models.ChatMessage{
+		ID:               message.ID,
 		UUID:             message.UUID,
 		Status:           message.Status,
 		ConversationUUID: message.ConversationUUID,

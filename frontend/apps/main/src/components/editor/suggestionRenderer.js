@@ -35,7 +35,7 @@ export function createSuggestionRenderer(ListComponent) {
         if (popup) popup.style.display = 'none'
         return true
       }
-      return component.ref?.onKeyDown(props)
+      return component?.ref?.onKeyDown(props) ?? false
     },
 
     onExit: () => {

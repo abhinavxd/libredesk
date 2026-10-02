@@ -37,6 +37,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
@@ -55,18 +56,20 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
+import { useAiPromptStore } from '@main/stores/aiPrompt'
 
 const { t } = useI18n()
 const emitter = useEmitter()
+const aiPromptStore = useAiPromptStore()
+const { prompts } = storeToRefs(aiPromptStore)
 const isLoading = ref(false)
-const prompts = ref([])
 const dialogOpen = ref(false)
 const isEditing = ref(false)
 const initialValues = ref({})
 const editingId = ref(null)
 
 const refreshHandler = (data) => {
-  if (data?.model === 'ai_editor_prompts') getPrompts()
+  if (data?.model === 'ai_editor_prompts') refreshPrompts()
 }
 
 const editHandler = (data) => {
@@ -74,7 +77,7 @@ const editHandler = (data) => {
 }
 
 onMounted(() => {
-  getPrompts()
+  loadPrompts()
   emitter.on(EMITTER_EVENTS.REFRESH_LIST, refreshHandler)
   emitter.on(EMITTER_EVENTS.EDIT_MODEL, editHandler)
 })
@@ -84,19 +87,16 @@ onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.EDIT_MODEL, editHandler)
 })
 
-const getPrompts = async () => {
-  try {
-    isLoading.value = true
-    const resp = await api.getAiPrompts()
-    prompts.value = resp.data.data || []
-  } catch (error) {
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    isLoading.value = false
-  }
+const loadPrompts = async () => {
+  isLoading.value = true
+  await aiPromptStore.fetchPrompts()
+  isLoading.value = false
+}
+
+const refreshPrompts = async () => {
+  isLoading.value = true
+  await aiPromptStore.refreshPrompts()
+  isLoading.value = false
 }
 
 const newPrompt = () => {
@@ -128,7 +128,7 @@ const submitPrompt = async (values) => {
       await api.createAIPrompt(values)
     }
     dialogOpen.value = false
-    getPrompts()
+    await refreshPrompts()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })

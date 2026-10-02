@@ -17,11 +17,13 @@ export const getConversationSuggestions = async (query, search = api.searchConve
   const reference = query.trim()
   if (reference.length < MIN_REFERENCE_QUERY_LENGTH) return []
 
-  const response = await search({ query: reference })
-  return (response.data?.data || []).slice(0, SUGGESTION_LIMIT).map((conversation) => ({
-    id: conversation.uuid,
-    label: conversation.reference_number,
-    subject: conversation.subject,
-    status: conversation.status
-  }))
+  const response = await search({ query: reference, page_size: SUGGESTION_LIMIT })
+  return (response.data?.data?.results || [])
+    .filter((conversation) => conversation.reference_number === reference)
+    .map((conversation) => ({
+      id: conversation.uuid,
+      label: conversation.reference_number,
+      subject: conversation.subject,
+      status: conversation.status
+    }))
 }
