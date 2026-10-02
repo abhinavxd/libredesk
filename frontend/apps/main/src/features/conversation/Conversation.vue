@@ -44,7 +44,7 @@
               <span
                 class="rounded-md bg-primary px-2.5 py-1 text-xs lg:text-sm font-medium text-primary-foreground"
               >
-                {{ conversationStore.current?.status }}
+                {{ translateStatusLabel(conversationStore.current?.status) }}
               </span>
             </div>
           </DropdownMenuTrigger>
@@ -54,10 +54,20 @@
               :key="status.value"
               @click="handleUpdateStatus(status.label)"
             >
-              {{ status.label }}
+              {{ translateStatusLabel(status.label) }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <Button
+          v-if="canAssignToMe"
+          variant="outline"
+          size="sm"
+          class="h-11 lg:h-8"
+          @click="assignToSelf"
+        >
+          <UserCheck class="w-4 h-4" />
+          {{ t('conversation.assignSelfAction') }}
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button
@@ -99,7 +109,7 @@ const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal, ChevronLeft, PanelRight } from 'lucide-vue-next'
+import { Clock, MoreHorizontal, ChevronLeft, PanelRight, UserCheck } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useIsMobile } from '@shared-ui/composables'
 import {
@@ -144,6 +154,29 @@ const goBackToList = () => {
   const target = router.resolve({ name: listName, params })
   if (window.history.state?.back?.split('?')[0] === target.path) router.back()
   else router.push(target)
+}
+
+const canAssignToMe = computed(
+  () =>
+    userStore.can(perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE) &&
+    conversationStore.current?.assigned_user_id !== userStore.userID
+)
+const assignToSelf = () => {
+  conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
+}
+
+// Status names are admin-editable DB rows also used as literal identifiers elsewhere
+// (snooze detection, shortcuts, automation), so only the known defaults get a translated
+// display label here; custom statuses an admin creates are shown as typed.
+const DEFAULT_STATUS_I18N_KEYS = {
+  [CONVERSATION_DEFAULT_STATUSES.OPEN]: 'conversationStatus.open',
+  [CONVERSATION_DEFAULT_STATUSES.SNOOZED]: 'conversationStatus.snoozed',
+  [CONVERSATION_DEFAULT_STATUSES.RESOLVED]: 'conversationStatus.resolved',
+  [CONVERSATION_DEFAULT_STATUSES.CLOSED]: 'conversationStatus.closed'
+}
+const translateStatusLabel = (name) => {
+  const key = DEFAULT_STATUS_I18N_KEYS[name]
+  return key ? t(key) : name
 }
 
 const isSnoozed = computed(
