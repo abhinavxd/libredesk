@@ -547,6 +547,7 @@
   "admin.sla.triggerTiming": "Trigger timing",
   "admin.sla.warning": "Warning",
   "admin.sso.credentialsFromConfig": "The client ID and client secret of this provider are set in the server configuration and cannot be changed here.",
+  "admin.sso.credentialsFromConfigNote": "Set in the server configuration (oidc.client_id, oidc.client_secret).",
   "admin.sso.logoURLDescription": "Custom logo URL to display on the login page.",
   "admin.sso.setThisUrlForCallback": "Set this URI for callback.",
   "admin.status.help": "Create custom conversation statuses to extend default workflow.",
