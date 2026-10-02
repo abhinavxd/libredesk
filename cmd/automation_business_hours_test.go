@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Test: isOpenAt matches working hours and holidays, including ranges that cross midnight
 func TestIsOpenAt(t *testing.T) {
 	hours := bhmodels.BusinessHours{
 		Hours: types.JSONText(`{

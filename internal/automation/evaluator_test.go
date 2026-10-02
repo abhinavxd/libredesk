@@ -1835,6 +1835,7 @@ func TestMoreThanTwoGroups_RuleSkipped(t *testing.T) {
 	assert.Equal(t, 0, mockStore.callCount, "rules with more than 2 groups must be skipped entirely")
 }
 
+// mockBusinessHours is a businessHoursChecker stub that always reports the configured open state or error.
 type mockBusinessHours struct {
 	open bool
 	err  error
@@ -1842,6 +1843,7 @@ type mockBusinessHours struct {
 
 func (m mockBusinessHours) IsOpen(int, time.Time) (bool, error) { return m.open, m.err }
 
+// Test: business_hours_status rule matches open/closed state and skips when the checker is missing or errors
 func TestEvaluateRuleBusinessHoursStatus(t *testing.T) {
 	conv := createTestConversation()
 	rule := func(op, val string) models.RuleDetail {
