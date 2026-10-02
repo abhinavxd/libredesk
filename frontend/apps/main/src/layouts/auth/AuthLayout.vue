@@ -12,7 +12,7 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        Powered by libredesk
+        Fernmail · Based on LibreDesk
       </a>
     </div>
   </div>

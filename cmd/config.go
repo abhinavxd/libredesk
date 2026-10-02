@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	oidcmodels "github.com/abhinavxd/libredesk/internal/oidc/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	oidcmodels "github.com/jakedolan443/fernmail/internal/oidc/models"
 	"github.com/zerodha/fastglue"
 )
 
@@ -29,10 +29,9 @@ func handleGetConfig(r *fastglue.Request) error {
 
 	// Filter to only include public fields needed for initial app load
 	publicSettings := map[string]any{
-		"app.lang":        settings["app.lang"],
-		"app.favicon_url": settings["app.favicon_url"],
-		"app.logo_url":    settings["app.logo_url"],
-		"app.site_name":   settings["app.site_name"],
+		"app.lang":      settings["app.lang"],
+		"app.logo_url":  settings["app.logo_url"],
+		"app.site_name": settings["app.site_name"],
 	}
 
 	// Get all OIDC providers

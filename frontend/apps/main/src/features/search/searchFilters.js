@@ -1,8 +1,8 @@
-export const FILTER_KEYS = ['status', 'inbox', 'created']
+export const FILTER_KEYS = ['status', 'address', 'created']
 
 export const emptyFilters = () => ({
   status: '',
-  inbox: '',
+  address: '',
   created: ''
 })
 
@@ -39,7 +39,7 @@ const leaf = (field, operator, value = '') => ({
 export const toFiltersJSON = (filters) => {
   const rules = []
   if (filters.status) rules.push(leaf('status_id', 'equals', filters.status))
-  if (filters.inbox) rules.push(leaf('inbox_id', 'equals', filters.inbox))
+  if (filters.address) rules.push(leaf('address_id', 'equals', filters.address))
   if (filters.created) rules.push(leaf('created_at', 'between', filters.created))
   return rules.length ? JSON.stringify(rules) : ''
 }

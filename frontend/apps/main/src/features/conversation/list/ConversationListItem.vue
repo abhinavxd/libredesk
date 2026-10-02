@@ -10,6 +10,12 @@
           'hover:bg-accent/40': !isCurrent && !isItemSelected
         }"
       >
+        <span
+          v-if="isUnread"
+          class="pointer-events-none absolute inset-y-0 left-0 w-1 bg-success"
+          data-unread-indicator
+          aria-hidden="true"
+        />
         <div class="flex items-start gap-2">
           <div
             v-if="showCheckbox"
@@ -77,7 +83,7 @@
                 :class="isUnread ? 'text-foreground font-medium' : 'text-muted-foreground'"
               >
                 <template v-if="isTyping">
-                  <span class="italic text-foreground">{{ $t('globals.terms.typing') }}</span>
+                  <span class="italic text-foreground">{{ conversationStore.typingNames(conversation.uuid) ? $t('conversation.agentsTyping', { names: conversationStore.typingNames(conversation.uuid) }) : $t('globals.terms.typing') }}</span>
                 </template>
                 <template v-else-if="hasDraftForConversation && !isCurrent">
                   <span class="font-medium text-foreground">{{ $t('globals.terms.draft') }}:</span>
@@ -159,12 +165,11 @@ const handleMarkAsUnread = () => {
 }
 
 const conversationRoute = computed(() => {
-  const baseRoute = route.params.viewID ? 'view-inbox-conversation' : 'inbox-conversation'
   return {
-    name: baseRoute,
+    name: 'address-inbox-conversation',
     params: {
       uuid: props.conversation.uuid,
-      ...(baseRoute === 'view-inbox-conversation' && { viewID: route.params.viewID })
+      addressID: route.params.addressID || props.conversation.address_id
     },
     query: props.conversation.mentioned_message_uuid
       ? { scrollTo: props.conversation.mentioned_message_uuid }

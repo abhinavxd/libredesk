@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 )
 
 // ErrTooManyGroups is returned when a filter exceeds MaxFilterGroups. Callers map it to a user-facing error.

@@ -3,8 +3,8 @@ package main
 import (
 	"strconv"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/oidc/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/oidc/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

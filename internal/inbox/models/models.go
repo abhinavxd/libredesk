@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/volatiletech/null/v9"
 )
 
@@ -44,6 +44,21 @@ type Config struct {
 	FromNameTemplate     string       `json:"from_name_template"`
 	ReplyTo              string       `json:"reply_to"`
 	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+	// EmailAliases is derived runtime configuration generated from canonical
+	// email_addresses. It remains here only because the IMAP receiver consumes
+	// a compact delivery list.
+	EmailAliases []EmailAlias `json:"email_aliases"`
+}
+
+// EmailAlias is the receiver's derived representation of a canonical address.
+// A single IMAP mailbox is polled once while the address model retains the
+// recipient endpoint and selects the correct From address for replies.
+type EmailAlias struct {
+	Address     string `json:"address"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	Default     bool   `json:"default"`
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.

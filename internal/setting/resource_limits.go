@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/abhinavxd/libredesk/internal/resourceusage"
+	"github.com/jakedolan443/fernmail/internal/resourceusage"
 	"github.com/jmoiron/sqlx/types"
 )
 

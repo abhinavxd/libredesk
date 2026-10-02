@@ -1,18 +1,51 @@
-/* Geist (SIL OFL 1.1) - see fonts/LICENSE.txt. */
+/* Go (Bigelow & Holmes, BSD-style licence) - see fonts/LICENSE.txt.
+   Static faces: 600 (semibold) resolves to Bold. */
 @font-face {
-  font-family: 'Geist';
+  font-family: 'Go';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
-  src: url('/static/public/static/fonts/Geist-Variable.woff2') format('woff2');
+  src: url('/static/public/static/fonts/Go-Regular.ttf') format('truetype');
 }
 
 @font-face {
-  font-family: 'Geist';
+  font-family: 'Go';
   font-style: italic;
-  font-weight: 100 900;
+  font-weight: 400;
   font-display: swap;
-  src: url('/static/public/static/fonts/Geist-Italic-Variable.woff2') format('woff2');
+  src: url('/static/public/static/fonts/Go-Italic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Go';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Go-Medium.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Go';
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Go-Medium-Italic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Go';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Go-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Go';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/public/static/fonts/Go-Bold-Italic.ttf') format('truetype');
 }
 
 /* Form controls default to the browser UI font, not the page font. */

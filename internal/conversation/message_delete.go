@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 )
 
 // DeletePrivateMessage soft-deletes a private note, unlinks its media for GC, and returns the tombstone text. A senderID of 0 skips the author check.

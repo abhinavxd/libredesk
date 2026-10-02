@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/migrations"
+	"github.com/jakedolan443/fernmail/internal/migrations"
 )
 
 func TestImageSenderPermissions(t *testing.T) {

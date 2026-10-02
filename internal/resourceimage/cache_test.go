@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/migrations"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
-	"github.com/abhinavxd/libredesk/internal/setting"
-	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/google/uuid"
+	"github.com/jakedolan443/fernmail/internal/migrations"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/setting"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
 

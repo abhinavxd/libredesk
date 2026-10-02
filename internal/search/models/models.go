@@ -70,6 +70,7 @@ type ConversationResult struct {
 	Priority        null.String `db:"priority" json:"-"`
 	InboxName       null.String `db:"inbox_name" json:"inbox_name"`
 	InboxChannel    null.String `db:"inbox_channel" json:"inbox_channel"`
+	Address         null.String `db:"address" json:"address"`
 	Contact         Contact     `db:"contact" json:"correspondent"`
 }
 
@@ -94,5 +95,6 @@ type MessageResult struct {
 	Priority                    null.String `db:"priority" json:"-"`
 	InboxName                   null.String `db:"inbox_name" json:"inbox_name"`
 	InboxChannel                null.String `db:"inbox_channel" json:"inbox_channel"`
+	Address                     null.String `db:"address" json:"address"`
 	Contact                     Contact     `db:"contact" json:"correspondent"`
 }

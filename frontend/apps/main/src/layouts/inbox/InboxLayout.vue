@@ -1,6 +1,6 @@
 <template>
   <ResizablePanelGroup
-    v-if="!isSearchRoute && !isMobile"
+    v-if="!isSearchRoute && !isMobile && !isListRoute"
     direction="horizontal"
     class="h-full w-full"
     @layout="onLayoutChange"
@@ -22,6 +22,10 @@
     </ResizablePanel>
   </ResizablePanelGroup>
 
+  <!-- A list is the primary desktop workspace until a conversation is opened. -->
+  <ConversationList v-else-if="!isSearchRoute && !isMobile && addressID" />
+  <ConversationPlaceholder v-else-if="!isSearchRoute && !isMobile" />
+
   <!-- v-show, not v-if: the list keeps its scroll position. -->
   <div v-else-if="!isSearchRoute" class="h-full w-full">
     <ConversationList v-show="isListRoute" />
@@ -36,11 +40,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { useStorage } from '@vueuse/core'
+import { computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useDocumentVisibility, useIntervalFn, useStorage } from '@vueuse/core'
 import ConversationList from '@/features/conversation/list/ConversationList.vue'
+import ConversationPlaceholder from '@/features/conversation/ConversationPlaceholder.vue'
 import { useIsMobile } from '@shared-ui/composables'
+import { useAddressStore } from '@main/stores/address'
+import { useConversationStore } from '@main/stores/conversation'
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -50,8 +57,12 @@ import {
 defineOptions({ name: 'InboxLayout' })
 
 const route = useRoute()
+const router = useRouter()
 const isMobile = useIsMobile()
+const addressStore = useAddressStore()
+const conversationStore = useConversationStore()
 const isSearchRoute = computed(() => route.name === 'search')
+const addressID = computed(() => route.params.addressID)
 
 // Every detail route is its list route's name plus `-conversation`.
 const isListRoute = computed(() => !String(route.name).endsWith('-conversation'))
@@ -62,4 +73,45 @@ const panelSizes = useStorage('inboxPanelSizes', [25, 75])
 const onLayoutChange = (sizes) => {
   panelSizes.value = sizes
 }
+
+let lastFetchedAddressID = ''
+
+const hasCurrentList = () =>
+  conversationStore.conversations.initialized &&
+  conversationStore.conversations.addressID === Number(addressID.value)
+
+async function fetchForCurrentRoute() {
+  await addressStore.fetchAddresses()
+  if (!addressID.value) {
+    const first = addressStore.addresses[0]
+    if (first) router.replace({ name: 'address-inbox', params: { addressID: first.id } })
+    return
+  }
+
+  if (!addressStore.get(addressID.value)) {
+    router.replace({ name: 'address-inbox' })
+    return
+  }
+
+  if (String(addressID.value) === lastFetchedAddressID && hasCurrentList()) {
+    conversationStore.refreshConversationList()
+    return
+  }
+  lastFetchedAddressID = String(addressID.value)
+  conversationStore.fetchConversationsList(true, Number(addressID.value))
+}
+
+onMounted(fetchForCurrentRoute)
+watch(addressID, fetchForCurrentRoute)
+
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(() => conversationStore.refreshConversationList(), 120000)
+watch(visibility, (value) => {
+  if (value === 'visible') {
+    conversationStore.refreshConversationList()
+    resume()
+  } else {
+    pause()
+  }
+})
 </script>

@@ -231,14 +231,20 @@ Cypress.Commands.add('widgetBody', () =>
 // No cy.login() here: cy.session() blanks the page, which would tear down an embedded widget mid-test.
 Cypress.Commands.add('latestConversation', (inbox) => {
   return cy
-    .api(
-      'GET',
-      '/api/v1/conversations/all?order=desc&order_by=conversations.created_at&page=1&page_size=50'
-    )
+    .api('GET', '/api/v1/addresses')
     .then(({ body }) => {
-      const match = body.data.results.find((c) => c.inbox_name === inbox.payload.name)
-      expect(match, `no conversation found for inbox ${inbox.payload.name}`).to.exist
-      return match
+      const address = body.data.find((entry) => entry.inbox_id === inbox.id)
+      expect(address, `no address found for inbox ${inbox.payload.name}`).to.exist
+      return cy
+        .api(
+          'GET',
+          `/api/v1/addresses/${address.id}/conversations?order=desc&order_by=conversations.created_at&page=1&page_size=50`
+        )
+        .then(({ body: conversationBody }) => {
+          const match = conversationBody.data.results[0]
+          expect(match, `no conversation found for inbox ${inbox.payload.name}`).to.exist
+          return match
+        })
     })
 })
 
@@ -299,7 +305,6 @@ Cypress.Commands.add('setDefaultBusinessHours', (businessHoursId) =>
   cy.api('GET', '/api/v1/settings/general').then(({ body }) => {
     const settings = { ...body.data, 'app.business_hours_id': businessHoursId }
     delete settings['app.version']
-    delete settings['app.update']
     delete settings['app.restart_required']
     return cy.api('PUT', '/api/v1/settings/general', settings).its('status').should('eq', 200)
   })

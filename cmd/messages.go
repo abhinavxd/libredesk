@@ -4,11 +4,11 @@ import (
 	"slices"
 	"strings"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	authzModels "github.com/jakedolan443/fernmail/internal/authz/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -207,7 +207,6 @@ func handleSendMessage(r *fastglue.Request) error {
 	if !inbox.Enabled {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
 	}
-
 	if req.SenderType != umodels.UserTypeAgent && req.SenderType != umodels.UserTypeContact {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
@@ -215,6 +214,18 @@ func handleSendMessage(r *fastglue.Request) error {
 	// Contacts cannot send private messages
 	if req.SenderType == umodels.UserTypeContact && req.Private {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+	}
+	// Retired addresses remain readable so historical routing is never lost,
+	// but they must not be used for a public agent reply. Internal notes remain
+	// available for safely documenting historic conversations.
+	if conv.AddressID.Valid && req.SenderType == umodels.UserTypeAgent && !req.Private {
+		entry, err := app.address.Get(conv.AddressID.Int)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if !entry.Enabled {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("address.disabled"), nil, envelope.InputError)
+		}
 	}
 
 	// Check if user has permission to send messages as contact
@@ -234,17 +245,17 @@ func handleSendMessage(r *fastglue.Request) error {
 		}
 	}
 
-	// Get media for all attachments, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
+	// Resolve only this agent's pending uploads; claims are rechecked atomically when inserting the message.
+	media, err := getUnassociatedMedia(app, req.Attachments, user.ID)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
 
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
-		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID)
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID, user.ID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}

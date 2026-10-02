@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/attachment"
 	"github.com/microcosm-cc/bluemonday"
 	xhtml "golang.org/x/net/html"
 	"golang.org/x/net/html/atom"

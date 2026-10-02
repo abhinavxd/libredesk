@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/lib/pq"
 )
 

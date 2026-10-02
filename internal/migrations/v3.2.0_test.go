@@ -1,13 +1,16 @@
 package migrations
 
 import (
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"testing"
 )
 
 func TestRetireTagsPreservesRemainingViewFilters(t *testing.T) {
 	db := testutil.NewDB(t, "retire_tags")
 	db.MustExec(`
+ CREATE TYPE view_visibility AS ENUM ('all', 'team', 'user');
+ CREATE TABLE views(id SERIAL PRIMARY KEY, name TEXT NOT NULL, visibility view_visibility NOT NULL,
+   filters JSONB NOT NULL DEFAULT '[]', user_id BIGINT, team_id INTEGER);
  CREATE TABLE tags(id int);
  CREATE TABLE conversation_tags(tag_id int);
  ALTER TABLE inboxes ADD COLUMN prompt_tags_on_reply bool;

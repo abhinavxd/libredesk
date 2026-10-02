@@ -2,14 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 	"strings"
 	"testing"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 	"github.com/volatiletech/null/v9"
 )
 

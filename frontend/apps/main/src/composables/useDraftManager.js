@@ -1,160 +1,218 @@
-import { ref, watch } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { useDebounceFn, useEventListener } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
-import api from '@main/api'
 
-const hasKeys = (obj, keys) => Boolean(obj) && keys.every((key) => key in obj)
+const keyFor = (uuid, type) => `${uuid}::${type}`
+const emptyRecipients = () => ({ to: '', cc: '', bcc: '' })
+const copy = (value) => JSON.parse(JSON.stringify(value))
+const isEmpty = (draft) =>
+  !getTextFromHTML(draft?.content || '').length &&
+  !/<img\b/i.test(draft?.content || '') &&
+  !draft?.meta?.attachments?.length &&
+  !draft?.meta?.recipients
+const sameDraft = (left, right) =>
+  (isEmpty(left) && isEmpty(right)) ||
+  JSON.stringify({ content: left?.content || '', meta: left?.meta || {} }) ===
+    JSON.stringify({ content: right?.content || '', meta: right?.meta || {} })
 
-const validateAttachments = (attachments) => {
-  if (!Array.isArray(attachments)) return []
-  return attachments.filter((attachment) =>
-    hasKeys(attachment, ['id', 'size', 'uuid', 'filename', 'content_type'])
-  )
-}
-
-const isDraftEmpty = (draft) => {
-  const content = draft?.content || ''
-  const hasText = getTextFromHTML(content).length > 0
-  const hasInlineImage = /<img\b/i.test(content)
-  const hasAttachments = draft?.meta?.attachments?.length > 0
-  return !hasText && !hasInlineImage && !hasAttachments
-}
-
-const draftKey = (uuid, type) => `${uuid}::${type}`
-
-const metaSignature = (meta) =>
-  JSON.stringify({
-    attachments: (meta?.attachments || []).map((a) => a.uuid)
-  })
-
-const sameDraft = (a, b) => {
-  if (isDraftEmpty(a) && isDraftEmpty(b)) return true
-  return (
-    (a?.content || '') === (b?.content || '') && metaSignature(a?.meta) === metaSignature(b?.meta)
-  )
-}
-
-export function useDraftManager(conversationUUID, messageType, uploadedFiles = null) {
-  const conversationStore = useConversationStore()
+export function useDraftManager(
+  conversationUUID,
+  messageType,
+  uploadedFiles = null,
+  recipientDefaults = null
+) {
+  const store = useConversationStore()
   const htmlContent = ref('')
   const textContent = ref('')
   const isLoading = ref(false)
   const loadedAttachments = ref([])
-
-  // Live-key guard: the editor is transiently empty during open/switch and must not clobber a stored draft.
+  const recipients = ref(emptyRecipients())
   const loadedKey = ref(null)
-  const currentKey = () => draftKey(conversationUUID.value, messageType.value)
+  let recipientsInitialized = false
+  let recipientsEdited = false
+  let applying = false
+  let loadSequence = 0
+  const currentKey = () => keyFor(conversationUUID.value, messageType.value)
 
-  const buildDraft = () => {
+  function applyRecipients(value) {
+    applying = true
+    recipients.value = { ...emptyRecipients(), ...value }
+    applying = false
+  }
+
+  function prefillRecipients() {
+    const defaults = recipientDefaults?.value
+    if (
+      recipientsInitialized ||
+      recipientsEdited ||
+      !defaults?.ready ||
+      defaults.uuid !== conversationUUID.value ||
+      loadedKey.value !== currentKey()
+    )
+      return
+    applyRecipients(defaults.recipients)
+    recipientsInitialized = true
+  }
+
+  function buildDraft() {
     const meta = {}
-    if (uploadedFiles?.value?.length > 0) {
+    if (uploadedFiles?.value?.length) {
       meta.attachments = uploadedFiles.value.map((file) => ({
         id: file.id,
         url: file.url,
         size: file.size,
         uuid: file.uuid,
-        filename: file.filename,
+        filename: file.filename || file.name,
         content_type: file.content_type,
         disposition: file.disposition
       }))
     }
+    // Recipient-only edits are a draft too; untouched defaults do not create one.
+    if (
+      messageType.value === 'reply' &&
+      (recipientsEdited || htmlContent.value || meta.attachments)
+    ) {
+      meta.recipients = { ...recipients.value }
+    }
     return { content: htmlContent.value, meta }
   }
 
-  const applyDraft = (draft) => {
+  function applyDraft(draft) {
     htmlContent.value = draft?.content || ''
-    textContent.value = ''
-    loadedAttachments.value = validateAttachments(draft?.meta?.attachments)
+    textContent.value = getTextFromHTML(htmlContent.value)
+    loadedAttachments.value = (draft?.meta?.attachments || []).filter((a) => a.id && a.uuid)
+    recipientsEdited = Boolean(draft?.meta?.recipients)
+    recipientsInitialized = recipientsEdited
+    applyRecipients(draft?.meta?.recipients || emptyRecipients())
   }
 
-  const load = async (uuid, type) => {
-    isLoading.value = true
-    loadedKey.value = null
-    // Prefetch may still be in flight on a fresh page load; reading the store now would apply an empty draft.
-    const before = htmlContent.value
-    await conversationStore.draftsReady
-    // If the user typed while drafts were still loading, keep their input instead of clobbering it.
-    if (htmlContent.value === before) {
-      applyDraft(conversationStore.getDraft(uuid, type))
-    }
-    loadedKey.value = draftKey(uuid, type)
-    isLoading.value = false
-  }
-
-  // Serialize every server write so a delete can never land before an earlier save and resurrect the row.
-  let syncChain = Promise.resolve()
-  const queueSync = (fn) => {
-    syncChain = syncChain.then(fn, fn)
-  }
-
-  // Update the store synchronously; server sync runs in the background, never awaited.
-  const save = (uuid, type) => {
-    const draft = buildDraft()
-    if (sameDraft(draft, conversationStore.getDraft(uuid, type))) return
-    if (isDraftEmpty(draft)) {
-      conversationStore.removeDraft(uuid, type)
-      queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
+  function persist(uuid, type, draft) {
+    if (sameDraft(draft, store.getDraft(uuid, type))) return
+    if (isEmpty(draft)) {
+      store.removeDraft(uuid, type)
+      store.syncDraft(uuid, type, null)
     } else {
-      conversationStore.setDraft(uuid, type, draft)
-      queueSync(() => api.saveDraft(uuid, type, draft).catch(() => {}))
+      store.setDraft(uuid, type, draft)
+      store.syncDraft(uuid, type, draft)
     }
+  }
+
+  function save(uuid = conversationUUID.value, type = messageType.value) {
+    if (uuid) persist(uuid, type, buildDraft())
   }
 
   const debouncedSave = useDebounceFn(() => {
-    if (loadedKey.value === currentKey()) save(conversationUUID.value, messageType.value)
+    if (loadedKey.value === currentKey()) save()
   }, 500)
 
-  const clearDraft = (uuid = conversationUUID.value, type = messageType.value) => {
-    if (!uuid) return
-    conversationStore.removeDraft(uuid, type)
-    queueSync(() => api.deleteDraft(uuid, type).catch(() => {}))
-    if (uuid === conversationUUID.value && type === messageType.value) applyDraft(null)
-  }
-
-  const watchSources = [htmlContent, textContent]
-  if (uploadedFiles) watchSources.push(uploadedFiles)
+  watch(
+    recipients,
+    () => {
+      if (applying || isLoading.value) return
+      recipientsEdited = true
+      recipientsInitialized = true
+      debouncedSave()
+    },
+    { deep: true, flush: 'sync' }
+  )
 
   watch(
-    watchSources,
+    [htmlContent, textContent, ...(uploadedFiles ? [uploadedFiles] : [])],
     () => {
       if (!isLoading.value && loadedKey.value === currentKey()) debouncedSave()
     },
     { deep: true }
   )
 
-  // Serialize switches: a rapid A->B->A must not interleave save and load.
-  let chain = Promise.resolve()
   watch(
     [conversationUUID, messageType],
-    ([uuid, type], oldVals) => {
-      const [prevUuid, prevType] = oldVals || []
-      chain = chain
-        .then(async () => {
-          if (prevUuid && loadedKey.value === draftKey(prevUuid, prevType)) save(prevUuid, prevType)
-          if (uuid) await load(uuid, type)
-          else applyDraft(null)
-        })
-        .catch(() => {})
+    async ([uuid, type], old = []) => {
+      const [prevUuid, prevType] = old
+      if (prevUuid && loadedKey.value === keyFor(prevUuid, prevType)) {
+        // Use the old type when capturing a switch from reply to private note.
+        const draft = buildDraft()
+        if (prevType === 'reply' && (recipientsEdited || draft.content || draft.meta.attachments)) {
+          draft.meta.recipients = { ...recipients.value }
+        }
+        if (prevType !== 'reply') delete draft.meta.recipients
+        persist(prevUuid, prevType, draft)
+      }
+      const sequence = ++loadSequence
+      isLoading.value = true
+      loadedKey.value = null
+      await store.draftsReady
+      if (sequence !== loadSequence) return
+      applyDraft(uuid ? store.getDraft(uuid, type) : null)
+      // Allow the attachment owner to restore the loaded array before autosaving.
+      await nextTick()
+      if (sequence !== loadSequence) return
+      loadedKey.value = uuid ? keyFor(uuid, type) : null
+      isLoading.value = false
+      prefillRecipients()
     },
     { immediate: true }
   )
 
-  useEventListener(document, 'visibilitychange', () => {
-    if (
-      document.visibilityState === 'hidden' &&
-      conversationUUID.value &&
-      loadedKey.value === currentKey()
-    ) {
-      save(conversationUUID.value, messageType.value)
-    }
-  })
+  if (recipientDefaults) watch(recipientDefaults, prefillRecipients, { deep: true })
 
+  function clearDraft(uuid = conversationUUID.value, type = messageType.value) {
+    if (!uuid) return
+    store.removeDraft(uuid, type)
+    store.syncDraft(uuid, type, null)
+    if (loadedKey.value === keyFor(uuid, type)) {
+      applyDraft(null)
+      prefillRecipients()
+    }
+  }
+
+  // Re-read the open draft from the store, e.g. after a review returns a reply to it.
+  function reloadDraft() {
+    const uuid = conversationUUID.value
+    if (!uuid || loadedKey.value !== currentKey()) return
+    applyDraft(store.getDraft(uuid, messageType.value))
+    prefillRecipients()
+  }
+
+  function captureDraft() {
+    const snapshot = {
+      uuid: conversationUUID.value,
+      type: messageType.value,
+      draft: copy(buildDraft())
+    }
+    persist(snapshot.uuid, snapshot.type, snapshot.draft)
+    return snapshot
+  }
+
+  function completeSend(snapshot) {
+    const isCurrent = loadedKey.value === keyFor(snapshot.uuid, snapshot.type)
+    const latest = isCurrent ? buildDraft() : store.getDraft(snapshot.uuid, snapshot.type)
+    if (!sameDraft(latest, snapshot.draft)) return false
+    clearDraft(snapshot.uuid, snapshot.type)
+    return isCurrent
+  }
+
+  const flush = () => {
+    if (loadedKey.value === currentKey()) save()
+  }
+  useEventListener(document, 'visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush()
+  })
+  onScopeDispose(flush)
+
+  const saveState = computed(() => store.draftSaveStates.get(currentKey()) || '')
+  const retrySave = () => store.retryDraftSave(conversationUUID.value, messageType.value)
   return {
     htmlContent,
     textContent,
     isLoading,
+    loadedAttachments,
+    recipients,
     clearDraft,
-    loadedAttachments
+    reloadDraft,
+    captureDraft,
+    completeSend,
+    saveState,
+    retrySave
   }
 }

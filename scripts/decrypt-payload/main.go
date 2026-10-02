@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/abhinavxd/libredesk/internal/crypto"
+	"github.com/jakedolan443/fernmail/internal/crypto"
 )
 
 func main() {

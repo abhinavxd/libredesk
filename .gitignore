@@ -4,6 +4,9 @@ config.toml.*
 libredesk.bin
 libredesk
 libredesk.exe
+fernmail.bin
+fernmail
+fernmail.exe
 uploads
 .env
 dist/

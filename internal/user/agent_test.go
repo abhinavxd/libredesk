@@ -122,3 +122,30 @@ func TestGetAgentsCompactFilters(t *testing.T) {
 		t.Fatalf("got %d users without filters, want 2 human mailbox accounts", len(unfiltered))
 	}
 }
+
+func TestInvalidRoleSetsCannotCreateOrDeauthorizeAgents(t *testing.T) {
+	mgr, db := newTestManager(t)
+	agent, err := mgr.CreateAgent("Keep", "Roles", "keep@example.test", []string{"Agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, roles := range [][]string{nil, {}, {""}, {"Missing"}, {"Agent", "Missing"}, {"Agent", "Agent"}} {
+		if _, err := mgr.CreateAgent("Orphan", "", "orphan@example.test", roles); err == nil {
+			t.Fatalf("created invalid roles %v", roles)
+		}
+		var count int
+		if err := db.Get(&count, `SELECT count(*) FROM users WHERE email='orphan@example.test'`); err != nil || count != 0 {
+			t.Fatalf("invalid roles inserted orphan: %d %v", count, err)
+		}
+		if err := mgr.UpdateAgent(agent.ID, "Changed", "", "keep@example.test", roles, true, "", ""); err == nil {
+			t.Fatalf("accepted invalid update roles %v", roles)
+		}
+		current, err := mgr.GetAgent(agent.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if current.FirstName != "Keep" || len(current.Roles) != 1 || current.Roles[0] != "Agent" {
+			t.Fatalf("rejected update changed account: %+v", current)
+		}
+	}
+}

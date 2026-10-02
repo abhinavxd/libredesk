@@ -151,12 +151,6 @@ const createUser = (data) =>
     }
   })
 
-const createConversation = (data) =>
-  http.post('/api/v1/conversations', data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
 const updateConversationStatus = (uuid, data) =>
   http.put(`/api/v1/conversations/${uuid}/status`, data, {
     headers: {
@@ -185,19 +179,49 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
+const markAddressAsRead = (id) => http.post(`/api/v1/addresses/${id}/mark-read`)
 const getConversationTranscript = (uuid) =>
   http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
 
-const getAllConversations = (params) =>
-  http.get('/api/v1/conversations/all', { params, abortOnRoute: true })
-const getMentionedConversations = (params) =>
-  http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
+const getAddresses = () => http.get('/api/v1/addresses')
+const getAddressConversations = (id, params) =>
+  http.get(`/api/v1/addresses/${id}/conversations`, { params, abortOnRoute: true })
 const getSidebarCounts = () => http.get('/api/v1/conversations/sidebar-counts')
-const getViewCount = (id) => http.get(`/api/v1/views/${id}/count`)
-const getViewConversations = (id, params) =>
-  http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
+const getAdminAddresses = () => http.get('/api/v1/admin/addresses')
+const getAddressPrincipals = () => http.get('/api/v1/admin/address-principals')
+const getAdminAddress = (id) => http.get(`/api/v1/admin/addresses/${id}`)
+const getAddressAccess = (id) => http.get(`/api/v1/admin/addresses/${id}/access`)
+const createAddress = (data) => http.post('/api/v1/admin/addresses', data)
+const updateAddress = (id, data) => http.put(`/api/v1/admin/addresses/${id}`, data)
+const deleteAddress = (id) => http.delete(`/api/v1/admin/addresses/${id}`)
+// Compose New and the review queue.
+const composeEmail = (data) => http.post('/api/v1/compose', data)
+const submitReplyForReview = (uuid, data) => http.post(`/api/v1/conversations/${uuid}/reviews`, data)
+const getConversationReviews = (uuid) => http.get(`/api/v1/conversations/${uuid}/reviews`)
+const getReviews = () => http.get('/api/v1/reviews')
+const getReviewCounts = () => http.get('/api/v1/reviews/counts')
+const getReview = (uuid) => http.get(`/api/v1/reviews/${uuid}`)
+const approveReview = (uuid) => http.post(`/api/v1/reviews/${uuid}/approve`)
+const denyReview = (uuid, note) => http.post(`/api/v1/reviews/${uuid}/deny`, { note })
+const withdrawReview = (uuid) => http.post(`/api/v1/reviews/${uuid}/withdraw`)
+const dismissReview = (uuid) => http.post(`/api/v1/reviews/${uuid}/dismiss`)
+const resubmitReview = (uuid, data) => http.put(`/api/v1/reviews/${uuid}`, data)
+const discardReview = (uuid) => http.delete(`/api/v1/reviews/${uuid}`)
+
+// Users settings screen.
+const getManagedUsers = () => http.get('/api/v1/admin/users')
+const createManagedUser = (data) => http.post('/api/v1/admin/users', data)
+const updateManagedUserAccess = (id, data) => http.put(`/api/v1/admin/users/${id}/access`, data)
+const deleteManagedUser = (id) => http.delete(`/api/v1/admin/users/${id}`)
+
 const uploadMedia = (data) =>
   http.post('/api/v1/media', data, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+const uploadSiteLogo = (data) =>
+  http.post('/api/v1/settings/general/logo', data, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -236,38 +260,6 @@ const getAllDrafts = () => http.get('/api/v1/drafts')
 
 const deleteDraft = (uuid, type) =>
   http.delete(`/api/v1/conversations/${uuid}/draft`, { params: { type } })
-const getCurrentUserViews = () => http.get('/api/v1/views/me')
-const createView = (data) =>
-  http.post('/api/v1/views/me', data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-const updateView = (id, data) =>
-  http.put(`/api/v1/views/me/${id}`, data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-const deleteView = (id) => http.delete(`/api/v1/views/me/${id}`)
-
-const getSharedViews = () => http.get('/api/v1/views/shared')
-const getAllSharedViews = () => http.get('/api/v1/shared-views')
-const getSharedView = (id) => http.get(`/api/v1/shared-views/${id}`)
-const createSharedView = (data) =>
-  http.post('/api/v1/shared-views', data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-const updateSharedView = (id, data) =>
-  http.put(`/api/v1/shared-views/${id}`, data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-const deleteSharedView = (id) => http.delete(`/api/v1/shared-views/${id}`)
-
 const getWebhooksCompact = () => http.get('/api/v1/webhooks/compact')
 const getWebhooks = () => http.get('/api/v1/webhooks')
 const getWebhook = (id) => http.get(`/api/v1/webhooks/${id}`)
@@ -308,6 +300,23 @@ const initiateOAuthFlow = (provider, data) =>
   })
 
 export default {
+  composeEmail,
+  submitReplyForReview,
+  getConversationReviews,
+  getReviews,
+  getReviewCounts,
+  getReview,
+  approveReview,
+  denyReview,
+  withdrawReview,
+  dismissReview,
+  resubmitReview,
+  discardReview,
+  getManagedUsers,
+  createManagedUser,
+  updateManagedUserAccess,
+  deleteManagedUser,
+  markAddressAsRead,
   login,
   deleteUser,
   importAgents,
@@ -325,12 +334,16 @@ export default {
   getAvailableLanguages,
   getConversation,
 
-  getAllConversations,
-  getMentionedConversations,
+  getAddresses,
+  getAddressConversations,
   getSidebarCounts,
-  getViewCount,
-
-  getViewConversations,
+  getAdminAddresses,
+  getAddressPrincipals,
+  getAdminAddress,
+  getAddressAccess,
+  createAddress,
+  updateAddress,
+  deleteAddress,
 
   getConversationMessage,
   allowMessageImages,
@@ -343,12 +356,12 @@ export default {
   updateConversationStatus,
 
   uploadMedia,
+  uploadSiteLogo,
   updateAssigneeLastSeen,
   markConversationAsUnread,
   updateUser,
   updateCurrentUserAvailability,
 
-  createConversation,
   sendMessage,
   retryMessage,
   deleteMessage,
@@ -386,17 +399,6 @@ export default {
   saveDraft,
   getAllDrafts,
   deleteDraft,
-  getCurrentUserViews,
-  createView,
-  updateView,
-  deleteView,
-  getSharedViews,
-  getAllSharedViews,
-  getSharedView,
-  createSharedView,
-  updateSharedView,
-  deleteSharedView,
-
   searchConversations,
   searchMessages,
 

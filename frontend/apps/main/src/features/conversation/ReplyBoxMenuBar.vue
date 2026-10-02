@@ -52,15 +52,16 @@
     </div>
     <div class="flex items-center rounded-md shadow-sm">
       <Button
-        class="h-8 max-md:h-11 px-4 rounded-r-none"
+        class="h-8 max-md:h-11 px-4"
+        :class="[{ 'rounded-r-none': allowSetStatus }, { 'bg-review text-review-foreground hover:bg-review/90': sendForReview }]"
         @click="handleSend"
         :disabled="!enableSend"
         :isLoading="isSending"
         v-if="showSendButton"
       >
-        {{ $t('globals.messages.send') }}
+        {{ sendForReview ? $t('replyBox.sendForReview') : $t('globals.messages.send') }}
       </Button>
-      <DropdownMenu v-if="showSendButton">
+      <DropdownMenu v-if="showSendButton && allowSetStatus">
         <DropdownMenuTrigger as-child>
           <Button
             class="h-8 max-md:h-11 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
@@ -131,7 +132,11 @@ defineProps({
     default: true
   },
   handleFileUpload: Function,
-  handleInlineImageUpload: Function
+  handleInlineImageUpload: Function,
+  // Contributor replies are held for review instead of being sent.
+  sendForReview: { type: Boolean, default: false },
+  // Hidden for people who cannot change conversation status.
+  allowSetStatus: { type: Boolean, default: true }
 })
 
 onClickOutside(emojiPickerRef, () => {

@@ -28,6 +28,7 @@ import { useI18n } from 'vue-i18n'
 
 const emitter = useEmitter()
 const { t } = useI18n()
+
 const formLoading = ref(false)
 const isLoading = ref(false)
 const inbox = ref({})

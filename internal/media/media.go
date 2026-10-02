@@ -18,12 +18,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
-	"github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/image"
+	"github.com/jakedolan443/fernmail/internal/media/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -188,6 +188,7 @@ func (m *Manager) GetStorageUsage() (StorageUsage, error) {
 
 // queries holds the prepared SQL statements.
 type queries struct {
+	GetUnlinkedBrandingMedia   *sqlx.Stmt `query:"get-unlinked-branding-media"`
 	GetUnlinkedResourceAvatars *sqlx.Stmt `query:"get-unlinked-resource-avatars"`
 	GetUnlinkedResourceImages  *sqlx.Stmt `query:"get-unlinked-resource-images"`
 	Insert                     *sqlx.Stmt `query:"insert-media"`
@@ -205,6 +206,18 @@ type queries struct {
 // any bytes. The short accounting transaction ends before storage I/O; pending
 // uploads count against the quota and abandoned rows use the unlinked-media sweep.
 func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (models.Media, error) {
+	return m.uploadAndInsert(srcFilename, contentType, contentID, modelType, modelID, content, fileSize, disposition, meta, private, 0)
+}
+
+// UploadForUser records ownership in the initial reservation, before the file can be referenced.
+func (m *Manager) UploadForUser(srcFilename, contentType string, modelType null.String, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, userID int) (models.Media, error) {
+	if userID <= 0 {
+		return models.Media{}, mediaPermissionError()
+	}
+	return m.uploadAndInsert(srcFilename, contentType, "", modelType, null.Int{}, content, fileSize, disposition, meta, true, userID)
+}
+
+func (m *Manager) uploadAndInsert(srcFilename, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool, uploadedBy int) (models.Media, error) {
 	if modelType.String == models.ModelResourceImages || modelType.String == models.ModelResourceAvatars {
 		return models.Media{}, fmt.Errorf("external images must use the image cache reservation path")
 	}
@@ -224,7 +237,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		modelType = null.StringFrom(models.ModelMessages)
 	}
 	name := uuid.NewString()
-	reserved, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, name, modelID, int(size), meta, private)
+	reserved, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, name, modelID, int(size), meta, private, uploadedBy)
 	if err != nil {
 		return models.Media{}, err
 	}
@@ -269,7 +282,11 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 }
 
 // Insert inserts media details into the database and returns the inserted media record.
-func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
+func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool, ownerIDs ...int) (models.Media, error) {
+	var uploadedBy int
+	if len(ownerIDs) > 0 {
+		uploadedBy = ownerIDs[0]
+	}
 	var id int
 	m.maxStorageMu.RLock()
 	maxStorageBytes := m.maxStorageBytes
@@ -291,14 +308,14 @@ func (m *Manager) Insert(disposition null.String, fileName, contentType, content
 			m.notifyStorageFull()
 			return models.Media{}, m.storageFullError()
 		}
-		if err := tx.Stmtx(m.queries.Insert).QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+		if err := tx.Stmtx(m.queries.Insert).QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private, uploadedBy).Scan(&id); err != nil {
 			m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 			return models.Media{}, m.mediaGenericError()
 		}
 		if err := tx.Commit(); err != nil {
 			return models.Media{}, m.mediaGenericError()
 		}
-	} else if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+	} else if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private, uploadedBy).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -370,10 +387,10 @@ func (m *Manager) GetByContentIDs(contentIDs []string, conversationUUID string) 
 	return out, nil
 }
 
-// GetDraftInlineMedia returns media by UUID only if it's unattached or linked to a message in the given conversation.
-func (m *Manager) GetDraftInlineMedia(uuid string, conversationID int) (models.Media, error) {
+// GetDraftInlineMedia resolves the user's pending upload or a historic attachment in this conversation.
+func (m *Manager) GetDraftInlineMedia(uuid string, conversationID, userID int) (models.Media, error) {
 	var media models.Media
-	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID); err != nil {
+	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID, userID); err != nil {
 		if err == sql.ErrNoRows {
 			return media, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMedia"), nil)
 		}
@@ -450,22 +467,6 @@ func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
 	return m.store.SignedURLValidator()
 }
 
-// LinkMessageMediaTx links a message's attachments and inline images to it within the given transaction, stamping a content_id on the inline ones.
-func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string) error {
-	if len(media) == 0 && len(inlineUUIDs) == 0 {
-		return nil
-	}
-	ids := make([]int, 0, len(media))
-	for _, med := range media {
-		ids = append(ids, med.ID)
-	}
-	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs)); err != nil {
-		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
-		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
-	}
-	return nil
-}
-
 // GetByModel retrieves all media files attached to a specific model.
 func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) {
 	var media = make([]models.Media, 0)
@@ -520,7 +521,7 @@ func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
 
 // deleteUnlinked runs all unlinked-media sweeps.
 func (m *Manager) deleteUnlinked() {
-	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedResourceImages, m.queries.GetUnlinkedResourceAvatars} {
+	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedResourceImages, m.queries.GetUnlinkedResourceAvatars, m.queries.GetUnlinkedBrandingMedia} {
 		if err := m.deleteUnlinkedRows(stmt); err != nil {
 			m.lo.Error("error deleting unlinked media", "error", err)
 		}
@@ -536,13 +537,19 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 	}
 	for _, mm := range media {
 		m.lo.Info("deleting unlinked media", "media_id", mm.ID, "uuid", mm.UUID, "filename", mm.Filename, "model_type", mm.Model.String, "model_id", mm.ModelID.Int)
-		if err := m.Delete(mm.UUID); err != nil {
+		var deleteErr error
+		if stmt == m.queries.GetUnlinkedMessageMedia {
+			deleteErr = m.deletePendingMessageMedia(mm.ID)
+		} else {
+			deleteErr = m.Delete(mm.UUID)
+		}
+		if err := deleteErr; err != nil {
 			m.lo.Error("error deleting unlinked media", "media_id", mm.ID, "model_type", mm.Model.String, "model_id", mm.ModelID.Int, "error", err)
 			continue
 		}
 
-		// If it's an image, also delete the `thumb_uuid` image from store.
-		if mm.Model.String != models.ModelResourceImages && mm.Model.String != models.ModelResourceAvatars && strings.HasPrefix(mm.ContentType, "image/") {
+		// If it's an image, also delete the `thumb_uuid` image from store. Logos are stored without thumbnails.
+		if stmt != m.queries.GetUnlinkedMessageMedia && mm.Model.String != models.ModelResourceImages && mm.Model.String != models.ModelResourceAvatars && mm.Model.String != models.ModelBranding && strings.HasPrefix(mm.ContentType, "image/") {
 			thumbUUID := image.ThumbPrefix + mm.UUID
 			if err := m.Delete(thumbUUID); err != nil {
 				m.lo.Error("error deleting thumbnail for unlinked media", "media_id", mm.ID, "thumb_uuid", thumbUUID, "error", err)

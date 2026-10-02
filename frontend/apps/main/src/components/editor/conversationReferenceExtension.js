@@ -1,7 +1,7 @@
 import Mention from '@tiptap/extension-mention'
 
 export const conversationReferenceHref = (uuid) =>
-  `/inboxes/all/conversation/${encodeURIComponent(uuid)}`
+  `/conversation/${encodeURIComponent(uuid)}`
 
 export const ConversationReference = Mention.extend({
   name: 'conversationReference',

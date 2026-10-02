@@ -29,6 +29,7 @@ SELECT
     cs.name AS status,
     inboxes.name AS inbox_name,
     inboxes.channel AS inbox_channel,
+    ea.address AS address,
     users.first_name AS "contact.first_name",
     users.last_name AS "contact.last_name",
     users.email AS "contact.email",
@@ -38,8 +39,10 @@ JOIN users ON conversations.contact_id = users.id
 LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
 LEFT JOIN teams ON conversations.assigned_team_id = teams.id
 LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN email_addresses ea ON ea.id = conversations.address_id
 LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
 WHERE inboxes.channel = 'email' AND conversations.id IN (SELECT id FROM matched_conversations)
+  AND can_access_email_address(conversations.address_id, $2)
   AND $3
   AND (
        $4
@@ -78,6 +81,7 @@ SELECT
     cs.name AS conversation_status,
     inboxes.name AS inbox_name,
     inboxes.channel AS inbox_channel,
+    ea.address AS address,
     users.first_name AS "contact.first_name",
     users.last_name AS "contact.last_name",
     users.email AS "contact.email",
@@ -89,9 +93,11 @@ LEFT JOIN users sender ON conversation_messages.sender_id = sender.id
 LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
 LEFT JOIN teams ON conversations.assigned_team_id = teams.id
 LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN email_addresses ea ON ea.id = conversations.address_id
 LEFT JOIN conversation_statuses cs ON conversations.status_id = cs.id
 WHERE inboxes.channel = 'email' AND conversation_messages.type != 'activity'
   AND conversation_messages.text_content ILIKE $10 ESCAPE '\'
+  AND can_access_email_address(conversations.address_id, $2)
   AND $3
   AND (
        $4

@@ -5,8 +5,6 @@ export const EMITTER_EVENTS = {
   SHOW_SOONER: 'show-sooner',
   NEW_MESSAGE: 'new-message',
   SCROLL_TO_MESSAGE: 'scroll-to-message',
-  OPEN_CREATE_CONVERSATION: 'open-create-conversation',
-  OPEN_VIEW_FORM: 'open-view-form',
   REPLY_BOX_FOCUS: 'reply-box-focus',
   REPLY_BOX_SET_TYPE: 'reply-box-set-type',
   CONVERSATION_ACTION: 'conversation-action',

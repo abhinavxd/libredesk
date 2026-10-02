@@ -9,7 +9,6 @@ DROP TYPE IF EXISTS "conversation_assignment_type" CASCADE; CREATE TYPE "convers
 DROP TYPE IF EXISTS "template_type" CASCADE; CREATE TYPE "template_type" AS ENUM ('email_outgoing');
 -- Visitors are unauthenticated contacts.
 DROP TYPE IF EXISTS "user_type" CASCADE; CREATE TYPE "user_type" AS ENUM ('agent', 'contact', 'visitor', 'ai_assistant');
-DROP TYPE IF EXISTS "view_visibility" CASCADE; CREATE TYPE "view_visibility" AS ENUM ('all', 'team', 'user');
 DROP TYPE IF EXISTS "media_disposition" CASCADE; CREATE TYPE "media_disposition" AS ENUM ('inline', 'attachment');
 DROP TYPE IF EXISTS "media_store" CASCADE; CREATE TYPE "media_store" AS ENUM ('s3', 'fs');
 DROP TYPE IF EXISTS "user_availability_status" CASCADE; CREATE TYPE "user_availability_status" AS ENUM ('online', 'away', 'away_manual', 'offline', 'away_and_reassigning');
@@ -184,6 +183,125 @@ CREATE TABLE user_roles (
 );
 CREATE INDEX index_user_roles_on_user_id ON user_roles(user_id);
 
+DROP TABLE IF EXISTS inbox_access, inbox_users, inbox_roles CASCADE;
+
+-- Existing inboxes remain available until an administrator restricts them.
+CREATE TABLE IF NOT EXISTS inbox_access (
+    inbox_id INTEGER PRIMARY KEY REFERENCES inboxes(id) ON DELETE CASCADE,
+    restricted BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE TABLE IF NOT EXISTS inbox_users (
+    inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (inbox_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS inbox_roles (
+    inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+    role_id INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (inbox_id, role_id)
+);
+
+-- One policy for HTTP reads, lists, search, counts and live notifications.
+CREATE OR REPLACE FUNCTION can_access_inbox(target_inbox INTEGER, viewer BIGINT)
+RETURNS BOOLEAN LANGUAGE SQL STABLE AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM inboxes i
+        JOIN users u ON u.id = viewer AND u.type = 'agent' AND u.enabled AND u.deleted_at IS NULL
+        WHERE i.id = target_inbox AND i.channel = 'email' AND i.deleted_at IS NULL
+        AND (
+            u.email = 'System'
+            OR EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                       WHERE ur.user_id = viewer AND r.name = 'Admin')
+            OR EXISTS (SELECT 1 FROM inbox_users iu WHERE iu.inbox_id = i.id AND iu.user_id = viewer)
+            OR EXISTS (SELECT 1 FROM inbox_roles ir JOIN user_roles ur ON ur.role_id = ir.role_id
+                       WHERE ir.inbox_id = i.id AND ur.user_id = viewer)
+        )
+    );
+$$;
+
+-- Addresses are the user-facing mail endpoints. A mailbox owns an IMAP/SMTP
+-- transport inbox; an alias deliberately shares one. Keeping the endpoint
+-- separate from the transport lets permissions, routing, and reply identity
+-- agree without polling an alias more than once.
+DROP TABLE IF EXISTS email_address_teams, email_address_users, email_addresses CASCADE;
+CREATE TABLE email_addresses (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+    address TEXT NOT NULL,
+    display_name TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL DEFAULT 'alias' CHECK (kind IN ('mailbox', 'alias')),
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT constraint_email_addresses_address CHECK (length(address) <= 320),
+    CONSTRAINT constraint_email_addresses_display_name CHECK (length(display_name) <= 140)
+);
+CREATE UNIQUE INDEX index_email_addresses_on_normalized_address ON email_addresses (lower(address));
+CREATE UNIQUE INDEX index_email_addresses_one_mailbox_per_inbox
+    ON email_addresses (inbox_id) WHERE kind = 'mailbox';
+CREATE INDEX index_email_addresses_on_inbox_id ON email_addresses(inbox_id);
+
+CREATE TABLE email_address_users (
+    address_id INTEGER NOT NULL REFERENCES email_addresses(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    PRIMARY KEY (address_id, user_id)
+);
+CREATE TABLE email_address_teams (
+    address_id INTEGER NOT NULL REFERENCES email_addresses(id) ON DELETE CASCADE,
+    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    PRIMARY KEY (address_id, team_id)
+);
+CREATE INDEX index_email_address_users_on_user_id ON email_address_users(user_id);
+CREATE INDEX index_email_address_teams_on_team_id ON email_address_teams(team_id);
+
+DROP TABLE IF EXISTS team_members CASCADE;
+CREATE TABLE team_members (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	-- Cascade deletes when team or user is deleted.
+	team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	emoji TEXT NULL,
+	CONSTRAINT constraint_team_members_on_emoji CHECK (length(emoji) <= 1)
+);
+CREATE UNIQUE INDEX index_unique_team_members_on_team_id_and_user_id ON team_members (team_id, user_id);
+CREATE INDEX index_team_members_on_user_id ON team_members (user_id);
+
+-- Address policies are the sole user-facing access control. The IMAP/SMTP
+-- transport is implementation detail, so a hidden transport policy can never
+-- override an explicit Address grant. Admins see every address; everyone else
+-- needs a direct or team grant, there is no open-to-all address.
+CREATE OR REPLACE FUNCTION can_access_email_address(target_address INTEGER, viewer BIGINT)
+RETURNS BOOLEAN LANGUAGE SQL STABLE AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM email_addresses a
+        JOIN inboxes i ON i.id = a.inbox_id
+            AND i.channel = 'email'
+            AND i.deleted_at IS NULL
+        JOIN users u ON u.id = viewer AND u.type = 'agent' AND u.enabled AND u.deleted_at IS NULL
+        WHERE a.id = target_address
+          AND (
+              u.email = 'System'
+              OR EXISTS (
+                  SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                  WHERE ur.user_id = viewer AND r.name = 'Admin'
+              )
+              OR EXISTS (
+                  SELECT 1 FROM email_address_users eau
+                  WHERE eau.address_id = a.id AND eau.user_id = viewer
+              )
+              OR EXISTS (
+                  SELECT 1
+                  FROM email_address_teams eat
+                  JOIN team_members tm ON tm.team_id = eat.team_id
+                  WHERE eat.address_id = a.id AND tm.user_id = viewer
+              )
+          )
+    );
+$$;
+
 DROP TABLE IF EXISTS conversation_statuses CASCADE;
 CREATE TABLE conversation_statuses (
 	id SERIAL PRIMARY KEY,
@@ -213,6 +331,10 @@ CREATE TABLE conversations (
 
     -- Cascade deletes when inbox is deleted.
 	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+
+	-- Email addresses are the visible communication endpoints. This remains
+	-- nullable for non-email channels.
+	address_id INT REFERENCES email_addresses(id) ON DELETE SET NULL ON UPDATE CASCADE,
 
 	-- Restrict delete.
 	status_id INT REFERENCES conversation_statuses(id) ON DELETE RESTRICT ON UPDATE CASCADE NOT NULL,
@@ -245,6 +367,7 @@ CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_
 CREATE INDEX index_conversations_on_snoozed_until ON conversations (snoozed_until);
 CREATE INDEX index_conversations_on_contact_id ON conversations (contact_id);
 CREATE INDEX index_conversations_on_inbox_id ON conversations (inbox_id);
+CREATE INDEX index_conversations_on_address_id ON conversations (address_id);
 CREATE INDEX index_conversations_on_status_id ON conversations (status_id);
 CREATE INDEX index_conversations_on_priority_id ON conversations (priority_id);
 CREATE INDEX index_conversations_on_created_at ON conversations (created_at);
@@ -403,20 +526,6 @@ CREATE TABLE settings (
 );
 CREATE INDEX index_settings_on_key ON settings USING btree ("key");
 
-DROP TABLE IF EXISTS team_members CASCADE;
-CREATE TABLE team_members (
-	id SERIAL PRIMARY KEY,
-	created_at TIMESTAMPTZ DEFAULT NOW(),
-	updated_at TIMESTAMPTZ DEFAULT NOW(),
-	-- Cascade deletes when team or user is deleted.
-	team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
-	user_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
-	emoji TEXT NULL,
-	CONSTRAINT constraint_team_members_on_emoji CHECK (length(emoji) <= 1)
-);
-CREATE UNIQUE INDEX index_unique_team_members_on_team_id_and_user_id ON team_members (team_id, user_id);
-CREATE INDEX index_team_members_on_user_id ON team_members (user_id);
-
 DROP TABLE IF EXISTS templates CASCADE;
 CREATE TABLE templates (
 	id SERIAL PRIMARY KEY,
@@ -433,25 +542,6 @@ CREATE TABLE templates (
 );
 CREATE UNIQUE INDEX index_unique_templates_on_is_default_when_is_default_is_true ON templates USING btree (is_default)
 WHERE (is_default = true);
-
-DROP TABLE IF EXISTS views CASCADE;
-CREATE TABLE views (
-    id SERIAL PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    name TEXT NOT NULL,
-    filters JSONB NOT NULL,
-    visibility view_visibility NOT NULL DEFAULT 'user',
-    -- Delete user views when user / team is deleted.
-    user_id BIGINT REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
-    team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT constraint_views_on_name CHECK (length(name) <= 140),
-    CONSTRAINT constraint_views_visibility_user CHECK (visibility != 'user' OR user_id IS NOT NULL),
-    CONSTRAINT constraint_views_visibility_team CHECK (visibility != 'team' OR team_id IS NOT NULL)
-);
-CREATE INDEX index_views_on_user_id ON views(user_id);
-CREATE INDEX index_views_on_visibility ON views(visibility);
-CREATE INDEX index_views_on_team_id ON views(team_id);
 
 DROP TABLE IF EXISTS webhooks CASCADE;
 CREATE TABLE webhooks (
@@ -478,8 +568,7 @@ VALUES
     ('security.resource_policy', '{"mode":"load_on_receipt","allowed_domains":[]}'::jsonb),
     ('app.root_url', '"http://localhost:9000"'::jsonb),
     ('app.logo_url', '""'::jsonb),
-    ('app.site_name', '"libredesk"'::jsonb),
-    ('app.favicon_url', '"http://localhost:9000/favicon.ico"'::jsonb),
+    ('app.site_name', '""'::jsonb),
     ('app.max_file_upload_size', '20'::jsonb),
     ('app.allowed_file_upload_extensions', '["*"]'::jsonb),
 	('app.timezone', '"Asia/Kolkata"'::jsonb),
@@ -515,7 +604,16 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read,conversations:update_status,messages:read,messages:write,messages:write_private,view:manage,conversations:write}'
+		'{conversations:read_all,conversations:read,conversations:update_status,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage}'
+	);
+
+INSERT INTO
+	roles ("name", description, permissions)
+VALUES
+	(
+		'Contributor',
+		'Reads assigned addresses; replies and new emails are reviewed before sending.',
+		'{conversations:read_all,conversations:read,conversations:create,messages:read,reviews:submit}'
 	);
 
 INSERT INTO
@@ -524,5 +622,136 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,conversations:write,general_settings:manage,oidc:manage,conversations:read_all,conversations:read,conversations:update_status,messages:read,messages:write,messages:write_private,view:manage,shared_views:manage,status:manage,users:manage,inboxes:manage,templates:manage}'
+		'{webhooks:manage,general_settings:manage,oidc:manage,conversations:read_all,conversations:read,conversations:update_status,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage,status:manage,users:manage,inboxes:manage,templates:manage}'
 	);
+
+-- BEGIN mail_reliability schema
+-- Durable mailbox progress and retries; a new UIDVALIDITY gets an independent full scan.
+CREATE TABLE IF NOT EXISTS mail_sync_cursors (
+ inbox_id integer NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+ mailbox_key text NOT NULL, uid_validity bigint NOT NULL, last_uid bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY(inbox_id,mailbox_key,uid_validity)
+);
+CREATE TABLE IF NOT EXISTS mail_sync_failures (
+ inbox_id integer NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+ mailbox_key text NOT NULL, uid_validity bigint NOT NULL, uid bigint NOT NULL,
+ error text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(inbox_id,mailbox_key,uid_validity,uid)
+);
+CREATE TABLE IF NOT EXISTS incoming_mail_queue (
+ id bigserial PRIMARY KEY, inbox_id integer NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+ delivery_key text NOT NULL UNIQUE, payload jsonb, attempts integer NOT NULL DEFAULT 0,
+ next_attempt_at timestamptz NOT NULL DEFAULT now(), lease_until timestamptz,
+ claim_token uuid, last_error text, completed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS incoming_mail_queue_pending ON incoming_mail_queue(next_attempt_at) WHERE completed_at IS NULL;
+CREATE INDEX IF NOT EXISTS incoming_mail_queue_inbox_pending ON incoming_mail_queue(inbox_id,id) WHERE completed_at IS NULL;
+CREATE INDEX IF NOT EXISTS incoming_mail_queue_completed ON incoming_mail_queue(completed_at,id) WHERE completed_at IS NOT NULL;
+-- Protect address-local Message-ID identity without deleting historical duplicates.
+CREATE TABLE IF NOT EXISTS received_mail_sources (
+ address_id integer NOT NULL REFERENCES email_addresses(id) ON DELETE CASCADE,
+ source_id text NOT NULL, message_id bigint NOT NULL REFERENCES conversation_messages(id) ON DELETE CASCADE,
+ PRIMARY KEY(address_id,source_id)
+);
+INSERT INTO received_mail_sources(address_id,source_id,message_id)
+ SELECT c.address_id,m.source_id,min(m.id) FROM conversation_messages m JOIN conversations c ON c.id=m.conversation_id
+ WHERE c.address_id IS NOT NULL AND m.type='incoming' AND m.source_id IS NOT NULL AND m.source_id<>''
+ GROUP BY c.address_id,m.source_id ON CONFLICT DO NOTHING;
+CREATE OR REPLACE FUNCTION reserve_received_mail_source() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE endpoint integer;
+BEGIN
+ IF NEW.type='incoming' AND NEW.source_id IS NOT NULL AND NEW.source_id<>'' THEN
+  SELECT address_id INTO endpoint FROM conversations WHERE id=NEW.conversation_id;
+  IF endpoint IS NOT NULL THEN
+   INSERT INTO received_mail_sources(address_id,source_id,message_id) VALUES(endpoint,NEW.source_id,NEW.id);
+  END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS reserve_received_mail_source ON conversation_messages;
+CREATE TRIGGER reserve_received_mail_source AFTER INSERT ON conversation_messages FOR EACH ROW EXECUTE FUNCTION reserve_received_mail_source();
+CREATE TABLE IF NOT EXISTS mail_delivery_attempts (
+ id bigserial PRIMARY KEY, message_id bigint NOT NULL REFERENCES conversation_messages(id) ON DELETE CASCADE,
+ token uuid NOT NULL UNIQUE, state text NOT NULL CHECK(state IN ('sending','sent','failed','unknown','retry_authorized')),
+ created_at timestamptz NOT NULL DEFAULT now(), lease_until timestamptz NOT NULL,
+ finished_at timestamptz, error text
+);
+CREATE UNIQUE INDEX IF NOT EXISTS mail_delivery_attempts_active ON mail_delivery_attempts(message_id) WHERE state IN ('sending','unknown');
+ALTER TABLE conversation_messages ADD COLUMN IF NOT EXISTS reply_to_source_id text NOT NULL DEFAULT '';
+-- END mail_reliability schema
+
+-- BEGIN media_ownership schema
+-- Browser uploads have an owner before any message or draft refers to them.
+-- Existing unlinked files have no trustworthy uploader provenance; do not infer
+-- ownership from user-controlled legacy draft metadata. Reupload those files.
+ALTER TABLE media ADD COLUMN IF NOT EXISTS uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS conversation_draft_media (
+    draft_id BIGINT NOT NULL REFERENCES conversation_drafts(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    PRIMARY KEY (draft_id, media_id)
+);
+CREATE INDEX IF NOT EXISTS index_conversation_draft_media_on_media_id ON conversation_draft_media(media_id);
+
+-- Protect existing draft references from collection without granting ownership.
+-- Match strings instead of casting legacy metadata supplied by browsers.
+INSERT INTO conversation_draft_media(draft_id, media_id)
+SELECT DISTINCT d.id, m.id
+FROM conversation_drafts d JOIN media m ON
+    d.content LIKE '%cid:ldsk-' || m.uuid::text || '%'
+    OR d.content LIKE '%/uploads/' || m.uuid::text || '%'
+    OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(d.meta->'attachments')='array'
+            THEN d.meta->'attachments' ELSE '[]'::jsonb END) attachment
+        WHERE attachment->>'id'=m.id::text OR attachment->>'uuid'=m.uuid::text
+    )
+WHERE COALESCE(m.model_id,0)=0 AND (m.model_type='messages' OR m.model_type IS NULL)
+ON CONFLICT DO NOTHING;
+-- END media_ownership schema
+
+-- BEGIN outbound_reviews schema
+-- Contributor emails wait here until an Admin or Agent approves or denies them.
+-- A submission is not a message: it is never dispatched, searched or counted
+-- as unread. Approval queues a real message in the same transaction.
+CREATE TABLE IF NOT EXISTS outbound_reviews (
+    id BIGSERIAL PRIMARY KEY,
+    "uuid" UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    kind TEXT NOT NULL CHECK (kind IN ('reply', 'new')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'withdrawn')),
+    author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    address_id INTEGER NOT NULL REFERENCES email_addresses(id) ON DELETE CASCADE,
+    conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL DEFAULT '',
+    content TEXT NOT NULL,
+    "to" TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+    cc TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+    bcc TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+    reviewer_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    reviewed_at TIMESTAMPTZ,
+    decision_note TEXT NOT NULL DEFAULT '',
+    dismissed_at TIMESTAMPTZ,
+    message_id BIGINT REFERENCES conversation_messages(id) ON DELETE SET NULL,
+    CONSTRAINT constraint_outbound_reviews_reply_conversation CHECK (kind <> 'reply' OR conversation_id IS NOT NULL),
+    CONSTRAINT constraint_outbound_reviews_subject CHECK (length(subject) <= 998),
+    CONSTRAINT constraint_outbound_reviews_content CHECK (length(content) <= 1048576),
+    CONSTRAINT constraint_outbound_reviews_note CHECK (length(decision_note) <= 2000)
+);
+CREATE INDEX IF NOT EXISTS index_outbound_reviews_on_status_and_address ON outbound_reviews(status, address_id);
+CREATE INDEX IF NOT EXISTS index_outbound_reviews_on_author_and_status ON outbound_reviews(author_id, status);
+CREATE INDEX IF NOT EXISTS index_outbound_reviews_on_conversation_id ON outbound_reviews(conversation_id);
+-- One pending reply per contributor per conversation; the composer locks meanwhile.
+CREATE UNIQUE INDEX IF NOT EXISTS index_unique_outbound_reviews_pending_reply
+    ON outbound_reviews(author_id, conversation_id) WHERE status = 'pending' AND kind = 'reply';
+
+-- Uploads referenced by a submission are protected from cleanup like draft uploads.
+CREATE TABLE IF NOT EXISTS outbound_review_media (
+    review_id BIGINT NOT NULL REFERENCES outbound_reviews(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    inline BOOLEAN NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (review_id, media_id)
+);
+CREATE INDEX IF NOT EXISTS index_outbound_review_media_on_media_id ON outbound_review_media(media_id);
+-- END outbound_reviews schema

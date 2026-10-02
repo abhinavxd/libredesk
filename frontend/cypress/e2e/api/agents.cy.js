@@ -43,6 +43,15 @@ describe('API: agents', () => {
     })
   })
 
+  for (const roles of [[], ['Agent', 'NoSuchRole']]) {
+    it(`rejects the entire invalid role set ${JSON.stringify(roles)}`, () => {
+      cy.api('POST', '/api/v1/agents', {
+        first_name: 'Invalid roles', email: `roles.${stamp}@example.com`, roles,
+        send_welcome_email: false
+      }, { failOnStatusCode: false }).its('status').should('eq', 400)
+    })
+  }
+
   it('rejects an update with an unknown availability status', () => {
     cy.api('POST', '/api/v1/agents', {
       first_name: 'Avail', email: `avail.${stamp}@example.com`, roles: ['Agent'], send_welcome_email: false

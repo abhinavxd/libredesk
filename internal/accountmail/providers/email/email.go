@@ -4,10 +4,10 @@ import (
 	"math/rand"
 	"net/textproto"
 
-	accountmail "github.com/abhinavxd/libredesk/internal/accountmail"
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
-	"github.com/abhinavxd/libredesk/internal/inbox/models"
+	accountmail "github.com/jakedolan443/fernmail/internal/accountmail"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/inbox/channel/email"
+	"github.com/jakedolan443/fernmail/internal/inbox/models"
 	"github.com/knadh/smtppool"
 	"github.com/zerodha/logf"
 )

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	oidcmodels "github.com/abhinavxd/libredesk/internal/oidc/models"
+	oidcmodels "github.com/jakedolan443/fernmail/internal/oidc/models"
 )
 
 func TestIsLocalLoginEnabled(t *testing.T) {

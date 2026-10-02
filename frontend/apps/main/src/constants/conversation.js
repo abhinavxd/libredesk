@@ -1,7 +1,5 @@
 export const CONVERSATION_LIST_TYPE = {
-  VIEW: 'view',
-  ALL: 'all',
-  MENTIONED: 'mentioned'
+  ADDRESS: 'address'
 }
 
 export const CONVERSATION_DEFAULT_STATUSES = {

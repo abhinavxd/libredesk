@@ -1,4 +1,4 @@
-# Libredesk Design System
+# Fernmail Design System
 
 Reference for colors, typography, spacing, radius, elevation, and component conventions
 across both apps (agent dashboard + livechat widget).
@@ -92,7 +92,7 @@ In light mode `card` is pure white against a near-white background. In dark mode
 
 ## 3. Typography
 
-Font: Geist. Sizes: `text-xs` 12 · `text-sm` 14 · `text-base` 16 · `text-lg` 18 ·
+Font: Go (Regular/Medium/Bold; 600 renders as Bold). Sizes: `text-xs` 12 · `text-sm` 14 · `text-base` 16 · `text-lg` 18 ·
 `text-xl` 20 · `text-2xl` 24 · `text-3xl` 30. Weights: 400 body · 500 labels · 600 headings ·
 700 rare emphasis.
 
@@ -151,7 +151,7 @@ Defined in `main.scss`. Prefer them over repeating the class list.
 | Utility | Expands to | Use for |
 |---|---|---|
 | `.box` | `border shadow-sm rounded-lg` | the standard card surface |
-| `.sidebar-section-label` | `text-xs font-medium uppercase tracking-wider text-muted-foreground` | sidebar group headers (Views, Team Inboxes) |
+| `.sidebar-section-label` | `text-xs font-medium uppercase tracking-wider text-muted-foreground` | sidebar group headers (Addresses) |
 | `.link-style` | `text-muted-foreground underline underline-offset-4 hover:text-foreground` | UI links. Not brand-colored, so links in chrome stay quiet |
 
 ---

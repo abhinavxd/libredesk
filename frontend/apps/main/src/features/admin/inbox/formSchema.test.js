@@ -12,7 +12,6 @@ const validImap = {
     username: 'desk@example.com',
     password: 'secret',
     tls_type: 'tls',
-    scan_inbox_since: '48h',
     read_interval: '5m'
 }
 
@@ -66,7 +65,8 @@ describe('Email Inbox Form Schema', () => {
     })
 
     test('name missing', () => {
-        const { name, ...form } = validForm
+        const form = { ...validForm }
+        delete form.name
         expect(() => schema.parse(form)).toThrow()
     })
 
@@ -75,7 +75,8 @@ describe('Email Inbox Form Schema', () => {
     })
 
     test('from missing', () => {
-        const { from, ...form } = validForm
+        const form = { ...validForm }
+        delete form.from
         expect(() => schema.parse(form)).toThrow()
     })
 
@@ -118,7 +119,8 @@ describe('Email Inbox Form Schema', () => {
     })
 
     test('auth_type missing', () => {
-        const { auth_type, ...form } = validForm
+        const form = { ...validForm }
+        delete form.auth_type
         expect(() => schema.parse(form)).toThrow()
     })
 
@@ -131,7 +133,8 @@ describe('Email Inbox Form Schema', () => {
     })
 
     test('imap block missing', () => {
-        const { imap, ...form } = validForm
+        const form = { ...validForm }
+        delete form.imap
         expect(() => schema.parse(form)).toThrow()
     })
 
@@ -171,8 +174,8 @@ describe('Email Inbox Form Schema', () => {
         }
     })
 
-    test('imap scan_inbox_since invalid duration', () => {
-        expect(() => schema.parse(withImap({ scan_inbox_since: '48 hours' }))).toThrow()
+    test('ignores deprecated lookback settings when editing older transports', () => {
+        expect(schema.parse(withImap({ scan_inbox_since: '48 hours' })).imap).not.toHaveProperty('scan_inbox_since')
     })
 
     test('imap read_interval invalid duration', () => {
@@ -188,7 +191,8 @@ describe('Email Inbox Form Schema', () => {
     })
 
     test('smtp block missing', () => {
-        const { smtp, ...form } = validForm
+        const form = { ...validForm }
+        delete form.smtp
         expect(() => schema.parse(form)).toThrow()
     })
 

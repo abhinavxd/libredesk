@@ -10,4 +10,7 @@ const (
 	PermMessagesWrite               = "messages:write"
 	PermMessagesWritePrivate        = "messages:write_private"
 	PermMessagesWriteAsContact      = "messages:write_as_contact"
+	PermConversationsCreate         = "conversations:create"
+	PermReviewsSubmit               = "reviews:submit"
+	PermReviewsManage               = "reviews:manage"
 )

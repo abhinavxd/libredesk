@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/jmoiron/sqlx"
 )
 

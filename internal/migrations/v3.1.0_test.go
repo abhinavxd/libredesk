@@ -1,7 +1,7 @@
 package migrations
 
 import (
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"testing"
 )
 

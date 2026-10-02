@@ -9,8 +9,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/migrations"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/migrations"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -55,6 +55,12 @@ var migList = []migFunc{
 	{"v3.0.0", migrations.V3_0_0},
 	{"v3.1.0", migrations.V3_1_0},
 	{"v3.2.0", migrations.V3_2_0},
+	{"v3.3.0", migrations.V3_3_0},
+	{"v3.4.0", migrations.V3_4_0},
+	{"v3.5.0", migrations.V3_5_0},
+	{"v3.6.0", migrations.V3_6_0},
+	{"v3.7.0", migrations.V3_7_0},
+	{"v3.8.0", migrations.V3_8_0},
 }
 
 // upgrade upgrades the database to the current version by running SQL migration files
@@ -167,6 +173,6 @@ func checkPendingUpgrade(db *sqlx.DB) {
 		vers = append(vers, m.version)
 	}
 
-	log.Fatalf(`there are %d pending database upgrade(s): %v. The last upgrade was %s. Backup the database and run libredesk --upgrade`,
+	log.Fatalf(`there are %d pending database upgrade(s): %v. The last upgrade was %s. Backup the database and run fernmail --upgrade`,
 		len(toRun), vers, lastVer)
 }

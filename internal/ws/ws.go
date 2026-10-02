@@ -2,12 +2,13 @@
 package ws
 
 import (
+	"encoding/json"
 	"slices"
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	"github.com/jakedolan443/fernmail/internal/ws/models"
 	"github.com/zerodha/logf"
 )
 
@@ -134,6 +135,28 @@ func (h *Hub) ListSubscribers(uuid string) []*Client {
 	return out
 }
 
+// AuthorizedListSubscribers rechecks subscriptions so revocation takes effect on live connections.
+func (h *Hub) AuthorizedListSubscribers(uuid string) []*Client {
+	clients := h.ListSubscribers(uuid)
+	if h.conversationStore == nil {
+		return nil
+	}
+	checked := map[int]bool{}
+	allowed := map[int]bool{}
+	result := make([]*Client, 0, len(clients))
+	for _, client := range clients {
+		if !checked[client.ID] {
+			ids, err := h.conversationStore.FilterAuthorizedListUUIDs(client.ID, []string{uuid})
+			allowed[client.ID] = err == nil && len(ids) > 0
+			checked[client.ID] = true
+		}
+		if allowed[client.ID] {
+			result = append(result, client)
+		}
+	}
+	return result
+}
+
 // ClearClientSubs drops all of a client's list and open subscriptions.
 func (h *Hub) ClearClientSubs(client *Client) {
 	h.subsMu.Lock()
@@ -228,12 +251,19 @@ func (h *Hub) BroadcastMessage(msg models.BroadcastMessage) {
 }
 
 func (h *Hub) BroadcastTypingToConversation(conversationUUID string, typingMsg models.TypingMessage) {
-	if h.conversationStore != nil && !typingMsg.IsPrivateMessage {
+	data, err := json.Marshal(models.Message{Type: models.MessageTypeTyping, Data: typingMsg})
+	if err != nil {
+		return
+	}
+	for _, client := range h.AuthorizedListSubscribers(conversationUUID) {
+		if client.ID != typingMsg.UserID {
+			client.SendMessage(data, websocket.TextMessage)
+		}
 	}
 }
 
 func (h *Hub) BroadcastTypingToAllConversationClients(conversationUUID string, data []byte) {
-	for _, c := range h.ListSubscribers(conversationUUID) {
+	for _, c := range h.AuthorizedListSubscribers(conversationUUID) {
 		c.SendMessage(data, websocket.TextMessage)
 	}
 }

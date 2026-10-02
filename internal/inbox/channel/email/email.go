@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
-	"github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/jakedolan443/fernmail/internal/inbox"
+	"github.com/jakedolan443/fernmail/internal/inbox/channel/email/oauth"
+	"github.com/jakedolan443/fernmail/internal/inbox/models"
 	"github.com/knadh/smtppool"
 	"github.com/zerodha/logf"
 	xoauth2 "golang.org/x/oauth2"
@@ -37,6 +37,7 @@ type Email struct {
 	fromNameTemplate       string
 	replyTo                string
 	enablePlusAddressing   bool
+	emailAliases           []models.EmailAlias
 	messageStore           inbox.MessageStore
 	maxIncomingMessageSize int64
 	messageSizeMu          sync.RWMutex
@@ -95,6 +96,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		from:                   opts.Config.From,
 		fromNameTemplate:       opts.Config.FromNameTemplate,
 		replyTo:                opts.Config.ReplyTo,
+		emailAliases:           opts.Config.EmailAliases,
 		smtpCfg:                opts.Config.SMTP,
 		imapCfg:                opts.Config.IMAP,
 		lo:                     opts.Lo,
@@ -176,6 +178,7 @@ func (e *Email) getCurrentConfig() models.Config {
 		OAuth:                oauth,
 		AuthType:             e.authType,
 		EnablePlusAddressing: e.enablePlusAddressing,
+		EmailAliases:         e.emailAliases,
 	}
 }
 
@@ -187,6 +190,10 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	}
 
 	e.oauthMu.Lock()
+	if e.oauth == nil {
+		e.oauthMu.Unlock()
+		return nil, false, fmt.Errorf("OAuth configuration missing for inbox %d", e.id)
+	}
 
 	// Check if token is expired
 	if !oauth.IsTokenExpired(e.oauth.ExpiresAt) {

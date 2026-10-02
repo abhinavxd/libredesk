@@ -1,6 +1,6 @@
 <template>
   <router-link
-    :to="{ name: 'inbox-conversation', params: { uuid: conversationUUID, type: 'all' } }"
+    :to="{ name: 'conversation-redirect', params: { uuid: conversationUUID } }"
     class="flex gap-4 px-5 py-4 hover:bg-accent/40 transition-colors"
   >
     <Avatar class="w-10 h-10 rounded-full shrink-0 mt-0.5">
@@ -52,9 +52,9 @@
         <Badge v-if="status" variant="outline" class="font-normal">{{ status }}</Badge>
 
         <span class="tabular-nums">#{{ referenceNumber }}</span>
-        <span v-if="item.inbox_name" class="inline-flex items-center gap-1.5 min-w-0">
+        <span v-if="item.address" class="inline-flex items-center gap-1.5 min-w-0">
           <component :is="Mail" :class="METADATA_ICON_CLASS" aria-hidden="true" />
-          <span class="truncate">{{ item.inbox_name }}</span>
+          <span class="truncate">{{ item.address }}</span>
         </span>
       </div>
     </div>

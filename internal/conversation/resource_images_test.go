@@ -5,18 +5,18 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/testutil"
-	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
-	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
+	"github.com/jakedolan443/fernmail/internal/testutil"
+	wmodels "github.com/jakedolan443/fernmail/internal/webhook/models"
+	"github.com/jakedolan443/fernmail/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )
 
 type receiptMediaStore struct{ mediaStore }
 
-func (receiptMediaStore) LinkMessageMediaTx(*sqlx.Tx, int, []mmodels.Media, []string) error {
+func (receiptMediaStore) LinkMessageMediaTx(*sqlx.Tx, int, []mmodels.Media, []string, int) error {
 	return nil
 }
 

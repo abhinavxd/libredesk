@@ -53,5 +53,7 @@ const submitForm = async (values) => {
     Object.entries(values).map(([key, value]) => [`app.${key}`, value])
   )
   await api.updateSettings('general', updatedValues)
+  // Refresh so the top bar, tab title and favicon pick up the new branding.
+  await settingsStore.fetchSettings('general')
 }
 </script>

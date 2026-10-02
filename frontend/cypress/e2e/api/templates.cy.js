@@ -35,8 +35,7 @@ describe('API: templates', () => {
     })
   })
 
-  // An unknown type reaches the template_type enum insert and 500s.
-  it.skip('rejects a create with an unknown type', () => {
+  it('rejects a create with an unknown type', () => {
     cy.api('POST', '/api/v1/templates', {
       name: `${name}-badtype`, type: 'not_a_type', body: 'b'
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -45,8 +44,7 @@ describe('API: templates', () => {
     })
   })
 
-  // An unknown type on the list route also reaches the enum cast and 500s.
-  it.skip('rejects a list with an unknown type', () => {
+  it('rejects a list with an unknown type', () => {
     cy.api('GET', '/api/v1/templates?type=not_a_type', null, { failOnStatusCode: false })
       .then(({ status, body }) => {
         expect(status).to.eq(400)
@@ -54,8 +52,7 @@ describe('API: templates', () => {
       })
   })
 
-  // Name over 140 chars hits the DB check constraint and 500s.
-  it.skip('rejects a name over the length limit', () => {
+  it('rejects a name over the length limit', () => {
     cy.api('POST', '/api/v1/templates', {
       name: 'x'.repeat(200), type: 'email_outgoing', body: 'b'
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -146,8 +143,7 @@ describe('API: templates', () => {
       })
   })
 
-  // Update of a missing row 500s instead of reporting it as not found.
-  it.skip('404s on an update of a template that does not exist', () => {
+  it('404s on an update of a template that does not exist', () => {
     cy.api('PUT', '/api/v1/templates/99999999', {
       name: 'ghost', type: 'email_outgoing', body: 'b'
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -156,24 +152,35 @@ describe('API: templates', () => {
     })
   })
 
-  // A second default collides with the partial unique index and 500s.
-  it.skip('rejects a second default template', () => {
-    cy.api('POST', '/api/v1/templates', {
-      name: `${name}-default-a`, type: 'email_outgoing', body: 'b', is_default: true
-    }).then(({ body }) => {
-      cy.api('POST', '/api/v1/templates', {
-        name: `${name}-default-b`, type: 'email_outgoing', body: 'b', is_default: true
-      }, { failOnStatusCode: false }).then((res) => {
-        expect(res.status).to.eq(409)
-        expect(res.body.error_type).to.eq('ConflictException')
+  it('rejects a second default template without changing the existing default', () => {
+    cy.api('GET', '/api/v1/templates?type=email_outgoing').then(({ body }) => {
+      const existing = (body.data.results || body.data).find((row) => row.is_default)
+      const getDefault = existing
+        ? cy.wrap(existing)
+        : cy.api('POST', '/api/v1/templates', {
+          name: `${name}-default-a`, type: 'email_outgoing', body: 'b', is_default: true
+        }).then(({ body: created }) => created.data)
+      getDefault.then((first) => {
+        cy.api('POST', '/api/v1/templates', {
+          name: `${name}-default-b`, type: 'email_outgoing', body: 'b', is_default: true
+        }, { failOnStatusCode: false }).then((res) => {
+          expect(res.status).to.eq(409)
+          expect(res.body.error_type).to.eq('ConflictException')
+        })
+        cy.api('PUT', `/api/v1/templates/${templateId}`, {
+          name: `${name}-renamed`, type: 'email_outgoing', body: 'b', is_default: true
+        }, { failOnStatusCode: false }).then((res) => {
+          expect(res.status).to.eq(409)
+          expect(res.body.error_type).to.eq('ConflictException')
+        })
+        cy.api('GET', `/api/v1/templates/${first.id}`).its('body.data.is_default').should('eq', true)
+        if (!existing) cy.api('DELETE', `/api/v1/templates/${first.id}`)
       })
-      cy.api('DELETE', `/api/v1/templates/${body.data.id}`, {})
     })
   })
 
-  // DELETE decodes a JSON body it never uses, so it needs one sent.
   it('deletes the template', () => {
-    cy.api('DELETE', `/api/v1/templates/${templateId}`, {}).its('status').should('eq', 200)
+    cy.api('DELETE', `/api/v1/templates/${templateId}`).its('status').should('eq', 200)
     cy.api('GET', `/api/v1/templates/${templateId}`, null, { failOnStatusCode: false })
       .its('status')
       .should('eq', 404)
@@ -181,5 +188,6 @@ describe('API: templates', () => {
 })
 
 it('rejects retired notification template requests', () => {
+  cy.login()
   cy.api('GET', '/api/v1/templates?type=email_notification', null, { failOnStatusCode: false }).its('status').should('eq', 400)
 })

@@ -6,13 +6,13 @@ import (
 
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
 
-	"github.com/abhinavxd/libredesk/internal/testutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/jakedolan443/fernmail/internal/testutil"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
+	wmodels "github.com/jakedolan443/fernmail/internal/webhook/models"
 	"github.com/zerodha/logf"
 )
 
@@ -61,7 +61,6 @@ func TestValidateAgentRequestNormalizesFields(t *testing.T) {
 }
 
 func TestValidateAgentRequestEmptyRolesSlice(t *testing.T) {
-	t.Skip("validateAgentRequest checks Roles == nil, so a JSON body with \"roles\": [] passes and creates an agent with no roles")
 
 	app := newValidatorTestApp(t)
 	req := agentReq{Email: "agent@example.com", FirstName: "Ada", Roles: []string{}}
@@ -81,6 +80,11 @@ func TestValidateWebhook(t *testing.T) {
 		{"empty url", wmodels.Webhook{Name: "hook", Events: []string{"conversation.created"}}, true},
 		{"nil events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook"}, true},
 		{"empty events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{}}, true},
+		{"unknown event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"not.an.event"}}, true},
+		{"retired tag event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.tags_changed"}}, true},
+		{"retired assignment event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.assigned"}}, true},
+		{"mixed supported and unsupported events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"message.created", "not.an.event"}}, true},
+		{"all retained events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.created", "conversation.status_changed", "message.created", "message.updated"}}, false},
 	}
 
 	for _, tc := range tests {

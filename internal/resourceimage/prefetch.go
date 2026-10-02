@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/sync/errgroup"
 )

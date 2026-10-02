@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

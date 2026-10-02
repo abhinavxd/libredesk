@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 	"testing"

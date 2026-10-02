@@ -6,10 +6,10 @@ import (
 	"strings"
 	"sync"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/ws"
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/ws"
+	wsmodels "github.com/jakedolan443/fernmail/internal/ws/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -59,6 +59,7 @@ func handleWS(r *fastglue.Request, hub *ws.Hub) error {
 	err := agentUpgrader.Upgrade(r.RequestCtx, func(conn *websocket.Conn) {
 		c := ws.Client{
 			ID:   auser.ID,
+			Name: strings.TrimSpace(auser.FirstName + " " + auser.LastName),
 			Hub:  hub,
 			Conn: conn,
 			Send: make(chan wsmodels.WSMessage, 128),

@@ -37,8 +37,7 @@ describe('API: webhooks', () => {
     })
   })
 
-  // An event outside the webhook_event enum surfaces as a 500 GeneralException, not a 400.
-  it.skip('rejects a create with an unknown event', () => {
+  it('rejects a create with an unknown event', () => {
     cy.api('POST', '/api/v1/webhooks', {
       name: `${name}-badevent`, url, events: ['no.such.event']
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -107,7 +106,7 @@ describe('API: webhooks', () => {
     cy.api('PUT', `/api/v1/webhooks/${webhookId}`, {
       name: `${name}-renamed`,
       url: `${url}/v2`,
-      events: ['conversation.assigned'],
+      events: ['conversation.status_changed'],
       secret: '',
       is_active: false
     }).its('status').should('eq', 200)
@@ -115,7 +114,7 @@ describe('API: webhooks', () => {
     cy.api('GET', `/api/v1/webhooks/${webhookId}`).then(({ body }) => {
       expect(body.data.name).to.eq(`${name}-renamed`)
       expect(body.data.url).to.eq(`${url}/v2`)
-      expect(body.data.events).to.deep.eq(['conversation.assigned'])
+      expect(body.data.events).to.deep.eq(['conversation.status_changed'])
       expect(body.data.is_active).to.eq(false)
     })
   })
@@ -145,8 +144,7 @@ describe('API: webhooks', () => {
       })
   })
 
-  // Updating a missing row returns 500 GeneralException, not a 404.
-  it.skip('404s when updating a webhook that does not exist', () => {
+  it('404s when updating a webhook that does not exist', () => {
     cy.api('PUT', '/api/v1/webhooks/99999999', {
       name: 'ghost', url: 'https://example.com', events: ['conversation.created']
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -155,11 +153,13 @@ describe('API: webhooks', () => {
     })
   })
 
-  // Deleting a missing webhook returns 200, skipped until the API settles on 404 vs 200.
-  it.skip('404s when deleting a webhook that does not exist', () => {
-    cy.api('DELETE', '/api/v1/webhooks/99999999', null, { failOnStatusCode: false })
-      .its('status')
-      .should('eq', 404)
+  it('deleting a missing webhook is idempotent', () => {
+    cy.api('DELETE', '/api/v1/webhooks/99999999').its('status').should('eq', 200)
+    cy.api('DELETE', '/api/v1/webhooks/99999999').its('status').should('eq', 200)
+    cy.api('GET', '/api/v1/webhooks/99999999', null, { failOnStatusCode: false }).then(({ status, body }) => {
+      expect(status).to.eq(404)
+      expect(body.error_type).to.eq('NotFoundException')
+    })
   })
 
   it('deletes the webhook', () => {

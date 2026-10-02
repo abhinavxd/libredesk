@@ -1,14 +1,14 @@
 services:
-  # Libredesk app
+  # Fernmail app
   app:
-    image: ghcr.io/jakedolan443/libredesk-hardened:latest
+    image: ghcr.io/jakedolan443/fernmail:latest
     container_name: libredesk_app
     restart: unless-stopped
     ports:
       - "9000:9000"
     environment:
       # If the password is set during first docker-compose up, the system user password will be set to this value.
-      # You can always set system user password later by running `docker exec -it libredesk_app ./libredesk --set-system-user-password`.
+      # You can always set the system user password later by running `docker exec -it libredesk_app ./fernmail --set-system-user-password`.
       LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:-}
     networks:
       - libredesk
@@ -16,9 +16,9 @@ services:
       - db
       - redis
     volumes:
-      - ./uploads:/libredesk/uploads:rw 
-      - ./config.toml:/libredesk/config.toml
-    command: [sh, -c, "./libredesk --install --idempotent-install --yes --config /libredesk/config.toml && ./libredesk --upgrade --yes --config /libredesk/config.toml && ./libredesk --config /libredesk/config.toml"]
+      - ./uploads:/fernmail/uploads:rw
+      - ./config.toml:/fernmail/config.toml
+    command: [sh, -c, "./fernmail --install --idempotent-install --yes --config /fernmail/config.toml && ./fernmail --upgrade --yes --config /fernmail/config.toml && ./fernmail --config /fernmail/config.toml"]
 
   # PostgreSQL database
   db:

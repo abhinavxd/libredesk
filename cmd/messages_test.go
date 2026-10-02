@@ -3,10 +3,10 @@ package main
 import (
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	authzmodels "github.com/jakedolan443/fernmail/internal/authz/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/lib/pq"
 )
 

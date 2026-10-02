@@ -3,8 +3,8 @@ package main
 import (
 	"strconv"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/template/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/template/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -92,17 +92,11 @@ func handleUpdateTemplate(r *fastglue.Request) error {
 
 // handleDeleteTemplate deletes a template.
 func handleDeleteTemplate(r *fastglue.Request) error {
-	var (
-		app = r.Context.(*App)
-		req = models.Template{}
-	)
+	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
 			"Invalid template `id`.", nil, envelope.InputError)
-	}
-	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 	if err = app.tmpl.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)

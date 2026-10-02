@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/crypto"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/crypto"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/volatiletech/null/v9"
@@ -36,7 +36,8 @@ var (
 	efs embed.FS
 
 	// ErrInboxNotFound is returned when an inbox is not found.
-	ErrInboxNotFound = errors.New("inbox not found")
+	ErrInboxNotFound     = errors.New("inbox not found")
+	ErrIncomingQueueFull = errors.New("durable incoming queue is full")
 )
 
 type initFn func(imodels.Inbox, MessageStore, UserStore) (Inbox, error)
@@ -77,7 +78,8 @@ type IncomingMessageSizeSetter interface {
 
 // MessageStore defines methods for storing and processing messages.
 type MessageStore interface {
-	MessageExists(string) (bool, error)
+	IMAPState(int, string, uint32) (uint32, []uint32, error)
+	RecordIMAPResult(int, string, uint32, uint32, error) error
 	EnqueueIncoming(models.IncomingMessage) error
 }
 
@@ -99,6 +101,7 @@ type receiverState struct {
 }
 
 type Manager struct {
+	db            *sqlx.DB
 	mu            sync.RWMutex
 	queries       queries
 	inboxes       map[int]Inbox
@@ -132,6 +135,7 @@ func New(lo *logf.Logger, db *sqlx.DB, i18n *i18n.I18n, encryptionKey string) (*
 	}
 
 	m := &Manager{
+		db:            db,
 		lo:            lo,
 		inboxes:       make(map[int]Inbox),
 		receivers:     make(map[int]receiverState),
@@ -358,20 +362,22 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	switch current.Channel {
 	case "email":
 		var currentCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AuthType             string               `json:"auth_type"`
+			OAuth                map[string]string    `json:"oauth"`
+			IMAP                 []map[string]any     `json:"imap"`
+			SMTP                 []map[string]any     `json:"smtp"`
+			ReplyTo              string               `json:"reply_to"`
+			EnablePlusAddressing bool                 `json:"enable_plus_addressing"`
+			EmailAliases         []imodels.EmailAlias `json:"email_aliases"`
 		}
 		var updateCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AuthType             string               `json:"auth_type"`
+			OAuth                map[string]string    `json:"oauth"`
+			IMAP                 []map[string]any     `json:"imap"`
+			SMTP                 []map[string]any     `json:"smtp"`
+			ReplyTo              string               `json:"reply_to"`
+			EnablePlusAddressing bool                 `json:"enable_plus_addressing"`
+			EmailAliases         []imodels.EmailAlias `json:"email_aliases"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
@@ -418,6 +424,12 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 					updateCfg.OAuth[k] = v
 				}
 			}
+		}
+
+		// Preserve aliases when an older client updates an inbox without sending
+		// the optional alias configuration.
+		if updateCfg.EmailAliases == nil && currentCfg.EmailAliases != nil {
+			updateCfg.EmailAliases = currentCfg.EmailAliases
 		}
 
 		updatedConfig, err := json.Marshal(updateCfg)

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
 	"github.com/volatiletech/null/v9"
 )
 

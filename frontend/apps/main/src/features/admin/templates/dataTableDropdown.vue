@@ -11,16 +11,14 @@
         <Pencil class="mr-2 h-4 w-4" />
         {{ $t('globals.messages.edit') }}
       </DropdownMenuItem>
-      <template>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          @click="() => (alertOpen = true)"
-          class="text-destructive focus:text-destructive"
-        >
-          <Trash class="mr-2 h-4 w-4" />
-          {{ $t('globals.messages.delete') }}
-        </DropdownMenuItem>
-      </template>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        @click="() => (alertOpen = true)"
+        class="text-destructive focus:text-destructive"
+      >
+        <Trash class="mr-2 h-4 w-4" />
+        {{ $t('globals.messages.delete') }}
+      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 

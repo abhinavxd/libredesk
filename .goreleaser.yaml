@@ -2,7 +2,7 @@ env:
   - GO111MODULE=on
   - CGO_ENABLED=0
   - GITHUB_ORG=jakedolan443
-  - IMAGE_NAME=libredesk-hardened
+  - IMAGE_NAME=fernmail
 
 before:
   hooks:
@@ -28,7 +28,7 @@ builds:
     goarm:
       - 6
       - 7
-    binary: libredesk
+    binary: fernmail
     ldflags:
       - -s -w -X "main.buildString={{ .Tag }} ({{ .ShortCommit }} {{ .Date }}, {{ .Os }}/{{ .Arch }})" -X "main.versionString={{ .Tag }}"
     hooks:
@@ -36,19 +36,19 @@ builds:
 
 archives:
   - format: tar.gz
-    name_template: 'libredesk_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Arch "arm" }}v{{ .Arm }}{{ end }}'
+    name_template: 'fernmail_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Arch "arm" }}v{{ .Arm }}{{ end }}'
     files:
       - config.sample.toml
       - README.md
       - LICENSE
 
 checksum:
-  name_template: "libredesk_{{ .Version }}_checksums.txt"
+  name_template: "fernmail_{{ .Version }}_checksums.txt"
 
 source:
   enabled: true
   format: tar.gz
-  name_template: "libredesk_{{ .Version }}_source"
+  name_template: "fernmail_{{ .Version }}_source"
 
 dockers:
   - use: buildx
@@ -170,6 +170,6 @@ docker_manifests:
 release:
   github:
     owner: jakedolan443
-    name: libredesk-hardened
+    name: fernmail
   prerelease: auto
   draft: true

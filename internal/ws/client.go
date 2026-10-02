@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
+	"github.com/jakedolan443/fernmail/internal/ws/models"
 )
 
 const (
@@ -21,7 +21,8 @@ const (
 // Client is a single connected WS user.
 type Client struct {
 	// Client ID.
-	ID int
+	ID   int
+	Name string
 
 	// Hub.
 	Hub *Hub
@@ -157,10 +158,8 @@ func (c *Client) handleConversationSubscribe(data json.RawMessage) {
 
 // handleTyping handles typing indicator messages.
 //
-// Same trust assumption as handleConversationSubscribe: the sender is an
-// authenticated agent. A hostile agent could broadcast fake typing to any
-// conversation UUID (including widget clients), but typing is ephemeral and
-// cosmetic; adding per-frame authz isn't worth the DB cost today.
+// Typing is scoped to readable conversations and attributed to the authenticated
+// socket, never to identity fields supplied by the browser.
 func (c *Client) handleTyping(data json.RawMessage) {
 	var typingMsg models.TypingMessage
 	if err := json.Unmarshal(data, &typingMsg); err != nil {
@@ -173,6 +172,14 @@ func (c *Client) handleTyping(data json.RawMessage) {
 		return
 	}
 
+	if c.Hub.conversationStore == nil {
+		return
+	}
+	authorized, err := c.Hub.conversationStore.FilterAuthorizedListUUIDs(c.ID, []string{typingMsg.ConversationUUID})
+	if err != nil || len(authorized) == 0 {
+		return
+	}
+	typingMsg.UserID, typingMsg.UserName = c.ID, c.Name
 	c.Hub.BroadcastTypingToConversation(typingMsg.ConversationUUID, typingMsg)
 }
 

@@ -19,37 +19,37 @@ import (
 
 	_ "time/tzdata"
 
-	auth_ "github.com/abhinavxd/libredesk/internal/auth"
-	"github.com/abhinavxd/libredesk/internal/authz"
+	"github.com/jakedolan443/fernmail/internal/address"
+	auth_ "github.com/jakedolan443/fernmail/internal/auth"
+	"github.com/jakedolan443/fernmail/internal/authz"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
+	"github.com/jakedolan443/fernmail/internal/colorlog"
 
-	accountmail "github.com/abhinavxd/libredesk/internal/accountmail"
+	accountmail "github.com/jakedolan443/fernmail/internal/accountmail"
 
-	"github.com/abhinavxd/libredesk/internal/resourceimage"
-	"github.com/abhinavxd/libredesk/internal/search"
+	"github.com/jakedolan443/fernmail/internal/resourceimage"
+	"github.com/jakedolan443/fernmail/internal/search"
 
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/abhinavxd/libredesk/internal/view"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/jakedolan443/fernmail/internal/conversation"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/jakedolan443/fernmail/internal/conversation/status"
 
-	"github.com/abhinavxd/libredesk/internal/importer"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/media"
-	"github.com/abhinavxd/libredesk/internal/oidc"
-	"github.com/abhinavxd/libredesk/internal/ratelimit"
-	"github.com/abhinavxd/libredesk/internal/role"
-	"github.com/abhinavxd/libredesk/internal/setting"
-	"github.com/abhinavxd/libredesk/internal/team"
-	"github.com/abhinavxd/libredesk/internal/template"
-	"github.com/abhinavxd/libredesk/internal/user"
-	"github.com/abhinavxd/libredesk/internal/webhook"
-	"github.com/abhinavxd/libredesk/internal/ws"
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/jakedolan443/fernmail/internal/importer"
+	"github.com/jakedolan443/fernmail/internal/inbox"
+	"github.com/jakedolan443/fernmail/internal/media"
+	"github.com/jakedolan443/fernmail/internal/oidc"
+	"github.com/jakedolan443/fernmail/internal/ratelimit"
+	"github.com/jakedolan443/fernmail/internal/role"
+	"github.com/jakedolan443/fernmail/internal/setting"
+	"github.com/jakedolan443/fernmail/internal/team"
+	"github.com/jakedolan443/fernmail/internal/template"
+	"github.com/jakedolan443/fernmail/internal/user"
+	"github.com/jakedolan443/fernmail/internal/webhook"
+	"github.com/jakedolan443/fernmail/internal/ws"
+	wsmodels "github.com/jakedolan443/fernmail/internal/ws/models"
 
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
@@ -62,7 +62,7 @@ import (
 var (
 	ko          = koanf.New(".")
 	ctx         = context.Background()
-	appName     = "libredesk"
+	appName     = "fernmail"
 	frontendDir = "frontend/dist/main"
 
 	// Injected at build time.
@@ -105,9 +105,9 @@ type App struct {
 	team           *team.Manager
 	status         *status.Manager
 	inbox          *inbox.Manager
+	address        *address.Manager
 	tmpl           *template.Manager
 	conversation   *conversation.Manager
-	view           *view.Manager
 	search         *search.Manager
 	accountmail    *accountmail.Service
 	webhook        *webhook.Manager
@@ -117,8 +117,6 @@ type App struct {
 	importer       *importer.Importer
 	wsHub          *ws.Hub
 
-	// Global state that stores data on an available app update.
-	update *AppUpdate
 	// Flag to indicate if app restart is required for settings to take effect.
 	restartRequired bool
 	sync.Mutex
@@ -220,6 +218,7 @@ func main() {
 		media                       = initMedia(db, i18n, settings)
 		resourceImages              = resourceimage.NewStore(db, media, constants.UploadProvider, settings.GetResourcePolicyTx)
 		inbox                       = initInbox(db, i18n)
+		address                     = initAddress(db)
 		team                        = initTeam(db, i18n)
 		webhook                     = initWebhook(db, i18n, ssrfControl)
 		user                        = initUser(i18n, db)
@@ -268,6 +267,7 @@ func main() {
 		media:          media,
 		setting:        settings,
 		inbox:          inbox,
+		address:        address,
 		user:           user,
 		team:           team,
 		status:         status,
@@ -275,8 +275,7 @@ func main() {
 		accountmail:    accountmail,
 		consts:         atomic.Value{},
 		conversation:   conversation,
-		authz:          initAuthz(i18n),
-		view:           initView(db, i18n),
+		authz:          initAuthz(i18n, inbox, address),
 		search:         initSearch(db, i18n, conversation),
 		role:           initRole(db, i18n),
 		importer:       initImporter(i18n),
@@ -314,11 +313,6 @@ func main() {
 			log.Fatalf("error starting server: %v", err)
 		}
 	}()
-
-	// Start the app update checker.
-	if ko.Bool("app.check_updates") {
-		go checkUpdates(versionString, time.Hour*1, app)
-	}
 
 	// Wait for shutdown signal.
 	<-ctx.Done()

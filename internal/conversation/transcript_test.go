@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/volatiletech/null/v9"
 )
 

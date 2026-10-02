@@ -1,0 +1,100 @@
+[app]
+log_level = "info"
+env = "prod"
+encryption_key = "__ENCRYPTION_KEY__"
+
+[app.server]
+address = "0.0.0.0:9000"
+socket = ""
+disable_secure_cookies = false
+session_lifetime = "9h"
+read_timeout = "60s"
+write_timeout = "60s"
+max_body_size = 52428800
+read_buffer_size = 65536
+keepalive_timeout = "10s"
+
+[auth]
+local_login_enabled = false
+
+[upload]
+provider = "fs"
+max_storage_bytes = 1073741824
+
+[upload.fs]
+upload_path = "uploads"
+expiry = "1h"
+
+[db]
+host = "db"
+port = 5432
+user = "libredesk"
+password = "__DB_PASSWORD__"
+database = "libredesk"
+ssl_mode = "disable"
+max_open = 10
+max_idle = 5
+max_lifetime = "300s"
+
+[redis]
+address = "redis:6379"
+user = ""
+password = ""
+db = 0
+
+[message]
+outgoing_queue_workers = 2
+incoming_queue_workers = 2
+max_incoming_message_size = 52428800
+message_outgoing_scan_interval = "250ms"
+incoming_queue_size = 1000
+outgoing_queue_size = 1000
+
+[notification]
+concurrency = 1
+queue_size = 500
+
+[automation]
+worker_count = 1
+
+[ai_agent]
+worker_count = 1
+queue_size = 100
+max_steps = 6
+max_history_messages = 30
+
+[autoassigner]
+autoassign_interval = "5m"
+
+[webhook]
+workers = 2
+queue_size = 1000
+timeout = "15s"
+
+[ssrf]
+enabled = true
+allowed_cidrs = []
+
+[conversation]
+unsnooze_interval = "5m"
+draft_retention_duration = "360h"
+continuity_scan_interval = "5m"
+
+[sla]
+evaluation_interval = "5m"
+
+[rate_limit.widget]
+enabled = true
+requests_per_minute = 100
+
+[rate_limit.auth]
+enabled = true
+requests_per_minute = 30
+
+[rate_limit.public]
+enabled = true
+requests_per_minute = 100
+
+[rate_limit.media]
+enabled = true
+requests_per_minute = 300

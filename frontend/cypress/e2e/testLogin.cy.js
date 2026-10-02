@@ -7,7 +7,6 @@ describe('Login Component', () => {
             statusCode: 200,
             body: {
                 data: {
-                    "app.favicon_url": "http://localhost:9000/favicon.ico",
                     "app.lang": "en",
                     "app.logo_url": "http://localhost:9000/logo.png",
                     "app.site_name": "libredesk",
@@ -29,6 +28,8 @@ describe('Login Component', () => {
 
         // Visit the login page
         cy.visit('/')
+        cy.wait('@getOIDCProviders')
+        cy.get('#email', { timeout: 10000 }).should('be.visible')
     })
 
     it('should display login form', () => {
@@ -41,7 +42,6 @@ describe('Login Component', () => {
     })
 
     it('should display OIDC providers when loaded', () => {
-        cy.wait('@getOIDCProviders')
         cy.contains('button', 'Google').should('be.visible')
         cy.contains('div', 'Or continue with').should('be.visible')
     })
@@ -92,8 +92,8 @@ describe('Login Component', () => {
         // Wait for API call
         cy.wait('@loginSuccess')
 
-        // Verify redirection to inboxes page
-        cy.url().should('include', '/inboxes/assigned')
+        // Verify redirection to the address workspace.
+        cy.url().should('include', '/addresses')
     })
 
     it('should validate email format', () => {

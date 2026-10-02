@@ -1,0 +1,141 @@
+# yaml-language-server: $schema=https://www.authelia.com/schemas/latest/json-schema/configuration.json
+
+server:
+  address: 'tcp://:9091/'
+  # The image health check is replaced in Compose so a read-only root filesystem is safe.
+  disable_healthcheck: true
+
+log:
+  level: 'info'
+
+# New users authenticate with their password and a code from their authenticator
+# app. WebAuthn stays available for a future passkey enrolment.
+default_2fa_method: 'totp'
+
+identity_validation:
+  # Once a user has enrolled a second factor, require it for account-security
+  # changes. Losing TOTP is therefore an SSH administrator recovery event,
+  # rather than an email-recovery bypass.
+  elevated_session:
+    code_lifespan: '5 minutes'
+    elevation_lifespan: '10 minutes'
+    characters: 8
+    require_second_factor: true
+    skip_second_factor: true
+  reset_password:
+    jwt_lifespan: '5 minutes'
+
+authentication_backend:
+  file:
+    path: '/config/users.yml'
+    watch: false
+    search:
+      email: true
+      case_insensitive: true
+    password:
+      algorithm: 'argon2'
+      argon2:
+        variant: 'argon2id'
+        iterations: 3
+        memory: 65536
+        parallelism: 4
+        key_length: 32
+        salt_length: 16
+
+password_policy:
+  zxcvbn:
+    enabled: true
+    min_score: 4
+
+access_control:
+  default_policy: 'deny'
+  rules:
+    - domain: 'auth.antimuonstudios.com'
+      policy: 'bypass'
+    - domain: 'sys.antimuonstudios.com'
+      policy: 'two_factor'
+
+session:
+  name: 'authelia_session'
+  same_site: 'lax'
+  inactivity: '15 minutes'
+  expiration: '8 hours'
+  remember_me: '7 days'
+  cookies:
+    - domain: 'antimuonstudios.com'
+      authelia_url: 'https://auth.antimuonstudios.com'
+      default_redirection_url: 'https://sys.antimuonstudios.com'
+
+regulation:
+  modes:
+    - 'user'
+    - 'ip'
+  max_retries: 3
+  find_time: '2 minutes'
+  ban_time: '15 minutes'
+
+storage:
+  local:
+    path: '/data/db.sqlite3'
+
+notifier:
+  smtp:
+    # This Zoho tenant is in the Europe data centre.
+    address: 'submissions://smtppro.zoho.eu:465'
+    timeout: '10 seconds'
+    username: 'director@antimuonstudios.com'
+    sender: 'Antimuon Studios Authentication <auth@antimuonstudios.com>'
+    identifier: 'auth.antimuonstudios.com'
+    subject: '[Antimuon Studios] {title}'
+    startup_check_address: 'director@antimuonstudios.com'
+
+totp:
+  disable: false
+  issuer: 'Antimuon Studios'
+
+webauthn:
+  display_name: 'Antimuon Studios'
+  enable_passkey_login: false
+  selection_criteria:
+    discoverability: 'preferred'
+    user_verification: 'required'
+
+# Fernmail uses Authelia as its OpenID Connect provider. The signing key,
+# HMAC secret, and client-secret digest are read from a root-protected,
+# read-only secret mount rather than stored in this file.
+identity_providers:
+  oidc:
+    hmac_secret: {{ secret "/config/secrets/oidc/hmac_secret" | msquote }}
+    jwks:
+      - key: {{ secret "/config/secrets/oidc/jwks/rsa.2048.key" | mindent 10 "|" | msquote }}
+        algorithm: 'RS256'
+        use: 'sig'
+    # Fernmail currently reads the user identity directly from the ID token
+    # rather than the OIDC UserInfo endpoint. Limit the extra claims to the
+    # minimum identity fields it needs, and apply them only to this client.
+    claims_policies:
+      libredesk:
+        id_token:
+          - 'email'
+          - 'email_verified'
+    clients:
+      - client_id: 'libredesk'
+        client_name: 'Antimuon Studios Fernmail'
+        client_secret: {{ secret "/config/secrets/oidc/libredesk_client_secret.hash" | msquote }}
+        public: false
+        # Fernmail's OIDC client uses HTTP Basic authentication at the token endpoint.
+        token_endpoint_auth_method: 'client_secret_basic'
+        redirect_uris:
+          - 'https://desk.antimuonstudios.com/api/v1/oidc/1/finish'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+        grant_types:
+          - 'authorization_code'
+        response_types:
+          - 'code'
+        claims_policy: 'libredesk'
+        authorization_policy: 'two_factor'
+        consent_mode: 'pre-configured'
+        pre_configured_consent_duration: '1 year'

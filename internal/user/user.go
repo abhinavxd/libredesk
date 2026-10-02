@@ -19,11 +19,11 @@ import (
 
 	"log"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	rmodels "github.com/abhinavxd/libredesk/internal/role/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	rmodels "github.com/jakedolan443/fernmail/internal/role/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
@@ -384,7 +384,7 @@ func CreateSystemUser(ctx context.Context, password string, db *sqlx.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to create system user: %v", err)
 	}
-	log.Print("system user created successfully. Use command 'libredesk --set-system-user-password' to set the password and login with email 'System'.")
+	log.Print("system user created successfully. Use command 'fernmail --set-system-user-password' to set the password and login with email 'System'.")
 	return nil
 }
 

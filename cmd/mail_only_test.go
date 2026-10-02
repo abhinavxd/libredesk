@@ -21,6 +21,11 @@ func TestRetiredFeatureRoutesAreAbsent(t *testing.T) {
 		{"GET", "/widget.js"}, {"GET", "/widget/ws"},
 		{"PUT", "/api/v1/conversations/123/priority"},
 		{"PUT", "/api/v1/conversations/123/assignee"},
+		{"POST", "/api/v1/conversations"},
+		{"GET", "/api/v1/views"}, {"POST", "/api/v1/views"},
+		{"GET", "/api/v1/views/1"}, {"PUT", "/api/v1/views/1"}, {"DELETE", "/api/v1/views/1"},
+		{"GET", "/api/v1/mailboxes"}, {"GET", "/api/v1/mailboxes/1/conversations"},
+		{"GET", "/api/v1/inboxes/1/access"}, {"PUT", "/api/v1/inboxes/1/access"},
 	} {
 		handler, _ := g.Router.Lookup(route.method, route.path, &fasthttp.RequestCtx{})
 		if handler != nil {

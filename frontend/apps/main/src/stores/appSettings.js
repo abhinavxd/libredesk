@@ -1,11 +1,21 @@
 import { defineStore } from 'pinia'
 import api from '@/api'
 
+export const DEFAULT_SITE_TITLE = 'Fernmail'
+
+// Signed-in settings win; the public config covers the login screen.
+const brandSetting = (state, key) => state.settings[key] ?? state.public_config[key]
+
 export const useAppSettingsStore = defineStore('settings', {
     state: () => ({
         settings: {},
         public_config: {}
     }),
+    getters: {
+        // A blank title or logo means the Fernmail default.
+        siteTitle: (state) => brandSetting(state, 'app.site_name')?.trim() || DEFAULT_SITE_TITLE,
+        siteLogo: (state) => brandSetting(state, 'app.logo_url') || ''
+    },
     actions: {
         async fetchSettings (key = 'general') {
             try {

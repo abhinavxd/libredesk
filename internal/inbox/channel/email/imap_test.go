@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/emersion/go-message/mail"
+	"github.com/jakedolan443/fernmail/internal/attachment"
 	"github.com/jhillyerd/enmime/v2"
 )
 

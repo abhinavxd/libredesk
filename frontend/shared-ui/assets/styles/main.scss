@@ -199,6 +199,11 @@
     --warning-foreground: 24 45% 2%;
     --warning-600: 35 92% 33%;
 
+    /* Review queue: emails waiting for an Admin or Agent to approve. */
+    --review: 214 84% 46%;
+    --review-foreground: 0 0% 100%;
+    --review-soft: 214 90% 96%;
+
     --link: 210 100% 40%;
 
     --border: 0 0% 91%;
@@ -242,6 +247,10 @@
     --warning-foreground: 24 45% 2%;
     --warning-600: 36 87% 62%;
 
+    --review: 213 90% 64%;
+    --review-foreground: 220 40% 8%;
+    --review-soft: 215 40% 16%;
+
     --link: 210 90% 66%;
 
     --border: 150 2% 16%;
@@ -278,11 +287,11 @@
 // Email transport details live beside the bubble, so email content can use the
 // available width without a second padded header inside the message container.
 .message-bubble.email-message-bubble {
-  @apply w-full max-w-none min-w-0 rounded-none border-0 bg-transparent px-0 py-4 shadow-none;
+  @apply w-full max-w-none min-w-0 rounded-none border-0 bg-transparent px-0 pt-2 pb-3 shadow-none;
 }
 
 .email-message-header {
-  @apply flex items-start gap-4 px-1 pt-4;
+  @apply flex flex-wrap items-start gap-x-3 gap-y-1 px-1;
 }
 
 .email-message-date {

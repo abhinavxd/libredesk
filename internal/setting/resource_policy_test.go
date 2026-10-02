@@ -4,8 +4,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/zerodha/logf"
 )
 

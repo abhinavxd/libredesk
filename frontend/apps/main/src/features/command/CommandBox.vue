@@ -34,33 +34,31 @@
         <p class="text-sm text-muted-foreground">{{ emptyText }}</p>
       </CommandEmpty>
 
-      <template>
-        <CommandGroup v-for="group in groups" :key="group.section" :heading="group.label">
-          <CommandItem
-            v-for="command in group.commands"
-            :key="command.id"
-            :value="command.id"
-            :class="['gap-2.5', { 'text-destructive': command.destructive }]"
-            @select="onSelect($event, command)"
-          >
-            <component
-              :is="command.icon"
-              v-if="command.icon"
-              class="!h-4 !w-4 shrink-0 text-muted-foreground"
+      <CommandGroup v-for="group in groups" :key="group.section" :heading="group.label">
+        <CommandItem
+          v-for="command in group.commands"
+          :key="command.id"
+          :value="command.id"
+          :class="['gap-2.5', { 'text-destructive': command.destructive }]"
+          @select="onSelect($event, command)"
+        >
+          <component
+            :is="command.icon"
+            v-if="command.icon"
+            class="!h-4 !w-4 shrink-0 text-muted-foreground"
+          />
+          <span class="min-w-0 truncate">{{ command.label }}</span>
+          <span v-if="command.hint" class="min-w-0 truncate text-xs text-muted-foreground">
+            {{ command.hint }}
+          </span>
+          <span class="ml-auto flex shrink-0 items-center gap-1 pl-3">
+            <ChevronRight
+              v-if="command.group || command.navigateTo"
+              class="!h-4 !w-4 text-muted-foreground"
             />
-            <span class="min-w-0 truncate">{{ command.label }}</span>
-            <span v-if="command.hint" class="min-w-0 truncate text-xs text-muted-foreground">
-              {{ command.hint }}
-            </span>
-            <span class="ml-auto flex shrink-0 items-center gap-1 pl-3">
-              <ChevronRight
-                v-if="command.group || command.navigateTo"
-                class="!h-4 !w-4 text-muted-foreground"
-              />
-            </span>
-          </CommandItem>
-        </CommandGroup>
-      </template>
+          </span>
+        </CommandItem>
+      </CommandGroup>
     </CommandList>
 
     <div

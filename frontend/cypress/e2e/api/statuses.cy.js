@@ -112,8 +112,7 @@ describe('API: statuses', () => {
     })
   })
 
-  // A duplicate status name returns 500 GeneralException.
-  it.skip('rejects a duplicate name', () => {
+  it('rejects a duplicate name', () => {
     cy.api('POST', '/api/v1/statuses', { name: renamed, category: 'open' }, {
       failOnStatusCode: false
     }).then(({ status, body }) => {
@@ -122,8 +121,7 @@ describe('API: statuses', () => {
     })
   })
 
-  // Updating a status that does not exist returns 500 GeneralException.
-  it.skip('404s on an update to a status that does not exist', () => {
+  it('404s on an update to a status that does not exist', () => {
     cy.api('PUT', '/api/v1/statuses/99999999', { name: 'nope', category: 'open' }, {
       failOnStatusCode: false
     }).then(({ status, body }) => {
@@ -132,8 +130,7 @@ describe('API: statuses', () => {
     })
   })
 
-  // Deleting a status that does not exist returns 500 GeneralException.
-  it.skip('404s on a delete of a status that does not exist', () => {
+  it('404s on a delete of a status that does not exist', () => {
     cy.api('DELETE', '/api/v1/statuses/99999999', null, { failOnStatusCode: false }).then(({ status, body }) => {
       expect(status).to.eq(404)
       expect(body.error_type).to.eq('NotFoundException')

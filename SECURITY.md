@@ -1,10 +1,10 @@
 # Security Reports
 
-Report vulnerabilities privately via GitHub Security Advisories: https://github.com/jakedolan443/libredesk-hardened/security/advisories
+Report vulnerabilities privately via GitHub Security Advisories: https://github.com/jakedolan443/fernmail/security/advisories
 
 ## Threat model
 
-Libredesk is **self-hosted and single-tenant**. Agents and admins are trusted internal staff. The only untrusted surfaces are the **livechat widget** (anonymous contacts) and **inbound email**.
+Fernmail is **self-hosted and single-tenant**. Agents and admins are trusted internal staff. The only untrusted surfaces are the **livechat widget** (anonymous contacts) and **inbound email**.
 The permission system is a policy layer over already-trusted users, not a boundary between mutually distrusting parties. Admin permissions (`*:manage`, `*:read_all`) grant full control over their scope and are not granted by default.
 
 ## Out of scope

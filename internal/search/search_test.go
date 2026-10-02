@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/search/models"
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/search/models"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
 )
@@ -84,6 +84,8 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO inboxes (name, channel) VALUES ('Search test', 'email')`); err != nil {
 		t.Fatalf("inserting inbox: %v", err)
 	}
+	db.MustExec(`INSERT INTO email_addresses(inbox_id,address,kind)
+		SELECT id,'search@example.test','mailbox' FROM inboxes WHERE name='Search test'`)
 
 	oldest := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
 	insertSearchConversation(t, db, "108", "exact-108@example.com", "Exact", "Contact", "Old subject", oldest)
@@ -115,7 +117,12 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 		}
 	}
 
-	scope := models.ReadScope{Read: true, ReadAll: true}
+	var viewerID int
+	if err := db.Get(&viewerID, `INSERT INTO users(type, email, first_name) VALUES ('agent','search-reader@example.test','Reader') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`INSERT INTO email_address_users(address_id,user_id) SELECT id,$1 FROM email_addresses`, viewerID)
+	scope := models.ReadScope{UserID: viewerID, Read: true, ReadAll: true}
 	results, hasMore, cursor, err := manager.Conversations(models.Query{Term: "108", PageSize: 10}, scope)
 	if err != nil {
 		t.Fatalf("searching conversations: %v", err)
@@ -274,10 +281,11 @@ func insertSearchConversation(t *testing.T, db *sqlx.DB, reference, email, first
 
 	var conversationID int
 	if err := db.Get(&conversationID, `
-		INSERT INTO conversations (contact_id, inbox_id, status_id, reference_number, subject, last_message_at)
+		INSERT INTO conversations (contact_id, inbox_id, address_id, status_id, reference_number, subject, last_message_at)
 		VALUES (
 			$1,
 			(SELECT id FROM inboxes LIMIT 1),
+			(SELECT id FROM email_addresses LIMIT 1),
 			(SELECT id FROM conversation_statuses WHERE name = 'Open'),
 			$2,
 			$3,

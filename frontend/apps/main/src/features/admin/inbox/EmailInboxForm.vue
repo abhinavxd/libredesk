@@ -244,18 +244,6 @@
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="imap.scan_inbox_since">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.imapScanInboxSince') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="48h" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.imapScanInboxSince.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
     </div>
 
     <!-- OAuth SMTP Configuration -->
@@ -443,18 +431,6 @@
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="imap.scan_inbox_since">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.imapScanInboxSince') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="48h" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>
-            {{ $t('admin.inbox.imapScanInboxSince.description') }}
-          </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
 
       <FormField v-slot="{ componentField, handleChange }" name="imap.tls_skip_verify">
         <FormItem>
@@ -863,7 +839,6 @@ const form = useForm({
       password: '',
       tls_type: 'none',
       read_interval: '5m',
-      scan_inbox_since: '48h',
       tls_skip_verify: false
     },
     smtp: {

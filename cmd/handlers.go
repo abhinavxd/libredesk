@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/ws"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -44,6 +44,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/settings/resource-policy", auth(handleGetResourcePolicy))
 	g.PUT("/api/v1/settings/resource-policy", perm(handleUpdateResourcePolicy, "general_settings:manage"))
 	g.PUT("/api/v1/settings/general", perm(handleUpdateGeneralSettings, "general_settings:manage"))
+	g.POST("/api/v1/settings/general/logo", perm(handleUploadSiteLogo, "general_settings:manage"))
 	g.GET("/api/v1/system/resource-usage", perm(handleGetResourceUsage, "general_settings:manage"))
 	g.GET("/api/v1/system/resource-limits", perm(handleGetResourceLimits, "general_settings:manage"))
 	g.PUT("/api/v1/system/resource-limits", perm(handleUpdateResourceLimits, "general_settings:manage"))
@@ -55,12 +56,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/oidc/{id}", perm(handleUpdateOIDC, "oidc:manage"))
 	g.DELETE("/api/v1/oidc/{id}", perm(handleDeleteOIDC, "oidc:manage"))
 
-	// Conversations.
-	g.GET("/api/v1/conversations/all", perm(handleGetAllConversations, "conversations:read_all"))
-	g.GET("/api/v1/conversations/mentioned", perm(handleGetMentionedConversations, "conversations:read"))
+	// Conversations. Fernmail is address-first: no global inbox or saved views.
+	// New emails start from an address through /api/v1/compose.
+	g.GET("/api/v1/addresses", perm(handleGetAddresses, "conversations:read"))
+	g.GET("/api/v1/addresses/{id}/conversations", perm(handleGetAddressConversations, "conversations:read"))
+	g.POST("/api/v1/addresses/{id}/mark-read", perm(handleMarkAddressRead, "conversations:read"))
 	g.GET("/api/v1/conversations/sidebar-counts", perm(handleGetSidebarCounts, "conversations:read"))
-	g.GET("/api/v1/views/{id}/conversations", perm(handleGetViewConversations, "conversations:read"))
-	g.GET("/api/v1/views/{id}/count", perm(handleGetViewCount, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}", perm(handleGetConversation, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}/participants", perm(handleGetConversationParticipants, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/status", perm(handleUpdateConversationStatus, "conversations:update_status"))
@@ -74,7 +75,20 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/conversations/{cuuid}/messages", auth(handleSendMessage))
 	g.PUT("/api/v1/conversations/{cuuid}/messages/{uuid}/retry", perm(handleRetryMessage, "messages:write"))
 	g.DELETE("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleDeleteMessage, "messages:write_private"))
-	g.POST("/api/v1/conversations", perm(handleCreateConversation, "conversations:write"))
+	// Compose New and the review queue. messages:write sends directly;
+	// reviews:submit holds the email until an Admin or Agent approves it.
+	g.POST("/api/v1/compose", perm(handleCompose, "conversations:create"))
+	g.POST("/api/v1/conversations/{uuid}/reviews", perm(handleSubmitReplyReview, "reviews:submit"))
+	g.GET("/api/v1/conversations/{uuid}/reviews", perm(handleGetConversationReviews, "conversations:read"))
+	g.GET("/api/v1/reviews", auth(handleGetReviews))
+	g.GET("/api/v1/reviews/counts", auth(handleGetReviewCounts))
+	g.GET("/api/v1/reviews/{uuid}", auth(handleGetReview))
+	g.PUT("/api/v1/reviews/{uuid}", perm(handleResubmitReview, "reviews:submit"))
+	g.DELETE("/api/v1/reviews/{uuid}", auth(handleDiscardReview))
+	g.POST("/api/v1/reviews/{uuid}/approve", perm(handleApproveReview, "reviews:manage"))
+	g.POST("/api/v1/reviews/{uuid}/deny", perm(handleDenyReview, "reviews:manage"))
+	g.POST("/api/v1/reviews/{uuid}/withdraw", auth(handleWithdrawReview))
+	g.POST("/api/v1/reviews/{uuid}/dismiss", auth(handleDismissReview))
 	// Draft endpoints
 	g.GET("/api/v1/drafts", auth(handleGetAllDrafts))
 	g.POST("/api/v1/conversations/{uuid}/draft", auth(handleUpsertConversationDraft))
@@ -87,20 +101,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// New paginated search bar routes with better filter support and pagination.
 	g.GET("/api/v1/search/conversations", perm(handlePaginatedSearchConversations, "conversations:read"))
 	g.GET("/api/v1/search/messages", perm(handlePaginatedSearchMessages, "messages:read"))
-
-	// Views.
-	g.GET("/api/v1/views/me", perm(handleGetUserViews, "view:manage"))
-	g.POST("/api/v1/views/me", perm(handleCreateUserView, "view:manage"))
-	g.PUT("/api/v1/views/me/{id}", perm(handleUpdateUserView, "view:manage"))
-	g.DELETE("/api/v1/views/me/{id}", perm(handleDeleteUserView, "view:manage"))
-
-	g.GET("/api/v1/views/shared", auth(handleGetSharedViews))
-
-	g.GET("/api/v1/shared-views", perm(handleGetAllSharedViews, "shared_views:manage"))
-	g.GET("/api/v1/shared-views/{id}", perm(handleGetSharedView, "shared_views:manage"))
-	g.POST("/api/v1/shared-views", perm(handleCreateSharedView, "shared_views:manage"))
-	g.PUT("/api/v1/shared-views/{id}", perm(handleUpdateSharedView, "shared_views:manage"))
-	g.DELETE("/api/v1/shared-views/{id}", perm(handleDeleteSharedView, "shared_views:manage"))
 
 	// Message status.
 	g.GET("/api/v1/statuses", auth(handleGetStatuses))
@@ -122,11 +122,25 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/agents/import/status", perm(handleGetAgentImportStatus, "users:manage"))
 	g.POST("/api/v1/agents/{id}/api-key", perm(handleGenerateAPIKey, "users:manage"))
 	g.DELETE("/api/v1/agents/{id}/api-key", perm(handleRevokeAPIKey, "users:manage"))
+	// Users settings screen: role, addresses and enabled state in one place.
+	g.GET("/api/v1/admin/users", perm(handleGetManagedUsers, "users:manage"))
+	g.POST("/api/v1/admin/users", perm(handleCreateManagedUser, "users:manage"))
+	g.PUT("/api/v1/admin/users/{id}/access", perm(handleUpdateManagedUserAccess, "users:manage"))
+	g.DELETE("/api/v1/admin/users/{id}", perm(handleDeleteManagedUser, "users:manage"))
 	g.POST("/api/v1/agents/reset-password", rateLimit(tryAuth(handleResetPassword), "auth"))
 	g.POST("/api/v1/agents/set-password", rateLimit(tryAuth(handleSetPassword), "auth"))
 
 	// Inboxes.
-	g.GET("/api/v1/inboxes", auth(handleGetInboxes))
+	// These are transport-level credentials and lifecycle controls. The primary
+	// product configuration lives under /api/v1/admin/addresses.
+	g.GET("/api/v1/admin/addresses", perm(handleGetAdminAddresses, "inboxes:manage"))
+	g.GET("/api/v1/admin/address-principals", perm(handleGetAddressPrincipals, "inboxes:manage"))
+	g.GET("/api/v1/admin/addresses/{id}", perm(handleGetAdminAddress, "inboxes:manage"))
+	g.GET("/api/v1/admin/addresses/{id}/access", perm(handleGetAddressAccess, "inboxes:manage"))
+	g.POST("/api/v1/admin/addresses", perm(handleCreateAddress, "inboxes:manage"))
+	g.PUT("/api/v1/admin/addresses/{id}", perm(handleUpdateAddress, "inboxes:manage"))
+	g.DELETE("/api/v1/admin/addresses/{id}", perm(handleDeleteAddress, "inboxes:manage"))
+	g.GET("/api/v1/inboxes", perm(handleGetInboxes, "inboxes:manage"))
 	g.GET("/api/v1/inboxes/{id}", perm(handleGetInbox, "inboxes:manage"))
 	g.POST("/api/v1/inboxes", perm(handleCreateInbox, "inboxes:manage"))
 	g.PUT("/api/v1/inboxes/{id}/toggle", perm(handleToggleInbox, "inboxes:manage"))
@@ -167,8 +181,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Frontend pages.
 	getAndHead("/", notAuthPage(serveIndexPage))
+	g.GET("/addresses/{all:*}", authPage(serveIndexPage))
+	g.GET("/search", authPage(serveIndexPage))
+	g.GET("/reviews", authPage(serveIndexPage))
+	g.GET("/reviews/{all:*}", authPage(serveIndexPage))
+	g.GET("/conversation/{all:*}", authPage(serveIndexPage))
+	// Keep legacy bookmarks client-routable while the frontend redirects them to
+	// their first accessible address.
 	g.GET("/inboxes/{all:*}", authPage(serveIndexPage))
-	g.GET("/views/{all:*}", authPage(serveIndexPage))
 	g.GET("/admin/{all:*}", authPage(serveIndexPage))
 	g.GET("/reset-password", notAuthPage(serveIndexPage))
 	g.GET("/set-password", notAuthPage(serveIndexPage))
@@ -177,6 +197,12 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// FIXME: Reduce the number of routes.
 	g.GET("/assets/{all:*}", serveFrontendStaticFiles)
 	g.GET("/images/{all:*}", serveFrontendStaticFiles)
+	getAndHead("/favicon.svg", func(r *fastglue.Request) error {
+		return serveMainFrontendFile(r, "favicon.svg", "image/svg+xml", "no-cache")
+	})
+	getAndHead("/favicon.ico", func(r *fastglue.Request) error {
+		return serveMainFrontendFile(r, "favicon.ico", "image/x-icon", "no-cache")
+	})
 	g.GET("/manifest.webmanifest", serveManifest)
 	g.GET("/sw.js", serveServiceWorker)
 	g.GET("/static/public/{all:*}", serveStaticFiles)

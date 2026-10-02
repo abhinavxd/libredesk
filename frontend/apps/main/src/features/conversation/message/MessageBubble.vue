@@ -84,6 +84,7 @@
                 <p>{{ formatFullTimestamp(message.created_at) }}</p>
               </TooltipContent>
             </Tooltip>
+            <MessageConversationActions v-if="showConversationActions" />
           </div>
 
           <!-- Keep email transport details outside the bubble for other message types. -->
@@ -171,20 +172,12 @@
               <!-- CSAT Response -->
 
               <!-- Spinner for Pending Messages (outgoing only) -->
-              <Spinner v-if="isOutgoing && message.status === 'pending'" size="sm" />
 
               <!-- Status Icons (outgoing only) -->
               <div v-if="isOutgoing" class="flex items-center space-x-2 mt-2 self-end">
                 <Lock :size="12" v-if="isPrivateMessage" class="text-muted-foreground" />
 
-                <Tooltip v-if="isDelivered">
-                  <TooltipTrigger>
-                    <Check :size="14" class="text-success" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{{ t('globals.terms.sent') }}</p>
-                  </TooltipContent>
-                </Tooltip>
+                <MessageDeliveryStatus v-if="!isPrivateMessage" :message="message" />
                 <Tooltip v-if="message.meta?.continuity_emailed">
                   <TooltipTrigger>
                     <Mail :size="12" class="text-muted-foreground" />
@@ -193,12 +186,6 @@
                     <p>{{ t('conversation.sentViaEmail') }}</p>
                   </TooltipContent>
                 </Tooltip>
-                <RotateCcw
-                  size="12"
-                  @click="retryMessage(message)"
-                  class="cursor-pointer text-muted-foreground hover:text-foreground transition-colors duration-200"
-                  v-if="showRetry"
-                />
               </div>
             </template>
           </div>
@@ -255,7 +242,7 @@ import { computed, ref, onMounted, nextTick, watch } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { Lock, Mail, RotateCcw, Check, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
+import { Lock, Mail, Maximize2, Trash2, MoreHorizontal } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -274,15 +261,15 @@ import {
 } from '@shared-ui/components/ui/alert-dialog'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import MessageDeliveryStatus from './MessageDeliveryStatus.vue'
 import { formatMessageTimestamp, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import BubbleAttachmentPreview from '@main/features/conversation/message/attachment/BubbleAttachmentPreview.vue'
 import MessageEnvelope from './MessageEnvelope.vue'
+import MessageConversationActions from './MessageConversationActions.vue'
 
-import api from '@main/api'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 
 const COLLAPSE_THRESHOLD_PX = 400
@@ -304,6 +291,7 @@ onMounted(async () => {
 
 const props = defineProps({
   message: Object,
+  showConversationActions: Boolean,
   direction: {
     type: String,
     validator: (v) => ['incoming', 'outgoing'].includes(v)
@@ -387,20 +375,6 @@ const canDeleteNote = computed(
     !isDeleted.value &&
     (props.message.sender_id === userStore.userID || userStore.hasAdminRole)
 )
-const isDelivered = computed(
-  () => isOutgoing.value && props.message.status === 'sent' && !isPrivateMessage.value
-)
-const showRetry = computed(
-  () =>
-    isOutgoing.value &&
-    props.message.status === 'failed' &&
-    props.message.sender_id === userStore.userID
-)
-
-const retryMessage = (msg) => {
-  api.retryMessage(convStore.current.uuid, msg.uuid)
-}
-
 const showQuotedText = ref(false)
 const hasQuotedContent = computed(
   () => !isOutgoing.value && containsQuoteMarkers(props.message.display?.html)

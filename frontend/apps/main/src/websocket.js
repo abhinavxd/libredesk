@@ -1,4 +1,5 @@
 import { useConversationStore } from './stores/conversation'
+import { useAddressStore } from './stores/address'
 
 import { useUsersStore } from './stores/users'
 import { useConnectionStore } from './stores/connection'
@@ -6,6 +7,9 @@ import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { EMITTER_EVENTS } from './constants/emitterEvents.js'
 import { useEmitter } from './composables/useEmitter'
 import { getI18n } from './i18n'
+import { useBrowserNotificationsStore } from './stores/browserNotifications'
+import { useUserStore } from './stores/user'
+import { useReviewStore } from './stores/review'
 
 export class WebSocketClient {
   constructor() {
@@ -20,8 +24,12 @@ export class WebSocketClient {
     this.pingInterval = null
     this.lastPong = Date.now()
     this.convStore = useConversationStore()
+    this.addressStore = useAddressStore()
+    this.browserNotifications = useBrowserNotificationsStore()
 
     this.usersStore = useUsersStore()
+    this.userStore = useUserStore()
+    this.reviewStore = useReviewStore()
     this.connectionStore = useConnectionStore()
     this.emitter = useEmitter()
     this.messageQueue = []
@@ -64,6 +72,8 @@ export class WebSocketClient {
     this.setupPing()
     this.flushMessageQueue()
     if (wasReconnect) {
+      this.convStore.resyncMail()
+      this.reviewStore.fetchCounts()
       // RESUB!
       const uuids = this.convStore.conversations.data?.map((c) => c.uuid) || []
       this.subscribeListReplace(uuids)
@@ -84,9 +94,14 @@ export class WebSocketClient {
 
       const data = JSON.parse(event.data)
       const handlers = {
+        address_read: () => this.convStore.resyncMail(),
+        addresses_updated: () => {
+          this.addressStore.fetchAddresses(true)
+          this.convStore.resyncMail()
+        },
         [WS_EVENT.NEW_MESSAGE]: () => {
           const uuid = data.data.conversation_uuid
-          const isOpen = this.convStore.conversation.data?.uuid === uuid
+          const isOpen = this.convStore.isViewingConversation(uuid)
           const convPayload = data.data.conversation
 
           if (convPayload) {
@@ -100,11 +115,19 @@ export class WebSocketClient {
             })
           }
 
-          if (!isOpen && this.convStore.isConversationInList(uuid)) {
-            this.convStore.incrementUnread(uuid)
+          if (!isOpen || document.hidden) {
+            if (this.convStore.isConversationInList(uuid)) {
+              this.convStore.incrementUnread(uuid)
+            } else if (convPayload?.address_id) {
+              this.convStore.incrementAddressUnread(convPayload.address_id)
+            }
           }
 
+          if (!isOpen || document.hidden) this.convStore.sidebarCounts.unread++
+          this.convStore.refreshSidebarCounts()
+
           this.convStore.updateConversationMessage(data.data)
+          this.browserNotifications.notifyNewMessage(data.data)
         },
         [WS_EVENT.NEW_CONVERSATION]: () => {
           if (data.data && data.data.uuid) {
@@ -124,11 +147,14 @@ export class WebSocketClient {
         },
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
+          if (data.data?.user_id === this.userStore.userID) return
           this.convStore.updateTypingStatus(data.data)
         },
 
         [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
           this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),
+        [WS_EVENT.REVIEW_CREATED]: () => this.reviewStore.handleLiveEvent(WS_EVENT.REVIEW_CREATED, data.data),
+        [WS_EVENT.REVIEW_UPDATED]: () => this.reviewStore.handleLiveEvent(WS_EVENT.REVIEW_UPDATED, data.data),
         [WS_EVENT.SYSTEM_TOAST]: () => {
           const message = data.data || {}
           const translated = message.message_key ? getI18n().global.t(message.message_key) : ''

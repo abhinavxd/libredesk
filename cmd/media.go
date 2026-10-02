@@ -13,13 +13,13 @@ import (
 
 	"slices"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/google/uuid"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/image"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -121,7 +121,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 		}
 		meta = prepared.meta
 	}
-	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, "", null.NewString(linkedModel, linkedModel != ""), null.Int{}, file, int(srcFileSize), disposition, meta, true)
+	media, err := app.media.UploadForUser(srcFileName, srcContentType, null.NewString(linkedModel, linkedModel != ""), file, int(srcFileSize), disposition, meta, r.RequestCtx.UserValue("user").(amodels.User).ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -187,6 +187,11 @@ func handleServeMedia(r *fastglue.Request) error {
 	allowed, err := app.authz.EnforceMediaAccess(user, media.Model.String)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	// Pending uploads belong only to their uploader, before conversation ACLs exist.
+	if media.ModelID.Int <= 0 && (!media.UploadedBy.Valid || media.UploadedBy.Int != user.ID) {
+		return r.SendErrorEnvelope(http.StatusForbidden, "Permission denied", nil, envelope.PermissionError)
 	}
 
 	// For messages, check access to the conversation this message is part of.
@@ -255,21 +260,9 @@ func bytesToMegabytes(bytes int64) float64 {
 	return float64(bytes) / 1024 / 1024
 }
 
-// getUnassociatedMedia fetches media by IDs, skipping any already associated with a model.
-func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
-	all, err := app.media.GetMany(ids)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]mmodels.Media, 0, len(all))
-	for _, m := range all {
-		if m.ModelID.Int > 0 {
-			app.lo.Warn("attachment already associated with another model, skipping", "media_id", m.ID, "model", m.Model.String, "model_id", m.ModelID.Int)
-			continue
-		}
-		out = append(out, m)
-	}
-	return out, nil
+// getUnassociatedMedia accepts only the caller's pending message uploads.
+func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, error) {
+	return app.media.GetPendingForUser(ids, userID)
 }
 
 // getMediaByUUID fetches media metadata from DB, handling thumbnail prefix.

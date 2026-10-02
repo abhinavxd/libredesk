@@ -1,0 +1,55 @@
+{
+  auto_https off
+  admin 127.0.0.1:2019
+
+  servers {
+    # cloudflared is the only process permitted to reach this listener.
+    trusted_proxies static 127.0.0.1/32
+    client_ip_headers X-Forwarded-For
+  }
+}
+
+(secure_headers) {
+  header {
+    -Server
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    X-Frame-Options "SAMEORIGIN"
+  }
+}
+
+http://desk.antimuonstudios.com:8080 {
+  bind 127.0.0.1
+  import secure_headers
+
+  reverse_proxy 127.0.0.1:9000 {
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host {host}
+  }
+}
+
+http://auth.antimuonstudios.com:8080 {
+  bind 127.0.0.1
+  import secure_headers
+
+  reverse_proxy 127.0.0.1:9091 {
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host {host}
+  }
+}
+
+http://sys.antimuonstudios.com:8080 {
+  bind 127.0.0.1
+  import secure_headers
+
+  forward_auth 127.0.0.1:9091 {
+    uri /api/authz/forward-auth
+    copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+  }
+
+  reverse_proxy 127.0.0.1:5001 {
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host {host}
+  }
+}

@@ -10,14 +10,16 @@ const maskedSecret = '••••••••••'
 const newPath = '/admin/inboxes/new'
 const listPath = '/admin/inboxes'
 
-const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
+const filterList = (text) => {
+  cy.get('input[placeholder="Search"]').clear()
+  cy.get('input[placeholder="Search"]').type(text)
+}
 
 // The hidden OAuth section repeats imap/smtp field names first, so the manual copy is last.
 const field = (name) => cy.get(`input[name="${name}"]`).last()
 
 const openManualForm = () => {
   cy.visit(newPath)
-  cy.contains('Create an email inbox').click()
   cy.contains('Configure IMAP and SMTP manually').click()
 }
 
@@ -73,7 +75,6 @@ describe('Email inbox form', () => {
     field('imap.mailbox').should('have.value', 'INBOX')
     field('imap.username').should('have.value', 'cypress')
     field('imap.read_interval').should('have.value', '5m')
-    field('imap.scan_inbox_since').should('have.value', '48h')
 
     field('smtp.host').should('have.value', smtpHost)
     field('smtp.port').should('have.value', smtpPort)
@@ -113,7 +114,8 @@ describe('Email inbox form', () => {
     cy.get('button[type="submit"]').click()
 
     // Submitting scrolls to the bottom of a long form, so bring the first error back into view.
-    cy.contains(/required/i).first().scrollIntoView().should('be.visible')
+    cy.contains(/required/i).first().scrollIntoView()
+    cy.contains(/required/i).first().should('be.visible')
     cy.get('@createInbox.all').should('have.length', 0)
     cy.location('pathname').should('eq', newPath)
   })

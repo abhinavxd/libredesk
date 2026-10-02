@@ -1,0 +1,98 @@
+name: libredesk
+
+services:
+  app:
+    image: ghcr.io/jakedolan443/fernmail:latest
+    container_name: libredesk_app
+    restart: unless-stopped
+    init: true
+    user: "65532:65532"
+    env_file: .env
+    ports:
+      - "127.0.0.1:9000:9000"
+    volumes:
+      - ./uploads:/fernmail/uploads:rw
+      - ./config.toml:/fernmail/config.toml:ro
+    command: ["sh", "-c", "./fernmail --install --idempotent-install --yes --config /fernmail/config.toml && ./fernmail --upgrade --yes --config /fernmail/config.toml && ./fernmail --config /fernmail/config.toml"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  db:
+    image: postgres:17-alpine
+    container_name: libredesk_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+    command:
+      - postgres
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=25
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 192m
+    pids_limit: 128
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: libredesk_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "48mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 96m
+    pids_limit: 64
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  default:
+    name: libredesk
+
+volumes:
+  postgres-data:
+  redis-data:

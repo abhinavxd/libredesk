@@ -1,8 +1,8 @@
 package main
 
 import (
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"

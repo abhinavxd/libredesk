@@ -1,7 +1,7 @@
 package user
 
 import (
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/volatiletech/null/v9"
 	"sync"
 	"testing"

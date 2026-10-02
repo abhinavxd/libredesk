@@ -18,25 +18,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/authz"
-	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
+	"github.com/jakedolan443/fernmail/internal/authz"
+	authzmodels "github.com/jakedolan443/fernmail/internal/authz/models"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
 
-	smodels "github.com/abhinavxd/libredesk/internal/conversation/status/models"
+	smodels "github.com/jakedolan443/fernmail/internal/conversation/status/models"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/inbox"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 
-	"github.com/abhinavxd/libredesk/internal/template"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
-	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/jakedolan443/fernmail/internal/template"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
+	wmodels "github.com/jakedolan443/fernmail/internal/webhook/models"
+	"github.com/jakedolan443/fernmail/internal/ws"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
 
@@ -50,7 +50,7 @@ var (
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
 	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
-	conversationsAllowedFields      = []string{"status_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "snoozed_until"}
+	conversationsAllowedFields      = []string{"status_id", "inbox_id", "address_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "snoozed_until"}
 	conversationStatusAllowedFields = []string{"id", "name"}
 	usersAllowedFields              = []string{"email", "external_user_id"}
 	inboxesAllowedFields            = []string{"channel"}
@@ -60,9 +60,10 @@ const (
 	conversationsListMaxPageSize = 500
 )
 
-var ListFilterRenderers = dbutil.FieldRenderers{
-	"conversations": {},
-}
+// ListFilterRenderers remains a stable integration point for generic list and
+// search filtering. Address routing is now a database field, not a legacy
+// metadata renderer.
+var ListFilterRenderers = dbutil.FieldRenderers{}
 
 var ListFilterAllowedFields = dbutil.AllowedFields{
 	"conversations":         conversationsAllowedFields,
@@ -89,6 +90,7 @@ type Manager struct {
 	incomingMessageQueue       chan models.IncomingMessage
 	outgoingMessageQueue       chan models.Message
 	outgoingProcessingMessages sync.Map
+	stopCh                     chan struct{}
 	closed                     bool
 	closedMu                   sync.RWMutex
 	wg                         sync.WaitGroup
@@ -112,10 +114,10 @@ type mediaStore interface {
 	GetURL(uuid, contentType, fileName string) string
 	GetSignedURL(name string) string
 	GetThumbnailURL(uuid string) string
-	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string) error
+	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string, uploadUserID int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	GetByContentIDs(contentIDs []string, conversationUUID string) ([]mmodels.Media, error)
-	GetDraftInlineMedia(uuid string, conversationID int) (mmodels.Media, error)
+	GetDraftInlineMedia(uuid string, conversationID, userID int) (mmodels.Media, error)
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
 	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
@@ -187,6 +189,7 @@ func New(
 		template:                   template,
 		db:                         opts.DB,
 		lo:                         opts.Lo,
+		stopCh:                     make(chan struct{}),
 		incomingMessageQueue:       make(chan models.IncomingMessage, opts.IncomingMessageQueueSize),
 		outgoingMessageQueue:       make(chan models.Message, opts.OutgoingMessageQueueSize),
 		outgoingProcessingMessages: sync.Map{},
@@ -204,8 +207,6 @@ type queries struct {
 	GetConversationsCreatedAfter      *sqlx.Stmt `query:"get-conversations-created-after"`
 	GetConversations                  string     `query:"get-conversations"`
 	GetConversationParticipants       *sqlx.Stmt `query:"get-conversation-participants"`
-	GetSidebarStandardCounts          *sqlx.Stmt `query:"get-sidebar-standard-counts"`
-	GetConversationsCountBase         string     `query:"get-conversations-count-base"`
 	StartConversationWaitingSince     *sqlx.Stmt `query:"start-conversation-waiting-since"`
 	UpdateConversationReplyTimestamps *sqlx.Stmt `query:"update-conversation-reply-timestamps"`
 	UpdateConversationContactLastSeen *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
@@ -250,7 +251,7 @@ type queries struct {
 
 // CreateConversation creates a new conversation. If maxConversations > 0, the insert is
 // atomically rejected when the contact already has >= maxConversations in the given window.
-func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool, meta, customAttributes map[string]any, maxConversations int, rateLimitWindow time.Duration) (int, string, error) {
+func (c *Manager) CreateConversation(contactID, inboxID, addressID int, lastMessage string, lastMessageAt time.Time, subject string, appendRefNumToSubject bool, meta, customAttributes map[string]any, maxConversations int, rateLimitWindow time.Duration) (int, string, error) {
 	var (
 		id     int
 		uuid   string
@@ -280,18 +281,15 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 		since = time.Now().Add(-rateLimitWindow)
 	}
 
-	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid); err != nil {
+	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat, addressID).Scan(&id, &uuid); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.T("globals.messages.tooManyRequests"), nil)
 		}
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
 		return 0, "", err
 	}
-	if item, err := c.GetConversationListItem(uuid); err == nil {
-		c.BroadcastNewConversation(&item)
-	} else {
-		c.lo.Error("error fetching conversation list item for broadcast", "uuid", uuid, "error", err)
-	}
+	// The first message owns publication: failed/duplicate ingestion may still
+	// remove this provisional conversation before any mail has committed.
 	return id, uuid, nil
 }
 
@@ -406,16 +404,6 @@ func (c *Manager) GetConversationUUID(id int) (string, error) {
 	return uuid, nil
 }
 
-// GetAllConversationsList retrieves all conversations with optional filtering, ordering, and pagination.
-func (c *Manager) GetAllConversationsList(viewingUserID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
-	return c.GetConversations(viewingUserID, 0, []int{}, []string{models.AllConversations}, order, orderBy, filters, page, pageSize)
-}
-
-// GetMentionedConversationsList retrieves conversations where the user is mentioned (directly or via team).
-func (c *Manager) GetMentionedConversationsList(viewingUserID int, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
-	return c.GetConversations(viewingUserID, 0, []int{}, []string{models.MentionedConversations}, order, orderBy, filters, page, pageSize)
-}
-
 // InsertMentions inserts mentions for a message.
 func (c *Manager) InsertMentions(conversationID, messageID, mentionedByUserID int, mentions []models.MentionInput) error {
 	for _, mention := range mentions {
@@ -437,10 +425,6 @@ func (c *Manager) InsertMentions(conversationID, messageID, mentionedByUserID in
 	return nil
 }
 
-func (c *Manager) GetViewConversationsList(viewingUserID, userID int, teamIDs []int, listType []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
-	return c.GetConversations(viewingUserID, userID, teamIDs, listType, order, orderBy, filters, page, pageSize)
-}
-
 // GetConversations retrieves conversations list based on user ID, type, and optional filtering, ordering, and pagination.
 // viewingUserID is used to calculate per-agent unread counts.
 func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, listTypes []string, order, orderBy, filters string, page, pageSize int) ([]models.ConversationListItem, error) {
@@ -456,11 +440,12 @@ func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, lis
 	tx, err := c.db.BeginTxx(context.Background(), &sql.TxOptions{
 		ReadOnly: true,
 	})
-	defer tx.Rollback()
 	if err != nil {
 		c.lo.Error("error preparing get conversations query", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+
+	defer tx.Rollback()
 
 	if err := tx.Select(&conversations, query, qArgs...); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
@@ -631,17 +616,25 @@ func (m *Manager) GetMessageSourceIDs(conversationID, limit int) ([]string, erro
 // BuildEmailThreadingHeaders builds References and In-Reply-To headers for an outgoing email,
 // excluding the message's own source ID.
 func (m *Manager) BuildEmailThreadingHeaders(conversationID int, selfSourceID string) ([]string, string) {
-	references, err := m.GetMessageSourceIDs(conversationID, 20)
-	if err != nil {
+	var current struct {
+		ID     int    `db:"id"`
+		Parent string `db:"reply_to_source_id"`
+	}
+	if err := m.db.Get(&current, `SELECT id,reply_to_source_id FROM conversation_messages WHERE conversation_id=$1 AND source_id=$2 ORDER BY id DESC LIMIT 1`, conversationID, selfSourceID); err != nil {
+		return nil, ""
+	}
+	var references []string
+	// A reply's parent is fixed at queue time. Never point at a future pending
+	// or failed reply simply because another agent typed at the same time.
+	if err := m.db.Select(&references, `SELECT source_id FROM conversation_messages WHERE conversation_id=$1 AND id<$2 AND NOT private AND type IN ('incoming','outgoing') AND status IN ('received','sent') AND source_id>'' AND ($3='' OR id<=(SELECT id FROM conversation_messages WHERE conversation_id=$1 AND source_id=$3 ORDER BY id DESC LIMIT 1)) ORDER BY id DESC LIMIT 20`, conversationID, current.ID, current.Parent); err != nil {
 		return nil, ""
 	}
 	slices.Reverse(references)
-	references = stringutil.RemoveItemByValue(references, selfSourceID)
-	var inReplyTo string
-	if len(references) > 0 {
-		inReplyTo = references[len(references)-1]
+	parent := current.Parent
+	if parent == "" && len(references) > 0 {
+		parent = references[len(references)-1]
 	}
-	return references, inReplyTo
+	return references, parent
 }
 
 // DeleteConversation deletes a conversation.
@@ -737,19 +730,6 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
 }
 
-// ValidateListFilters structurally validates a conversation view's filters payload.
-func (c *Manager) ValidateListFilters(filtersJSON string) error {
-	err := dbutil.ValidateFilters(filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
-	if err == nil {
-		return nil
-	}
-	c.lo.Error("error validating view filters", "error", err)
-	if errors.Is(err, dbutil.ErrTooManyGroups) {
-		return envelope.NewError(envelope.InputError, c.i18n.Ts("conversation.filters.tooManyGroups", "max", fmt.Sprintf("%d", dbutil.MaxFilterGroups)), nil)
-	}
-	return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
-}
-
 func (c *Manager) GetConversationListItem(uuid string) (models.ConversationListItem, error) {
 	var item models.ConversationListItem
 	if err := c.q.GetConversationListItem.Get(&item, uuid); err != nil {
@@ -758,7 +738,7 @@ func (c *Manager) GetConversationListItem(uuid string) (models.ConversationListI
 	return item, nil
 }
 
-func (c *Manager) AuthorizedConnectedAgentIDs(assignedUserID, assignedTeamID null.Int) []int {
+func (c *Manager) AuthorizedConnectedAgentIDs(assignedUserID, assignedTeamID, addressID null.Int, inboxID int) []int {
 	connected := c.wsHub.ConnectedUserIDs()
 	if len(connected) == 0 {
 		return nil
@@ -770,6 +750,15 @@ func (c *Manager) AuthorizedConnectedAgentIDs(assignedUserID, assignedTeamID nul
 			continue
 		}
 		if !agent.Enabled {
+			continue
+		}
+		var allowed bool
+		if addressID.Valid {
+			err = c.db.Get(&allowed, `SELECT can_access_email_address($1,$2)`, addressID.Int, id)
+		} else {
+			err = c.db.Get(&allowed, `SELECT can_access_inbox($1,$2)`, inboxID, id)
+		}
+		if err != nil || !allowed {
 			continue
 		}
 		if authz.CanReadAssignment(agent, assignedUserID, assignedTeamID) {
@@ -821,60 +810,4 @@ func (c *Manager) FilterLocation() string {
 		return ""
 	}
 	return tz
-}
-
-// appendListTypeConditions returns the SQL conditions for the list types, appending their bind parameters to args.
-func appendListTypeConditions(listTypes []string, viewingUserID, userID int, teamIDs []int, args *[]any) ([]string, error) {
-	conditions := make([]string, 0, len(listTypes))
-	for _, lt := range listTypes {
-		switch lt {
-		case models.AssignedConversations:
-			*args = append(*args, userID)
-			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(*args)))
-		case models.UnassignedConversations:
-			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
-		case models.TeamUnassignedConversations:
-			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", appendTeamIDArgs(teamIDs, args)))
-		case models.TeamAllConversations:
-			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s))", appendTeamIDArgs(teamIDs, args)))
-		case models.AllConversations:
-			// No conditions needed for all conversations.
-		case models.MentionedConversations:
-			// Filter to only conversations where user is mentioned (directly or via team)
-			*args = append(*args, viewingUserID)
-			conditions = append(conditions, fmt.Sprintf(`conversations.id IN (
-				SELECT cm.conversation_id
-				FROM conversation_mentions cm
-				WHERE cm.mentioned_user_id = $%d
-				   OR EXISTS(
-					   SELECT 1 FROM team_members tm
-					   WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $%d
-				   )
-			)`, len(*args), len(*args)))
-		default:
-			return nil, fmt.Errorf("unknown conversation type: %s", lt)
-		}
-	}
-	return conditions, nil
-}
-
-// appendTeamIDArgs appends team IDs to args and returns their placeholders, or NULL when there are none.
-func appendTeamIDArgs(teamIDs []int, args *[]any) string {
-	if len(teamIDs) == 0 {
-		return "NULL"
-	}
-	placeholders := make([]string, len(teamIDs))
-	for i, id := range teamIDs {
-		*args = append(*args, id)
-		placeholders[i] = fmt.Sprintf("$%d", len(*args))
-	}
-	return strings.Join(placeholders, ",")
-}
-
-// listTypeWhereClause ORs the conditions into an AND (...) clause for the base query.
-func listTypeWhereClause(conditions []string) string {
-	if len(conditions) == 0 {
-		return ""
-	}
-	return "AND (" + strings.Join(conditions, " OR ") + ")"
 }

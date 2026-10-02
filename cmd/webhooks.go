@@ -4,9 +4,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/webhook/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -188,8 +188,10 @@ func validateWebhook(app *App, webhook models.Webhook) error {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`url`"), nil)
 	}
 	for _, event := range webhook.Events {
-		if event == "conversation.tags_changed" {
-			return envelope.NewError(envelope.InputError, "Tag webhook events are no longer supported.", nil)
+		switch models.WebhookEvent(event) {
+		case models.EventConversationCreated, models.EventConversationStatusChanged, models.EventMessageCreated, models.EventMessageUpdated:
+		default:
+			return envelope.NewError(envelope.InputError, "Unsupported webhook event.", nil)
 		}
 	}
 	if len(webhook.Events) == 0 {

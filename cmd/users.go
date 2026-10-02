@@ -4,13 +4,13 @@ import (
 	"strconv"
 	"strings"
 
-	accountmail "github.com/abhinavxd/libredesk/internal/accountmail"
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	accountmail "github.com/jakedolan443/fernmail/internal/accountmail"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	tmpl "github.com/abhinavxd/libredesk/internal/template"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
+	tmpl "github.com/jakedolan443/fernmail/internal/template"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -165,28 +165,8 @@ func handleCreateAgent(r *fastglue.Request) error {
 	}
 
 	if req.SendWelcomeEmail {
-		// Generate reset token.
-		resetToken, err := app.user.SetResetPasswordToken(agent.ID)
-		if err != nil {
+		if err := sendWelcomeEmail(app, agent.ID, req.Email); err != nil {
 			return sendErrorEnvelope(r, err)
-		}
-
-		// Render template and send email.
-		content, err := app.tmpl.RenderInMemoryTemplate(tmpl.TmplWelcome, map[string]any{
-			"ResetToken": resetToken,
-			"Email":      req.Email,
-		})
-		if err != nil {
-			app.lo.Error("error rendering template", "error", err)
-		}
-
-		if err := app.accountmail.Send(accountmail.Message{
-			RecipientEmails: []string{req.Email},
-			Subject:         app.i18n.T("globals.messages.welcomeToLibredesk"),
-			Content:         content,
-			Provider:        accountmail.ProviderEmail,
-		}); err != nil {
-			app.lo.Error("error sending account welcome email", "error", err)
 		}
 	}
 
@@ -202,8 +182,9 @@ func handleCreateAgent(r *fastglue.Request) error {
 // handleUpdateAgent updates an agent.
 func handleUpdateAgent(r *fastglue.Request) error {
 	var (
-		app = r.Context.(*App)
-		req = agentReq{}
+		app   = r.Context.(*App)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = agentReq{}
 
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
@@ -226,6 +207,12 @@ func handleUpdateAgent(r *fastglue.Request) error {
 	// Only human mailbox accounts can be edited.
 	if agent.Type != models.UserTypeAgent {
 		return r.SendErrorEnvelope(fasthttp.StatusNotFound, app.i18n.Ts("globals.messages.notFound", "name", app.i18n.T("globals.terms.agent")), nil, envelope.NotFoundError)
+	}
+
+	// Same safeguards as the Users settings screen: no self-demotion and never
+	// remove the last enabled Admin.
+	if err := app.user.CheckAccessChange(auser.ID, id, req.Roles, req.Enabled); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	// Update agent with individual fields
@@ -266,8 +253,8 @@ func handleDeleteAgent(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("user.userCannotDeleteSelf"), nil, envelope.InputError)
 	}
 
-	// Soft delete user.
-	if err = app.user.SoftDeleteAgent(id); err != nil {
+	// Soft delete user, keeping at least one enabled Admin.
+	if err = app.user.DeleteManagedUser(auser.ID, id); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
@@ -453,7 +440,7 @@ func validateAgentRequest(app *App, req *agentReq) error {
 		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
 	}
 
-	if req.Roles == nil {
+	if len(req.Roles) == 0 {
 		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`role`"), nil)
 	}
 
@@ -467,5 +454,30 @@ func validateAgentRequest(app *App, req *agentReq) error {
 		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidAvailabilityStatus"), nil)
 	}
 
+	return nil
+}
+
+// sendWelcomeEmail emails a new user a link to set their password. Delivery
+// failures are logged rather than returned: the account already exists.
+func sendWelcomeEmail(app *App, userID int, email string) error {
+	resetToken, err := app.user.SetResetPasswordToken(userID)
+	if err != nil {
+		return err
+	}
+	content, err := app.tmpl.RenderInMemoryTemplate(tmpl.TmplWelcome, map[string]any{
+		"ResetToken": resetToken,
+		"Email":      email,
+	})
+	if err != nil {
+		app.lo.Error("error rendering template", "error", err)
+	}
+	if err := app.accountmail.Send(accountmail.Message{
+		RecipientEmails: []string{email},
+		Subject:         app.i18n.T("globals.messages.welcomeToLibredesk"),
+		Content:         content,
+		Provider:        accountmail.ProviderEmail,
+	}); err != nil {
+		app.lo.Error("error sending account welcome email", "error", err)
+	}
 	return nil
 }

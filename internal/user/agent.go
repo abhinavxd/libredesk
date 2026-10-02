@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"golang.org/x/crypto/bcrypt"
@@ -94,6 +94,9 @@ func (u *Manager) GetAgentsCompactByIDs(ids []int) ([]models.UserCompact, error)
 
 // CreateAgent creates a new agent user.
 func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string) (models.User, error) {
+	if err := u.validateAgentRoles(roles); err != nil {
+		return models.User{}, err
+	}
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("error generating password", "error", err)
@@ -119,6 +122,9 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 
 // UpdateAgent updates an agent with individual field parameters
 func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles []string, enabled bool, availabilityStatus, newPassword string) error {
+	if err := u.validateAgentRoles(roles); err != nil {
+		return err
+	}
 	var (
 		hashedPassword any
 		err            error
@@ -195,4 +201,29 @@ func (u *Manager) MarkInactiveUsersOffline() []models.OfflineUser {
 func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
 	return u.GetAllUsers(1, 999999999, []string{models.UserTypeAgent}, "desc", "users.updated_at", "", "")
+}
+
+// Validate the entire role set before mutating users. A join alone silently drops
+// unknown names and can create an orphan account or remove all existing roles.
+func (u *Manager) validateAgentRoles(roles []string) error {
+	invalid := func() error { return envelope.NewError(envelope.InputError, u.i18n.T("validation.invalidRole"), nil) }
+	if len(roles) == 0 || len(roles) > 100 {
+		return invalid()
+	}
+	seen := map[string]bool{}
+	for _, role := range roles {
+		if strings.TrimSpace(role) == "" || seen[role] {
+			return invalid()
+		}
+		seen[role] = true
+	}
+	var count int
+	if err := u.db.Get(&count, `SELECT count(*) FROM roles WHERE name=ANY($1::text[])`, pq.Array(roles)); err != nil {
+		u.lo.Error("error validating agent roles", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if count != len(roles) {
+		return invalid()
+	}
+	return nil
 }

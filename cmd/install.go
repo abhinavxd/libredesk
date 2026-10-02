@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/user"
+	"github.com/jakedolan443/fernmail/internal/colorlog"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/stuffbin"
 )

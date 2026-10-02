@@ -28,7 +28,7 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['Geist', ...defaultTheme.fontFamily.sans]
+        sans: ['Go', ...defaultTheme.fontFamily.sans]
       },
       height: {
         screen: '100dvh'
@@ -73,6 +73,11 @@ module.exports = {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
           600: 'hsl(var(--warning-600))'
+        },
+        review: {
+          DEFAULT: 'hsl(var(--review))',
+          foreground: 'hsl(var(--review-foreground))',
+          soft: 'hsl(var(--review-soft))'
         },
         link: 'hsl(var(--link))',
         muted: {

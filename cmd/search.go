@@ -5,11 +5,11 @@ import (
 	"slices"
 	"strconv"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	searchmanager "github.com/abhinavxd/libredesk/internal/search"
-	smodels "github.com/abhinavxd/libredesk/internal/search/models"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	authzmodels "github.com/jakedolan443/fernmail/internal/authz/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	searchmanager "github.com/jakedolan443/fernmail/internal/search"
+	smodels "github.com/jakedolan443/fernmail/internal/search/models"
 	"github.com/zerodha/fastglue"
 )
 

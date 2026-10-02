@@ -36,7 +36,7 @@ Cypress.Commands.add('login', () => {
       cy.get('#email').clear().type(email)
       cy.get('#password').clear().type(password, { log: false })
       cy.contains('button', 'Sign in').click()
-      cy.url().should('include', '/inboxes')
+      cy.url().should('include', '/addresses')
     },
     {
       cacheAcrossSpecs: true,

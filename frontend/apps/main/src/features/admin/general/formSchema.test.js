@@ -7,7 +7,6 @@ const schema = createFormSchema(mockT)
 const validForm = {
     site_name: 'Support',
     root_url: 'https://support.example.com',
-    favicon_url: 'https://support.example.com/favicon.ico',
     max_file_upload_size: 20
 }
 
@@ -28,17 +27,13 @@ describe('General Form Schema', () => {
         })).not.toThrow()
     })
 
-    test('site_name missing', () => {
+    test('site_name optional, defaulting to blank', () => {
         const { site_name, ...form } = validForm
-        expect(() => schema.parse(form)).toThrow()
+        expect(schema.parse(form).site_name).toBe('')
     })
 
-    test('site_name empty string', () => {
-        expect(() => schema.parse({ ...validForm, site_name: '' })).toThrow()
-    })
-
-    test('site_name single character accepted', () => {
-        expect(() => schema.parse({ ...validForm, site_name: 'a' })).not.toThrow()
+    test('site_name empty string accepted', () => {
+        expect(() => schema.parse({ ...validForm, site_name: '' })).not.toThrow()
     })
 
     test('root_url missing', () => {
@@ -58,15 +53,6 @@ describe('General Form Schema', () => {
         expect(() => schema.parse({ ...validForm, root_url: 'http://localhost:9000/desk' })).not.toThrow()
     })
 
-    test('favicon_url missing', () => {
-        const { favicon_url, ...form } = validForm
-        expect(() => schema.parse(form)).toThrow()
-    })
-
-    test('favicon_url not a url', () => {
-        expect(() => schema.parse({ ...validForm, favicon_url: '/favicon.ico' })).toThrow()
-    })
-
     test('logo_url optional', () => {
         expect(() => schema.parse(validForm)).not.toThrow()
     })
@@ -77,6 +63,16 @@ describe('General Form Schema', () => {
 
     test('logo_url invalid url', () => {
         expect(() => schema.parse({ ...validForm, logo_url: 'not-a-url' })).toThrow()
+    })
+
+    test('uploaded logo accepted', () => {
+        expect(() => schema.parse({ ...validForm, logo_url: '/uploads/550e8400-e29b-41d4-a716-446655440000' })).not.toThrow()
+    })
+
+    test('logo_url rejects other app paths and non-http schemes', () => {
+        for (const logo_url of ['/uploads/not-a-uuid', '/images/fern.svg', 'javascript:alert(1)']) {
+            expect(() => schema.parse({ ...validForm, logo_url })).toThrow()
+        }
     })
 
     test('max_file_upload_size missing', () => {

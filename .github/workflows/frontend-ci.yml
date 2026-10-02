@@ -75,9 +75,9 @@ jobs:
           CYPRESS_SYSTEM_PASSWORD: "StrongPass!123"
           CYPRESS_MAILHOG_URL: "http://localhost:8025"
         run: |
-          ./libredesk --install --idempotent-install --yes --config ./config.toml
-          ./libredesk --upgrade --yes --config ./config.toml
-          ./libredesk --config ./config.toml &
+          ./fernmail --install --idempotent-install --yes --config ./config.toml
+          ./fernmail --upgrade --yes --config ./config.toml
+          ./fernmail --config ./config.toml &
           for i in $(seq 1 60); do
             if [ "$(curl --connect-timeout 1 --max-time 2 -s -o /dev/null -w '%{http_code}' http://localhost:9000/ || true)" = "200" ]; then
               echo "app is up"; break

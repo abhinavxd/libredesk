@@ -30,7 +30,7 @@ const conversationStore = useConversationStore()
 const route = useRoute()
 
 const showContent = computed(
-  () => conversationStore.current || conversationStore.conversation.loading
+  () => Boolean(conversationStore.current?.uuid)
 )
 
 const isLoading = computed(
@@ -42,16 +42,16 @@ const isDimmed = computed(() => conversationStore.conversation.loading)
 const visibility = useDocumentVisibility()
 watch(visibility, (state) => {
   if (state === 'visible' && props.uuid) {
-    conversationStore.updateAssigneeLastSeen(props.uuid)
+    conversationStore.resyncMail()
   }
 })
 
 const fetchConversation = async (uuid) => {
-  await Promise.all([
+  const [, loaded] = await Promise.all([
     conversationStore.fetchConversation(uuid),
     conversationStore.fetchMessages(uuid)
   ])
-  await conversationStore.updateAssigneeLastSeen(uuid)
+  if (loaded && !document.hidden) await conversationStore.updateAssigneeLastSeen(uuid)
 }
 
 // Initial fetch

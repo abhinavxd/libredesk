@@ -3,9 +3,9 @@ package main
 import (
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/media"
-	"github.com/abhinavxd/libredesk/internal/resourceusage"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/media"
+	"github.com/jakedolan443/fernmail/internal/resourceusage"
 	"github.com/zerodha/fastglue"
 )
 

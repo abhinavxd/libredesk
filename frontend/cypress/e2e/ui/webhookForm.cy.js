@@ -8,7 +8,10 @@ const updatedUrl = `https://cypress.test/hooks/${stamp}/v2`
 const newPath = '/admin/webhooks/new'
 const listPath = '/admin/webhooks'
 
-const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
+const filterList = (text) => {
+  cy.get('input[placeholder="Search"]').clear()
+  cy.get('input[placeholder="Search"]').type(text)
+}
 
 const checkEvent = (label) =>
   cy.contains('label', label).siblings('button[role="checkbox"]').click()
@@ -54,16 +57,18 @@ describe('Webhook form', () => {
     cy.get('input[name="url"]').should('have.value', webhookUrl)
     eventCheckbox('Conversation created').should('have.attr', 'data-state', 'checked')
     eventCheckbox('Message created').should('have.attr', 'data-state', 'checked')
-    eventCheckbox('Conversation assigned').should('have.attr', 'data-state', 'unchecked')
+    eventCheckbox('Conversation status changed').should('have.attr', 'data-state', 'unchecked')
   })
 
   it('persists a changed url and event list', () => {
     cy.intercept('PUT', `**/api/v1/webhooks/${webhookId}`).as('updateWebhook')
 
     cy.visit(`${listPath}/${webhookId}/edit`)
-    cy.get('input[name="name"]').should('have.value', webhookName).clear().type(renamedWebhook)
-    cy.get('input[name="url"]').clear().type(updatedUrl)
-    checkEvent('Conversation assigned')
+    cy.get('input[name="name"]').should('have.value', webhookName).clear()
+    cy.get('input[name="name"]').type(renamedWebhook)
+    cy.get('input[name="url"]').clear()
+    cy.get('input[name="url"]').type(updatedUrl)
+    checkEvent('Conversation status changed')
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateWebhook').its('response.statusCode').should('eq', 200)
@@ -71,7 +76,7 @@ describe('Webhook form', () => {
     cy.visit(`${listPath}/${webhookId}/edit`)
     cy.get('input[name="name"]').should('have.value', renamedWebhook)
     cy.get('input[name="url"]').should('have.value', updatedUrl)
-    eventCheckbox('Conversation assigned').should('have.attr', 'data-state', 'checked')
+    eventCheckbox('Conversation status changed').should('have.attr', 'data-state', 'checked')
   })
 
   it('rejects a submit with no name, url or event', () => {

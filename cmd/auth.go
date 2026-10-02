@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	auth_ "github.com/abhinavxd/libredesk/internal/auth"
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	auth_ "github.com/jakedolan443/fernmail/internal/auth"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"

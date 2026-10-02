@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	models "github.com/abhinavxd/libredesk/internal/search/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	models "github.com/jakedolan443/fernmail/internal/search/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"

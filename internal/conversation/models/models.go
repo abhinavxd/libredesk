@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	mmodels "github.com/jakedolan443/fernmail/internal/media/models"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
@@ -61,6 +61,8 @@ var (
 
 // ConversationListItem represents a conversation in list views
 type ConversationListItem struct {
+	InboxID               int                     `db:"inbox_id" json:"inbox_id"`
+	AddressID             null.Int                `db:"address_id" json:"address_id"`
 	Total                 int                     `db:"total" json:"-"`
 	ID                    int                     `db:"id" json:"id"`
 	CreatedAt             time.Time               `db:"created_at" json:"created_at"`
@@ -120,6 +122,7 @@ type Conversation struct {
 	UUID                      string                 `db:"uuid" json:"uuid"`
 	ContactID                 int                    `db:"contact_id" json:"-"`
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
+	AddressID                 null.Int               `db:"address_id" json:"address_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
 	ContactLastSeenAt         null.Time              `db:"contact_last_seen_at" json:"-"`
@@ -238,6 +241,8 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
+	UploadUserID      int                    `db:"-" json:"-"`
+	ReplyToSourceID   string                 `db:"reply_to_source_id" json:"-"`
 	Total             int                    `db:"total" json:"-"`
 	ID                int                    `db:"id" json:"id"`
 	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
@@ -377,6 +382,10 @@ type IncomingContact struct {
 }
 
 type IncomingMessage struct {
+	AddressID   int
+	MailboxKey  string
+	UIDValidity uint32
+	UID         uint32
 	// Channel context
 	Channel string
 	InboxID int
@@ -391,6 +400,7 @@ type IncomingMessage struct {
 	ContentType string
 	Meta        json.RawMessage
 	Attachments attachment.Attachments
+	EmailAlias  string
 
 	// Email threading
 	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)

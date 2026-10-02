@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/resourceusage"
+	"github.com/jakedolan443/fernmail/internal/resourceusage"
 )
 
 func TestLiveResourceLimitsConcurrentReadAndSave(t *testing.T) {

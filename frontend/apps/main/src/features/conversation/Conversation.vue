@@ -1,45 +1,14 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header -->
-    <div class="h-12 flex-shrink-0 px-4 border-b flex items-center justify-between gap-2">
-      <div class="flex items-center gap-2.5 min-w-0">
-        <Button
-          v-if="isMobile"
-          variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
-          :aria-label="t('globals.messages.back')"
-          @click="goBackToList"
-        >
-          <ChevronLeft class="w-4 h-4" />
-        </Button>
-        <Mail class="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span class="truncate text-sm font-medium">{{ conversationStore.currentSenderName }}</span>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <Tooltip v-if="isSnoozed && snoozedUntilLabel">
-          <TooltipTrigger as-child>
-            <span class="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-              <Clock :size="12" />
-              {{ snoozedUntilLabel }}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            {{ t('conversation.snoozedUntil', { time: snoozedUntilLabel }) }}
-          </TooltipContent>
-        </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
-              <MoreHorizontal class="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="downloadTranscript">
-              {{ t('conversation.downloadTranscript') }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+    <div v-if="isMobile" class="shrink-0 px-2 pt-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        :aria-label="t('globals.messages.back')"
+        @click="goBackToList"
+      >
+        <ChevronLeft class="w-4 h-4" />
+      </Button>
     </div>
 
     <Transition
@@ -93,17 +62,9 @@ import { computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal, ChevronLeft, Mail } from 'lucide-vue-next'
+import { ChevronLeft } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useIsMobile } from '@shared-ui/composables'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@shared-ui/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
@@ -114,7 +75,6 @@ import {
 } from '@shared-ui/components/ui/resizable'
 import MessageImagePermissions from './message/MessageImagePermissions.vue'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents.js'
-import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -152,15 +112,6 @@ const goBackToList = () => {
   if (window.history.state?.back?.split('?')[0] === target.path) router.back()
   else router.push(target)
 }
-
-const isSnoozed = computed(
-  () => conversationStore.current?.status === CONVERSATION_DEFAULT_STATUSES.SNOOZED
-)
-const snoozedUntilLabel = computed(() =>
-  conversationStore.current?.snoozed_until
-    ? formatMessageTimestamp(conversationStore.current.snoozed_until)
-    : ''
-)
 
 const downloadTranscript = async () => {
   const conversation = conversationStore.current

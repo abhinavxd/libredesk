@@ -14,51 +14,49 @@ import (
 
 	"html/template"
 
-	auth_ "github.com/abhinavxd/libredesk/internal/auth"
-	"github.com/abhinavxd/libredesk/internal/authz"
+	"github.com/jakedolan443/fernmail/internal/address"
+	auth_ "github.com/jakedolan443/fernmail/internal/auth"
+	"github.com/jakedolan443/fernmail/internal/authz"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
+	"github.com/jakedolan443/fernmail/internal/colorlog"
 
-	"github.com/abhinavxd/libredesk/internal/conversation"
+	"github.com/jakedolan443/fernmail/internal/conversation"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/status"
+	"github.com/jakedolan443/fernmail/internal/conversation/status"
 
-	"github.com/abhinavxd/libredesk/internal/importer"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
+	"github.com/jakedolan443/fernmail/internal/importer"
+	"github.com/jakedolan443/fernmail/internal/inbox"
+	"github.com/jakedolan443/fernmail/internal/inbox/channel/email"
 
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
 
-	accountmail "github.com/abhinavxd/libredesk/internal/accountmail"
-	emailaccountmail "github.com/abhinavxd/libredesk/internal/accountmail/providers/email"
-	"github.com/abhinavxd/libredesk/internal/media"
-	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
-	"github.com/abhinavxd/libredesk/internal/media/stores/s3"
+	accountmail "github.com/jakedolan443/fernmail/internal/accountmail"
+	emailaccountmail "github.com/jakedolan443/fernmail/internal/accountmail/providers/email"
+	"github.com/jakedolan443/fernmail/internal/media"
+	fs "github.com/jakedolan443/fernmail/internal/media/stores/localfs"
+	"github.com/jakedolan443/fernmail/internal/media/stores/s3"
 
-	"github.com/abhinavxd/libredesk/internal/oidc"
-	"github.com/abhinavxd/libredesk/internal/ratelimit"
+	"github.com/jakedolan443/fernmail/internal/oidc"
+	"github.com/jakedolan443/fernmail/internal/ratelimit"
 
-	"github.com/abhinavxd/libredesk/internal/resourceimage"
-	"github.com/abhinavxd/libredesk/internal/role"
-	"github.com/abhinavxd/libredesk/internal/search"
-	"github.com/abhinavxd/libredesk/internal/setting"
+	"github.com/jakedolan443/fernmail/internal/resourceimage"
+	"github.com/jakedolan443/fernmail/internal/role"
+	"github.com/jakedolan443/fernmail/internal/search"
+	"github.com/jakedolan443/fernmail/internal/setting"
 
-	"github.com/abhinavxd/libredesk/internal/ssrf"
-	"github.com/abhinavxd/libredesk/internal/team"
-	tmpl "github.com/abhinavxd/libredesk/internal/template"
-	"github.com/abhinavxd/libredesk/internal/user"
-	"github.com/abhinavxd/libredesk/internal/view"
-	"github.com/abhinavxd/libredesk/internal/webhook"
-	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/jakedolan443/fernmail/internal/ssrf"
+	"github.com/jakedolan443/fernmail/internal/team"
+	tmpl "github.com/jakedolan443/fernmail/internal/template"
+	"github.com/jakedolan443/fernmail/internal/user"
+	"github.com/jakedolan443/fernmail/internal/webhook"
+	"github.com/jakedolan443/fernmail/internal/ws"
 	"github.com/jmoiron/sqlx"
 
-	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/posflag"
-	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
 	_ "github.com/lib/pq"
@@ -70,10 +68,18 @@ import (
 	"github.com/zerodha/logf"
 )
 
+// Branding used when the site title or logo is unset.
+const (
+	defaultSiteName   = "Fernmail"
+	defaultFaviconURL = "/favicon.svg"
+)
+
 // constants holds the app constants.
 type constants struct {
-	AppBaseURL                  string
-	FaviconURL                  string
+	AppBaseURL string
+	// FaviconURL is the site logo, or the bundled favicon when no logo is set.
+	FaviconURL string
+	// LogoURL is absolute so it also resolves in emails; empty when unset.
 	LogoURL                     string
 	SiteName                    string
 	UploadProvider              string
@@ -150,15 +156,25 @@ func initFlags() {
 
 // initConstants initializes the app constants.
 func initConstants() *constants {
+	rootURL := ko.String("app.root_url")
+	logoURL := absoluteAppURL(rootURL, strings.TrimSpace(ko.String("app.logo_url")))
 	return &constants{
-		AppBaseURL:                  ko.String("app.root_url"),
-		FaviconURL:                  ko.String("app.favicon_url"),
-		LogoURL:                     ko.String("app.logo_url"),
-		SiteName:                    ko.String("app.site_name"),
+		AppBaseURL:                  rootURL,
+		FaviconURL:                  cmp.Or(logoURL, defaultFaviconURL),
+		LogoURL:                     logoURL,
+		SiteName:                    cmp.Or(strings.TrimSpace(ko.String("app.site_name")), defaultSiteName),
 		UploadProvider:              ko.MustString("upload.provider"),
 		AllowedUploadFileExtensions: ko.Strings("app.allowed_file_upload_extensions"),
 		MaxFileUploadSizeMB:         ko.Int("app.max_file_upload_size"),
 	}
+}
+
+// absoluteAppURL prefixes an app-relative path, such as an uploaded logo, with the root URL.
+func absoluteAppURL(rootURL, u string) string {
+	if strings.HasPrefix(u, "/") && !strings.HasPrefix(u, "//") {
+		return strings.TrimRight(rootURL, "/") + u
+	}
+	return u
 }
 
 // initFS initializes the stuffbin FileSystem. If staticDir is set, files from
@@ -241,8 +257,8 @@ func loadSettings(m *setting.Manager) {
 		log.Fatalf("error parsing settings from DB: %v", err)
 	}
 
-	// Setting keys are dot separated, eg: app.favicon_url. Unflatten them into
-	// nested maps {app: {favicon_url}}.
+	// Setting keys are dot separated, eg: app.logo_url. Unflatten them into
+	// nested maps {app: {logo_url}}.
 	var out map[string]any
 
 	if err := json.Unmarshal(j, &out); err != nil {
@@ -309,16 +325,10 @@ func initConversations(
 	return c
 }
 
-// initViews inits view manager.
-func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
-	var lo = initLogger("view_manager")
-	m, err := view.New(view.Opts{
-		DB:   db,
-		Lo:   lo,
-		I18n: i18n,
-	})
+func initAddress(db *sqlx.DB) *address.Manager {
+	m, err := address.New(db)
 	if err != nil {
-		log.Fatalf("error initializing view manager: %v", err)
+		log.Fatalf("error initializing address manager: %v", err)
 	}
 	return m
 }
@@ -597,13 +607,10 @@ func initAccountMailer() *accountmail.Service {
 func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager) (inbox.Inbox, error) {
 	var config imodels.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
-		return nil, fmt.Errorf("loading config: %w", err)
-	}
-
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
-		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
+	// Inbox configuration must never mutate or inherit another inbox's global
+	// application configuration (OAuth, aliases and reply routing are private).
+	if err := json.Unmarshal(inboxRecord.Config, &config); err != nil {
+		return nil, fmt.Errorf("decoding email inbox %s: %w", inboxRecord.Name, err)
 	}
 
 	if len(config.SMTP) == 0 {
@@ -693,8 +700,8 @@ func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.Messag
 }
 
 // initAuthz initializes authorization enforcer.
-func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
-	enforcer, err := authz.NewEnforcer(initLogger("authz"), i18n)
+func initAuthz(i18n *i18n.I18n, inbox *inbox.Manager, address *address.Manager) *authz.Enforcer {
+	enforcer, err := authz.NewEnforcer(initLogger("authz"), i18n, inbox.CanAccess, address.CanAccess)
 	if err != nil {
 		log.Fatalf("error initializing authz: %v", err)
 	}

@@ -3,163 +3,74 @@ package conversation
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 	"time"
 
-	authzModels "github.com/abhinavxd/libredesk/internal/authz/models"
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	vmodels "github.com/abhinavxd/libredesk/internal/view/models"
+	authzModels "github.com/jakedolan443/fernmail/internal/authz/models"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 )
 
-const sidebarCountsViewBatchSize = 50
 const sidebarCountsQueryTimeout = 10 * time.Second
 
-// sidebarCountsScanCap bounds each view count's scan; the UI shows anything above 99 as "99+".
-const sidebarCountsScanCap = 100
-
-// GetSidebarCounts returns open counts for the standard inboxes and a count per accessible view.
-func (c *Manager) GetSidebarCounts(viewingUserID int, permissions []string, teamIDs []int, views []vmodels.View) (models.SidebarCounts, error) {
-	out := models.SidebarCounts{Views: map[int]int{}}
-	ctx, cancel := context.WithTimeout(context.Background(), sidebarCountsQueryTimeout)
-	defer cancel()
-
-	if err := c.fillStandardSidebarCounts(ctx, &out, viewingUserID, permissions); err != nil {
-		return out, err
-	}
-
+// GetSidebarCounts returns unread-message counts for the addresses visible to
+// this agent. Counts deliberately represent attention, not open conversation
+// totals: opening or resolving a thread must not make an unread badge lie.
+func (c *Manager) GetSidebarCounts(viewingUserID int, permissions []string, teamIDs []int) (models.SidebarCounts, error) {
+	out := models.SidebarCounts{Addresses: map[int]int{}}
 	lists := ListsForUserPermissions(permissions)
 	if len(lists) == 0 {
 		return out, nil
 	}
 
-	accessible := make([]vmodels.View, 0, len(views))
-	for _, view := range views {
-		if UserCanAccessView(view, viewingUserID, teamIDs) {
-			accessible = append(accessible, view)
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), sidebarCountsQueryTimeout)
+	defer cancel()
+
+	counts, err := c.getUnreadAddressCounts(ctx, viewingUserID, teamIDs, lists)
+	if err != nil {
+		return out, err
 	}
-	for start := 0; start < len(accessible); start += sidebarCountsViewBatchSize {
-		batch := accessible[start:min(start+sidebarCountsViewBatchSize, len(accessible))]
-		viewCounts, err := c.getViewCounts(ctx, viewingUserID, teamIDs, lists, batch)
-		if err != nil {
-			return out, err
-		}
-		maps.Copy(out.Views, viewCounts)
+	for addressID, count := range counts {
+		out.Addresses[addressID] = count
+		out.Unread += count
 	}
 	return out, nil
 }
 
-// GetViewCount returns the capped open count for one view.
-func (c *Manager) GetViewCount(viewingUserID int, permissions []string, teamIDs []int, view vmodels.View) (int, error) {
-	lists := ListsForUserPermissions(permissions)
-	if len(lists) == 0 {
-		return 0, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), sidebarCountsQueryTimeout)
-	defer cancel()
-
-	counts, err := c.getViewCounts(ctx, viewingUserID, teamIDs, lists, []vmodels.View{view})
-	if err != nil {
-		return 0, err
-	}
-	return counts[view.ID], nil
-}
-
-func (c *Manager) fillStandardSidebarCounts(ctx context.Context, out *models.SidebarCounts, userID int, permissions []string) error {
-	var row struct {
-		Assigned   int `db:"assigned"`
-		Unassigned int `db:"unassigned"`
-		Mentioned  int `db:"mentioned"`
-		All        int `db:"all"`
-	}
-
-	if err := c.q.GetSidebarStandardCounts.GetContext(ctx, &row, userID); err != nil {
-		c.lo.Error("error fetching sidebar standard counts", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	if slices.Contains(permissions, authzModels.PermConversationsReadAssigned) {
-		out.Assigned = row.Assigned
-	}
-	if slices.Contains(permissions, authzModels.PermConversationsReadUnassigned) {
-		out.Unassigned = row.Unassigned
-	}
-	if slices.Contains(permissions, authzModels.PermConversationsRead) {
-		out.Mentioned = row.Mentioned
-	}
-	if slices.Contains(permissions, authzModels.PermConversationsReadAll) {
-		out.All = row.All
-	}
-	return nil
-}
-
-// getViewCounts returns the conversation count per view ID in one round trip.
-func (c *Manager) getViewCounts(ctx context.Context, userID int, teamIDs []int, listTypes []string, views []vmodels.View) (map[int]int, error) {
+// getUnreadAddressCounts uses the same assignment and access predicates as the
+// lists themselves. A message belongs to exactly one address, even when its
+// source transport mailbox receives mail for several aliases.
+func (c *Manager) getUnreadAddressCounts(ctx context.Context, userID int, teamIDs []int, lists []string) (map[int]int, error) {
 	counts := map[int]int{}
-	if len(views) == 0 {
-		return counts, nil
-	}
-
-	query, qArgs, err := c.makeViewCountsQuery(userID, teamIDs, listTypes, views)
+	args := []any{userID}
+	conditions, err := appendListTypeConditions(lists, userID, userID, teamIDs, &args)
 	if err != nil {
-		c.lo.Error("error making view counts query", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return counts, err
 	}
-
+	query := `SELECT conversations.address_id, COUNT(*) AS count
+		FROM conversations
+		JOIN inboxes ON inboxes.id = conversations.inbox_id
+		JOIN conversation_messages AS messages ON messages.conversation_id = conversations.id
+		LEFT JOIN conversation_last_seen AS seen ON seen.conversation_id = conversations.id AND seen.user_id = $1
+		WHERE inboxes.channel = 'email'
+		  AND conversations.address_id IS NOT NULL
+		  AND messages.created_at > COALESCE(seen.last_seen_at, '1970-01-01'::TIMESTAMPTZ)
+		  AND (messages.meta IS NULL OR NOT COALESCE((messages.meta->>'continuity_email')::boolean, false))
+		  ` + listTypeWhereClause(conditions) + `
+		GROUP BY conversations.address_id`
 	var rows []struct {
-		ViewID int `db:"view_id"`
-		Count  int `db:"count"`
+		AddressID int `db:"address_id"`
+		Count     int `db:"count"`
 	}
-	if err := c.db.SelectContext(ctx, &rows, query, qArgs...); err != nil {
-		c.lo.Error("error fetching view counts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	if err := c.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		c.lo.Error("error fetching unread address counts", "error", err)
+		return counts, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-
 	for _, row := range rows {
-		counts[row.ViewID] = row.Count
+		counts[row.AddressID] = row.Count
 	}
 	return counts, nil
-}
-
-// makeViewCountsQuery unions one counting subquery per view into a single (view_id, count) statement.
-func (c *Manager) makeViewCountsQuery(userID int, teamIDs []int, listTypes []string, views []vmodels.View) (string, []any, error) {
-	var (
-		args  = []any{}
-		parts = make([]string, 0, len(views))
-		loc   = c.FilterLocation()
-	)
-
-	for _, view := range views {
-		countQuery, nextArgs, err := c.makeConversationsCountQuery(args, userID, teamIDs, listTypes, string(view.Filters), loc)
-		if err != nil {
-			return "", nil, err
-		}
-		parts = append(parts, fmt.Sprintf("SELECT %d AS view_id, (SELECT COUNT(*) FROM (%s LIMIT %d) capped) AS count", view.ID, countQuery, sidebarCountsScanCap))
-		args = nextArgs
-	}
-
-	return strings.Join(parts, " UNION ALL "), args, nil
-}
-
-// makeConversationsCountQuery builds a query selecting matching conversations, with placeholders continuing after existingArgs.
-func (c *Manager) makeConversationsCountQuery(existingArgs []any, userID int, teamIDs []int, listTypes []string, filtersJSON, loc string) (string, []any, error) {
-	if len(listTypes) == 0 {
-		return "", nil, fmt.Errorf("no conversation list types specified")
-	}
-
-	qArgs := existingArgs
-	conditions, err := appendListTypeConditions(listTypes, userID, userID, teamIDs, &qArgs)
-	if err != nil {
-		return "", nil, err
-	}
-
-	baseQuery := fmt.Sprintf(c.q.GetConversationsCountBase, listTypeWhereClause(conditions))
-
-	return dbutil.BuildFilterQuery(baseQuery, qArgs, filtersJSON, ListFilterAllowedFields, ListFilterRenderers, loc)
 }
 
 // ListsForUserPermissions returns conversation list types the user may access.
@@ -187,19 +98,68 @@ func ListsForUserPermissions(permissions []string) []string {
 	return lists
 }
 
-// UserCanAccessView reports whether a user can access a view.
-func UserCanAccessView(view vmodels.View, userID int, teamIDs []int) bool {
-	switch view.Visibility {
-	case vmodels.VisibilityUser:
-		return view.UserID != nil && *view.UserID == userID
-	case vmodels.VisibilityAll:
-		return true
-	case vmodels.VisibilityTeam:
-		if view.TeamID == nil {
-			return false
-		}
-		return slices.Contains(teamIDs, *view.TeamID)
-	default:
-		return false
+// appendListTypeConditions returns assignment conditions and always adds the
+// address-level access check. This is shared by address lists, unread counts,
+// search-like list operations, and notifications.
+func appendListTypeConditions(listTypes []string, viewingUserID, userID int, teamIDs []int, args *[]any) ([]string, error) {
+	if len(listTypes) == 0 {
+		return nil, fmt.Errorf("no conversation list types specified")
 	}
+	if slices.Contains(listTypes, models.AllConversations) {
+		*args = append(*args, viewingUserID)
+		return []string{fmt.Sprintf("can_access_email_address(conversations.address_id, $%d)", len(*args))}, nil
+	}
+	conditions := make([]string, 0, len(listTypes))
+	for _, lt := range listTypes {
+		switch lt {
+		case models.AssignedConversations:
+			*args = append(*args, userID)
+			conditions = append(conditions, fmt.Sprintf("conversations.assigned_user_id = $%d", len(*args)))
+		case models.UnassignedConversations:
+			conditions = append(conditions, "conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL")
+		case models.TeamUnassignedConversations:
+			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s) AND conversations.assigned_user_id IS NULL)", appendTeamIDArgs(teamIDs, args)))
+		case models.TeamAllConversations:
+			conditions = append(conditions, fmt.Sprintf("(conversations.assigned_team_id IN (%s))", appendTeamIDArgs(teamIDs, args)))
+		case models.MentionedConversations:
+			*args = append(*args, viewingUserID)
+			conditions = append(conditions, fmt.Sprintf(`conversations.id IN (
+				SELECT cm.conversation_id
+				FROM conversation_mentions cm
+				WHERE cm.mentioned_user_id = $%d
+				   OR EXISTS(
+					   SELECT 1 FROM team_members tm
+					   WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $%d
+				   )
+			)`, len(*args), len(*args)))
+		default:
+			return nil, fmt.Errorf("unknown conversation type: %s", lt)
+		}
+	}
+
+	scope := "TRUE"
+	if len(conditions) > 0 {
+		scope = "(" + strings.Join(conditions, " OR ") + ")"
+	}
+	*args = append(*args, viewingUserID)
+	return []string{fmt.Sprintf("%s AND can_access_email_address(conversations.address_id, $%d)", scope, len(*args))}, nil
+}
+
+func appendTeamIDArgs(teamIDs []int, args *[]any) string {
+	if len(teamIDs) == 0 {
+		return "NULL"
+	}
+	placeholders := make([]string, len(teamIDs))
+	for i, id := range teamIDs {
+		*args = append(*args, id)
+		placeholders[i] = fmt.Sprintf("$%d", len(*args))
+	}
+	return strings.Join(placeholders, ",")
+}
+
+func listTypeWhereClause(conditions []string) string {
+	if len(conditions) == 0 {
+		return ""
+	}
+	return "AND (" + strings.Join(conditions, " OR ") + ")"
 }

@@ -4,8 +4,8 @@ import (
 	"html"
 	"net/url"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 )
 
 func loadResourcePolicy(app *App) resourcepolicy.Policy {

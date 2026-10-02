@@ -6,7 +6,6 @@ describe('API: inboxes', () => {
   const chatName = `api.chat.${stamp}`
   const fromAddress = `support.${stamp}@example.com`
   let emailInboxId
-  let chatInboxId
 
   const emailConfig = {
     auth_type: 'password',
@@ -67,7 +66,7 @@ describe('API: inboxes', () => {
     }).then(({ status, body }) => {
       expect(status).to.eq(400)
       expect(body.error_type).to.eq('InputException')
-      expect(body.message).to.match(/channel/i)
+      expect(body.message).to.match(/email/i)
     })
   })
 
@@ -81,8 +80,7 @@ describe('API: inboxes', () => {
     })
   })
 
-  // Unknown channel values reach the DB enum and blow up instead of being rejected.
-  it.skip('rejects a create with an unknown channel', () => {
+  it('rejects a create with an unknown channel', () => {
     cy.api('POST', '/api/v1/inboxes', {
       name: emailName, channel: 'carrier_pigeon', config: { a: 1 }
     }, { failOnStatusCode: false }).then(({ status, body }) => {
@@ -175,7 +173,7 @@ describe('API: inboxes', () => {
       from: fromAddress,
       from_name_template: 'Acme Support',
       enabled: true,
-      csat_enabled: true,
+      csat_enabled: false,
       config: emailConfig
     }).then(({ status, body }) => {
       expect(status).to.eq(200)
@@ -187,7 +185,7 @@ describe('API: inboxes', () => {
       expect(body.data.from).to.eq(fromAddress)
       expect(body.data.from_name_template).to.eq('Acme Support')
       expect(body.data.enabled).to.eq(true)
-      expect(body.data.csat_enabled).to.eq(true)
+      expect(body.data.csat_enabled).to.eq(false)
       expect(body.data.config.auth_type).to.eq('password')
       expect(body.data.config.reply_to).to.eq(emailConfig.reply_to)
       expect(body.data.config.enable_plus_addressing).to.eq(true)
@@ -253,174 +251,27 @@ describe('API: inboxes', () => {
     })
   })
 
-  it('rejects a livechat inbox with no primary color', () => {
+  it('rejects a complete livechat configuration because only email is retained', () => {
     cy.api('POST', '/api/v1/inboxes', {
-      name: chatName, channel: 'livechat', config: { launcher: { position: 'right' } }
+      name: chatName, channel: 'livechat', enabled: true, config: chatConfig
     }, { failOnStatusCode: false }).then(({ status, body }) => {
       expect(status).to.eq(400)
       expect(body.error_type).to.eq('InputException')
     })
   })
 
-  it('rejects a livechat inbox with a non-hex primary color', () => {
+  it('rejects retired CSAT settings', () => {
     cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: { colors: { primary: 'blue' }, launcher: { position: 'right' } }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
+      name: `${emailName}-csat`, channel: 'email', from: `csat-${fromAddress}`,
+      csat_enabled: true, config: emailConfig
+    }, { failOnStatusCode: false }).its('status').should('eq', 400)
   })
 
-  it('rejects a livechat inbox with an unknown launcher position', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: { colors: { primary: '#112233' }, launcher: { position: 'middle' } }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('rejects launcher spacing outside the allowed range', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: {
-        colors: { primary: '#112233' },
-        launcher: { position: 'right', spacing: { side: 500, bottom: 10 } }
-      }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('rejects a trusted domain that carries a protocol', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: {
-        colors: { primary: '#112233' },
-        launcher: { position: 'right' },
-        trusted_domains: ['https://acme.example.com']
-      }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('rejects a malformed blocked IP', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: {
-        colors: { primary: '#112233' },
-        launcher: { position: 'right' },
-        blocked_ips: ['999.1.1.1']
-      }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('rejects a malformed website URL', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: {
-        colors: { primary: '#112233' },
-        launcher: { position: 'right' },
-        website_url: 'notaurl'
-      }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('rejects office hours after assignment without office hours in chat', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      config: {
-        colors: { primary: '#112233' },
-        launcher: { position: 'right' },
-        show_office_hours_in_chat: false,
-        show_office_hours_after_assignment: true
-      }
-    }, { failOnStatusCode: false }).then(({ status, body }) => {
-      expect(status).to.eq(400)
-      expect(body.error_type).to.eq('InputException')
-    })
-  })
-
-  it('creates a livechat inbox and persists every field', () => {
-    cy.api('POST', '/api/v1/inboxes', {
-      name: chatName,
-      channel: 'livechat',
-      enabled: true,
-      config: chatConfig
-    }).then(({ status, body }) => {
-      expect(status).to.eq(200)
-      chatInboxId = body.data.id
-      expect(chatInboxId).to.be.a('number')
-      expect(body.data.name).to.eq(chatName)
-      expect(body.data.channel).to.eq('livechat')
-      expect(body.data.enabled).to.eq(true)
-      expect(body.data.config.brand_name).to.eq('Acme Support')
-      expect(body.data.config.website_url).to.eq('https://acme.example.com')
-      expect(body.data.config.colors.primary).to.eq('#112233')
-      expect(body.data.config.launcher.position).to.eq('right')
-      expect(body.data.config.launcher.spacing.side).to.eq(20)
-      expect(body.data.config.launcher.spacing.bottom).to.eq(24)
-      expect(body.data.config.trusted_domains).to.deep.eq(chatConfig.trusted_domains)
-      expect(body.data.config.blocked_ips).to.deep.eq(chatConfig.blocked_ips)
-    })
-  })
-
-  it('reads the livechat inbox back by id', () => {
-    cy.api('GET', `/api/v1/inboxes/${chatInboxId}`).then(({ status, body }) => {
-      expect(status).to.eq(200)
-      expect(body.data.name).to.eq(chatName)
-      expect(body.data.channel).to.eq('livechat')
-      expect(body.data.config.colors.primary).to.eq('#112233')
-    })
-  })
-
-  it('updates the livechat inbox', () => {
-    cy.api('PUT', `/api/v1/inboxes/${chatInboxId}`, {
-      name: `${chatName}.renamed`,
-      channel: 'livechat',
-      enabled: true,
-      config: {
-        ...chatConfig,
-        brand_name: 'Acme Renamed',
-        colors: { primary: '#445566' },
-        launcher: { position: 'left', spacing: { side: 8, bottom: 8 } }
-      }
-    }).its('status').should('eq', 200)
-
-    cy.api('GET', `/api/v1/inboxes/${chatInboxId}`).then(({ body }) => {
-      expect(body.data.name).to.eq(`${chatName}.renamed`)
-      expect(body.data.config.brand_name).to.eq('Acme Renamed')
-      expect(body.data.config.colors.primary).to.eq('#445566')
-      expect(body.data.config.launcher.position).to.eq('left')
-    })
-  })
-
-  it('toggles the livechat inbox', () => {
-    cy.api('PUT', `/api/v1/inboxes/${chatInboxId}/toggle`).then(({ status, body }) => {
-      expect(status).to.eq(200)
-      expect(body.data.enabled).to.eq(false)
-    })
-    cy.api('PUT', `/api/v1/inboxes/${chatInboxId}/toggle`)
-      .its('body.data.enabled')
-      .should('eq', true)
+  it('does not convert an email transport to livechat', () => {
+    cy.api('PUT', `/api/v1/inboxes/${emailInboxId}`, {
+      name: chatName, channel: 'livechat', enabled: true, config: chatConfig
+    }, { failOnStatusCode: false }).its('status').should('eq', 400)
+    cy.api('GET', `/api/v1/inboxes/${emailInboxId}`).its('body.data.channel').should('eq', 'email')
   })
 
   it('rejects an update of an inbox that does not exist', () => {
@@ -437,15 +288,11 @@ describe('API: inboxes', () => {
       .should('be.gte', 400)
   })
 
-  it('deletes both inboxes', () => {
+  it('deletes the email inbox', () => {
     cy.api('DELETE', `/api/v1/inboxes/${emailInboxId}`).its('status').should('eq', 200)
     cy.api('GET', `/api/v1/inboxes/${emailInboxId}`, null, { failOnStatusCode: false })
       .its('status')
       .should('be.gte', 400)
 
-    cy.api('DELETE', `/api/v1/inboxes/${chatInboxId}`).its('status').should('eq', 200)
-    cy.api('GET', `/api/v1/inboxes/${chatInboxId}`, null, { failOnStatusCode: false })
-      .its('status')
-      .should('be.gte', 400)
   })
 })

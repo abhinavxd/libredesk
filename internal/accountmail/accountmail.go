@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/attachment"
 	"github.com/zerodha/logf"
 )
 

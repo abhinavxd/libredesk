@@ -47,7 +47,7 @@ function closeOnNavItemTap (event) {
       data-sidebar="sidebar"
       data-mobile="true"
       :side="side"
-      class="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+      class="w-[--sidebar-width] !h-[100dvh] !min-h-[100dvh] !max-h-[100dvh] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
       :style="{
         '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
       }"

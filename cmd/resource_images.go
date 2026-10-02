@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/resourceimage"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/resourceimage"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/fastglue"
 )

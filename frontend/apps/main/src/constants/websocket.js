@@ -8,7 +8,9 @@ export const WS_EVENT = {
   LIST_SUBSCRIBE_REPLACE: 'list_subscribe_replace',
   TYPING: 'typing',
   AGENT_AVAILABILITY_UPDATE: 'agent_availability_update',
-  SYSTEM_TOAST: 'system_toast'
+  SYSTEM_TOAST: 'system_toast',
+  REVIEW_CREATED: 'review_created',
+  REVIEW_UPDATED: 'review_updated'
 }
 
 // Message types that should not be queued because they become stale quickly

@@ -39,6 +39,6 @@ describe('conversation editor resources', () => {
   })
 
   it('preserves conversation references without arbitrary classes', () => {
-    expect(prepareEditorContent('<a class="ld-conversation-reference arbitrary" data-id="abc" href="/inboxes/all/conversation/abc">#1</a>')).toContain('class="ld-conversation-reference"')
+    expect(prepareEditorContent('<a class="ld-conversation-reference arbitrary" data-id="abc" href="/conversation/abc">#1</a>')).toContain('class="ld-conversation-reference"')
   })
 })

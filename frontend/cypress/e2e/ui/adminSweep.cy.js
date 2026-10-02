@@ -18,7 +18,11 @@ describe('Every navigable page loads', () => {
   before(() => {
     cy.readFile(NAV_SOURCE).then((src) => {
       hrefs = [...src.matchAll(/href:\s*'([^']+)'/g)].map((m) => m[1])
-      expect(hrefs.length, 'nav hrefs discovered').to.be.greaterThan(10)
+      expect(hrefs, 'current administration routes').to.include.members([
+        '/admin/general', '/admin/users', '/admin/resources', '/admin/addresses', '/admin/templates',
+        '/admin/conversations/statuses', '/admin/sso', '/admin/webhooks'
+      ])
+      expect(hrefs.some((href) => /\/(teams|views|contacts)(\/|$)/.test(href))).to.eq(false)
     })
   })
 

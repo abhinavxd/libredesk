@@ -9,6 +9,8 @@ import (
 const (
 	RoleAdmin = "Admin"
 	RoleAgent = "Agent"
+	// RoleContributor reads assigned addresses; outgoing mail is reviewed first.
+	RoleContributor = "Contributor"
 )
 
 type Role struct {

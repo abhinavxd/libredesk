@@ -59,3 +59,35 @@ func TestRemoveClientUnknown(t *testing.T) {
 		t.Fatalf("removing an unregistered client must not change the slice: %v", h.clients[1])
 	}
 }
+
+type mailboxAccessStub struct{ allowed map[int]bool }
+
+func (s *mailboxAccessStub) FilterAuthorizedListUUIDs(id int, uuids []string) ([]string, error) {
+	if s.allowed[id] {
+		return uuids, nil
+	}
+	return nil, nil
+}
+
+func TestLiveSubscribersLoseAccessImmediately(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	hub := NewHub(&lo, nil)
+	policy := &mailboxAccessStub{allowed: map[int]bool{1: true, 2: false}}
+	hub.conversationStore = policy
+	allowed := &Client{ID: 1, Hub: hub}
+	denied := &Client{ID: 2, Hub: hub}
+	hub.SubscribeListReplace(allowed, []string{"conversation"})
+	hub.SubscribeOpenConv(allowed, "conversation")
+	hub.SubscribeOpenConv(denied, "conversation")
+	if got := hub.AuthorizedListSubscribers("conversation"); len(got) != 1 || got[0] != allowed {
+		t.Fatalf("unexpected recipients: %v", got)
+	}
+	policy.allowed[1] = false
+	if got := hub.AuthorizedListSubscribers("conversation"); len(got) != 0 {
+		t.Fatalf("revoked subscription remains: %v", got)
+	}
+	hub.conversationStore = nil
+	if got := hub.AuthorizedListSubscribers("conversation"); len(got) != 0 {
+		t.Fatal("missing authorization must fail closed")
+	}
+}

@@ -2,12 +2,12 @@
 LAST_COMMIT := $(or $(shell git rev-parse --short HEAD 2> /dev/null),$(shell head -n 1 VERSION | grep -oP -m 1 "^[a-z0-9]+$$"), "")
 
 # Try to get the semver from 1) git 2) the VERSION file 3) fallback.
-VERSION := $(or $(LIBREDESK_VERSION),$(shell git describe --tags --abbrev=0 2> /dev/null),$(shell grep -oP 'tag: \Kv\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?' VERSION),"v0.0.0")
+VERSION := $(or $(FERNMAIL_VERSION),$(LIBREDESK_VERSION),$(shell git describe --tags --abbrev=0 2> /dev/null),$(shell grep -oP 'tag: \Kv\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?' VERSION),"v0.0.0")
 
 BUILDSTR := ${VERSION} (\#${LAST_COMMIT} $(shell date -u +"%Y-%m-%dT%H:%M:%S%z"))
 
 # Binary names and paths
-BIN := libredesk
+BIN := fernmail
 FRONTEND_DIR := frontend
 FRONTEND_DIST := ${FRONTEND_DIR}/dist
 STATIC := ${FRONTEND_DIST}/main i18n schema.sql static
@@ -42,7 +42,7 @@ frontend-build-main: install-deps
 .PHONY: run-backend
 run-backend:
 	@echo "→ Running backend..."
-	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}'" ./cmd/
+	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/jakedolan443/fernmail/internal/version.Version=${VERSION}'" ./cmd/
 
 # Run the JS frontend server in development mode (main app only).
 .PHONY: run-frontend
@@ -65,7 +65,7 @@ run-frontend-main:
 build-backend: $(STUFFBIN)
 	@echo "→ Building backend..."
 	@CGO_ENABLED=0 go build \
-		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -s -w" \
+		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/jakedolan443/fernmail/internal/version.Version=${VERSION}' -s -w" \
 		-o ${BIN} ./cmd
 
 # Main build target: builds both frontend and backend, then stuffs static assets into the binary.

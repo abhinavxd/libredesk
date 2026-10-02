@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/image"
-	"github.com/abhinavxd/libredesk/internal/user/models"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/image"
+	"github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 	"github.com/zerodha/simplesessions/v3"
@@ -239,7 +239,7 @@ func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandle
 		if user.ID != 0 {
 			nextURI := string(r.RequestCtx.QueryArgs().Peek("next"))
 			if nextURI == "" {
-				nextURI = "/inboxes/all"
+				nextURI = "/addresses"
 			}
 			return r.RedirectURI(nextURI, fasthttp.StatusFound, nil, "")
 		}

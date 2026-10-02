@@ -2,70 +2,71 @@ package email
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/jakedolan443/fernmail/internal/inbox"
 	"io"
 	"mime"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/jakedolan443/fernmail/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/jhillyerd/enmime/v2"
 	"github.com/volatiletech/null/v9"
 )
 
 const (
-	defaultReadInterval   = time.Duration(5 * time.Minute)
-	defaultScanInboxSince = time.Duration(48 * time.Hour)
+	defaultReadInterval = time.Duration(5 * time.Minute)
 )
 
 // Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
 var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
 
+var errIMAPBacklog = errors.New("mailbox has more UIDs to synchronize")
+
 // ReadIncomingMessages reads and processes incoming messages from an IMAP server based on the provided configuration.
 func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig) error {
 	readInterval, err := time.ParseDuration(cfg.ReadInterval)
-	if err != nil {
+	if err != nil || readInterval <= 0 {
 		e.lo.Warn("could not parse IMAP read interval, using the default read interval of 5 minutes", "interval", cfg.ReadInterval, "inbox_id", e.Identifier(), "error", err)
 		readInterval = defaultReadInterval
 	}
 
-	scanInboxSince, err := time.ParseDuration(cfg.ScanInboxSince)
-	if err != nil {
-		e.lo.Warn("could not parse IMAP scan inbox since duration, using the default value of 48 hours", "interval", cfg.ScanInboxSince, "inbox_id", e.Identifier(), "error", err)
-		scanInboxSince = defaultScanInboxSince
-	}
-
-	readTicker := time.NewTicker(readInterval)
-	defer readTicker.Stop()
-
 	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		err := e.processMailbox(ctx, 0, cfg)
+		delay := readInterval
+		switch {
+		case errors.Is(err, errIMAPBacklog):
+			delay = time.Second
+		case errors.Is(err, inbox.ErrIncomingQueueFull):
+			delay = 5 * time.Second
+		case err != nil && ctx.Err() == nil:
+			e.lo.Error("synchronizing mailbox", "error", err)
+		}
+		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return nil
-		case <-readTicker.C:
-			// If the ticker interval is too short, it may trigger while the previous `processMailbox` call is still running,
-			// leading to overlapping executions or delays in handling context cancellation, check if the context is already done.
-			if ctx.Err() != nil {
-				return nil
-			}
-
-			if err := e.processMailbox(ctx, scanInboxSince, cfg); err != nil && err != context.Canceled {
-				e.lo.Error("error searching emails", "error", err)
-			}
-			e.lo.Info("email search complete", "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
+		case <-timer.C:
 		}
 	}
 }
 
 // processMailbox processes emails in the specified mailbox.
-func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) error {
+func (e *Email) processMailbox(ctx context.Context, _ time.Duration, cfg imodels.IMAPConfig) error {
 	var (
 		client *imapclient.Client
 		err    error
@@ -91,7 +92,16 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("failed to connect to IMAP server: %w", err)
 	}
 
-	defer client.Logout()
+	defer client.Close()
+	cancelled := make(chan struct{})
+	defer close(cancelled)
+	go func() {
+		select {
+		case <-ctx.Done():
+			client.Close()
+		case <-cancelled:
+		}
+	}()
 
 	// Authenticate based on auth type
 	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
@@ -115,346 +125,148 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		}
 	}
 
-	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
-		return fmt.Errorf("error selecting mailbox: %w", err)
-	}
-
-	// Scan emails since the specified duration.
-	since := time.Now().Add(-scanInboxSince)
-
-	e.lo.Info("searching emails", "since", since, "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
-
-	// Search for messages in the mailbox.
-	searchResults, err := e.searchMessages(client, since)
+	selected, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait()
 	if err != nil {
-		return fmt.Errorf("error searching messages: %w", err)
+		return fmt.Errorf("selecting mailbox: %w", err)
 	}
-
-	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
-}
-
-// searchMessages searches for messages in the specified time range.
-// Uses ESEARCH if supported by the server, otherwise falls back to standard SEARCH.
-func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*imap.SearchData, error) {
-	criteria := &imap.SearchCriteria{
-		Since: since,
+	if selected.UIDValidity == 0 {
+		return fmt.Errorf("mailbox omitted UIDVALIDITY")
 	}
-
-	// Attempt ESEARCH if server supports it
-	if client.Caps().Has(imap.CapESearch) {
-		opts := &imap.SearchOptions{
-			ReturnMin:   true,
-			ReturnMax:   true,
-			ReturnAll:   true,
-			ReturnCount: true,
-		}
-
-		result, err := client.Search(criteria, opts).Wait()
-		if err == nil {
-			return result, nil
-		}
-
-		e.lo.Warn("ESEARCH failed, falling back to standard SEARCH", "error", err, "inbox_id", e.Identifier())
-	}
-
-	return client.Search(criteria, nil).Wait()
-}
-
-// fetchAndProcessMessages fetches and processes messages based on the search results.
-func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int) error {
-	seqSet := imap.SeqSet{}
-	if searchResults.Min > 0 && searchResults.Max > 0 {
-		e.lo.Debug("using ESEARCH range", "min", searchResults.Min, "max", searchResults.Max, "inbox_id", inboxID)
-		seqSet.AddRange(searchResults.Min, searchResults.Max)
-	} else if seqNums := searchResults.AllSeqNums(); len(seqNums) > 0 {
-		e.lo.Debug("using SEARCH fallback (no ESEARCH support)", "count", len(seqNums), "inbox_id", inboxID)
-		seqSet.AddNum(seqNums...)
-	} else {
-		// No results found
-		e.lo.Debug("no messages found in search results", "inbox_id", inboxID)
-		return nil
-	}
-
-	// Fetch envelope and headers needed for auto-reply detection.
-	fetchOptions := &imap.FetchOptions{
-		Envelope:   true,
-		RFC822Size: true,
-		BodySection: []*imap.FetchItemBodySection{
-			{
-				Specifier: imap.PartSpecifierHeader,
-				HeaderFields: []string{
-					headerAutoSubmitted,
-					headerAutoreply,
-					headerLibredeskLoopPrevention,
-					headerMessageID,
-				},
-			},
-		},
-	}
-
-	// Collect messages to process later.
-	type msgData struct {
-		env                *imap.Envelope
-		seqNum             uint32
-		size               int64
-		autoReply          bool
-		isLoop             bool
-		extractedMessageID string
-	}
-	var messages []msgData
-
-	fetchCmd := client.Fetch(seqSet, fetchOptions)
-
-	// Extract the inbox email address.
-	inboxEmail, err := stringutil.ExtractEmail(e.FromAddress())
+	// A fresh account or UIDVALIDITY reset performs a full backfill. The legacy
+	// scan window never bounds recovery: already-durable UIDs are cheap to skip.
+	key := fmt.Sprintf("%s:%d/%s/%s", cfg.Host, cfg.Port, cfg.Username, cfg.Mailbox)
+	cursor, failed, err := e.messageStore.IMAPState(e.id, key, selected.UIDValidity)
 	if err != nil {
-		e.lo.Error("failed to extract email address from the 'From' header", "error", err)
-		return fmt.Errorf("failed to extract email address from 'From' header: %w", err)
+		return err
 	}
-	if inboxEmail == "" {
-		e.lo.Error("inbox email address is empty, cannot process messages", "inbox_id", e.Identifier())
-		return fmt.Errorf("inbox (%d) email address is empty, cannot process messages", e.Identifier())
+	pending := imap.UIDSet{}
+	pending.AddRange(imap.UID(cursor)+1, 0)
+	result, err := client.UIDSearch(&imap.SearchCriteria{UID: []imap.UIDSet{pending}}, nil).Wait()
+	if err != nil {
+		return err
 	}
-	for {
-		// Check for context cancellation before fetching the next message.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		// Fetch the next message.
-		msg := fetchCmd.Next()
-		if msg == nil {
-			// No more messages to process.
-			break
-		}
-
-		var (
-			env                *imap.Envelope
-			messageSize        int64
-			autoReply          bool
-			isLoop             bool
-			extractedMessageID string
-		)
-		// Process all fetch items for the current message.
-		for {
-			// Check for context cancellation before processing the next item.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// Fetch the next item in the message.
-			item := msg.Next()
-			if item == nil {
-				// No message items left to process.
+	uids := map[uint32]bool{}
+	newUIDs := result.AllUIDs()
+	sort.Slice(newUIDs, func(i, j int) bool { return newUIDs[i] < newUIDs[j] })
+	for _, uid := range newUIDs {
+		if uint32(uid) > cursor {
+			uids[uint32(uid)] = true
+			if len(uids) >= 100 {
 				break
 			}
-
-			// Body section.
-			if bs, ok := item.(imapclient.FetchItemDataBodySection); ok && bs.Literal != nil {
-				envelope, err := mimeParser.ReadEnvelope(bs.Literal)
-				if err != nil {
-					e.lo.Error("error reading envelope", "error", err)
-					continue
-				}
-				if isAutoReply(envelope) {
-					autoReply = true
-				}
-				if isLoopMessage(envelope, inboxEmail) {
-					isLoop = true
-				}
-
-				// Extract Message-Id from raw headers as fallback for problematic Message IDs
-				extractedMessageID = extractMessageIDFromHeaders(envelope)
-			}
-
-			// Envelope.
-			if ed, ok := item.(imapclient.FetchItemDataEnvelope); ok {
-				env = ed.Envelope
-			}
-
-			// RFC822.SIZE lets us reject an oversized message before fetching its
-			// body and asking the MIME parser to materialize its parts in memory.
-			if size, ok := item.(imapclient.FetchItemDataRFC822Size); ok {
-				messageSize = size.Size
-			}
 		}
-
-		// Skip if we couldn't get the envelope.
-		if env == nil {
-			e.lo.Warn("skipping message without envelope", "seq_num", msg.SeqNum, "inbox_id", e.Identifier())
-			continue
-		}
-
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, size: messageSize, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
 	}
-
-	// Now process each collected message.
-	for _, msgData := range messages {
-		// Check for context cancellation before processing each message.
-		select {
-		case <-ctx.Done():
+	for _, uid := range failed {
+		uids[uid] = true
+	}
+	ordered := make([]uint32, 0, len(uids))
+	for uid := range uids {
+		ordered = append(ordered, uid)
+	}
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
+	for _, uid := range ordered {
+		if ctx.Err() != nil {
 			return ctx.Err()
-		default:
 		}
-
-		maxMessageSize := e.incomingMessageSizeLimit()
-		if shouldSkipMessage(msgData.size, maxMessageSize) {
-			e.lo.Warn("skipping oversized incoming email",
-				"message_id", msgData.env.MessageID,
-				"size_bytes", msgData.size,
-				"max_size_bytes", maxMessageSize,
-				"inbox_id", inboxID)
-			continue
+		failure := e.fetchUID(ctx, client, key, selected.UIDValidity, uid)
+		// Backpressure is not a poison message: leave this UID unacknowledged
+		// so the next poll starts here when workers free staging capacity.
+		if errors.Is(failure, inbox.ErrIncomingQueueFull) {
+			return inbox.ErrIncomingQueueFull
 		}
-
-		// Skip if this is an auto-reply message.
-		if msgData.autoReply {
-			e.lo.Info("skipping auto-reply message", "subject", msgData.env.Subject, "message_id", msgData.env.MessageID)
-			continue
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
-
-		// Skip if this message is a loop prevention message.
-		if msgData.isLoop {
-			e.lo.Info("skipping message with loop prevention header", "subject", msgData.env.Subject, "message_id", msgData.env.MessageID)
-			continue
+		if err := e.messageStore.RecordIMAPResult(e.id, key, selected.UIDValidity, uid, failure); err != nil {
+			return err
 		}
-
-		// Process the envelope.
-		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID); err != nil && err != context.Canceled {
-			e.lo.Error("error processing envelope", "error", err)
+		if failure != nil {
+			e.lo.Error("incoming email retained for retry", "uid", uid, "error", failure)
 		}
 	}
-
+	var newestProcessed uint32
+	for uid := range uids {
+		if uid > newestProcessed {
+			newestProcessed = uid
+		}
+	}
+	for _, uid := range newUIDs {
+		if uint32(uid) > cursor && uint32(uid) > newestProcessed {
+			return errIMAPBacklog
+		}
+	}
 	return nil
 }
 
-// processEnvelope processes a single email envelope.
-func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, env *imap.Envelope, seqNum uint32, inboxID int, extractedMessageID string) error {
+func (e *Email) fetchUID(ctx context.Context, client *imapclient.Client, key string, validity, uid uint32) error {
+	set := imap.UIDSet{}
+	set.AddNum(imap.UID(uid))
+	metadata, err := client.Fetch(set, &imap.FetchOptions{UID: true, Envelope: true, RFC822Size: true}).Collect()
+	if err != nil {
+		return err
+	}
+	if len(metadata) == 0 {
+		return nil
+	} // Expunged from the provider before retrieval.
+	item := metadata[0]
+	if shouldSkipMessage(item.RFC822Size, e.incomingMessageSizeLimit()) {
+		return fmt.Errorf("message size %d exceeds configured limit", item.RFC822Size)
+	}
+	if item.Envelope == nil {
+		return fmt.Errorf("missing message envelope")
+	}
+	incoming, err := incomingFromEnvelope(item.Envelope, e.id, key, validity, uid)
+	if err != nil {
+		return err
+	}
+	fetch := client.Fetch(set, &imap.FetchOptions{BodySection: []*imap.FetchItemBodySection{{Peek: true}}})
+	defer fetch.Close()
+	received := false
+	for message := fetch.Next(); message != nil; message = fetch.Next() {
+		for part := message.Next(); part != nil; part = message.Next() {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if body, ok := part.(imapclient.FetchItemDataBodySection); ok {
+				received = true
+				if err = e.processFullMessage(body, incoming); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if err := fetch.Close(); err != nil {
+		return err
+	}
+	if !received {
+		return fmt.Errorf("message body unavailable")
+	}
+	return nil
+}
+
+func incomingFromEnvelope(env *imap.Envelope, inboxID int, key string, validity, uid uint32) (models.IncomingMessage, error) {
 	if len(env.From) == 0 {
-		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
-		return nil
+		return models.IncomingMessage{}, fmt.Errorf("email has no sender")
 	}
-	var fromAddress = strings.ToLower(env.From[0].Addr())
-
-	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
-	messageID := env.MessageID
-	if messageID == "" {
-		messageID = extractedMessageID
-		if messageID != "" {
-			e.lo.Debug("using raw header Message-ID as fallback for malformed ID", "message_id", messageID, "subject", env.Subject, "from", fromAddress)
+	addresses := func(items []imap.Address) []string {
+		out := []string{}
+		for _, item := range items {
+			if item.Addr() != "" {
+				out = append(out, strings.ToLower(item.Addr()))
+			}
 		}
+		return out
 	}
-
-	// Drop message if we still don't have a valid Message ID
-	if messageID == "" {
-		e.lo.Error("dropping message: no valid Message-ID found in IMAP parsing or raw headers", "subject", env.Subject, "from", fromAddress)
-		return nil
-	}
-
-	// Check if the message already exists in the database; if it does, ignore it.
-	exists, err := e.messageStore.MessageExists(messageID)
+	meta, err := json.Marshal(map[string]any{"from": addresses(env.From), "to": addresses(env.To), "cc": addresses(env.Cc), "bcc": addresses(env.Bcc), "reply_to": addresses(env.ReplyTo), "subject": env.Subject, "date": env.Date})
 	if err != nil {
-		e.lo.Error("error checking if message exists", "message_id", messageID)
-		return fmt.Errorf("checking if message exists in DB: %w", err)
+		return models.IncomingMessage{}, err
 	}
-	if exists {
-		return nil
+	first, last := getContactName(env.From[0])
+	sourceID := env.MessageID
+	if sourceID == "" {
+		sourceID = fmt.Sprintf("imap-%x@local.invalid", sha256.Sum256([]byte(fmt.Sprintf("%d:%s:%d:%d", inboxID, key, validity, uid))))
 	}
-
-	// Check if any contact with this email is blocked, if so, ignore the message.
-
-	e.lo.Debug("processing new incoming message", "message_id", messageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
-
-	// Make contact.
-	firstName, lastName := getContactName(env.From[0])
-	contact := models.IncomingContact{
-		FirstName: firstName,
-		LastName:  lastName,
-		Email:     null.StringFrom(fromAddress),
-	}
-
-	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
-	var ccAddr = make([]string, 0, len(env.Cc))
-	var toAddr = make([]string, 0, len(env.To))
-	var bccAddr = make([]string, 0, len(env.Bcc))
-	var fromAddr = make([]string, 0, len(env.From))
-	for _, cc := range env.Cc {
-		if cc.Addr() != "" {
-			ccAddr = append(ccAddr, strings.ToLower(cc.Addr()))
-		}
-	}
-	for _, to := range env.To {
-		if to.Addr() != "" {
-			toAddr = append(toAddr, strings.ToLower(to.Addr()))
-		}
-	}
-	for _, bcc := range env.Bcc {
-		if bcc.Addr() != "" {
-			bccAddr = append(bccAddr, strings.ToLower(bcc.Addr()))
-		}
-	}
-	for _, from := range env.From {
-		if from.Addr() != "" {
-			fromAddr = append(fromAddr, strings.ToLower(from.Addr()))
-		}
-	}
-
-	meta, err := json.Marshal(map[string]any{
-		"from":    fromAddr,
-		"cc":      ccAddr,
-		"bcc":     bccAddr,
-		"to":      toAddr,
-		"subject": env.Subject,
-	})
-	if err != nil {
-		e.lo.Error("error marshalling meta", "error", err)
-		return fmt.Errorf("marshalling meta: %w", err)
-	}
-	incomingMsg := models.IncomingMessage{
-		Channel:  ChannelEmail,
-		InboxID:  inboxID,
-		Contact:  contact,
-		Subject:  env.Subject,
-		SourceID: null.StringFrom(messageID),
-		Meta:     meta,
-	}
-
-	// Fetch full message body.
-	fetchOptions := &imap.FetchOptions{
-		BodySection: []*imap.FetchItemBodySection{{}},
-	}
-	seqSet := imap.SeqSet{}
-	seqSet.AddNum(seqNum)
-
-	fullFetchCmd := client.Fetch(seqSet, fetchOptions)
-	fullMsg := fullFetchCmd.Next()
-	if fullMsg == nil {
-		return nil
-	}
-
-	// Fetch full message.
-	for {
-		// Check for context cancellation before processing the next item.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		fullFetchItem := fullMsg.Next()
-		if fullFetchItem == nil {
-			return nil
-		}
-
-		if fullItem, ok := fullFetchItem.(imapclient.FetchItemDataBodySection); ok {
-			e.lo.Debug("fetching full message body", "message_id", messageID)
-			return e.processFullMessage(fullItem, incomingMsg)
-		}
-	}
+	return models.IncomingMessage{Channel: ChannelEmail, InboxID: inboxID, MailboxKey: key, UIDValidity: validity, UID: uid, Contact: models.IncomingContact{FirstName: first, LastName: last, Email: null.StringFrom(strings.ToLower(env.From[0].Addr()))}, Subject: env.Subject, SourceID: null.StringFrom(sourceID), Meta: meta}, nil
 }
 
 // processFullMessage processes the full message and enqueues it for inserting into the database.
@@ -493,6 +305,17 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.SourceID.String)
 		return fmt.Errorf("parsing email envelope: %w", err)
 	}
+
+	if id := extractMessageIDFromHeaders(envelope); id != "" {
+		incomingMsg.SourceID = null.StringFrom(id)
+	}
+	var meta map[string]any
+	if json.Unmarshal(incomingMsg.Meta, &meta) != nil {
+		meta = map[string]any{}
+	}
+	meta["auto_submitted"] = envelope.GetHeader("Auto-Submitted")
+	meta["auto_reply"] = isAutoReply(envelope)
+	incomingMsg.Meta, _ = json.Marshal(meta)
 
 	// Log any envelope errors.
 	for _, err := range envelope.Errors {
@@ -537,6 +360,22 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 
 	incomingMsg.InReplyTo = inReplyTo
 	incomingMsg.References = references
+	incomingMsg.EmailAlias = resolveRecipientAlias(e.emailAliases, map[string]string{
+		"Delivered-To":  envelope.GetHeader("Delivered-To"),
+		"X-Original-To": envelope.GetHeader("X-Original-To"),
+		"To":            envelope.GetHeader("To"),
+		"Cc":            envelope.GetHeader("Cc"),
+	})
+	if incomingMsg.EmailAlias != "" {
+		var meta map[string]any
+		if err := json.Unmarshal(incomingMsg.Meta, &meta); err != nil {
+			meta = map[string]any{}
+		}
+		meta["email_alias"] = incomingMsg.EmailAlias
+		if incomingMsg.Meta, err = json.Marshal(meta); err != nil {
+			return fmt.Errorf("marshalling email alias metadata: %w", err)
+		}
+	}
 
 	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
 	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)

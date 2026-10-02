@@ -7,6 +7,7 @@ WHERE snoozed_until <= NOW()
 -- name: insert-conversation
 -- $11 = rate limit window start (timestamptz), $12 = max conversations (0 = unlimited)
 -- $13 = subject reference marker template (placeholder: {ref})
+-- $14 = user-facing email address ID (nullable for non-email channels)
 WITH
 status_id AS (
     SELECT id FROM conversation_statuses WHERE name = $2
@@ -15,11 +16,12 @@ reference_number AS (
     SELECT generate_reference_number($7) AS reference_number
 )
 INSERT INTO conversations
-(contact_id, status_id, inbox_id, last_message, last_message_at, subject, reference_number, meta, custom_attributes)
+(contact_id, status_id, inbox_id, address_id, last_message, last_message_at, subject, reference_number, meta, custom_attributes)
 SELECT
    $1,
    (SELECT id FROM status_id),
    $3,
+   $14,
    $4,
    $5,
    CASE
@@ -38,6 +40,8 @@ RETURNING id, uuid;
 SELECT
     COUNT(*) OVER() as total,
     conversations.id,
+    conversations.inbox_id,
+    conversations.address_id,
     conversations.created_at,
     conversations.updated_at,
     conversations.uuid,
@@ -99,6 +103,8 @@ WHERE inboxes.channel = 'email' %s
 -- name: get-conversation-list-item
 SELECT
     conversations.id,
+    conversations.inbox_id,
+    conversations.address_id,
     conversations.created_at,
     conversations.updated_at,
     conversations.uuid,
@@ -140,8 +146,9 @@ SELECT
    c.resolved_at,
    c.contact_last_seen_at,
    c.inbox_id,
+   c.address_id,
    inb.name as inbox_name,
-   COALESCE(inb.from, '') as inbox_mail,
+   COALESCE(ea.address, c.meta->>'email_alias', inb.from, '') as inbox_mail,
    COALESCE(inb.config->>'reply_to', '') as inbox_reply_to,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
@@ -176,6 +183,7 @@ SELECT
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 JOIN inboxes inb ON c.inbox_id = inb.id
+LEFT JOIN email_addresses ea ON ea.id = c.address_id
 LEFT JOIN LATERAL (
     SELECT lower(address.value) AS recipient
     FROM conversation_messages cm
@@ -226,33 +234,6 @@ SET status_id     = (SELECT id FROM new_status),
     snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
     updated_at    = NOW()
 WHERE uuid = $1;
-
--- name: get-sidebar-standard-counts
-SELECT
-    COUNT(*) FILTER (WHERE conversations.assigned_user_id = $1) AS assigned,
-    COUNT(*) FILTER (WHERE conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL) AS unassigned,
-    COUNT(*) FILTER (WHERE EXISTS (
-        SELECT 1 FROM conversation_mentions cm
-        WHERE cm.conversation_id = conversations.id
-          AND (cm.mentioned_user_id = $1 OR EXISTS (
-              SELECT 1 FROM team_members tm
-              WHERE tm.team_id = cm.mentioned_team_id AND tm.user_id = $1
-          ))
-    )) AS mentioned,
-    COUNT(*) AS "all"
-FROM conversations
-JOIN inboxes ON inboxes.id = conversations.inbox_id
-WHERE inboxes.channel = 'email' AND conversations.status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open');
-
--- name: get-conversations-count-base
--- The list-type WHERE clause is appended at %s; view filters are added by BuildFilterQuery.
-SELECT 1
-FROM conversations
-JOIN users ON contact_id = users.id
-JOIN inboxes ON inbox_id = inboxes.id
-LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
-WHERE inboxes.channel = 'email'
-%s
 
 -- name: upsert-user-last-seen
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
@@ -383,7 +364,7 @@ SELECT
     source_id
 FROM conversation_messages
 WHERE conversation_id = $1
-AND type in ('incoming', 'outgoing') and private = false
+AND type in ('incoming', 'outgoing') and private = false AND status IN ('received','sent')
 and source_id > ''
 ORDER BY id DESC
 LIMIT $2;
@@ -422,6 +403,8 @@ INNER JOIN conversations c ON c.id = m.conversation_id
 JOIN inboxes ON inboxes.id = c.inbox_id AND inboxes.channel = 'email'
 WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
 AND NOT(m.id = ANY($1::INT[]))
+AND NOT EXISTS (SELECT 1 FROM mail_delivery_attempts a WHERE a.message_id=m.id AND a.state IN ('sending','unknown','sent'))
+ORDER BY m.id LIMIT 100
 
 -- name: get-message
 SELECT
@@ -526,27 +509,28 @@ WITH conversation_id AS (
    FROM conversations
    WHERE CASE
        WHEN $3 > 0 THEN id = $3
-       ELSE uuid = $4
+       ELSE uuid = NULLIF($4,'')::uuid
    END
 ),
 inserted_msg AS (
    INSERT INTO conversation_messages (
        "type", status, conversation_id, "content",
        text_content, sender_id, sender_type, private,
-       content_type, source_id, meta
+       content_type, source_id, meta, reply_to_source_id, created_at
    )
    VALUES (
        $1, $2, (SELECT id FROM conversation_id),
-       $5, $6, $7, $8, $9, $10, $11, $12
+       $5, $6, $7, $8, $9, $10, $11, $12, $13, clock_timestamp()
    )
    RETURNING *
 )
 SELECT * FROM inserted_msg;
 
 -- name: message-exists-by-source-id
-SELECT conversation_id
-FROM conversation_messages
-WHERE source_id = ANY($1::text []);
+SELECT m.conversation_id
+FROM conversation_messages m JOIN conversations c ON c.id=m.conversation_id
+WHERE m.source_id = ANY($1::text []) AND c.address_id=$2
+ORDER BY array_position($1::text[],m.source_id),m.id DESC LIMIT 1;
 
 -- name: update-message-status
 update conversation_messages set status = $1, updated_at = NOW() where uuid = $2;
@@ -563,7 +547,7 @@ SELECT cd.id, cd.conversation_id, cd.user_id, cd.type, cd.content, cd.meta, cd.c
 FROM conversation_drafts cd
 INNER JOIN conversations c ON cd.conversation_id = c.id
 JOIN inboxes ON inboxes.id = c.inbox_id AND inboxes.channel = 'email'
-WHERE cd.user_id = $1
+WHERE cd.user_id = $1 AND can_access_email_address(c.address_id, $1)
 ORDER BY cd.updated_at DESC;
 
 -- name: delete-conversation-draft
@@ -576,7 +560,7 @@ AND ($4::text = '' OR type = $4::text);
 
 -- name: delete-stale-drafts
 DELETE FROM conversation_drafts
-WHERE created_at < $1;
+WHERE updated_at < $1;
 
 -- name: insert-mention
 INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_user_id, mentioned_team_id, mentioned_by_user_id)
@@ -613,6 +597,7 @@ DO UPDATE SET
 SELECT uuid::text
 FROM conversations
 WHERE uuid = ANY($1::uuid[])
+  AND can_access_email_address(conversations.address_id, $2)
   AND $4
   AND (
        $5

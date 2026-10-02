@@ -1,6 +1,10 @@
 <template>
   <!-- Set fixed width only when not in fullscreen. -->
   <div class="flex min-h-0 flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
+    <div v-if="isFullscreen && newerReply" class="mb-2 flex shrink-0 items-center gap-2 rounded-md bg-warning/10 p-2 text-sm" role="status">
+      <span class="flex-1">{{ t('replyBox.newerReply') }}</span>
+      <Button type="button" size="sm" variant="ghost" @click="$emit('reviewedReply')">{{ t('replyBox.reviewedReply') }}</Button>
+    </div>
     <!-- Message type toggle -->
     <div
       class="flex items-center justify-between"
@@ -8,10 +12,10 @@
     >
       <Tabs v-model="messageType" class="rounded-lg">
         <TabsList>
-          <TabsTrigger v-if="canSendReply" value="reply" class="max-md:py-2.5">
+          <TabsTrigger v-if="canSendReply" value="reply" :disabled="isSending" class="max-md:py-2.5">
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
-          <TabsTrigger v-if="canSendPrivateNote" value="private_note" class="max-md:py-2.5">
+          <TabsTrigger v-if="canSendPrivateNote" value="private_note" :disabled="isSending" class="max-md:py-2.5">
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
         </TabsList>
@@ -37,6 +41,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="to"
+            :disabled="isSending || isDraftLoading"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
@@ -47,6 +52,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="cc"
+            :disabled="isSending || isDraftLoading"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
@@ -60,6 +66,7 @@
             type="text"
             :placeholder="t('replyBox.emailAddresess')"
             v-model="bcc"
+            :disabled="isSending || isDraftLoading"
             :class="RECIPIENT_INPUT_CLASS"
             @blur="validateEmails"
           />
@@ -85,7 +92,7 @@
         :placeholder="t('globals.terms.typeMessage')"
         :insertContent="insertContent"
         :autoFocus="true"
-        :disabled="isDraftLoading"
+        :disabled="isDraftLoading || isSending"
         :enableMentions="messageType === 'private_note'"
         :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
@@ -107,6 +114,13 @@
       class="mt-2"
     />
 
+    <div v-if="draftSaveState" class="mt-1 flex items-center gap-2 text-xs" role="status"
+      :class="draftSaveState === 'error' ? 'text-destructive' : 'text-muted-foreground'">
+      <span>{{ t(`replyBox.draft${draftSaveState === 'error' ? 'SaveFailed' : draftSaveState === 'saving' ? 'Saving' : 'Saved'}`) }}</span>
+      <Button v-if="draftSaveState === 'error'" type="button" variant="link" size="sm"
+        @click="$emit('retryDraftSave')">{{ t('replyBox.retryDraftSave') }}</Button>
+    </div>
+
     <!-- Editor menu bar with send button -->
     <ReplyBoxMenuBar
       class="mt-2 shrink-0"
@@ -117,6 +131,8 @@
       :handleSend="handleSend"
       :handleSendAndSetStatus="handleSendAndSetStatus"
       :showGenerateReply="messageType !== 'private_note'"
+      :sendForReview="sendForReview && messageType === 'reply'"
+      :allowSetStatus="allowSetStatus"
       @emojiSelect="handleEmojiSelect"
       @generateReply="$emit('generateReply')"
     />
@@ -214,6 +230,7 @@ const toggleMessageType = () => {
 }
 
 const props = defineProps({
+  newerReply: { type: Boolean, default: false },
   isFullscreen: {
     type: Boolean,
     default: false
@@ -236,6 +253,7 @@ const props = defineProps({
     required: false,
     default: false
   },
+  draftSaveState: { type: String, default: '' },
   canSendReply: {
     type: Boolean,
     required: true
@@ -243,7 +261,9 @@ const props = defineProps({
   canSendPrivateNote: {
     type: Boolean,
     required: true
-  }
+  },
+  sendForReview: { type: Boolean, default: false },
+  allowSetStatus: { type: Boolean, default: true }
 })
 
 const emit = defineEmits([
@@ -253,7 +273,9 @@ const emit = defineEmits([
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
-  'filesDropped'
+  'filesDropped',
+  'reviewedReply',
+  'retryDraftSave'
 ])
 
 const conversationStore = useConversationStore()

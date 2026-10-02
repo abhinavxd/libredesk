@@ -1,34 +1,20 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { AtSign, Eye, Layers, Search } from 'lucide-vue-next'
+import { Mail, Search } from 'lucide-vue-next'
 import { navIconMap } from '@main/constants/navIcons'
 import { adminNavItems } from '@main/constants/navigation'
-import { permissions } from '@main/constants/permissions'
-
-import { useViewStore } from '@main/stores/view'
-import { useSharedViewStore } from '@main/stores/sharedView'
-import { useInboxNavigation } from '@main/composables/useInboxNavigation'
+import { useAddressStore } from '@main/stores/address'
+import { useAddressNavigation } from '@main/composables/useAddressNavigation'
 import { SECTIONS } from '../sections'
-
-const INBOX_TYPES = [
-  { type: 'mentioned', labelKey: 'conversation.mentions', icon: AtSign },
-
-  { type: 'all', labelKey: 'globals.messages.all', icon: Layers }
-]
 
 export function useNavigationCommands() {
   const router = useRouter()
   const { t } = useI18n()
-
-  const viewStore = useViewStore()
-  const sharedViewStore = useSharedViewStore()
-  const { navigateToInbox, navigateToViewInbox } = useInboxNavigation()
-
-  const goTo = (route) => () => router.push(route)
+  const addressStore = useAddressStore()
+  const { navigateToAddress } = useAddressNavigation()
 
   const navItemLabel = (item) => t(item.titleKey, item.isTitleKeyPlural ? 2 : 1)
-
   const adminCommands = () =>
     adminNavItems.flatMap((group) =>
       group.children.map((item) => ({
@@ -39,48 +25,27 @@ export function useNavigationCommands() {
         section: SECTIONS.GOTO,
         icon: navIconMap[item.icon],
         permission: item.permission,
-        run: goTo(item.href)
+        run: () => router.push(item.href)
       }))
     )
 
   return computed(() => [
-    ...INBOX_TYPES.map(({ type, labelKey, icon }) => ({
-      id: `goto.inbox.${type}`,
-      label: t(labelKey),
-      hint: t('globals.terms.inbox', 2),
-      keywords: [t('globals.terms.inbox', 2)],
+    ...addressStore.addresses.map((address) => ({
+      id: `goto.address.${address.id}`,
+      label: address.address,
+      hint: address.display_name || 'Address',
+      keywords: [address.address, address.display_name].filter(Boolean),
       section: SECTIONS.GOTO,
-      icon,
-      run: () => navigateToInbox(type)
-    })),
-
-    ...viewStore.views.map((view) => ({
-      id: `goto.view.${view.id}`,
-      label: view.name,
-      hint: t('globals.terms.view'),
-      keywords: [t('globals.terms.view')],
-      section: SECTIONS.GOTO,
-      icon: Eye,
-      permission: permissions.VIEW_MANAGE,
-      run: () => navigateToViewInbox(view.id)
-    })),
-    ...sharedViewStore.sharedViewList.map((view) => ({
-      id: `goto.shared-view.${view.id}`,
-      label: view.name,
-      hint: t('globals.terms.sharedView'),
-      keywords: [t('globals.terms.sharedView'), t('globals.terms.view')],
-      section: SECTIONS.GOTO,
-      icon: Eye,
-      run: () => navigateToViewInbox(view.id)
+      icon: Mail,
+      run: () => navigateToAddress(address.id)
     })),
     {
       id: 'goto.search',
       label: t('conversation.search'),
       section: SECTIONS.GOTO,
       icon: Search,
-      run: goTo({ name: 'search' })
+      run: () => router.push({ name: 'search' })
     },
-
     ...adminCommands()
   ])
 }

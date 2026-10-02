@@ -7,12 +7,12 @@ import { conversationReferenceHref } from './conversationReferenceExtension'
 
 describe('conversation reference editor extension', () => {
   it('builds a root-relative conversation link', () => {
-    expect(conversationReferenceHref('abc')).toBe('/inboxes/all/conversation/abc')
+    expect(conversationReferenceHref('abc')).toBe('/conversation/abc')
   })
 
   it('round-trips a conversation reference through HTML in the conversation editor', () => {
     const content =
-      '<p><a data-id="conversation-uuid" data-label="108" href="/inboxes/all/conversation/conversation-uuid" class="ld-conversation-reference">#108</a></p>'
+      '<p><a data-id="conversation-uuid" data-label="108" href="/conversation/conversation-uuid" class="ld-conversation-reference">#108</a></p>'
     const editor = new Editor({
       extensions: buildConversationExtensions({ getPlaceholder: () => '' }),
       content
@@ -21,7 +21,7 @@ describe('conversation reference editor extension', () => {
       type: 'conversationReference',
       attrs: { id: 'conversation-uuid', label: '108' }
     })
-    expect(editor.getHTML()).toContain('href="/inboxes/all/conversation/conversation-uuid"')
+    expect(editor.getHTML()).toContain('href="/conversation/conversation-uuid"')
     editor.destroy()
   })
 
@@ -32,7 +32,7 @@ describe('conversation reference editor extension', () => {
       extensions: buildConversationExtensions({ getPlaceholder: () => '' }),
       content
     })
-    expect(editor.getHTML()).toContain('href="/inboxes/all/conversation/conversation-uuid"')
+    expect(editor.getHTML()).toContain('href="/conversation/conversation-uuid"')
     expect(editor.getHTML()).not.toContain('evil.example')
     editor.destroy()
   })

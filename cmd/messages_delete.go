@@ -1,7 +1,7 @@
 package main
 
 import (
-	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
+	amodels "github.com/jakedolan443/fernmail/internal/auth/models"
 	"github.com/zerodha/fastglue"
 )
 

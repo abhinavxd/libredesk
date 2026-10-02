@@ -12,7 +12,7 @@ describe('searchFilters', () => {
     const filters = {
       ...emptyFilters(),
       status: '2',
-      inbox: '3',
+      address: '3',
       created: '2026-01-01,2026-01-31'
     }
     expect(filtersFromQuery(queryFromFilters(filters))).toEqual(filters)
@@ -26,13 +26,14 @@ describe('searchFilters', () => {
   it('reports whether any filter is active', () => {
     expect(hasActiveFilters(emptyFilters())).toBe(false)
     expect(hasActiveFilters({ ...emptyFilters(), tags: ['1'] })).toBe(false)
-    expect(hasActiveFilters({ ...emptyFilters(), inbox: '5' })).toBe(true)
+    expect(hasActiveFilters({ ...emptyFilters(), address: '5' })).toBe(true)
   })
 
-  it('serializes mailbox filters and ignores retired assignment filters', () => {
+  it('serializes address filters and ignores retired assignment filters', () => {
     const json = toFiltersJSON({
       ...emptyFilters(),
       status: '1',
+      address: '4',
       assignee: 'none',
       team: '9',
       tags: ['2', '5'],
@@ -40,6 +41,7 @@ describe('searchFilters', () => {
     })
     expect(JSON.parse(json)).toEqual([
       { model: 'conversations', field: 'status_id', operator: 'equals', value: '1' },
+      { model: 'conversations', field: 'address_id', operator: 'equals', value: '4' },
       {
         model: 'conversations',
         field: 'created_at',

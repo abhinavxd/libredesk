@@ -13,11 +13,11 @@
 
       <div :class="FILTER_CLASS">
         <SelectComboBox
-          :model-value="filters.inbox"
-          :items="inboxStore.options"
-          :placeholder="t('globals.terms.inbox')"
+          :model-value="filters.address"
+          :items="addressOptions"
+          :placeholder="t('address.title', 2)"
           align="start"
-          @update:model-value="set('inbox', $event)"
+          @update:model-value="set('address', $event)"
         />
       </div>
 
@@ -34,13 +34,13 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 
 import DateFilterValue from '@main/components/filter/DateFilterValue.vue'
 import { useConversationStore } from '@main/stores/conversation'
-import { useInboxStore } from '@main/stores/inbox'
+import { useAddressStore } from '@main/stores/address'
 
 const FILTER_CLASS = 'flex-1 min-w-28'
 
@@ -51,7 +51,10 @@ const emit = defineEmits(['update:filters'])
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
-const inboxStore = useInboxStore()
+const addressStore = useAddressStore()
+const addressOptions = computed(() =>
+  addressStore.addresses.map((address) => ({ label: address.address, value: String(address.id) }))
+)
 
 const set = (key, value) => {
   emit('update:filters', { ...props.filters, [key]: value ?? '' })
@@ -59,6 +62,6 @@ const set = (key, value) => {
 
 onMounted(() => {
   conversationStore.fetchStatuses()
-  inboxStore.fetchInboxes()
+  addressStore.fetchAddresses()
 })
 </script>

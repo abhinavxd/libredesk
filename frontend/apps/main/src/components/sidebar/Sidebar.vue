@@ -1,6 +1,6 @@
 <script setup>
 import { adminNavItems } from '../../constants/navigation'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Collapsible,
   CollapsibleContent,
@@ -14,96 +14,56 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
   SidebarProvider
 } from '@shared-ui/components/ui/sidebar'
-import { useAppSettingsStore } from '@main/stores/appSettings'
-import { ChevronRight, EllipsisVertical, Search, Plus, List, AtSign } from 'lucide-vue-next'
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@shared-ui/components/ui/dropdown-menu'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '@shared-ui/components/ui/alert-dialog'
-
-import MobileDrawerFooter from './MobileDrawerFooter.vue'
-import SidebarCountBadge from './SidebarCountBadge.vue'
-import { filterNavItems } from '@main/utils/nav-permissions'
-import { permissions } from '@main/constants/permissions'
-import { useStorage } from '@vueuse/core'
+import { ArrowLeft, ChevronRight, Mail, Search, ShieldCheck, SquarePen } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useStorage } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import { useUserStore } from '@main/stores/user'
+import { useAddressStore } from '@main/stores/address'
 import { useConversationStore } from '@main/stores/conversation'
+import { useReviewStore } from '@main/stores/review'
+import { useComposeStore } from '@main/stores/compose'
+import { permissions as perms } from '@main/constants/permissions'
+import { useAddressNavigation } from '@main/composables/useAddressNavigation'
+import { Button } from '@shared-ui/components/ui/button'
 import { navIconMap } from '@main/constants/navIcons'
-import { useInboxNavigation } from '@main/composables/useInboxNavigation'
+import { filterNavItems } from '@main/utils/nav-permissions'
+import { addressLabel } from '@main/utils/address-display'
+import MobileDrawerFooter from './MobileDrawerFooter.vue'
+import MobileSidebarSwipeArea from './MobileSidebarSwipeArea.vue'
+import SidebarCountBadge from './SidebarCountBadge.vue'
+import BrandLogo from '@main/components/brand/BrandLogo.vue'
 
-defineProps({
-  userTeams: { type: Array, default: () => [] },
-  userViews: { type: Array, default: () => [] },
-  sharedViews: { type: Array, default: () => [] }
-})
 const userStore = useUserStore()
+const addressStore = useAddressStore()
 const conversationStore = useConversationStore()
+const reviewStore = useReviewStore()
+const composeStore = useComposeStore()
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
-const emit = defineEmits(['createView', 'editView', 'deleteView', 'createConversation'])
+const { navigateToAddress } = useAddressNavigation()
 
-const isActiveParent = (parentHref) => {
-  return route.path.startsWith(parentHref)
-}
-
-const isInboxRoute = (path) => {
-  return path.startsWith('/inboxes')
-}
-
-const openCreateViewDialog = () => {
-  emit('createView')
-}
-
-const editView = (view) => {
-  emit('editView', view)
-}
-
-const openDeleteConfirmation = (view) => {
-  viewToDelete.value = view
-  isDeleteOpen.value = true
-}
-
-const handleDeleteView = () => {
-  if (viewToDelete.value) {
-    emit('deleteView', viewToDelete.value)
-    isDeleteOpen.value = false
-    viewToDelete.value = null
-  }
-}
-
-const { navigateToInbox, navigateToViewInbox } = useInboxNavigation()
-
+const isActiveParent = (parentHref) => route.path.startsWith(parentHref)
+const isMailRoute = (path) =>
+  path.startsWith('/addresses') ||
+  path.startsWith('/search') ||
+  path.startsWith('/conversation') ||
+  path.startsWith('/reviews')
+const canCompose = computed(() => userStore.can(perms.CONVERSATIONS_CREATE))
+const isActiveAddress = (addressID) => String(route.params.addressID) === String(addressID)
 const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
 
-// For auto opening admin collapsibles when a child route is active
 const openAdminCollapsible = ref(null)
 const toggleAdminCollapsible = (titleKey) => {
   openAdminCollapsible.value = openAdminCollapsible.value === titleKey ? null : titleKey
 }
-// Watch for route changes and update the active collapsible
 watch(
   [() => route.path, filteredAdminNavItems],
   () => {
@@ -111,50 +71,46 @@ watch(
       if (!item.children) return isActiveParent(item.href)
       return item.children.some((child) => isActiveParent(child.href))
     })
-    if (activeItem) {
-      openAdminCollapsible.value = activeItem.titleKey
-    }
+    if (activeItem) openAdminCollapsible.value = activeItem.titleKey
   },
   { immediate: true }
 )
 
-// Sidebar open state in local storage
 const sidebarOpen = useStorage('mainSidebarOpen', true)
-
-const viewInboxOpen = useStorage('viewInboxOpen', true)
-const sharedViewInboxOpen = useStorage('sharedViewInboxOpen', true)
-
-// Track delete confirmation dialog state
-const isDeleteOpen = ref(false)
-const viewToDelete = ref(null)
-
-const viewSidebarCount = (viewID) => {
-  return conversationStore.sidebarCounts.views?.[viewID] ?? 0
-}
+const addressesOpen = useStorage('addressesSectionOpen', true)
 
 onMounted(() => {
+  addressStore.fetchAddresses()
   conversationStore.fetchSidebarCounts({ force: true })
+  reviewStore.fetchCounts()
 })
 </script>
 
 <template>
   <SidebarProvider
-    style="--sidebar-width: 14rem"
+    style="--sidebar-width: 18rem"
     :default-open="sidebarOpen"
     v-on:update:open="sidebarOpen = $event"
   >
-    <!-- Admin Sidebar -->
     <template v-if="route.matched.some((record) => record.name && record.name.startsWith('admin'))">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
+          <Button
+            variant="default"
+            class="h-10 w-full justify-start bg-success px-3 text-success-foreground hover:bg-success/90"
+            @click="router.push('/addresses')"
+          >
+            <ArrowLeft class="h-4 w-4" aria-hidden="true" />
+            Back to addresses
+          </Button>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex flex-col items-start justify-between w-full px-1">
-                <span class="font-semibold text-xl">
-                  {{ t('globals.terms.admin') }}
-                </span>
-                <!-- App version -->
-                <div v-if="settingsStore.settings['app.version']" class="text-xs text-muted-foreground">
+              <div class="flex w-full flex-col items-start justify-between px-1">
+                <span class="text-xl font-semibold">{{ t('globals.terms.admin') }}</span>
+                <div
+                  v-if="settingsStore.settings['app.version']"
+                  class="text-xs text-muted-foreground"
+                >
                   {{ settingsStore.settings['app.version'] }}
                 </div>
               </div>
@@ -170,11 +126,10 @@ onMounted(() => {
                   :isActive="isActiveParent(item.href)"
                   asChild
                 >
-                  <router-link :to="item.href">
-                    <span>{{ t(item.titleKey) }}</span>
-                  </router-link>
+                  <router-link :to="item.href"
+                    ><span>{{ t(item.titleKey) }}</span></router-link
+                  >
                 </SidebarMenuButton>
-
                 <Collapsible
                   v-else
                   class="group/collapsible"
@@ -187,10 +142,9 @@ onMounted(() => {
                       <Badge
                         v-if="item.badge"
                         variant="outline"
-                        class="ml-1.5 rounded-full uppercase tracking-[0.07em] font-medium text-[9px] leading-none px-[5.5px] py-[3px] bg-warning/10 text-warning-600 border-warning/50 shrink-0"
+                        class="ml-1.5 shrink-0 rounded-full border-warning/50 bg-warning/10 px-[5.5px] py-[3px] text-[9px] font-medium leading-none tracking-[0.07em] text-warning-600 uppercase"
+                        >{{ item.badge }}</Badge
                       >
-                        {{ item.badge }}
-                      </Badge>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />
@@ -219,235 +173,137 @@ onMounted(() => {
       </Sidebar>
     </template>
 
-    <!-- Inbox sidebar -->
-    <template v-if="route.path && isInboxRoute(route.path)">
+    <template v-if="route.path && isMailRoute(route.path)">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex items-center justify-between w-full px-1">
-                <div class="font-semibold text-xl">
-                  <span>{{ t('globals.terms.inbox') }}</span>
+              <div class="flex w-full items-center justify-between px-1">
+                <div class="min-w-0 text-xl font-semibold">
+                  <BrandLogo :name="settingsStore.siteTitle" :logo="settingsStore.siteLogo" />
                 </div>
-                <div class="mr-1 mt-1 transition-colors">
-                  <router-link :to="{ name: 'search' }">
-                    <Search
-                      size="18"
-                      stroke-width="2.5"
-                      class="text-muted-foreground hover:text-foreground"
-                    />
-                  </router-link>
-                </div>
+                <router-link :to="{ name: 'search' }" class="mr-1 mt-1 transition-colors">
+                  <Search
+                    size="18"
+                    stroke-width="2.5"
+                    class="text-muted-foreground hover:text-foreground"
+                  />
+                </router-link>
               </div>
             </SidebarMenuItem>
           </SidebarMenu>
+          <Button
+            v-if="canCompose"
+            variant="default"
+            class="h-10 w-full justify-start bg-success px-3 text-success-foreground hover:bg-success/90 max-md:h-12"
+            @click="composeStore.open()"
+          >
+            <SquarePen class="h-4 w-4" aria-hidden="true" />
+            {{ t('compose.button') }}
+          </Button>
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup>
+          <SidebarGroup v-if="reviewStore.enabled" class="pb-0">
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton @click="emit('createConversation')">
-                  <Plus />
-                  <span>{{ t('conversation.newConversation') }}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
                 <SidebarMenuButton
-                  :isActive="isActiveParent('/inboxes/mentioned')"
-                  @click="navigateToInbox('mentioned')"
+                  :isActive="route.path.startsWith('/reviews')"
+                  class="!h-auto min-h-10 px-2.5 py-2 max-md:min-h-12"
+                  asChild
                 >
-                  <AtSign />
-                  <span class="flex-1 truncate">
-                    {{ t('globals.terms.mention', 2) }}
-                  </span>
-                  <SidebarCountBadge
-                    :count="conversationStore.sidebarCounts.mentioned"
-                    :ariaLabel="
-                      t(
-                        'conversation.sidebarCounts.mentioned',
-                        conversationStore.sidebarCounts.mentioned
-                      )
-                    "
-                  />
+                  <router-link :to="{ name: 'reviews' }">
+                    <ShieldCheck class="h-4 w-4 text-review" aria-hidden="true" />
+                    <span class="flex-1 truncate text-base font-medium max-md:text-lg">{{ t('review.title') }}</span>
+                    <SidebarCountBadge
+                      tone="review"
+                      :count="reviewStore.badgeCount"
+                      :ariaLabel="t('review.badgeLabel', { count: reviewStore.badgeCount })"
+                    />
+                  </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  :isActive="isActiveParent('/inboxes/all')"
-                  @click="navigateToInbox('all')"
-                >
-                  <List />
-                  <span class="flex-1 truncate">
-                    {{ t('globals.messages.all') }}
-                  </span>
-                  <SidebarCountBadge
-                    :count="conversationStore.sidebarCounts.all"
-                    :ariaLabel="
-                      t('conversation.sidebarCounts.all', conversationStore.sidebarCounts.all)
-                    "
-                  />
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
-              <!-- Team Inboxes -->
-
-              <!-- Views -->
-              <Collapsible
-                class="group/collapsible"
-                defaultOpen
-                v-model:open="viewInboxOpen"
-                v-if="userStore.can(permissions.VIEW_MANAGE)"
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton class="group/item !p-2">
-                      <span class="sidebar-section-label">
-                        {{ t('globals.terms.view', 2) }}
-                      </span>
-                      <div>
-                        <Plus
-                          size="18"
-                          @click.stop="openCreateViewDialog"
-                          class="rounded-md cursor-pointer transition-colors duration-200 can-hover:opacity-0 can-hover:group-hover/item:opacity-100 hover:bg-sidebar-accent/50 text-muted-foreground hover:text-sidebar-accent-foreground p-1"
-                        />
-                      </div>
-                      <ChevronRight
-                        class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-                        v-if="userViews.length"
-                      />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem
-                        v-for="view in userViews"
-                        :key="view.id"
-                        class="group/view-item"
-                      >
-                        <SidebarMenuButton
-                          size="sm"
-                          class="group-has-[[data-sidebar=menu-action]]/menu-item:pr-7"
-                          :isActive="route.params.viewID == view.id"
-                          @click="navigateToViewInbox(view.id)"
-                        >
-                          <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
-                          <SidebarCountBadge
-                            :count="viewSidebarCount(view.id)"
-                            :ariaLabel="
-                              t('conversation.sidebarCounts.view', viewSidebarCount(view.id))
-                            "
-                          />
-                        </SidebarMenuButton>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger as-child>
-                            <SidebarMenuAction
-                              class="mr-1 can-hover:opacity-0 can-hover:group-hover/view-item:opacity-100 data-[state=open]:opacity-100"
-                              @click.prevent
-                            >
-                              <EllipsisVertical />
-                            </SidebarMenuAction>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem @click="() => editView(view)">
-                              <span>{{ t('globals.messages.edit') }}</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
-                              <span>{{ t('globals.messages.delete') }}</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
-                </SidebarMenuItem>
-              </Collapsible>
-
-              <!-- Shared Views -->
-              <Collapsible
-                class="group/collapsible"
-                defaultOpen
-                v-model:open="sharedViewInboxOpen"
-                v-if="sharedViews.length"
-              >
+            </SidebarMenu>
+          </SidebarGroup>
+          <SidebarGroup>
+            <Collapsible class="group/collapsible" v-model:open="addressesOpen">
+              <SidebarMenu>
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton class="!p-2">
-                      <span class="sidebar-section-label">
-                        {{ t('globals.terms.sharedView', 2) }}
-                      </span>
+                      <span class="text-sm font-medium text-muted-foreground">Addresses</span>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
-
                   <CollapsibleContent>
-                    <SidebarMenuSub>
-                      <SidebarMenuSubItem v-for="view in sharedViews" :key="view.id">
+                    <SidebarMenu class="max-md:gap-2">
+                      <SidebarMenuItem v-for="address in addressStore.addresses" :key="address.id">
                         <SidebarMenuButton
-                          size="sm"
-                          :isActive="route.params.viewID == view.id"
-                          @click="navigateToViewInbox(view.id)"
+                          size="default"
+                          :isActive="isActiveAddress(address.id)"
+                          :title="addressLabel(address) + ' · ' + address.address"
+                          :class="[
+                            '!h-auto min-h-12 items-start px-2.5 py-2.5 max-md:min-h-16 max-md:rounded-xl max-md:border max-md:border-sidebar-border/80 max-md:bg-sidebar-accent/80 max-md:px-3 max-md:py-3 max-md:shadow-sm',
+                            {
+                              'opacity-60': !address.enabled,
+                              'max-md:border-success/50 max-md:bg-success/10': isActiveAddress(
+                                address.id
+                              )
+                            }
+                          ]"
+                          @click="navigateToAddress(address.id)"
                         >
-                          <span class="flex-1 truncate" :title="view.name">{{ view.name }}</span>
+                          <Mail class="mt-0.5 h-4 w-4 max-md:mt-1 max-md:h-5 max-md:w-5" />
+                          <span class="min-w-0 flex-1 truncate">
+                            <span
+                              class="block truncate text-base leading-6 font-medium max-md:text-lg"
+                            >
+                              {{ addressLabel(address) }}
+                            </span>
+                            <span
+                              class="block truncate text-sm leading-5 text-muted-foreground max-md:text-base"
+                            >
+                              {{ address.address }}
+                            </span>
+                          </span>
                           <SidebarCountBadge
-                            :count="viewSidebarCount(view.id)"
+                            :count="conversationStore.sidebarCounts.addresses?.[address.id] || 0"
                             :ariaLabel="
-                              t('conversation.sidebarCounts.view', viewSidebarCount(view.id))
+                              String(conversationStore.sidebarCounts.addresses?.[address.id] || 0) +
+                              ' unread messages for ' +
+                              address.address
                             "
                           />
                         </SidebarMenuButton>
-                      </SidebarMenuSubItem>
-                    </SidebarMenuSub>
+                      </SidebarMenuItem>
+                    </SidebarMenu>
                   </CollapsibleContent>
                 </SidebarMenuItem>
-              </Collapsible>
-            </SidebarMenu>
+              </SidebarMenu>
+            </Collapsible>
           </SidebarGroup>
         </SidebarContent>
         <MobileDrawerFooter />
       </Sidebar>
     </template>
 
-    <!-- Main Content Area -->
-    <SidebarInset class="bg-canvas !min-h-0 !h-full">
-      <slot></slot>
-    </SidebarInset>
+    <MobileSidebarSwipeArea>
+      <SidebarInset class="!h-full !min-h-0 bg-canvas"><slot /></SidebarInset>
+    </MobileSidebarSwipeArea>
   </SidebarProvider>
-
-  <!-- View Delete Confirmation Dialog -->
-  <AlertDialog v-model:open="isDeleteOpen">
-    <AlertDialogContent>
-      <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
-        <AlertDialogDescription>
-          {{ t('confirm.deleteView') }}
-        </AlertDialogDescription>
-      </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction variant="destructive" @click="handleDeleteView">
-          {{ t('globals.messages.delete') }}
-        </AlertDialogAction>
-      </AlertDialogFooter>
-    </AlertDialogContent>
-  </AlertDialog>
 </template>
 
 <style scoped>
 :deep(.sidebar-secondary) {
-  @apply border border-sidebar-border ml-0 rounded-lg overflow-hidden;
-  left: 0.35rem;
-  top: 0.4rem !important;
+  @apply ml-0 overflow-hidden rounded-lg border border-sidebar-border;
   bottom: 0.35rem !important;
   height: auto !important;
+  left: 0.35rem;
+  top: 0.4rem !important;
 }
 
-/* Override SidebarProvider height */
 :deep(.group\/sidebar-wrapper) {
   min-height: auto !important;
   height: 100%;

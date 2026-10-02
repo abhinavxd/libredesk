@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
-	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/ssrfguard"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/ssrf"
 	_ "golang.org/x/image/webp"
 )
 

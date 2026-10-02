@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
 
-	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	wsmodels "github.com/jakedolan443/fernmail/internal/ws/models"
 )
 
 // broadcastConv shadows the per-user fields (another agent's unread state) out of the shared payload.
@@ -31,7 +31,13 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.Co
 		"preview":           preview,
 		"created_at":        message.CreatedAt.Format(time.RFC3339),
 		"sender_type":       message.SenderType,
-		"conversation":      convToBroadcast(conv),
+		"private":           message.Private,
+		"sender": map[string]string{
+			"first_name": message.Author.FirstName,
+			"last_name":  message.Author.LastName,
+			"email":      message.Author.Email.String,
+		},
+		"conversation": convToBroadcast(conv),
 	}
 
 	var meta map[string]any
@@ -43,7 +49,7 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.Co
 		}
 	}
 
-	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID, conv.AddressID, conv.InboxID)
 	if len(userIDs) == 0 {
 		return
 	}
@@ -76,13 +82,13 @@ func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationL
 	if conv == nil {
 		return
 	}
-	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID, conv.AddressID, conv.InboxID)
 	if oldConv != nil {
 		seen := make(map[int]struct{}, len(userIDs))
 		for _, id := range userIDs {
 			seen[id] = struct{}{}
 		}
-		for _, id := range m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID) {
+		for _, id := range m.AuthorizedConnectedAgentIDs(oldConv.AssignedUserID, oldConv.AssignedTeamID, oldConv.AddressID, oldConv.InboxID) {
 			if _, ok := seen[id]; !ok {
 				seen[id] = struct{}{}
 				userIDs = append(userIDs, id)
@@ -113,7 +119,7 @@ func (m *Manager) broadcastToUsers(userIDs []int, message wsmodels.Message) {
 
 // broadcastToConversationListSubs pushes a message to the conversation's list and open subscribers.
 func (m *Manager) broadcastToConversationListSubs(conversationUUID string, message wsmodels.Message) {
-	clients := m.wsHub.ListSubscribers(conversationUUID)
+	clients := m.wsHub.AuthorizedListSubscribers(conversationUUID)
 	if len(clients) == 0 {
 		return
 	}

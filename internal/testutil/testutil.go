@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
-
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 const (
@@ -30,14 +30,24 @@ func NewDB(t *testing.T, name string) *sqlx.DB {
 	}
 	admin, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
+		if os.Getenv(dbDSNEnv) != "" {
+			t.Fatalf("configured test database is unreachable: %v", err)
+		}
 		t.Skipf("test database unreachable, set %s or start the dev postgres: %v", dbDSNEnv, err)
 	}
-	defer admin.Close()
 
-	dbName := "libredesk_test_" + name
-	admin.MustExec(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1`, dbName)
-	admin.MustExec(fmt.Sprintf(`DROP DATABASE IF EXISTS %s`, dbName))
-	admin.MustExec(fmt.Sprintf(`CREATE DATABASE %s`, dbName))
+	// Independent test processes must never terminate or drop each other's DBs.
+	if len(name) > 32 {
+		name = name[:32]
+	}
+	dbName := "libredesk_test_" + name + "_" + uuid.NewString()[:8]
+	t.Cleanup(func() { admin.Close() })
+	admin.MustExec(fmt.Sprintf(`CREATE DATABASE %s`, pq.QuoteIdentifier(dbName)))
+	t.Cleanup(func() {
+		if _, err := admin.Exec(fmt.Sprintf(`DROP DATABASE %s WITH (FORCE)`, pq.QuoteIdentifier(dbName))); err != nil {
+			t.Errorf("removing test database: %v", err)
+		}
+	})
 
 	u, err := url.Parse(dsn)
 	if err != nil {

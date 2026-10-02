@@ -12,7 +12,9 @@ export function computeRecipientsFromMessage (message, contactEmail, inboxEmail,
 
     // Build TO field
     const toList = isIncoming
-        ? meta.from && meta.from.length
+        ? meta.reply_to && meta.reply_to.length
+            ? meta.reply_to
+            : meta.from && meta.from.length
             ? meta.from
             : contactEmail
                 ? [contactEmail]
@@ -34,6 +36,7 @@ export function computeRecipientsFromMessage (message, contactEmail, inboxEmail,
         // If someone else replies (not the original contact), re-add original contact to CC to keep them in the loop.
         if (
             contactEmail &&
+            !(meta.from || []).some(email => email.toLowerCase() === contactEmail.toLowerCase()) &&
             !toList.includes(contactEmail) &&
             !ccList.includes(contactEmail)
         ) {

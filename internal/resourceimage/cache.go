@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 	"github.com/jmoiron/sqlx"
 )
 

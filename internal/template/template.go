@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"strings"
 	"sync"
+	"unicode/utf8"
 
-	"github.com/abhinavxd/libredesk/internal/dbutil"
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/template/models"
+	"github.com/jakedolan443/fernmail/internal/dbutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/template/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
 	"github.com/zerodha/logf"
@@ -66,8 +68,17 @@ func New(lo *logf.Logger, db *sqlx.DB, webTpls *template.Template, tpls *templat
 
 // Update updates a new template with the given name, and body.
 func (m *Manager) Update(id int, t models.Template) (models.Template, error) {
+	if err := validateTemplate(t); err != nil {
+		return models.Template{}, err
+	}
 	var result models.Template
 	if err := m.q.UpdateTemplate.Get(&result, id, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.Template{}, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundTemplate"), nil)
+		}
+		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil)
+		}
 		m.lo.Error("error updating template", "error", err)
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -76,13 +87,13 @@ func (m *Manager) Update(id int, t models.Template) (models.Template, error) {
 
 // Create creates a template.
 func (m *Manager) Create(t models.Template) (models.Template, error) {
-	if t.IsDefault {
-		t.Type = TypeEmailOutgoing
+	if err := validateTemplate(t); err != nil {
+		return models.Template{}, err
 	}
 	var result models.Template
 	if err := m.q.InsertTemplate.Get(&result, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
 		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
-			return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil)
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil)
 		}
 		m.lo.Error("error inserting template", "error", err)
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -173,5 +184,19 @@ func (m *Manager) Reload(webTpls, tpls *template.Template, funcMap template.Func
 	m.webTpls = webTpls
 	m.tpls = tpls
 	m.funcMap = funcMap
+	return nil
+}
+
+// validateTemplate mirrors the storage limits using character counts, as PostgreSQL does.
+func validateTemplate(t models.Template) error {
+	if strings.TrimSpace(t.Name) == "" || utf8.RuneCountInString(t.Name) > 140 {
+		return envelope.NewError(envelope.InputError, "Template name must contain between 1 and 140 characters.", nil)
+	}
+	if utf8.RuneCountInString(t.Subject.String) > 1000 {
+		return envelope.NewError(envelope.InputError, "Template subject cannot exceed 1000 characters.", nil)
+	}
+	if t.Type != TypeEmailOutgoing {
+		return envelope.NewError(envelope.InputError, "Invalid template type.", nil)
+	}
 	return nil
 }

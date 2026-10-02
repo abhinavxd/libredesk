@@ -1,0 +1,59 @@
+name: authelia
+
+secrets:
+  jwt_secret:
+    file: ./secrets/JWT_SECRET
+  session_secret:
+    file: ./secrets/SESSION_SECRET
+  storage_encryption_key:
+    file: ./secrets/STORAGE_ENCRYPTION_KEY
+  smtp_password:
+    file: ./secrets/SMTP_PASSWORD
+
+services:
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    init: true
+    user: "65532:65532"
+    ports:
+      - "127.0.0.1:9091:9091"
+    secrets:
+      - jwt_secret
+      - session_secret
+      - storage_encryption_key
+      - smtp_password
+    environment:
+      # Needed to load the OIDC signing key and client-secret digest from
+      # read-only files without putting either value in this Compose file.
+      X_AUTHELIA_CONFIG_FILTERS: template
+      AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE: /run/secrets/jwt_secret
+      AUTHELIA_SESSION_SECRET_FILE: /run/secrets/session_secret
+      AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE: /run/secrets/storage_encryption_key
+      AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+    volumes:
+      - ./config/configuration.yml:/config/configuration.yml:ro
+      - ./config/users.yml:/config/users.yml:rw
+      - ./data:/data:rw
+      - ./secrets/oidc:/config/secrets/oidc:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 160m
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:9091/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"

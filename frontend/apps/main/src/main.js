@@ -9,22 +9,14 @@ import '@shared-ui/assets/styles/main.scss'
 import '@shared-ui/utils/string.js'
 import Root from './Root.vue'
 
-const setFavicon = (url) => {
-  let link = document.createElement("link")
-  link.rel = "icon"
-  document.head.appendChild(link)
-  link.href = url
-}
-
-async function initApp () {
+async function initApp() {
   const config = (await api.getConfig()).data.data
   const emitter = mitt()
   const lang = config['app.lang'] || 'en-US'
-  const langMessages = await api.getLanguage(lang)
-
-  // Set favicon.
-  if (config['app.favicon_url'])
-    setFavicon(config['app.favicon_url'])
+  const [langMessages, fallbackMessages] = await Promise.all([
+    api.getLanguage(lang),
+    lang === 'en-US' ? Promise.resolve(null) : api.getLanguage('en-US')
+  ])
 
   // Initialize i18n.
   const i18nConfig = {
@@ -32,6 +24,7 @@ async function initApp () {
     locale: lang,
     fallbackLocale: 'en-US',
     messages: {
+      'en-US': fallbackMessages?.data || langMessages.data,
       [lang]: langMessages.data
     }
   }

@@ -42,7 +42,9 @@ const props = defineProps({
   enableConversationReferences: { type: Boolean, default: false },
   getConversationSuggestions: { type: Function, default: null },
   enableInlineImages: { type: Boolean, default: false },
-  linkedModel: { type: String, default: 'messages' }
+  linkedModel: { type: String, default: 'messages' },
+  // Off for editors outside the open conversation, e.g. Compose New.
+  typingIndicator: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['send', 'mentionsChanged', 'filesDropped', 'toggleMessageType'])
@@ -62,11 +64,13 @@ const shouldShowBubble = ({ editor: e, state }) => {
 }
 
 const conversationStore = useConversationStore()
-const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyping, {
-  get isPrivateMessage() {
-    return props.messageType === 'private_note'
-  }
-})
+const { startTyping, stopTyping } = props.typingIndicator
+  ? useTypingIndicator(conversationStore.sendTyping, {
+      get isPrivateMessage() {
+        return props.messageType === 'private_note'
+      }
+    })
+  : { startTyping: () => {}, stopTyping: () => {} }
 
 const { editor, extractMentions, focus } = useTextEditor({
   restrictResources: true,

@@ -5,8 +5,20 @@
         <FormItem>
           <FormLabel>{{ t('admin.general.siteName') }}</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="" v-bind="field" />
+            <Input type="text" :placeholder="DEFAULT_SITE_TITLE" v-bind="field" />
           </FormControl>
+          <FormDescription>{{ t('admin.general.siteName.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="logo_url">
+        <FormItem>
+          <FormLabel>{{ t('admin.general.siteLogo') }}</FormLabel>
+          <FormControl>
+            <SiteLogoInput v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ t('admin.general.siteLogo.description') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -70,26 +82,6 @@
           <FormDescription>
             {{ t('admin.general.rootURL.description') }}
           </FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ field }" name="favicon_url" :value="props.initialValues.favicon_url">
-        <FormItem>
-          <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="" v-bind="field" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ field }" name="logo_url" :value="props.initialValues.logo_url">
-        <FormItem>
-          <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="" v-bind="field" />
-          </FormControl>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -188,6 +180,8 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { timeZones } from '../../../constants/timezones.js'
 import { useI18n } from 'vue-i18n'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
+import SiteLogoInput from './SiteLogoInput.vue'
+import { DEFAULT_SITE_TITLE } from '../../../stores/appSettings.js'
 
 const emitter = useEmitter()
 const { t } = useI18n()

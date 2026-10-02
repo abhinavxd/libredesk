@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/conversation/models"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/conversation/models"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/knadh/smtppool"
 )
 
@@ -222,6 +222,9 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		serverCount = len(e.smtpPools)
 		server      *smtppool.Pool
 	)
+	if serverCount == 0 {
+		return fmt.Errorf("no SMTP server configured for inbox %d", e.id)
+	}
 	if serverCount > 1 {
 		server = e.smtpPools[rand.Intn(serverCount)]
 	} else {

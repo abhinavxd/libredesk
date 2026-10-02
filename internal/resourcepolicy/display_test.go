@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/jakedolan443/fernmail/internal/attachment"
 	"golang.org/x/net/html"
 )
 

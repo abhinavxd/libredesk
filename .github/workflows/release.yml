@@ -62,4 +62,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ORG: ${{ github.repository_owner }}
-          IMAGE_NAME: ${{ github.event.repository.name }}
+          # Keep the package name stable while the GitHub repository is being renamed.
+          IMAGE_NAME: fernmail

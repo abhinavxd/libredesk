@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
-	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
-	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	cmodels "github.com/jakedolan443/fernmail/internal/conversation/models"
+	tmodels "github.com/jakedolan443/fernmail/internal/team/models"
+	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/knadh/go-i18n"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
@@ -21,7 +21,7 @@ func newTestEnforcer(t *testing.T) *Enforcer {
 		t.Fatalf("i18n init: %v", err)
 	}
 	lo := logf.New(logf.Opts{})
-	e, err := NewEnforcer(&lo, tr)
+	e, err := NewEnforcer(&lo, tr, func(int, int) (bool, error) { return true, nil })
 	if err != nil {
 		t.Fatalf("enforcer init: %v", err)
 	}

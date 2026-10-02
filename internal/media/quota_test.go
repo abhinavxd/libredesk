@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/testutil"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )

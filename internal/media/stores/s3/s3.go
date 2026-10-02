@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/media"
+	"github.com/jakedolan443/fernmail/internal/media"
 	"github.com/rhnvrm/simples3"
 )
 

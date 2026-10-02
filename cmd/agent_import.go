@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

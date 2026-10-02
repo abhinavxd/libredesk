@@ -5,7 +5,7 @@
       class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]"
       @scroll="handleScroll"
     >
-      <div ref="contentEl" class="min-h-full px-4 pt-4 pb-10 relative">
+      <div ref="contentEl" class="min-h-full px-4 pt-3 pb-10 relative">
         <div v-if="showLoadMore" class="text-center mt-3">
           <Button
             size="sm"
@@ -38,11 +38,16 @@
             :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
-            <DaySeparator v-if="row.showDaySeparator" :date="row.message.created_at" class="mb-4" />
+            <DaySeparator
+              v-if="row.showDaySeparator"
+              :date="row.message.created_at"
+              :class="isEmailConversation ? 'mb-2' : 'mb-4'"
+            />
             <div v-if="!row.message.private && row.message.type !== 'activity'">
               <MessageBubble
                 :message="row.message"
                 :direction="row.message.type"
+                :show-conversation-actions="row.message.uuid === firstEmailUUID"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -60,11 +65,29 @@
             </div>
           </div>
         </TransitionGroup>
+
+        <!-- Contributor emails waiting for review in this conversation. -->
+        <div v-if="pendingReviews.length && !conversationStore.messages.loading" class="mt-4 space-y-3">
+          <ReviewSubmission v-for="review in pendingReviews" :key="review.uuid" :review="review">
+            <template #actions>
+              <router-link
+                v-if="reviewStore.isReviewer && review.author_id !== userStore.userID"
+                :to="{ name: 'reviews', params: { uuid: review.uuid } }"
+                class="inline-flex h-8 items-center rounded-md bg-review px-3 text-xs font-medium text-review-foreground hover:bg-review/90"
+              >
+                {{ $t('review.openInQueue') }}
+              </router-link>
+            </template>
+          </ReviewSubmission>
+        </div>
       </div>
 
       <!-- Typing indicator -->
       <div v-if="conversationStore.conversation.isTyping" class="px-4 pb-4">
-        <TypingIndicator />
+        <p v-if="conversationStore.typingNames(conversationStore.current.uuid)" class="text-xs text-muted-foreground" role="status">
+          {{ $t('conversation.agentsTyping', { names: conversationStore.typingNames(conversationStore.current.uuid) }) }}
+        </p>
+        <TypingIndicator v-else />
       </div>
     </div>
 
@@ -93,6 +116,8 @@ import { isSameDay } from 'date-fns'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
 import MessagesSkeleton from './MessagesSkeleton.vue'
+import ReviewSubmission from '@main/features/review/ReviewSubmission.vue'
+import { useReviewStore } from '@main/stores/review'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { useStickyScroll } from '@shared-ui/composables'
 
@@ -105,7 +130,17 @@ const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
+const reviewStore = useReviewStore()
+const pendingReviews = computed(() =>
+  reviewStore.conversationReviews(conversationStore.current?.uuid).filter((review) => review.status === 'pending')
+)
 const isEmailConversation = computed(() => conversationStore.current?.inbox_channel === 'email')
+const firstEmailUUID = computed(
+  () =>
+    conversationStore.conversationMessages.find(
+      (message) => !message.private && message.type !== 'activity'
+    )?.uuid
+)
 const threadEl = ref(null)
 const contentEl = ref(null)
 const emitter = useEmitter()

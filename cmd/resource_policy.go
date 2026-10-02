@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/resourcepolicy"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/resourcepolicy"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/envelope"
 	"github.com/knadh/go-i18n"
 	"github.com/knadh/stuffbin"
 	"github.com/zerodha/fastglue"

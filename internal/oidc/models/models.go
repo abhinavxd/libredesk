@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 )
 
 // providerLogos holds known provider logos.

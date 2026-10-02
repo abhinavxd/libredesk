@@ -6,7 +6,7 @@ import (
 	"net/http/pprof"
 	"runtime"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
+	"github.com/jakedolan443/fernmail/internal/colorlog"
 )
 
 // startPprof starts the net/http/pprof server on its own address if enabled in config.

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/envelope"
-	"github.com/abhinavxd/libredesk/internal/inbox"
-	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
-	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jakedolan443/fernmail/internal/envelope"
+	"github.com/jakedolan443/fernmail/internal/inbox"
+	"github.com/jakedolan443/fernmail/internal/inbox/channel/email/oauth"
+	imodels "github.com/jakedolan443/fernmail/internal/inbox/models"
+	"github.com/jakedolan443/fernmail/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 	"golang.org/x/oauth2"
@@ -286,9 +286,9 @@ func handleOAuthCallback(r *fastglue.Request) error {
 			return r.Redirect("/admin/inboxes?error=inbox_update_failed", fasthttp.StatusFound, nil, "")
 		}
 
-		// Reload inbox to apply new tokens.
-		if err := reloadInbox(app, existingInbox.ID); err != nil {
-			app.lo.Error("error reloading inbox", "id", existingInbox.ID, "error", err)
+		// Preserve the canonical Address list while reloading the transport.
+		if err := syncEmailAddressConfig(app, existingInbox.ID); err != nil {
+			app.lo.Error("error syncing email address configuration", "id", existingInbox.ID, "error", err)
 		}
 
 		return r.Redirect("/admin/inboxes?success=oauth_reconnected", fasthttp.StatusFound, nil, "")
@@ -340,9 +340,9 @@ func handleOAuthCallback(r *fastglue.Request) error {
 		return r.Redirect("/admin/inboxes?error=inbox_creation_failed", fasthttp.StatusFound, nil, "")
 	}
 
-	// Reload inbox to start the new inbox.
-	if err := reloadInbox(app, createdInbox.ID); err != nil {
-		app.lo.Error("error reloading inbox", "id", createdInbox.ID, "error", err)
+	if err := provisionEmailAddresses(app, createdInbox, config.EmailAliases); err != nil {
+		app.lo.Error("error provisioning email addresses", "inbox_id", createdInbox.ID, "error", err)
+		return r.Redirect("/admin/inboxes?error=address_provision_failed", fasthttp.StatusFound, nil, "")
 	}
 
 	return r.Redirect("/admin/inboxes?success=oauth_connected", fasthttp.StatusFound, nil, "")

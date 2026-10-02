@@ -156,3 +156,12 @@ describe('computeRecipientsFromMessage', () => {
         })
     })
 })
+
+test('prefers incoming Reply-To without adding the original sender to CC', () => {
+  expect(computeRecipientsFromMessage({
+    type: 'incoming',
+    meta: { from: ['no-reply@example.test'], reply_to: ['human@example.test'], to: ['support@example.test'] }
+  }, 'no-reply@example.test', 'support@example.test')).toEqual({
+    to: ['human@example.test'], cc: [], bcc: []
+  })
+})

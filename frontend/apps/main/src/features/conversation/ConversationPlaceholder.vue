@@ -1,88 +1,44 @@
 <template>
   <div class="placeholder-container">
-    <Spinner v-if="isLoading" />
-    <template v-else>
-      <div v-if="showGettingStarted" class="getting-started-wrapper">
-        <div class="text-center">
-          <h2 class="text-2xl font-semibold text-foreground mb-6">
-            {{ $t('setup.completeYourSetup') }}
-          </h2>
-
-          <div class="space-y-4 mb-6">
-            <div class="checklist-item" :class="{ completed: hasInboxes }">
-              <CheckCircle v-if="hasInboxes" class="check-icon completed" />
-              <Circle v-else class="w-5 h-5 text-muted-foreground" />
-              <span class="flex-1 text-left ml-3 text-foreground">
-                {{ $t('setup.createFirstInbox') }}
-              </span>
-              <Button
-                v-if="!hasInboxes"
-                variant="ghost"
-                size="sm"
-                @click="router.push({ name: 'inbox-list' })"
-                class="ml-auto"
-              >
-                {{ $t('globals.messages.setUp') }}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div v-else>
-        <p class="placeholder-text">{{ $t('conversation.placeholder') }}</p>
-      </div>
-    </template>
+    <Spinner v-if="addressStore.loading" />
+    <div v-else class="text-center">
+      <template v-if="addressStore.addresses.length">
+        <p class="placeholder-text">Choose an address to see its conversations.</p>
+      </template>
+      <template v-else>
+        <h2 class="mb-2 text-2xl font-semibold text-foreground">No addresses are available</h2>
+        <p class="mb-5 text-sm text-muted-foreground">
+          An administrator must connect a mail transport and configure an address before mail can appear here.
+        </p>
+        <Button v-if="userStore.can('inboxes:manage')" @click="router.push({ name: 'address-list' })">
+          Configure addresses
+        </Button>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle, Circle } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
-import { useInboxStore } from '@/stores/inbox'
+import { useAddressStore } from '@/stores/address'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
-const inboxStore = useInboxStore()
+const addressStore = useAddressStore()
+const userStore = useUserStore()
 
-const isLoading = ref(true)
-
-onMounted(async () => {
-  try {
-    await inboxStore.fetchInboxes()
-  } finally {
-    isLoading.value = false
-  }
-})
-
-const hasInboxes = computed(() => inboxStore.inboxes.length > 0)
-
-const showGettingStarted = computed(() => !hasInboxes.value)
+onMounted(() => addressStore.fetchAddresses())
 </script>
 
 <style scoped>
 .placeholder-container {
-  @apply h-screen w-full flex items-center justify-center min-w-[400px] relative;
+  @apply relative flex h-full min-w-[400px] w-full items-center justify-center;
 }
 
-.getting-started-wrapper {
-  @apply w-full max-w-md mx-auto px-4;
-}
-
-.checklist-item {
-  @apply flex items-center justify-between py-3 px-4 rounded-lg border border-border;
-}
-
-.checklist-item.completed {
-  @apply bg-muted/50;
-}
-
-.checklist-item.disabled {
-  @apply opacity-50;
-}
-
-.check-icon.completed {
-  @apply w-5 h-5 text-primary;
+.placeholder-text {
+  @apply text-muted-foreground;
 }
 </style>

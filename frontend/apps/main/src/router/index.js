@@ -33,75 +33,49 @@ const routes = [
     component: () => import('@main/App.vue'),
     children: [
       {
-        path: '/inboxes/views/:viewID',
-        name: 'views',
-        props: true,
+        path: '/addresses/:addressID?',
         component: () => import('@main/layouts/inbox/InboxLayout.vue'),
-        meta: { titleKey: 'globals.terms.view', hidePageHeader: true },
+        meta: { titleKey: 'address.title', hidePageHeader: true },
         children: [
           {
             path: '',
-            name: 'view-inbox',
-            component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: { titleKey: 'globals.terms.view' },
+            name: 'address-inbox',
+            component: () => import('@main/views/address/AddressView.vue'),
             children: [
               {
                 path: 'conversation/:uuid',
-                name: 'view-inbox-conversation',
+                name: 'address-inbox-conversation',
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
-                meta: { titleKey: 'globals.terms.view', hidePageHeader: true }
+                meta: { titleKey: 'address.title', hidePageHeader: true }
               }
             ]
           }
         ]
       },
       {
-        path: 'inboxes/search',
+        path: '/reviews/:uuid?',
+        name: 'reviews',
+        component: () => import('@main/views/review/ReviewsView.vue'),
+        props: true,
+        meta: { titleKey: 'review.title', hidePageHeader: true }
+      },
+      {
+        path: '/search',
         name: 'search',
         component: () => import('@main/views/search/SearchView.vue'),
         meta: { titleKey: 'globals.terms.search', hidePageHeader: true }
       },
       {
-        path: '/inboxes/:type(all|mentioned)?',
-        name: 'inboxes',
-        redirect: '/inboxes/all',
-        component: () => import('@main/layouts/inbox/InboxLayout.vue'),
+        path: '/conversation/:uuid',
+        name: 'conversation-redirect',
+        component: () => import('@main/views/conversation/ConversationRedirectView.vue'),
         props: true,
-        meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true },
-        children: [
-          {
-            path: '',
-            name: 'inbox',
-            component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: {
-              titleKey: 'globals.terms.inbox',
-              typeKey: (route) => {
-                if (route.params.type === 'mentioned') return 'conversation.mentions'
-                if (route.params.type === 'all') return 'globals.messages.all'
-                return ''
-              }
-            },
-            children: [
-              {
-                path: 'conversation/:uuid',
-                name: 'inbox-conversation',
-                component: () => import('@main/views/conversation/ConversationDetailView.vue'),
-                props: true,
-                meta: {
-                  titleKey: 'globals.terms.inbox',
-                  typeKey: (route) => {
-                    if (route.params.type === 'mentioned') return 'conversation.mentions'
-                    if (route.params.type === 'all') return 'globals.messages.all'
-                    return ''
-                  },
-                  hidePageHeader: true
-                }
-              }
-            ]
-          }
-        ]
+        meta: { hidePageHeader: true }
       },
+      // A direct deep link to an old mailbox never restores the retired global
+      // list. It lands on the first address the user can read.
+      { path: '/inboxes/:pathMatch(.*)*', redirect: '/addresses' },
 
       {
         path: '/admin',
@@ -116,62 +90,63 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'users',
+            name: 'users',
+            component: () => import('@main/views/admin/users/UsersSettings.vue'),
+            meta: { titleKey: 'users.title' }
+          },
+          {
             path: 'resources',
             name: 'system-resources',
             component: () => import('@main/views/admin/resources/ResourceMonitor.vue'),
             meta: { titleKey: 'admin.systemResources.title' }
           },
-
+          {
+            path: 'addresses',
+            component: () => import('@main/views/admin/address/Addresses.vue'),
+            meta: { titleKey: 'address.title', titleCount: 2 },
+            children: [
+              {
+                path: '',
+                name: 'address-list',
+                component: () => import('@main/views/admin/address/AddressList.vue')
+              },
+              {
+                path: 'new',
+                name: 'new-address',
+                component: () => import('@main/views/admin/address/AddressForm.vue'),
+                meta: { titleKey: 'address.new' }
+              },
+              {
+                path: ':id/edit',
+                name: 'edit-address',
+                component: () => import('@main/views/admin/address/AddressForm.vue'),
+                props: true,
+                meta: { titleKey: 'address.edit' }
+              }
+            ]
+          },
+          // Transport setup is deliberately not in the normal navigation. It
+          // remains available for first-time IMAP/SMTP wiring, while aliases
+          // and agent access are configured exclusively as Addresses.
           {
             path: 'inboxes',
             component: () => import('@main/views/admin/inbox/InboxView.vue'),
             meta: { titleKey: 'globals.terms.inbox', titleCount: 2 },
             children: [
-              {
-                path: '',
-                name: 'inbox-list',
-                component: () => import('@main/views/admin/inbox/InboxList.vue')
-              },
-              {
-                path: 'new',
-                name: 'new-inbox',
-                component: () => import('@main/views/admin/inbox/NewInbox.vue'),
-                meta: { titleKey: 'inbox.newInbox' }
-              },
-              {
-                path: ':id/edit',
-                props: true,
-                name: 'edit-inbox',
-                component: () => import('@main/views/admin/inbox/EditInbox.vue'),
-                meta: { titleKey: 'inbox.edit' }
-              }
+              { path: '', name: 'inbox-list', component: () => import('@main/views/admin/inbox/InboxList.vue') },
+              { path: 'new', name: 'new-inbox', component: () => import('@main/views/admin/inbox/NewInbox.vue'), meta: { titleKey: 'inbox.newInbox' } },
+              { path: ':id/edit', props: true, name: 'edit-inbox', component: () => import('@main/views/admin/inbox/EditInbox.vue'), meta: { titleKey: 'inbox.edit' } }
             ]
           },
-
           {
             path: 'templates',
             component: () => import('@main/views/admin/templates/Templates.vue'),
             meta: { titleKey: 'globals.terms.template', titleCount: 2 },
             children: [
-              {
-                path: '',
-                name: 'template-list',
-                component: () => import('@main/views/admin/templates/TemplateList.vue')
-              },
-              {
-                path: ':id/edit',
-                name: 'edit-template',
-                props: true,
-                component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.edit' }
-              },
-              {
-                path: 'new',
-                name: 'new-template',
-                props: true,
-                component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.new' }
-              }
+              { path: '', name: 'template-list', component: () => import('@main/views/admin/templates/TemplateList.vue') },
+              { path: ':id/edit', name: 'edit-template', props: true, component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'), meta: { titleKey: 'template.edit' } },
+              { path: 'new', name: 'new-template', props: true, component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'), meta: { titleKey: 'template.new' } }
             ]
           },
           {
@@ -180,24 +155,9 @@ const routes = [
             name: 'sso',
             meta: { titleKey: 'globals.terms.sso' },
             children: [
-              {
-                path: '',
-                name: 'sso-list',
-                component: () => import('@main/views/admin/oidc/OIDCList.vue')
-              },
-              {
-                path: ':id/edit',
-                props: true,
-                name: 'edit-sso',
-                component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { titleKey: 'oidc.edit' }
-              },
-              {
-                path: 'new',
-                name: 'new-sso',
-                component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { titleKey: 'oidc.new' }
-              }
+              { path: '', name: 'sso-list', component: () => import('@main/views/admin/oidc/OIDCList.vue') },
+              { path: ':id/edit', props: true, name: 'edit-sso', component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'), meta: { titleKey: 'oidc.edit' } },
+              { path: 'new', name: 'new-sso', component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'), meta: { titleKey: 'oidc.new' } }
             ]
           },
           {
@@ -206,27 +166,11 @@ const routes = [
             name: 'webhooks',
             meta: { titleKey: 'globals.terms.webhook', titleCount: 2 },
             children: [
-              {
-                path: '',
-                name: 'webhook-list',
-                component: () => import('@main/views/admin/webhooks/WebhookList.vue')
-              },
-              {
-                path: ':id/edit',
-                props: true,
-                name: 'edit-webhook',
-                component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { titleKey: 'webhook.edit' }
-              },
-              {
-                path: 'new',
-                name: 'new-webhook',
-                component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { titleKey: 'webhook.new' }
-              }
+              { path: '', name: 'webhook-list', component: () => import('@main/views/admin/webhooks/WebhookList.vue') },
+              { path: ':id/edit', props: true, name: 'edit-webhook', component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'), meta: { titleKey: 'webhook.edit' } },
+              { path: 'new', name: 'new-webhook', component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'), meta: { titleKey: 'webhook.new' } }
             ]
           },
-
           {
             path: 'conversations',
             meta: { titleKey: 'globals.terms.conversation', titleCount: 2 },
@@ -235,32 +179,6 @@ const routes = [
                 path: 'statuses',
                 component: () => import('@main/views/admin/status/StatusView.vue'),
                 meta: { titleKey: 'globals.terms.status', titleCount: 2 }
-              },
-
-              {
-                path: 'shared-views',
-                component: () => import('@main/views/admin/shared-views/SharedViews.vue'),
-                meta: { titleKey: 'globals.terms.sharedView', titleCount: 2 },
-                children: [
-                  {
-                    path: '',
-                    name: 'shared-view-list',
-                    component: () => import('@main/views/admin/shared-views/SharedViewList.vue')
-                  },
-                  {
-                    path: 'new',
-                    name: 'new-shared-view',
-                    component: () => import('@main/views/admin/shared-views/CreateSharedView.vue'),
-                    meta: { titleKey: 'sharedView.new' }
-                  },
-                  {
-                    path: ':id/edit',
-                    props: true,
-                    name: 'edit-shared-view',
-                    component: () => import('@main/views/admin/shared-views/EditSharedView.vue'),
-                    meta: { titleKey: 'sharedView.editSharedView' }
-                  }
-                ]
               }
             ]
           }
@@ -268,30 +186,20 @@ const routes = [
       }
     ]
   },
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: () => {
-      return '/inboxes/all'
-    }
-  }
+  { path: '/:pathMatch(.*)*', redirect: '/addresses' }
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: routes
+  routes
 })
 
 router.beforeEach((to, from, next) => {
-  // Cancel in-flight requests.
-  if (to.fullPath !== from.fullPath) {
-    abortRouteScope()
-  }
-
+  if (to.fullPath !== from.fullPath) abortRouteScope()
   const appSettingsStore = useAppSettingsStore()
-  const siteName = appSettingsStore.settings?.['app.site_name'] || 'libredesk'
+  const siteName = appSettingsStore.siteTitle
   const i18n = getI18n()
-  const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
-  const titleKey = typeKey || to.meta?.titleKey
+  const titleKey = to.meta?.titleKey
   const pageTitle = titleKey && i18n ? i18n.global.t(titleKey, to.meta?.titleCount || 1) : ''
   document.title = `${pageTitle} - ${siteName}`
   next()

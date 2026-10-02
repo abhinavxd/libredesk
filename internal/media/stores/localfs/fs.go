@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/abhinavxd/libredesk/internal/media"
+	"github.com/jakedolan443/fernmail/internal/media"
 )
 
 // Opts holds fs options.
