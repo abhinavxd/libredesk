@@ -54,6 +54,7 @@ type Engine struct {
 	lo                      *logf.Logger
 	i18n                    *i18n.I18n
 	conversationStore       conversationStore
+	businessHours           businessHoursChecker
 	systemUserID            int
 	taskQueue               chan ConversationTask
 	closed                  bool
@@ -76,6 +77,11 @@ type conversationStore interface {
 	ApplyAction(action models.RuleAction, conversation cmodels.Conversation, user umodels.User) error
 	GetConversation(teamID int, uuid, refNum string) (cmodels.Conversation, error)
 	GetConversationsCreatedAfter(after time.Time, afterID, limit int) ([]cmodels.ConversationRef, error)
+}
+
+// businessHoursChecker reports whether support is open at a given time for a team, falling back to the helpdesk defaults when teamID is 0.
+type businessHoursChecker interface {
+	IsOpen(teamID int, at time.Time) (bool, error)
 }
 
 type queries struct {
@@ -112,6 +118,11 @@ func New(opt Opts) (*Engine, error) {
 // SetConversationStore sets conversations store.
 func (e *Engine) SetConversationStore(store conversationStore) {
 	e.conversationStore = store
+}
+
+// SetBusinessHoursChecker sets the checker used by the business_hours_status condition.
+func (e *Engine) SetBusinessHoursChecker(c businessHoursChecker) {
+	e.businessHours = c
 }
 
 // SetSystemUserID sets the system user ID used to identify events raised by automation actions.
