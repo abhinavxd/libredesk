@@ -29,6 +29,9 @@ type Manager struct {
 	i18n          *i18n.I18n
 	setting       settingsStore
 	encryptionKey string
+	// cfgClientID and cfgClientSecret are set only when both oidc.client_id and oidc.client_secret are configured.
+	cfgClientID     string
+	cfgClientSecret string
 }
 
 // Opts contains options for initializing the Manager.
@@ -37,6 +40,10 @@ type Opts struct {
 	Lo            *logf.Logger
 	I18n          *i18n.I18n
 	EncryptionKey string
+	// ConfigClientID and ConfigClientSecret are the oidc.client_id and oidc.client_secret config values.
+	// When both are set, the provider with this client ID uses this secret and its credentials cannot be edited.
+	ConfigClientID     string
+	ConfigClientSecret string
 }
 
 // queries contains prepared SQL queries.
@@ -58,13 +65,35 @@ func New(opts Opts, setting settingsStore) (*Manager, error) {
 	if err := dbutil.ScanSQLFile("queries.sql", &q, opts.DB, efs); err != nil {
 		return nil, err
 	}
-	return &Manager{
+	m := &Manager{
 		q:             q,
 		lo:            opts.Lo,
 		i18n:          opts.I18n,
 		setting:       setting,
 		encryptionKey: opts.EncryptionKey,
-	}, nil
+	}
+	m.setConfigCredentials(opts.ConfigClientID, opts.ConfigClientSecret)
+	return m, nil
+}
+
+// setConfigCredentials stores the client credentials from config, only when both are set.
+func (o *Manager) setConfigCredentials(clientID, clientSecret string) {
+	if clientID != "" && clientSecret != "" {
+		o.cfgClientID, o.cfgClientSecret = clientID, clientSecret
+	}
+}
+
+// secretFromConfig reports whether the provider with this client ID uses the client secret from config.
+func (o *Manager) secretFromConfig(clientID string) bool {
+	return o.cfgClientID != "" && clientID == o.cfgClientID
+}
+
+// ClientSecret returns the client secret to use for the provider, the one from config if it applies, else the stored one.
+func (o *Manager) ClientSecret(oidc models.OIDC) string {
+	if o.secretFromConfig(oidc.ClientID) {
+		return o.cfgClientSecret
+	}
+	return oidc.ClientSecret
 }
 
 // Get returns an oidc by id.
@@ -87,6 +116,7 @@ func (o *Manager) Get(id int) (models.OIDC, error) {
 		return models.OIDC{}, err
 	}
 	oidc.RedirectURI = fmt.Sprintf(rootURL+redirectURL, oidc.ID)
+	oidc.ClientSecretFromConfig = o.secretFromConfig(oidc.ClientID)
 	return oidc, nil
 }
 
@@ -119,6 +149,7 @@ func (o *Manager) GetAll() ([]models.OIDC, error) {
 	for i := range oidc {
 		oidc[i].RedirectURI = fmt.Sprintf(rootURL+redirectURL, oidc[i].ID)
 		oidc[i].SetProviderLogo()
+		oidc[i].ClientSecretFromConfig = o.secretFromConfig(oidc[i].ClientID)
 	}
 	return oidc, nil
 }
@@ -142,6 +173,7 @@ func (o *Manager) Create(oidc models.OIDC) (models.OIDC, error) {
 	}
 
 	o.decryptOIDC(&createdOIDC)
+	createdOIDC.ClientSecretFromConfig = o.secretFromConfig(createdOIDC.ClientID)
 
 	return createdOIDC, nil
 }
@@ -156,6 +188,9 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 	// A masked secret keeps the stored one.
 	if strings.Contains(oidc.ClientSecret, stringutil.PasswordDummy) {
 		oidc.ClientSecret = current.ClientSecret
+	}
+	if oidc, err = o.lockConfigCredentials(current, oidc); err != nil {
+		return models.OIDC{}, err
 	}
 	if err := o.validateCredentials(oidc); err != nil {
 		return models.OIDC{}, err
@@ -174,6 +209,7 @@ func (o *Manager) Update(id int, oidc models.OIDC) (models.OIDC, error) {
 	}
 
 	o.decryptOIDC(&updatedOIDC)
+	updatedOIDC.ClientSecretFromConfig = o.secretFromConfig(updatedOIDC.ClientID)
 
 	return updatedOIDC, nil
 }
@@ -192,10 +228,23 @@ func (o *Manager) validateCredentials(oidc models.OIDC) error {
 	if strings.TrimSpace(oidc.ClientID) == "" {
 		return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_id`"), nil)
 	}
-	if strings.TrimSpace(oidc.ClientSecret) == "" {
+	if strings.TrimSpace(oidc.ClientSecret) == "" && !o.secretFromConfig(oidc.ClientID) {
 		return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_secret`"), nil)
 	}
 	return nil
+}
+
+// lockConfigCredentials keeps the stored credentials of a provider whose secret comes from config.
+// The client ID cannot change (it is what ties the provider to the configured secret), and an empty secret keeps the stored one.
+func (o *Manager) lockConfigCredentials(current, req models.OIDC) (models.OIDC, error) {
+	if !o.secretFromConfig(current.ClientID) {
+		return req, nil
+	}
+	if req.ClientID != current.ClientID || (req.ClientSecret != "" && req.ClientSecret != current.ClientSecret) {
+		return models.OIDC{}, envelope.NewError(envelope.InputError, o.i18n.T("admin.sso.credentialsFromConfig"), nil)
+	}
+	req.ClientSecret = current.ClientSecret
+	return req, nil
 }
 
 // encryptOIDC encrypts sensitive OIDC fields (ClientID and ClientSecret).

@@ -27,6 +27,8 @@ type OIDC struct {
 	ProviderURL  string    `db:"provider_url" json:"provider_url"`
 	LogoURL      string    `db:"logo_url" json:"logo_url"`
 	RedirectURI  string    `db:"-" json:"redirect_uri"`
+	// ClientSecretFromConfig is true when the client secret comes from config (oidc.client_secret) and the credentials cannot be edited.
+	ClientSecretFromConfig bool `db:"-" json:"client_secret_from_config"`
 }
 
 // SetProviderLogo sets the logo URL if not already set.
