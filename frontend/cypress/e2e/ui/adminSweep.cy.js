@@ -20,9 +20,9 @@ describe('Every navigable page loads', () => {
       hrefs = [...src.matchAll(/href:\s*'([^']+)'/g)].map((m) => m[1])
       expect(hrefs, 'current administration routes').to.include.members([
         '/admin/general', '/admin/users', '/admin/resources', '/admin/addresses', '/admin/templates',
-        '/admin/conversations/statuses', '/admin/sso', '/admin/webhooks'
+        '/admin/sso', '/admin/webhooks'
       ])
-      expect(hrefs.some((href) => /\/(teams|views|contacts)(\/|$)/.test(href))).to.eq(false)
+      expect(hrefs.some((href) => /\/(teams|views|contacts|statuses)(\/|$)/.test(href))).to.eq(false)
     })
   })
 

@@ -22,8 +22,6 @@ import (
 
 	"github.com/jakedolan443/fernmail/internal/conversation"
 
-	"github.com/jakedolan443/fernmail/internal/conversation/status"
-
 	"github.com/jakedolan443/fernmail/internal/importer"
 	"github.com/jakedolan443/fernmail/internal/inbox"
 	"github.com/jakedolan443/fernmail/internal/inbox/channel/email"
@@ -41,7 +39,6 @@ import (
 
 	"github.com/jakedolan443/fernmail/internal/resourceimage"
 	"github.com/jakedolan443/fernmail/internal/role"
-	"github.com/jakedolan443/fernmail/internal/search"
 	"github.com/jakedolan443/fernmail/internal/setting"
 
 	"github.com/jakedolan443/fernmail/internal/ssrf"
@@ -297,7 +294,6 @@ func initUser(i18n *i18n.I18n, DB *sqlx.DB) *user.Manager {
 // initConversations inits conversation manager.
 func initConversations(
 	i18n *i18n.I18n,
-	status *status.Manager,
 	hub *ws.Hub,
 	db *sqlx.DB,
 	inboxStore *inbox.Manager,
@@ -309,7 +305,7 @@ func initConversations(
 	resourceImages *resourceimage.Store,
 ) *conversation.Manager {
 
-	c, err := conversation.New(hub, i18n, status, inboxStore, userStore, mediaStore, settings, template, webhook, conversation.Opts{
+	c, err := conversation.New(hub, i18n, inboxStore, userStore, mediaStore, settings, template, webhook, conversation.Opts{
 		CacheIncomingImages: func(ctx context.Context, id int, content string) error {
 			return resourceImages.Prefetch(ctx, id, content, settings.GetResourcePolicyTx)
 		},
@@ -862,36 +858,6 @@ func initRole(db *sqlx.DB, i18n *i18n.I18n) *role.Manager {
 		log.Fatalf("error initializing role manager: %v", err)
 	}
 	return r
-}
-
-// initStatus inits conversation status manager.
-func initStatus(db *sqlx.DB, i18n *i18n.I18n) *status.Manager {
-	manager, err := status.New(status.Opts{
-		DB:   db,
-		Lo:   initLogger("status-manager"),
-		I18n: i18n,
-	})
-	if err != nil {
-		log.Fatalf("error initializing status manager: %v", err)
-	}
-	return manager
-}
-
-// initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
-	lo := initLogger("search")
-	m, err := search.New(search.Opts{
-		DB:              db,
-		Lo:              lo,
-		I18n:            i18n,
-		FilterFields:    conversation.ListFilterAllowedFields,
-		FilterRenderers: conversation.ListFilterRenderers,
-		FilterLocation:  convo.FilterLocation,
-	})
-	if err != nil {
-		log.Fatalf("error initializing search manager: %v", err)
-	}
-	return m
 }
 
 // initWebhook inits webhook manager.

@@ -24,7 +24,7 @@ func TestMarkAddressReadHTTPAndPersonalBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conversations, err := conversation.New(nil, i18n, nil, nil, nil, nil, nil, nil, nil, conversation.Opts{DB: db, Lo: &lo})
+	conversations, err := conversation.New(nil, i18n, nil, nil, nil, nil, nil, nil, conversation.Opts{DB: db, Lo: &lo})
 	if err != nil {
 		t.Fatal(err)
 	}

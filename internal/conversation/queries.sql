@@ -1,9 +1,3 @@
--- name: unsnooze-all
-UPDATE conversations
-SET snoozed_until = NULL, status_id = (SELECT id FROM conversation_statuses WHERE name = 'Open')
-WHERE snoozed_until <= NOW()
-  AND status_id = (SELECT id FROM conversation_statuses WHERE name = 'Snoozed');
-
 -- name: insert-conversation
 -- $11 = rate limit window start (timestamptz), $12 = max conversations (0 = unlimited)
 -- $13 = subject reference marker template (placeholder: {ref})
@@ -222,18 +216,6 @@ SET contact_last_seen_at = NOW(),
 updated_at = NOW()
 WHERE uuid = $1
 RETURNING contact_last_seen_at;
-
--- name: update-conversation-status
-WITH new_status AS (
-    SELECT id, category FROM conversation_statuses WHERE name = $2
-)
-UPDATE conversations
-SET status_id     = (SELECT id FROM new_status),
-    resolved_at   = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
-    closed_at     = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
-    snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
-    updated_at    = NOW()
-WHERE uuid = $1;
 
 -- name: upsert-user-last-seen
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)

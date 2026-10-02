@@ -12,7 +12,7 @@ import { subscribeToConversation, sendTypingIndicator, subscribeListReplace } fr
 import MessageCache from '@main/utils/conversation-message-cache'
 import { createDraftSync } from '@main/utils/draft-sync'
 import { getI18n } from '@main/i18n'
-import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES } from '@/constants/conversation'
+import { CONVERSATION_LIST_TYPE } from '@/constants/conversation'
 import { useThrottleFn, useStorage } from '@vueuse/core'
 
 import { delayedLoading } from '@/utils/delayed-loading'
@@ -22,7 +22,6 @@ export const useConversationStore = defineStore('conversation', () => {
   const CONV_LIST_PAGE_SIZE = 25
   const MESSAGE_LIST_PAGE_SIZE = 30
 
-  const statuses = ref([])
   const currentTo = ref([])
   const currentBCC = ref([])
   const currentCC = ref([])
@@ -47,8 +46,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const router = useRouter()
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
-
-  const selectedUUIDs = ref(new Set())
 
   const sidebarCounts = reactive({
     unread: 0,
@@ -99,62 +96,6 @@ export const useConversationStore = defineStore('conversation', () => {
     true
   )
 
-  const statusOptions = computed(() => {
-    return statuses.value.map((s) => ({ label: s.name, value: s.id }))
-  })
-  const statusOptionsNoSnooze = computed(() =>
-    statuses.value
-      .filter((s) => s.name !== CONVERSATION_DEFAULT_STATUSES.SNOOZED)
-      .map((s) => ({
-        label: s.name,
-        value: s.id
-      }))
-  )
-
-  let lastClickedUUID = null
-
-  const selectedCount = computed(() => selectedUUIDs.value.size)
-  const allSelected = computed(() => {
-    const list = conversationsList.value
-    return list.length > 0 && selectedUUIDs.value.size === list.length
-  })
-
-  function toggleSelect(uuid, shiftKey = false) {
-    const next = new Set(selectedUUIDs.value)
-
-    if (shiftKey && lastClickedUUID && lastClickedUUID !== uuid) {
-      const list = conversationsList.value
-      const lastIdx = list.findIndex((c) => c.uuid === lastClickedUUID)
-      const curIdx = list.findIndex((c) => c.uuid === uuid)
-      if (lastIdx !== -1 && curIdx !== -1) {
-        const start = Math.min(lastIdx, curIdx)
-        const end = Math.max(lastIdx, curIdx)
-        for (let i = start; i <= end; i++) {
-          next.add(list[i].uuid)
-        }
-      }
-    } else {
-      if (next.has(uuid)) next.delete(uuid)
-      else next.add(uuid)
-    }
-
-    lastClickedUUID = uuid
-    selectedUUIDs.value = next
-  }
-
-  function selectAll() {
-    selectedUUIDs.value = new Set(conversationsList.value.map((c) => c.uuid))
-  }
-
-  function clearSelection() {
-    selectedUUIDs.value = new Set()
-    lastClickedUUID = null
-  }
-
-  function isSelected(uuid) {
-    return selectedUUIDs.value.has(uuid)
-  }
-
   // TODO: Move to constants.
   const sortFieldMap = {
     oldest: {
@@ -192,10 +133,6 @@ export const useConversationStore = defineStore('conversation', () => {
     waiting_longest: 'conversation.sort.waitingLongest'
   }
 
-  const persistedListStatus = useStorage(
-    'conversationListStatus',
-    CONVERSATION_DEFAULT_STATUSES.OPEN
-  )
   const persistedListSortField = useStorage('conversationListSortField', 'newest')
   if (!sortFieldMap[persistedListSortField.value]) {
     persistedListSortField.value = 'newest'
@@ -208,9 +145,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const conversations = reactive({
     data: [],
     listType: null,
-    status: persistedListStatus.value,
     sortField: persistedListSortField.value,
-    listFilters: [],
     addressID: 0,
     loading: false,
     fetching: false,
@@ -258,19 +193,6 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
 
-  function setListStatus(status, fetch = true) {
-    conversations.status = status
-    if (status) persistedListStatus.value = status
-    if (fetch) {
-      resetConversations()
-      reFetchConversationsList()
-    }
-  }
-
-  const getListStatus = computed(() => {
-    return conversations.status
-  })
-
   function setListSortField(field) {
     if (conversations.sortField === field) return
     conversations.sortField = field
@@ -285,36 +207,9 @@ export const useConversationStore = defineStore('conversation', () => {
     return t(sortFieldI18nKeys[conversations.sortField])
   })
 
-  async function fetchStatuses() {
-    if (statuses.value.length > 0) return
-    try {
-      const response = await api.getStatuses()
-      statuses.value = response.data.data.map((status) => ({
-        ...status,
-        id: status.id.toString()
-      }))
-      // A remembered status can point at one that has since been deleted.
-      if (conversations.status && !statuses.value.some((s) => s.name === conversations.status)) {
-        setListStatus(CONVERSATION_DEFAULT_STATUSES.OPEN)
-      }
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
-  }
-
   const conversationsList = computed(() => {
     if (!conversations.data) return []
-    let filteredConversations = conversations.data
-    if (conversations.status !== '') {
-      filteredConversations = filteredConversations.filter(
-        (conv) => conv.status === conversations.status
-      )
-    }
-
-    return [...filteredConversations].sort((a, b) => {
+    return [...conversations.data].sort((a, b) => {
       const field = sortFieldMap[conversations.sortField]?.field
       if (!a[field] && !b[field]) return 0
       if (!a[field]) return 1 // null goes last
@@ -626,16 +521,6 @@ export const useConversationStore = defineStore('conversation', () => {
     }
     conversations.listType = CONVERSATION_LIST_TYPE.ADDRESS
     conversations.addressID = addressID
-    let filters = []
-    if (conversations.status) {
-      filters.push({
-        model: 'conversation_statuses',
-        field: 'name',
-        operator: 'equals',
-        value: conversations.status
-      })
-    }
-    conversations.listFilters = filters
     const guard = showLoader ? delayedLoading(conversations, 'loading') : null
     conversations.fetching = true
     if (page === 0) page = conversations.page
@@ -643,7 +528,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const isStale = () => seq !== contextSeq
     try {
       conversations.errorMessage = ''
-      const response = await makeConversationListRequest(addressID, filters, page)
+      const response = await makeConversationListRequest(addressID, page)
       if (isStale()) return
       if (replace) {
         conversations.data = []
@@ -668,8 +553,7 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function makeConversationListRequest(addressID, filters, page) {
-    filters = filters.length > 0 ? JSON.stringify(filters) : []
+  async function makeConversationListRequest(addressID, page) {
     return api.getAddressConversations(addressID, {
       page,
       page_size: CONV_LIST_PAGE_SIZE,
@@ -677,8 +561,7 @@ export const useConversationStore = defineStore('conversation', () => {
         sortFieldMap[conversations.sortField].model +
         '.' +
         sortFieldMap[conversations.sortField].field,
-      order: sortFieldMap[conversations.sortField].order,
-      filters
+      order: sortFieldMap[conversations.sortField].order
     })
   }
 
@@ -714,26 +597,6 @@ export const useConversationStore = defineStore('conversation', () => {
     trimListToCurrentPage()
   }
 
-  async function updateStatus(v, uuid = conversation.data?.uuid) {
-    if (!uuid) return
-    const target = conversation.data?.uuid === uuid
-      ? conversation.data
-      : conversations.data.find((row) => row.uuid === uuid)
-    const previous = target?.status
-    if (target) target.status = v
-    try {
-      await api.updateConversationStatus(uuid, { status: v })
-
-      fetchSidebarCounts({ force: true })
-    } catch (error) {
-      if (target) target.status = previous
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
-  }
-
   let resyncRequest = null
   function resyncMail() {
     if (resyncRequest) return resyncRequest
@@ -767,21 +630,6 @@ export const useConversationStore = defineStore('conversation', () => {
       requests.push(silentRefetchConversation(conversation.data.uuid))
     }
     await Promise.allSettled(requests)
-  }
-
-  async function snoozeConversation(snoozeDuration) {
-    try {
-      await api.updateConversationStatus(conversation.data.uuid, {
-        status: CONVERSATION_DEFAULT_STATUSES.SNOOZED,
-        snoozed_until: snoozeDuration
-      })
-      fetchSidebarCounts({ force: true })
-    } catch (error) {
-      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        variant: 'destructive',
-        description: handleHTTPError(error).message
-      })
-    }
   }
 
   async function updateAssigneeLastSeen(uuid) {
@@ -964,7 +812,6 @@ export const useConversationStore = defineStore('conversation', () => {
       return
     }
     if (!canPushInsert(payload)) return
-    if (conversations.status !== '' && payload.status !== conversations.status) return
     if (!conversations.data) conversations.data = []
     conversations.data.unshift(payload)
     conversations.total += 1
@@ -986,7 +833,6 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.total = 0
     contextSeq++
 
-    clearSelection()
   }
 
   function updateTypingStatus(typingData) {
@@ -1148,28 +994,20 @@ export const useConversationStore = defineStore('conversation', () => {
     incrementUnread,
     incrementAddressUnread,
     updateConversationMessage,
-    snoozeConversation,
     fetchConversation,
     fetchConversationsList,
     fetchMessages,
 
-    updateStatus,
     refreshConversationList,
     resetConversations,
     updateConversationLastMessage,
     fetchFirstPageConversations,
-    fetchStatuses,
 
     setListSortField,
-    setListStatus,
 
     getListSortField,
     sortFieldI18nKeys,
-    getListStatus,
-    statuses,
 
-    statusOptionsNoSnooze,
-    statusOptions,
     updateTypingStatus,
     typingByUUID,
     sendTyping,
@@ -1189,13 +1027,6 @@ export const useConversationStore = defineStore('conversation', () => {
     addPendingMessage,
     replacePendingMessage,
     removePendingMessage,
-    selectedUUIDs,
-    selectedCount,
-    allSelected,
-    toggleSelect,
-    selectAll,
-    clearSelection,
-    isSelected,
     sidebarCounts,
     fetchSidebarCounts,
     refreshSidebarCounts

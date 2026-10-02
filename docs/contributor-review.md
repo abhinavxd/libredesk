@@ -19,7 +19,7 @@ Status: implemented on `feat/contributor-review`.
 | `reviews:submit` (replies and new emails are held for review) — **new** | ✓ | | |
 | `messages:write` (send directly) | | ✓ | ✓ |
 | `reviews:manage` (see queue, approve, deny) — **new** | | ✓ | ✓ |
-| `messages:write_private`, `conversations:update_status` | | ✓ | ✓ |
+| `messages:write_private` | | ✓ | ✓ |
 | Admin-only management permissions (unchanged) | | | ✓ |
 
 Sending rule, enforced on the server for replies and new emails alike:
@@ -28,7 +28,7 @@ Sending rule, enforced on the server for replies and new emails alike:
 - otherwise `reviews:submit` → the email becomes a review submission.
 - otherwise → 403.
 
-Contributors cannot write internal notes or change conversation status. They can mark mail read, since read state is personal.
+Contributors cannot write internal notes. They can mark mail read, since read state is personal.
 
 ## Address access
 
@@ -147,6 +147,6 @@ Fresh installs get the same schema directly.
 ## Out of scope
 
 - Reviewers editing a submission before approving.
-- Contributor notes and status changes.
+- Contributor notes.
 - A password-reset button in the Users menu.
 - Team management.

@@ -40,7 +40,7 @@ func TestEmailStorageFullPreservesMessageAndUnavailableAttachments(t *testing.T)
 	}
 	db.MustExec(`UPDATE conversations SET address_id=$2 WHERE id=$1`, conversationID, addressID)
 	db.MustExec("INSERT INTO conversation_participants (user_id,conversation_id) VALUES ($1,$2)", userID, conversationID)
-	manager, err := New(ws.NewHub(&lo, nil), i18n, nil, nil, nil, mediaManager, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
+	manager, err := New(ws.NewHub(&lo, nil), i18n, nil, nil, mediaManager, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
 	if err != nil {
 		t.Fatal(err)
 	}

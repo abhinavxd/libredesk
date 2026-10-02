@@ -150,8 +150,6 @@ enabled = false
 allowed_cidrs = []
 
 [conversation]
-# How often to check for conversations to unsnooze
-unsnooze_interval = "5m"
 # How long to keep drafts before deleting them from the database. (e.g. "360h", "48h")
 draft_retention_duration = "360h"
 

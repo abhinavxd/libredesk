@@ -8,7 +8,6 @@ const { api, route } = vi.hoisted(() => ({
     getAddressConversations: vi.fn(),
     getConversation: vi.fn(),
     getConversationMessages: vi.fn(),
-    updateConversationStatus: vi.fn(),
     markAddressAsRead: vi.fn()
   }
 }))
@@ -81,16 +80,6 @@ describe('mail synchronization', () => {
     )
     await store.fetchMessages('B')
     expect(store.messages.data.getAllPagesMessages('B').map((m) => m.uuid)).toEqual(['new-B'])
-  })
-
-  it('targets the captured thread when send-and-close completes after navigation', async () => {
-    store.conversation.data = { uuid: 'B', status: 'Open' }
-    store.conversations.data = [{ uuid: 'A', status: 'Open' }]
-    api.updateConversationStatus.mockResolvedValue(response({}))
-    await store.updateStatus('Closed', 'A')
-    expect(api.updateConversationStatus).toHaveBeenCalledWith('A', { status: 'Closed' })
-    expect(store.conversation.data.status).toBe('Open')
-    expect(store.conversations.data[0].status).toBe('Closed')
   })
 
   it('marks only the selected address and preserves mail arriving after the cutoff', async () => {

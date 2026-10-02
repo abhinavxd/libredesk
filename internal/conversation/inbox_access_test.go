@@ -8,8 +8,6 @@ import (
 	"github.com/jakedolan443/fernmail/internal/conversation/models"
 	"github.com/jakedolan443/fernmail/internal/dbutil"
 	"github.com/jakedolan443/fernmail/internal/inbox"
-	"github.com/jakedolan443/fernmail/internal/search"
-	smodels "github.com/jakedolan443/fernmail/internal/search/models"
 	"github.com/jakedolan443/fernmail/internal/testutil"
 	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/lib/pq"
@@ -18,7 +16,7 @@ import (
 )
 
 // Every read surface must use the same address policy. This covers list,
-// unread badges, drafts, live-subscription filtering, search, and direct URL
+// unread badges, drafts, live-subscription filtering and direct URL
 // access rather than trusting a sidebar-only visibility check.
 func TestAddressAccessAcrossMailSurfaces(t *testing.T) {
 	db := testutil.NewDB(t, "address_access_surfaces")
@@ -87,16 +85,11 @@ func TestAddressAccessAcrossMailSurfaces(t *testing.T) {
 	if err := dbutil.ScanSQLFile("queries.sql", &manager.q, db, efs); err != nil {
 		t.Fatal(err)
 	}
-	searcher, err := search.New(search.Opts{DB: db, Lo: &lo, I18n: i18n, FilterLocation: func() string { return "UTC" }})
-	if err != nil {
-		t.Fatal(err)
-	}
 	enforcer, err := authz.NewEnforcer(&lo, i18n, inboxes.CanAccess, addresses.CanAccess)
 	if err != nil {
 		t.Fatal(err)
 	}
 	reader := umodels.User{ID: viewer, Enabled: true, Permissions: []string{"conversations:read", "conversations:read_all"}}
-	scope := smodels.ReadScope{UserID: viewer, Read: true, ReadAll: true}
 
 	check := func(want int) {
 		t.Helper()
@@ -116,14 +109,6 @@ func TestAddressAccessAcrossMailSurfaces(t *testing.T) {
 		err = manager.q.FilterAuthorizedListUUIDs.Select(&authorized, pq.Array([]string{billingUUID, supportUUID}), viewer, pq.Array([]int{}), true, true, false, false, false, false)
 		if err != nil || len(authorized) != want {
 			t.Fatalf("live subscriptions=%v err=%v want=%d", authorized, err, want)
-		}
-		conversations, _, _, err := searcher.Conversations(smodels.Query{Term: "sender@example.test", PageSize: 20}, scope)
-		if err != nil || len(conversations) != want {
-			t.Fatalf("search conversations=%d err=%v want=%d", len(conversations), err, want)
-		}
-		messages, _, _, err := searcher.Messages(smodels.Query{Term: "private mailbox example", PageSize: 20}, scope)
-		if err != nil || len(messages) != want {
-			t.Fatalf("search messages=%d err=%v want=%d", len(messages), err, want)
 		}
 	}
 

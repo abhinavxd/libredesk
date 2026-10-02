@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Mail, Search } from 'lucide-vue-next'
+import { Mail } from 'lucide-vue-next'
 import { navIconMap } from '@main/constants/navIcons'
 import { adminNavItems } from '@main/constants/navigation'
 import { useAddressStore } from '@main/stores/address'
@@ -39,13 +39,6 @@ export function useNavigationCommands() {
       icon: Mail,
       run: () => navigateToAddress(address.id)
     })),
-    {
-      id: 'goto.search',
-      label: t('conversation.search'),
-      section: SECTIONS.GOTO,
-      icon: Search,
-      run: () => router.push({ name: 'search' })
-    },
     ...adminCommands()
   ])
 }

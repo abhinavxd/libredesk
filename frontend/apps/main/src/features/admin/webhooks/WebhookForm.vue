@@ -126,10 +126,6 @@ const webhookEvents = ref([
       {
         value: 'conversation.created',
         label: 'Conversation created'
-      },
-      {
-        value: 'conversation.status_changed',
-        label: 'Conversation status changed'
       }
     ]
   },

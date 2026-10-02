@@ -57,7 +57,9 @@ describe('Webhook form', () => {
     cy.get('input[name="url"]').should('have.value', webhookUrl)
     eventCheckbox('Conversation created').should('have.attr', 'data-state', 'checked')
     eventCheckbox('Message created').should('have.attr', 'data-state', 'checked')
-    eventCheckbox('Conversation status changed').should('have.attr', 'data-state', 'unchecked')
+    eventCheckbox('Message updated').should('have.attr', 'data-state', 'unchecked')
+    // Statuses are retired, so their event is no longer offered.
+    cy.contains('label', 'Conversation status changed').should('not.exist')
   })
 
   it('persists a changed url and event list', () => {
@@ -68,7 +70,7 @@ describe('Webhook form', () => {
     cy.get('input[name="name"]').type(renamedWebhook)
     cy.get('input[name="url"]').clear()
     cy.get('input[name="url"]').type(updatedUrl)
-    checkEvent('Conversation status changed')
+    checkEvent('Message updated')
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateWebhook').its('response.statusCode').should('eq', 200)
@@ -76,7 +78,7 @@ describe('Webhook form', () => {
     cy.visit(`${listPath}/${webhookId}/edit`)
     cy.get('input[name="name"]').should('have.value', renamedWebhook)
     cy.get('input[name="url"]').should('have.value', updatedUrl)
-    eventCheckbox('Conversation status changed').should('have.attr', 'data-state', 'checked')
+    eventCheckbox('Message updated').should('have.attr', 'data-state', 'checked')
   })
 
   it('rejects a submit with no name, url or event', () => {

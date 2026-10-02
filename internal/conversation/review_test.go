@@ -61,7 +61,7 @@ func newReviewFixture(t *testing.T, name string) reviewFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(ws.NewHub(&lo, nil), i18n, nil, reviewInboxStore{db: db}, users, files, stubSettingsStore{}, &template.Manager{}, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
+	m, err := New(ws.NewHub(&lo, nil), i18n, reviewInboxStore{db: db}, users, files, stubSettingsStore{}, &template.Manager{}, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
 	if err != nil {
 		t.Fatal(err)
 	}

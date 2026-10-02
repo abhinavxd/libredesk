@@ -10,26 +10,8 @@ import (
 	"github.com/jakedolan443/fernmail/internal/envelope"
 	"github.com/jakedolan443/fernmail/internal/stringutil"
 	umodels "github.com/jakedolan443/fernmail/internal/user/models"
-	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
-
-type assigneeChangeReq struct {
-	AssigneeID int `json:"assignee_id"`
-}
-
-type teamAssigneeChangeReq struct {
-	AssigneeID int `json:"assignee_id"`
-}
-
-type priorityUpdateReq struct {
-	Priority string `json:"priority"`
-}
-
-type statusUpdateReq struct {
-	Status       string `json:"status"`
-	SnoozedUntil string `json:"snoozed_until,omitempty"`
-}
 
 // handleGetSidebarCounts returns unread-message counts for each accessible address.
 func handleGetSidebarCounts(r *fastglue.Request) error {
@@ -170,54 +152,6 @@ func handleGetConversationParticipants(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(p)
-}
-
-// handleUpdateConversationStatus updates the status of a conversation.
-func handleUpdateConversationStatus(r *fastglue.Request) error {
-	var (
-		app   = r.Context.(*App)
-		uuid  = r.RequestCtx.UserValue("uuid").(string)
-		auser = r.RequestCtx.UserValue("user").(amodels.User)
-		req   = statusUpdateReq{}
-	)
-
-	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error decoding status update request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
-	}
-
-	status := req.Status
-	snoozedUntil := req.SnoozedUntil
-
-	// Validate inputs
-	if status == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`status`"), nil, envelope.InputError)
-	}
-	if snoozedUntil == "" && status == cmodels.StatusSnoozed {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`snoozed_until`"), nil, envelope.InputError)
-	}
-	if status == cmodels.StatusSnoozed {
-		_, err := time.ParseDuration(snoozedUntil)
-		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
-		}
-	}
-
-	// Enforce conversation access.
-	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	_, err = enforceConversationAccess(app, uuid, user)
-	if err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
-	// Update conversation status.
-	if err := app.conversation.UpdateConversationStatus(uuid, 0 /**status_id**/, status, snoozedUntil, user); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-	return r.SendEnvelope(true)
 }
 
 // enforceConversationAccess fetches the conversation and checks if the user has access to it.

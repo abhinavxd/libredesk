@@ -94,10 +94,8 @@
         :autoFocus="true"
         :disabled="isDraftLoading || isSending"
         :enableMentions="messageType === 'private_note'"
-        :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
         :getSuggestions="getSuggestions"
-        :getConversationSuggestions="getConversationSuggestions"
         @send="handleSend"
         @mentionsChanged="handleMentionsChanged"
         @filesDropped="handleFilesDropped"
@@ -129,10 +127,8 @@
       :isSending="isSending"
       :enableSend="enableSend"
       :handleSend="handleSend"
-      :handleSendAndSetStatus="handleSendAndSetStatus"
       :showGenerateReply="messageType !== 'private_note'"
       :sendForReview="sendForReview && messageType === 'reply'"
-      :allowSetStatus="allowSetStatus"
       @emojiSelect="handleEmojiSelect"
       @generateReply="$emit('generateReply')"
     />
@@ -160,10 +156,6 @@ import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
 import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import api from '@main/api'
-import {
-  createLatestConversationSuggestionFetcher,
-  getConversationSuggestions as fetchConversationSuggestions
-} from '@main/components/editor/conversationReference'
 
 const MENTION_LIMIT = 10
 const MENTION_DEBOUNCE_MS = 250
@@ -202,21 +194,6 @@ const debouncedFetchSuggestions = useDebounceFn(fetchSuggestions, MENTION_DEBOUN
 const getSuggestions = async (query) => {
   if (messageType.value !== 'private_note') return []
   return (await debouncedFetchSuggestions(query)) || []
-}
-
-const debouncedFetchConversationSuggestions = useDebounceFn(
-  fetchConversationSuggestions,
-  MENTION_DEBOUNCE_MS
-)
-const fetchLatestConversationSuggestions = createLatestConversationSuggestionFetcher(
-  debouncedFetchConversationSuggestions
-)
-
-const getConversationSuggestions = async (query) => {
-  if (messageType.value !== 'private_note') return []
-  const messageTypeAtRequest = messageType.value
-  const suggestions = (await fetchLatestConversationSuggestions(query)) || []
-  return messageType.value === messageTypeAtRequest ? suggestions : []
 }
 
 // Handle mentions changed from editor
@@ -262,14 +239,12 @@ const props = defineProps({
     type: Boolean,
     required: true
   },
-  sendForReview: { type: Boolean, default: false },
-  allowSetStatus: { type: Boolean, default: true }
+  sendForReview: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
   'toggleFullscreen',
   'send',
-  'sendAndSetStatus',
   'fileUpload',
   'inlineImageUpload',
   'fileDelete',
@@ -352,14 +327,6 @@ const validateBeforeSend = async () => {
 const handleSend = async () => {
   if (!(await validateBeforeSend())) return
   emit('send')
-}
-
-/**
- * Send the reply or private note and set conversation status
- */
-const handleSendAndSetStatus = async (status) => {
-  if (!(await validateBeforeSend())) return
-  emit('sendAndSetStatus', status)
 }
 
 const handleFileUpload = (event) => {

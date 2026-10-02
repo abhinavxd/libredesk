@@ -21,7 +21,7 @@ vi.mock('./ReplyBoxContent.vue', async () => {
   return {
     default: {
       props: ['htmlContent', 'textContent'],
-      emits: ['update:htmlContent', 'update:textContent', 'sendAndSetStatus'],
+      emits: ['update:htmlContent', 'update:textContent', 'send'],
       setup(props, { emit }) {
         return () =>
           h('div', [
@@ -32,7 +32,7 @@ vi.mock('./ReplyBoxContent.vue', async () => {
                 emit('update:textContent', event.target.value)
               }
             }),
-            h('button', { onClick: () => emit('sendAndSetStatus', 'Closed') }, 'Send and close')
+            h('button', { onClick: () => emit('send') }, 'Send')
           ])
       }
     }
@@ -64,8 +64,7 @@ beforeEach(async () => {
     setSelectedDraftType: vi.fn(),
     addPendingMessage: vi.fn(() => 'pending-A'),
     removePendingMessage: vi.fn(),
-    replacePendingMessage: vi.fn(),
-    updateStatus: vi.fn()
+    replacePendingMessage: vi.fn()
   })
   review = reactive({
     needsReview: false,
@@ -116,7 +115,6 @@ describe('reply sends across navigation', () => {
     finish({ data: { data: { uuid: 'real-A' } } })
     await settle()
     expect(store.replacePendingMessage).toHaveBeenCalledWith('A', 'pending-A', { uuid: 'real-A' })
-    expect(store.updateStatus).toHaveBeenCalledWith('Closed', 'A')
     expect(root.querySelector('textarea').value).toBe('B draft')
     expect(drafts.has('A::reply')).toBe(false)
   })
@@ -141,7 +139,6 @@ describe('reply sends across navigation', () => {
     await settle()
     expect(root.querySelector('textarea').value).toBe('B draft')
     expect(drafts.get('A::reply').content).toBe('A reply')
-    expect(store.updateStatus).not.toHaveBeenCalled()
   })
 })
 
@@ -161,8 +158,7 @@ describe('contributor replies', () => {
       'A',
       expect.objectContaining({ content: 'A reply', to: ['alice@example.test'], attachments: [] })
     )
-    // Contributors cannot change status, and the sent draft is cleared.
-    expect(store.updateStatus).not.toHaveBeenCalled()
+    // The submitted draft is cleared.
     expect(drafts.has('A::reply')).toBe(false)
     expect(root.querySelector('textarea')).toBeNull()
     expect(root.textContent).toContain('review.yourReplyAwaiting')

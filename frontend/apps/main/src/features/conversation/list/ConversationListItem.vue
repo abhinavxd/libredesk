@@ -6,8 +6,7 @@
         class="group relative block px-3 py-2.5 transition-colors duration-150 ease-in-out cursor-pointer"
         :class="{
           'bg-accent': isCurrent,
-          'bg-primary/5 hover:bg-primary/10': isItemSelected && !isCurrent,
-          'hover:bg-accent/40': !isCurrent && !isItemSelected
+          'hover:bg-accent/40': !isCurrent
         }"
       >
         <span
@@ -17,18 +16,6 @@
           aria-hidden="true"
         />
         <div class="flex items-start gap-2">
-          <div
-            v-if="showCheckbox"
-            class="shrink-0 pt-0.5"
-            @click.prevent.stop="handleCheckboxClick"
-          >
-            <Checkbox
-              :checked="isItemSelected"
-              :aria-label="t('conversation.bulkActions.selectConversation')"
-              class="w-5 h-5"
-            />
-          </div>
-
           <!-- Content container -->
           <div class="flex-1 min-w-0 space-y-1.5">
             <!-- Name + Subject group -->
@@ -114,11 +101,6 @@
       </router-link>
     </ContextMenuTrigger>
     <ContextMenuContent>
-      <!-- Long press is the only way to reach the first checkbox on touch. -->
-      <ContextMenuItem v-if="canBulkAct && !showCheckbox" @click="handleSelect">
-        <SquareCheck class="w-4 h-4 mr-2" />
-        {{ $t('conversation.bulkActions.selectConversation') }}
-      </ContextMenuItem>
       <ContextMenuItem @click="handleMarkAsUnread">
         <MailOpen class="w-4 h-4 mr-2" />
         {{ $t('globals.messages.markAsUnread') }}
@@ -131,7 +113,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
-import { Mail, Reply, MailOpen, SquareCheck } from 'lucide-vue-next'
+import { Mail, Reply, MailOpen } from 'lucide-vue-next'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -140,10 +122,8 @@ import {
 } from '@shared-ui/components/ui/context-menu'
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useConversationStore } from '@main/stores/conversation'
 import { useAppSettingsStore } from '@main/stores/appSettings'
-import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import { useI18n } from 'vue-i18n'
 
 let timer = null
@@ -151,7 +131,6 @@ const now = ref(new Date())
 const route = useRoute()
 const conversationStore = useConversationStore()
 const appSettingsStore = useAppSettingsStore()
-const { canBulkAct } = useBulkActionPermissions()
 const { t } = useI18n()
 
 const props = defineProps({
@@ -227,21 +206,4 @@ const showSubject = computed(
 const isUnread = computed(() => props.conversation.unread_message_count > 0)
 
 const isCurrent = computed(() => props.conversation.uuid === props.currentConversation?.uuid)
-
-const isItemSelected = computed(() => {
-  return conversationStore.isSelected(props.conversation.uuid)
-})
-
-const showCheckbox = computed(() => {
-  if (!canBulkAct.value) return false
-  return isItemSelected.value
-})
-
-const handleCheckboxClick = (event) => {
-  conversationStore.toggleSelect(props.conversation.uuid, event.shiftKey)
-}
-
-const handleSelect = () => {
-  conversationStore.toggleSelect(props.conversation.uuid, false)
-}
 </script>

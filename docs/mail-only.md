@@ -2,7 +2,7 @@
 
 The UI, HTTP routes and background workers for contacts/CRM, ticket assignment and priorities, automations, macros, SLA/business-hours tracking, CSAT, reports, activity logs, custom attributes, context links, public help centers, chat widgets and AI have been removed.
 
-Retained: email inbox connections and OAuth, reply with CC/BCC, attachments and image controls, drafts, threading, transcripts, search, read state, custom statuses and snoozing, internal notes and mentions, account authentication, SSO, mailbox configuration, APIs and webhooks for the retained features. Since v3.7.0, Compose New starts a new conversation from an address; see below.
+Retained: email inbox connections and OAuth, reply with CC/BCC, attachments and image controls, drafts, threading, transcripts, read state, internal notes and mentions, account authentication, SSO, mailbox configuration, APIs and webhooks for the retained features. Since v3.7.0, Compose New starts a new conversation from an address; see below.
 
 ## Existing installations
 
@@ -37,7 +37,7 @@ Browser uploads now belong to their uploader before a reply is sent. Attachments
 
 The corrected v3.5.0 migration preserves transport restrictions when retiring Views. If an installation already ran the previous v3.5.0 migration, review its address grants in Admin → Channel → Addresses. The old View records are gone, so the upgrade cannot distinguish a wrongly promoted grant from a later intentional administrator grant.
 
-Each address's menu offers **Mark all as read**. This marks the current user's visible conversations across all pages and statuses. It does not mark teammates' mail read, change conversation statuses, or hide messages arriving afterward. Other open tabs for the same user refresh their read state.
+Each address's menu offers **Mark all as read**. This marks the current user's visible conversations across all pages. It does not mark teammates' mail read or hide messages arriving afterward. Other open tabs for the same user refresh their read state.
 
 ### Regression tests
 
@@ -66,3 +66,11 @@ Back up the database and run `./fernmail --config config.toml --upgrade` before 
 - **Compose New** sends a new email from a chosen address. Admins and Agents send directly; a Contributor's email goes to review first.
 
 See [contributor-review.md](contributor-review.md) for the full design.
+
+## Search and conversation statuses retired (v3.9.0)
+
+Search is gone: the sidebar search, the search page, the conversation lookup in the command palette and the `#` conversation references in private notes, along with the `/api/v1/search/*`, `/api/v1/conversations/search` and `/api/v1/messages/search` endpoints. Old `/search` links open Addresses.
+
+Conversation statuses can no longer be set or managed. The Open/Snoozed/Resolved/Closed list filter, "send and set status", snoozing, bulk selection and the Admin statuses page are removed, as are `PUT /api/v1/conversations/{uuid}/status` and the `/api/v1/statuses` endpoints. Each address now lists every conversation. The upgrade reopens any snoozed conversation and the snooze timer (`conversation.unsnooze_interval`) is gone. Mail arriving in a conversation that was resolved or closed before the upgrade still reopens it. The `conversation.status_changed` webhook event is no longer offered and is removed from existing webhooks.
+
+The upgrade drops the message search index and removes the `conversations:update_status` and `status:manage` permissions from every role.

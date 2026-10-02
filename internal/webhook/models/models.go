@@ -29,10 +29,9 @@ type WebhookEvent string
 
 const (
 	// Conversation events
-	EventConversationCreated       WebhookEvent = "conversation.created"
-	EventConversationStatusChanged WebhookEvent = "conversation.status_changed"
-	EventConversationAssigned      WebhookEvent = "conversation.assigned"
-	EventConversationUnassigned    WebhookEvent = "conversation.unassigned"
+	EventConversationCreated    WebhookEvent = "conversation.created"
+	EventConversationAssigned   WebhookEvent = "conversation.assigned"
+	EventConversationUnassigned WebhookEvent = "conversation.unassigned"
 
 	// Message events
 	EventMessageCreated WebhookEvent = "message.created"

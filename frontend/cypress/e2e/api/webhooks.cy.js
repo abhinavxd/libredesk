@@ -106,7 +106,7 @@ describe('API: webhooks', () => {
     cy.api('PUT', `/api/v1/webhooks/${webhookId}`, {
       name: `${name}-renamed`,
       url: `${url}/v2`,
-      events: ['conversation.status_changed'],
+      events: ['message.updated'],
       secret: '',
       is_active: false
     }).its('status').should('eq', 200)
@@ -114,7 +114,7 @@ describe('API: webhooks', () => {
     cy.api('GET', `/api/v1/webhooks/${webhookId}`).then(({ body }) => {
       expect(body.data.name).to.eq(`${name}-renamed`)
       expect(body.data.url).to.eq(`${url}/v2`)
-      expect(body.data.events).to.deep.eq(['conversation.status_changed'])
+      expect(body.data.events).to.deep.eq(['message.updated'])
       expect(body.data.is_active).to.eq(false)
     })
   })

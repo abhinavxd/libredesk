@@ -396,7 +396,6 @@ CREATE TABLE conversation_messages (
     sender_type message_sender_type NOT NULL,
     meta JSONB DEFAULT '{}'::JSONB NULL
 );
-CREATE INDEX index_trgm_conversation_messages_on_text_content ON conversation_messages USING GIN (text_content gin_trgm_ops);
 CREATE INDEX index_conversation_messages_on_conversation_id ON conversation_messages (conversation_id);
 CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages (created_at);
 CREATE INDEX index_conversation_messages_on_source_id ON conversation_messages (source_id);
@@ -604,7 +603,7 @@ VALUES
 	(
 		'Agent',
 		'Role for all agents with limited access to conversations.',
-		'{conversations:read_all,conversations:read,conversations:update_status,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage}'
+		'{conversations:read_all,conversations:read,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage}'
 	);
 
 INSERT INTO
@@ -622,7 +621,7 @@ VALUES
 	(
 		'Admin',
 		'Role for users who have complete access to everything.',
-		'{webhooks:manage,general_settings:manage,oidc:manage,conversations:read_all,conversations:read,conversations:update_status,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage,status:manage,users:manage,inboxes:manage,templates:manage}'
+		'{webhooks:manage,general_settings:manage,oidc:manage,conversations:read_all,conversations:read,conversations:create,messages:read,messages:write,messages:write_private,reviews:manage,users:manage,inboxes:manage,templates:manage}'
 	);
 
 -- BEGIN mail_reliability schema

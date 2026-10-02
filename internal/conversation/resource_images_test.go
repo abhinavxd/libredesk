@@ -43,7 +43,7 @@ func TestIncomingImageCacheRunsAfterCommit(t *testing.T) {
 	}
 	db.MustExec("INSERT INTO conversation_participants (user_id, conversation_id) VALUES ($1, $2)", userID, conversationID)
 	calls := 0
-	manager, err := New(ws.NewHub(&lo, nil), testutil.NewI18n(t), nil, nil, nil, receiptMediaStore{}, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{
+	manager, err := New(ws.NewHub(&lo, nil), testutil.NewI18n(t), nil, nil, receiptMediaStore{}, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{
 		DB: db, Lo: &lo,
 		CacheIncomingImages: func(ctx context.Context, id int, content string) error {
 			calls++

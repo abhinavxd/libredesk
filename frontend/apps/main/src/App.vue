@@ -63,7 +63,6 @@ onMounted(async () => {
   if (!userStore.userID) await userStore.getCurrentUser()
   await Promise.allSettled([
     addressStore.fetchAddresses(),
-    conversationStore.fetchStatuses(),
     conversationStore.fetchAllDrafts(),
     usersStore.fetchUsers()
   ])

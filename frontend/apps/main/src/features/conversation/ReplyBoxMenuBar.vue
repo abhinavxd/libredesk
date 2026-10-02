@@ -53,7 +53,7 @@
     <div class="flex items-center rounded-md shadow-sm">
       <Button
         class="h-8 max-md:h-11 px-4"
-        :class="[{ 'rounded-r-none': allowSetStatus }, { 'bg-review text-review-foreground hover:bg-review/90': sendForReview }]"
+        :class="{ 'bg-review text-review-foreground hover:bg-review/90': sendForReview }"
         @click="handleSend"
         :disabled="!enableSend"
         :isLoading="isSending"
@@ -61,26 +61,6 @@
       >
         {{ sendForReview ? $t('replyBox.sendForReview') : $t('globals.messages.send') }}
       </Button>
-      <DropdownMenu v-if="showSendButton && allowSetStatus">
-        <DropdownMenuTrigger as-child>
-          <Button
-            class="h-8 max-md:h-11 px-2 rounded-l-none border-l border-primary-foreground/30 [&[data-state=open]>svg]:rotate-180"
-            :disabled="!enableSend"
-          >
-            <ChevronDownIcon class="text-primary-foreground transition-transform" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuLabel>{{ $t('replyBox.sendAndSetAs') }}</DropdownMenuLabel>
-          <DropdownMenuItem
-            v-for="status in conversationStore.statusOptionsNoSnooze"
-            :key="status.value"
-            @click="handleSendAndSetStatus(status.label)"
-          >
-            {{ status.label }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   </div>
 </template>
@@ -94,16 +74,7 @@ import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Paperclip, Smile, ChevronDownIcon } from 'lucide-vue-next'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuItem,
-  DropdownMenuContent,
-  DropdownMenuLabel
-} from '@shared-ui/components/ui/dropdown-menu'
-import { useConversationStore } from '@main/stores/conversation'
-const conversationStore = useConversationStore()
+import { Paperclip, Smile } from 'lucide-vue-next'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([import('vue3-emoji-picker'), import('vue3-emoji-picker/css')])
@@ -122,7 +93,6 @@ defineProps({
   isSending: Boolean,
   enableSend: Boolean,
   handleSend: Function,
-  handleSendAndSetStatus: Function,
   showSendButton: {
     type: Boolean,
     default: true
@@ -134,9 +104,7 @@ defineProps({
   handleFileUpload: Function,
   handleInlineImageUpload: Function,
   // Contributor replies are held for review instead of being sent.
-  sendForReview: { type: Boolean, default: false },
-  // Hidden for people who cannot change conversation status.
-  allowSetStatus: { type: Boolean, default: true }
+  sendForReview: { type: Boolean, default: false }
 })
 
 onClickOutside(emojiPickerRef, () => {

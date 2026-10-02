@@ -13,7 +13,7 @@
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction @click="processSend(true, deferredStatus)">{{
+        <AlertDialogAction @click="processSend(true)">{{
           $t('replyBox.sendAnyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
@@ -94,14 +94,12 @@
           v-model:mentions="mentions"
           @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
           @send="processSend"
-          @sendAndSetStatus="processSendAndSetStatus"
           @fileUpload="handleFileUpload"
           @fileDelete="handleFileDelete"
           @filesDropped="uploadFiles"
           :canSendReply="canSendReply"
           :canSendPrivateNote="canSendPrivateNote"
           :sendForReview="reviewStore.needsReview"
-          :allowSetStatus="canSetStatus"
           class="h-full flex-grow"
         />
       </DialogContent>
@@ -164,14 +162,12 @@
         v-model:mentions="mentions"
         @toggleFullscreen="isEditorFullscreen = !isEditorFullscreen"
         @send="processSend"
-        @sendAndSetStatus="processSendAndSetStatus"
         @fileUpload="handleFileUpload"
         @fileDelete="handleFileDelete"
         @filesDropped="uploadFiles"
         :canSendReply="canSendReply"
         :canSendPrivateNote="canSendPrivateNote"
         :sendForReview="reviewStore.needsReview"
-        :allowSetStatus="canSetStatus"
       />
     </div>
   </div>
@@ -223,7 +219,6 @@ useVisualViewportHeight()
 const reviewStore = useReviewStore()
 // Contributors reply too, but their replies are held for review.
 const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE) || reviewStore.needsReview)
-const canSetStatus = computed(() => userStore.can(perms.CONVERSATIONS_UPDATE_STATUS))
 const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
 const defaultMessageType = computed(() => (canSendReply.value ? 'reply' : 'private_note'))
 const isAllowedMessageType = (type) =>
@@ -384,7 +379,6 @@ const activeContentRef = () =>
   isEditorFullscreen.value ? fullscreenContentRef.value : replyBoxContentRef.value
 const showContactEmailWarning = ref(false)
 
-const deferredStatus = ref(null)
 const mentions = ref([])
 
 const setMessageTypeFromPalette = (type) => {
@@ -435,7 +429,7 @@ const { newerReply, acknowledgeReply } = useReplyAwareness({
   userID: computed(() => userStore.userID)
 })
 
-const processSend = async (skipContactEmailCheck = false, statusToSet = null) => {
+const processSend = async (skipContactEmailCheck = false) => {
   if (isSending.value || isDraftLoading.value || !conversationStore.current.uuid) return
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
@@ -470,7 +464,6 @@ const processSend = async (skipContactEmailCheck = false, statusToSet = null) =>
             .map((e) => e.trim())
             .some((email) => intendedRecipients.includes(email))
         ) {
-          deferredStatus.value = statusToSet
           showContactEmailWarning.value = true
           return
         }
@@ -568,12 +561,9 @@ const processSend = async (skipContactEmailCheck = false, statusToSet = null) =>
       emailErrors.value = []
       mentions.value = []
     }
-    if (statusToSet) await conversationStore.updateStatus(statusToSet, convUUID)
   }
   isSending.value = false
 }
-
-const processSendAndSetStatus = (status) => processSend(false, status)
 
 /**
  * Watch for loaded attachments from draft and restore them to mediaFiles.

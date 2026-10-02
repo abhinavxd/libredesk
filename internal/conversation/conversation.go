@@ -23,8 +23,6 @@ import (
 
 	"github.com/jakedolan443/fernmail/internal/conversation/models"
 
-	smodels "github.com/jakedolan443/fernmail/internal/conversation/status/models"
-
 	"github.com/jakedolan443/fernmail/internal/dbutil"
 	"github.com/jakedolan443/fernmail/internal/envelope"
 	"github.com/jakedolan443/fernmail/internal/inbox"
@@ -47,29 +45,28 @@ import (
 
 var (
 	//go:embed queries.sql
-	efs                             embed.FS
-	errConversationNotFound         = errors.New("conversation not found")
-	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
-	conversationsAllowedFields      = []string{"status_id", "inbox_id", "address_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "snoozed_until"}
-	conversationStatusAllowedFields = []string{"id", "name"}
-	usersAllowedFields              = []string{"email", "external_user_id"}
-	inboxesAllowedFields            = []string{"channel"}
+	efs                            embed.FS
+	errConversationNotFound        = errors.New("conversation not found")
+	ErrConversationAlreadyAssigned = errors.New("conversation already assigned")
+	// Conversation status is not filterable: the list shows every status.
+	conversationsAllowedFields = []string{"inbox_id", "address_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since"}
+	usersAllowedFields         = []string{"email", "external_user_id"}
+	inboxesAllowedFields       = []string{"channel"}
 )
 
 const (
 	conversationsListMaxPageSize = 500
 )
 
-// ListFilterRenderers remains a stable integration point for generic list and
-// search filtering. Address routing is now a database field, not a legacy
-// metadata renderer.
+// ListFilterRenderers remains a stable integration point for generic list
+// filtering. Address routing is now a database field, not a legacy metadata
+// renderer.
 var ListFilterRenderers = dbutil.FieldRenderers{}
 
 var ListFilterAllowedFields = dbutil.AllowedFields{
-	"conversations":         conversationsAllowedFields,
-	"conversation_statuses": conversationStatusAllowedFields,
-	"users":                 usersAllowedFields,
-	"inboxes":               inboxesAllowedFields,
+	"conversations": conversationsAllowedFields,
+	"users":         usersAllowedFields,
+	"inboxes":       inboxesAllowedFields,
 }
 
 // Manager handles the operations related to conversations
@@ -79,7 +76,6 @@ type Manager struct {
 	inboxStore                 inboxStore
 	userStore                  userStore
 	mediaStore                 mediaStore
-	statusStore                statusStore
 	settingsStore              settingsStore
 	webhookStore               webhookStore
 	lo                         *logf.Logger
@@ -95,10 +91,6 @@ type Manager struct {
 	closedMu                   sync.RWMutex
 	wg                         sync.WaitGroup
 	subjectRefFormat           string
-}
-
-type statusStore interface {
-	Get(int) (smodels.Status, error)
 }
 
 type userStore interface {
@@ -154,7 +146,6 @@ type Opts struct {
 func New(
 	wsHub *ws.Hub,
 	i18n *i18n.I18n,
-	statusStore statusStore,
 	inboxStore inboxStore,
 	userStore userStore,
 	mediaStore mediaStore,
@@ -185,7 +176,6 @@ func New(
 		mediaStore:                 mediaStore,
 		settingsStore:              settingsStore,
 		webhookStore:               webhook,
-		statusStore:                statusStore,
 		template:                   template,
 		db:                         opts.DB,
 		lo:                         opts.Lo,
@@ -212,12 +202,10 @@ type queries struct {
 	UpdateConversationContactLastSeen *sqlx.Stmt `query:"update-conversation-contact-last-seen"`
 	UpsertUserLastSeen                *sqlx.Stmt `query:"upsert-user-last-seen"`
 	MarkConversationUnread            *sqlx.Stmt `query:"mark-conversation-unread"`
-	UpdateConversationStatus          *sqlx.Stmt `query:"update-conversation-status"`
 	UpdateConversationLastMessage     *sqlx.Stmt `query:"update-conversation-last-message"`
 	InsertConversationParticipant     *sqlx.Stmt `query:"insert-conversation-participant"`
 	InsertConversation                *sqlx.Stmt `query:"insert-conversation"`
 	ReOpenConversation                *sqlx.Stmt `query:"re-open-conversation"`
-	UnsnoozeAll                       *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                *sqlx.Stmt `query:"delete-conversation"`
 
 	// Draft queries.
@@ -496,109 +484,6 @@ func (c *Manager) StartConversationWaitingSince(conversationUUID string, at time
 	if rows, _ := res.RowsAffected(); rows > 0 {
 		c.BroadcastConversationUpdate(conversationUUID, map[string]any{"waiting_since": at.Format(time.RFC3339)})
 	}
-	return nil
-}
-
-// UpdateConversationStatus updates the status of a conversation.
-func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, snoozeDur string, actor umodels.User) error {
-	// Fetch the status name if status ID is provided.
-	if statusID > 0 {
-		s, err := c.statusStore.Get(statusID)
-		if err != nil {
-			return envelope.NewError(envelope.InputError, err.Error(), nil)
-		}
-		status = s.Name
-	}
-
-	if status == models.StatusSnoozed && snoozeDur == "" {
-		return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
-	}
-
-	// Parse the snooze duration if status is snoozed.
-	snoozeUntil := time.Time{}
-	if status == models.StatusSnoozed {
-		duration, err := time.ParseDuration(snoozeDur)
-		if err != nil || duration <= 0 {
-			c.lo.Error("error parsing snooze duration", "duration", snoozeDur, "error", err)
-			return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
-		}
-		snoozeUntil = time.Now().Add(duration)
-	}
-
-	conversationBeforeChange, err := c.GetConversation(0, uuid, "")
-	if err != nil {
-		c.lo.Error("error fetching conversation before status change", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	oldStatus := conversationBeforeChange.Status.String
-
-	// Status not changed and not snoozed. Return early.
-	if oldStatus == status && status != models.StatusSnoozed {
-		c.lo.Debug("no status update: conversation status unchanged and not snoozed", "uuid", uuid, "old_status", oldStatus, "new_status", status)
-		return nil
-	}
-
-	// Update the conversation status.
-	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
-		c.lo.Error("error updating conversation status", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	// Stamps a just-resolved resolution SLA immediately and recomputes the cached deadline.
-
-	// Fetch conversation for webhook and automation rules.
-	conversation, err := c.GetConversation(0, uuid, "")
-	if err != nil {
-		c.lo.Error("error fetching conversation after status change", "uuid", uuid, "error", err)
-	}
-
-	// Trigger webhook for conversation status change
-	var snoozeUntilStr string
-	if !snoozeUntil.IsZero() {
-		snoozeUntilStr = snoozeUntil.UTC().Format(time.RFC3339)
-	}
-	c.webhookStore.TriggerEvent(wmodels.EventConversationStatusChanged, map[string]any{
-		"conversation_uuid": uuid,
-		"previous_status":   oldStatus,
-		"new_status":        status,
-		"snooze_until":      snoozeUntilStr,
-		"actor_id":          actor.ID,
-		"conversation":      conversation,
-	})
-
-	// Record the status change as an activity.
-	if err := c.RecordStatusChange(status, uuid, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	agentData := map[string]any{"status": status}
-	if oldStatus != models.StatusResolved && status == models.StatusResolved {
-		resolvedAt := conversationBeforeChange.ResolvedAt.Time
-		if resolvedAt.IsZero() {
-			resolvedAt = time.Now()
-		}
-		agentData["resolved_at"] = resolvedAt.Format(time.RFC3339)
-
-	}
-	if status == models.StatusClosed {
-		closedAt := time.Now()
-		if conversation.ID != 0 && !conversation.ClosedAt.Time.IsZero() {
-			closedAt = conversation.ClosedAt.Time
-		}
-		agentData["closed_at"] = closedAt.Format(time.RFC3339)
-	}
-	if status == models.StatusSnoozed {
-		agentData["snoozed_until"] = snoozeUntil.Format(time.RFC3339)
-	} else if oldStatus == models.StatusSnoozed {
-		agentData["snoozed_until"] = nil
-	}
-	c.BroadcastConversationUpdate(uuid, agentData)
-
-	if conversation.ID != 0 {
-	}
-
-	// Broadcast conversation update to widget clients.
-
 	return nil
 }
 

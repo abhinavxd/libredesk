@@ -28,10 +28,10 @@
       </span>
     </div>
 
-    <CommandInput :placeholder="placeholder" :loading="loading" @keydown="onInputKeydown" />
+    <CommandInput :placeholder="placeholder" @keydown="onInputKeydown" />
     <CommandList :key="parent || 'root'" :class="'h-auto min-h-[220px] max-h-[min(52vh,440px)]'">
-      <CommandEmpty v-if="!loading">
-        <p class="text-sm text-muted-foreground">{{ emptyText }}</p>
+      <CommandEmpty>
+        <p class="text-sm text-muted-foreground">{{ $t('globals.messages.noResultsFound') }}</p>
       </CommandEmpty>
 
       <CommandGroup v-for="group in groups" :key="group.section" :heading="group.label">
@@ -52,10 +52,7 @@
             {{ command.hint }}
           </span>
           <span class="ml-auto flex shrink-0 items-center gap-1 pl-3">
-            <ChevronRight
-              v-if="command.group || command.navigateTo"
-              class="!h-4 !w-4 text-muted-foreground"
-            />
+            <ChevronRight v-if="command.group" class="!h-4 !w-4 text-muted-foreground" />
           </span>
         </CommandItem>
       </CommandGroup>
@@ -82,18 +79,14 @@
       </span>
     </div>
   </CommandDialog>
-
-  <SnoozeDatePicker v-model:open="showSnoozeDatePicker" />
 </template>
 
 <script setup>
 const KBD_CLASS =
   'inline-flex h-5 items-center rounded-sm border bg-background px-1.5 font-mono text-xs font-medium text-foreground shadow-sm'
-const ASYNC_SEARCH_DEBOUNCE = 250
 
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDebounceFn } from '@vueuse/core'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import {
   CommandDialog,
@@ -103,10 +96,6 @@ import {
   CommandItem,
   CommandList
 } from '@shared-ui/components/ui/command'
-import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useEmitter } from '@main/composables/useEmitter'
-import { EMITTER_EVENTS } from '@main/constants/emitterEvents'
-import SnoozeDatePicker from './SnoozeDatePicker.vue'
 import { useCommandPalette } from './useCommandPalette'
 import { useCommandRegistry, commandMatches } from './useCommandRegistry'
 import { SECTION_ORDER, SECTION_LABEL_KEYS, SECTION_LABEL_PLURAL } from './sections'
@@ -114,28 +103,18 @@ import { useNavigationCommands } from './providers/useNavigationCommands'
 import { useCreateCommands } from './providers/useCreateCommands'
 import { useConversationCommands } from './providers/useConversationCommands'
 import { useListCommands } from './providers/useListCommands'
-import { useBulkCommands } from './providers/useBulkCommands'
-import { useEntitySearch, ENTITY_SEARCH_MIN_LENGTH } from './providers/useEntitySearch'
 
 const { t } = useI18n()
-const emitter = useEmitter()
 const palette = useCommandPalette()
 const { open, parent, searchTerm, closePalette, setParent } = palette
-const showSnoozeDatePicker = ref(false)
 const highlightedValue = ref('')
 
-const openSnoozeDatePicker = () => {
-  showSnoozeDatePicker.value = true
-}
-
 const registry = useCommandRegistry([
-  useBulkCommands(),
-  useConversationCommands({ openSnoozeDatePicker }),
+  useConversationCommands(),
   useListCommands(),
   useCreateCommands(),
   useNavigationCommands()
 ])
-const entitySearch = useEntitySearch()
 
 const parentCommand = computed(() => registry.get(parent.value))
 const breadcrumb = computed(() => parentCommand.value?.label || '')
@@ -144,75 +123,8 @@ const placeholder = computed(() => {
   return parentCommand.value?.placeholder || t('command.searchOrJumpTo')
 })
 
-// Results of the current async source: a group's own search, or the root entity search.
-const asyncResults = ref([])
-const loading = ref(false)
-let searchSeq = 0
-
-const asyncSource = () => {
-  const term = searchTerm.value.trim()
-  const group = parentCommand.value
-  if (group?.search) return () => group.search(term)
-  if (!parent.value && term.length >= ENTITY_SEARCH_MIN_LENGTH) {
-    return () => entitySearch.search(term)
-  }
-  return null
-}
-
-const runAsyncSearch = async () => {
-  const seq = ++searchSeq
-  const source = asyncSource()
-  if (!source) {
-    asyncResults.value = []
-    loading.value = false
-    return
-  }
-  loading.value = true
-  try {
-    const results = await source()
-    if (seq !== searchSeq) return
-    asyncResults.value = results
-  } catch (error) {
-    if (seq !== searchSeq) return
-    asyncResults.value = []
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      variant: 'destructive',
-      description: handleHTTPError(error).message
-    })
-  } finally {
-    if (seq === searchSeq) loading.value = false
-  }
-}
-const runAsyncSearchDebounced = useDebounceFn(runAsyncSearch, ASYNC_SEARCH_DEBOUNCE)
-
-watch(
-  () => [open.value, parent.value],
-  ([isOpen]) => {
-    searchSeq++
-    asyncResults.value = []
-    loading.value = false
-    if (isOpen) runAsyncSearch()
-  }
-)
-watch(
-  () => searchTerm.value,
-  () => {
-    if (!open.value) return
-    // The request only fires after the debounce, stale results would stay selectable until then.
-    searchSeq++
-    asyncResults.value = []
-    loading.value = Boolean(asyncSource())
-    runAsyncSearchDebounced()
-  }
-)
-
-const visibleCommands = computed(() => {
-  if (parentCommand.value?.search) return asyncResults.value
-  return [...registry.childrenOf(parent.value), ...asyncResults.value]
-})
-
+const visibleCommands = computed(() => registry.childrenOf(parent.value))
 const visibleById = computed(() => new Map(visibleCommands.value.map((c) => [c.id, c])))
-const asyncIds = computed(() => new Set(asyncResults.value.map((c) => c.id)))
 
 const groups = computed(() => {
   if (parent.value) {
@@ -227,25 +139,17 @@ const groups = computed(() => {
   })).filter((group) => group.commands.length)
 })
 
-// Async results are already filtered by the server, static commands match on label and keywords.
+// Commands match on their label and keywords.
 const filterFunction = (values, term) => {
   return values.filter((value) => {
-    if (asyncIds.value.has(value)) return true
     const command = visibleById.value.get(value)
     return command ? commandMatches(command, term) : false
   })
 }
 
-const emptyText = computed(() =>
-  !parent.value && searchTerm.value.trim().length < ENTITY_SEARCH_MIN_LENGTH
-    ? t('command.noCommandAvailable')
-    : t('globals.messages.noResultsFound')
-)
-
 const onSelect = async (event, command) => {
   // Without this radix writes the selected value into the search input.
   event.preventDefault()
-  if (command.navigateTo) return setParent(command.navigateTo)
   if (command.group) return setParent(command.id)
   closePalette()
   await command.run?.()

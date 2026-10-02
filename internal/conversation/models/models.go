@@ -14,11 +14,9 @@ import (
 )
 
 var (
-	StatusOpen     = "Open"
-	StatusReplied  = "Replied"
-	StatusResolved = "Resolved"
-	StatusClosed   = "Closed"
-	StatusSnoozed  = "Snoozed"
+	// StatusOpen is the status of every new conversation, and of one reopened
+	// by incoming mail. Statuses can no longer be set by people.
+	StatusOpen = "Open"
 
 	AssigneeTypeTeam = "team"
 	AssigneeTypeUser = "user"

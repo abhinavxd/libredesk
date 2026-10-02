@@ -64,7 +64,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/conversations/sidebar-counts", perm(handleGetSidebarCounts, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}", perm(handleGetConversation, "conversations:read"))
 	g.GET("/api/v1/conversations/{uuid}/participants", perm(handleGetConversationParticipants, "conversations:read"))
-	g.PUT("/api/v1/conversations/{uuid}/status", perm(handleUpdateConversationStatus, "conversations:update_status"))
 	g.PUT("/api/v1/conversations/{uuid}/last-seen", perm(handleUpdateConversationAssigneeLastSeen, "conversations:read"))
 	g.PUT("/api/v1/conversations/{uuid}/mark-unread", perm(handleMarkConversationAsUnread, "conversations:read"))
 	g.GET("/api/v1/conversations/{cuuid}/messages/{uuid}", perm(handleGetMessage, "messages:read"))
@@ -93,20 +92,6 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/drafts", auth(handleGetAllDrafts))
 	g.POST("/api/v1/conversations/{uuid}/draft", auth(handleUpsertConversationDraft))
 	g.DELETE("/api/v1/conversations/{uuid}/draft", auth(handleDeleteConversationDraft))
-
-	// Search.
-	g.GET("/api/v1/conversations/search", perm(handleSearchConversations, "conversations:read"))
-	g.GET("/api/v1/messages/search", perm(handleSearchMessages, "messages:read"))
-
-	// New paginated search bar routes with better filter support and pagination.
-	g.GET("/api/v1/search/conversations", perm(handlePaginatedSearchConversations, "conversations:read"))
-	g.GET("/api/v1/search/messages", perm(handlePaginatedSearchMessages, "messages:read"))
-
-	// Message status.
-	g.GET("/api/v1/statuses", auth(handleGetStatuses))
-	g.POST("/api/v1/statuses", perm(handleCreateStatus, "status:manage"))
-	g.PUT("/api/v1/statuses/{id}", perm(handleUpdateStatus, "status:manage"))
-	g.DELETE("/api/v1/statuses/{id}", perm(handleDeleteStatus, "status:manage"))
 
 	// Agents.
 	g.GET("/api/v1/agents/me", auth(handleGetCurrentAgent))
@@ -182,13 +167,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Frontend pages.
 	getAndHead("/", notAuthPage(serveIndexPage))
 	g.GET("/addresses/{all:*}", authPage(serveIndexPage))
-	g.GET("/search", authPage(serveIndexPage))
 	g.GET("/reviews", authPage(serveIndexPage))
 	g.GET("/reviews/{all:*}", authPage(serveIndexPage))
 	g.GET("/conversation/{all:*}", authPage(serveIndexPage))
 	// Keep legacy bookmarks client-routable while the frontend redirects them to
 	// their first accessible address.
 	g.GET("/inboxes/{all:*}", authPage(serveIndexPage))
+	// Search is retired; old /search bookmarks are redirected by the frontend.
+	g.GET("/search", authPage(serveIndexPage))
 	g.GET("/admin/{all:*}", authPage(serveIndexPage))
 	g.GET("/reset-password", notAuthPage(serveIndexPage))
 	g.GET("/set-password", notAuthPage(serveIndexPage))

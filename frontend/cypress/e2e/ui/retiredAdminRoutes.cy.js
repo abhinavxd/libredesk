@@ -4,7 +4,10 @@ describe('Retired administration stays retired', () => {
     cy.login()
   })
 
-  for (const path of ['/admin/teams/agents', '/admin/teams/agents/new', '/admin/teams', '/admin/views', '/admin/contacts']) {
+  for (const path of [
+    '/admin/teams/agents', '/admin/teams/agents/new', '/admin/teams', '/admin/views', '/admin/contacts',
+    '/admin/conversations/statuses', '/search'
+  ]) {
     it(`redirects the obsolete bookmark ${path} to Addresses`, () => {
       cy.visit(path)
       cy.location('pathname').should('match', /^\/addresses(?:\/|$)/)

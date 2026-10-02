@@ -1,6 +1,6 @@
 # Fernmail
 
-Fernmail is a self-hosted, address-first shared email application derived from LibreDesk. It keeps email receiving and replies, threading, attachments, rich replies, drafts, search, statuses, snoozing, private notes and mentions.
+Fernmail is a self-hosted, address-first shared email application derived from LibreDesk. It keeps email receiving and replies, threading, attachments, rich replies, drafts, private notes and mentions. Each address lists all of its conversations; there is no search and no conversation status to set.
 
 There is no global “All mail” page and no saved Views. The sidebar lists the email addresses a person may access, with green badges showing unread messages that need attention. **Compose New** starts an email from any of those addresses.
 
@@ -63,4 +63,4 @@ An **Address** is the email identity agents see, receive mail at and reply from.
 
 Admins can use every address. Everyone else needs access to an address, given to them in **Admin → Workspace → Users** or through a team; there are no addresses open to everyone. An address with historical conversations cannot be renamed, moved or deleted; disable it instead so existing replies retain the correct From identity.
 
-Access restrictions apply on the server to conversation reads and replies, lists, search, drafts, counts, attachments and live message notifications. Upgrade existing databases before starting this build (`--upgrade`); fresh installations include the address schema automatically.
+Access restrictions apply on the server to conversation reads and replies, lists, drafts, counts, attachments and live message notifications. Upgrade existing databases before starting this build (`--upgrade`); fresh installations include the address schema automatically.

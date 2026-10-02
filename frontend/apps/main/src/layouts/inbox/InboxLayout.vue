@@ -1,6 +1,6 @@
 <template>
   <ResizablePanelGroup
-    v-if="!isSearchRoute && !isMobile && !isListRoute"
+    v-if="!isMobile && !isListRoute"
     direction="horizontal"
     class="h-full w-full"
     @layout="onLayoutChange"
@@ -23,11 +23,11 @@
   </ResizablePanelGroup>
 
   <!-- A list is the primary desktop workspace until a conversation is opened. -->
-  <ConversationList v-else-if="!isSearchRoute && !isMobile && addressID" />
-  <ConversationPlaceholder v-else-if="!isSearchRoute && !isMobile" />
+  <ConversationList v-else-if="!isMobile && addressID" />
+  <ConversationPlaceholder v-else-if="!isMobile" />
 
   <!-- v-show, not v-if: the list keeps its scroll position. -->
-  <div v-else-if="!isSearchRoute" class="h-full w-full">
+  <div v-else class="h-full w-full">
     <ConversationList v-show="isListRoute" />
     <div v-show="!isListRoute" class="h-full">
       <router-view v-slot="{ Component }">
@@ -61,7 +61,6 @@ const router = useRouter()
 const isMobile = useIsMobile()
 const addressStore = useAddressStore()
 const conversationStore = useConversationStore()
-const isSearchRoute = computed(() => route.name === 'search')
 const addressID = computed(() => route.params.addressID)
 
 // Every detail route is its list route's name plus `-conversation`.

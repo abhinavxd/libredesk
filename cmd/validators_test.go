@@ -84,7 +84,8 @@ func TestValidateWebhook(t *testing.T) {
 		{"retired tag event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.tags_changed"}}, true},
 		{"retired assignment event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.assigned"}}, true},
 		{"mixed supported and unsupported events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"message.created", "not.an.event"}}, true},
-		{"all retained events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.created", "conversation.status_changed", "message.created", "message.updated"}}, false},
+		{"retired status event", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.status_changed"}}, true},
+		{"all retained events", wmodels.Webhook{Name: "hook", URL: "https://example.com/hook", Events: []string{"conversation.created", "message.created", "message.updated"}}, false},
 	}
 
 	for _, tc := range tests {

@@ -48,13 +48,7 @@ http.interceptors.request.use((request) => {
   return request
 })
 
-const searchConversations = (params) => http.get('/api/v1/search/conversations', { params })
-const searchMessages = (params) => http.get('/api/v1/search/messages', { params })
 
-const getStatuses = () => http.get('/api/v1/statuses')
-const createStatus = (data) => http.post('/api/v1/statuses', data)
-const updateStatus = (id, data) => http.put(`/api/v1/statuses/${id}`, data)
-const deleteStatus = (id) => http.delete(`/api/v1/statuses/${id}`)
 
 const getTemplate = (id) => http.get(`/api/v1/templates/${id}`)
 const getTemplates = (type) => http.get('/api/v1/templates', { params: { type: type } })
@@ -146,13 +140,6 @@ const importAgents = (data) =>
 const getAgentImportStatus = () => http.get('/api/v1/agents/import/status')
 const createUser = (data) =>
   http.post('/api/v1/agents', data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-
-const updateConversationStatus = (uuid, data) =>
-  http.put(`/api/v1/conversations/${uuid}/status`, data, {
     headers: {
       'Content-Type': 'application/json'
     }
@@ -353,7 +340,6 @@ export default {
   getConversationTranscript,
   getCurrentUser,
 
-  updateConversationStatus,
 
   uploadMedia,
   uploadSiteLogo,
@@ -388,19 +374,13 @@ export default {
   updateTemplate,
   deleteTemplate,
 
-  getStatuses,
 
-  createStatus,
-  updateStatus,
-  deleteStatus,
 
   getUsersCompact,
 
   saveDraft,
   getAllDrafts,
   deleteDraft,
-  searchConversations,
-  searchMessages,
 
   getWebhooksCompact,
   getWebhooks,

@@ -15,8 +15,6 @@ export function useTextEditor({
   linkedModel = 'messages',
   getSuggestions = null,
   enableMentions = () => false,
-  getConversationSuggestions = null,
-  conversationReferencesEnabled = () => false,
   onUpdate = () => {},
   onBlur = () => {},
   onOtherFiles = () => {}
@@ -57,8 +55,6 @@ export function useTextEditor({
       attributes: { class: 'outline-none' },
       getSuggestions,
       enableMentions,
-      getConversationSuggestions,
-      conversationReferencesEnabled,
       transformPastedHTML: prepare,
       handlePaste,
       handleDrop

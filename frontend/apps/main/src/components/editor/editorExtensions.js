@@ -9,8 +9,6 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import ResizableImage from './extensions/ResizableImage'
 import mentionSuggestion from './mentionSuggestion'
-import conversationReferenceSuggestion from './conversationReferenceSuggestion'
-import { ConversationReference } from './conversationReferenceExtension'
 
 // Inline table styling so it survives email clients that strip <style>.
 const tableStyle =
@@ -119,7 +117,6 @@ export function buildConversationExtensions({ getPlaceholder }) {
       HTMLAttributes: { class: 'ld-mention' },
       suggestion: mentionSuggestion
     }),
-    ConversationReference.configure({ suggestion: conversationReferenceSuggestion }),
     CustomTable.configure({ resizable: false }),
     TableRow,
     CustomTableCell,

@@ -26,13 +26,18 @@ func TestRetiredFeatureRoutesAreAbsent(t *testing.T) {
 		{"GET", "/api/v1/views/1"}, {"PUT", "/api/v1/views/1"}, {"DELETE", "/api/v1/views/1"},
 		{"GET", "/api/v1/mailboxes"}, {"GET", "/api/v1/mailboxes/1/conversations"},
 		{"GET", "/api/v1/inboxes/1/access"}, {"PUT", "/api/v1/inboxes/1/access"},
+		// Search and conversation status management are retired.
+		{"GET", "/api/v1/messages/search"},
+		{"GET", "/api/v1/search/conversations"}, {"GET", "/api/v1/search/messages"},
+		{"PUT", "/api/v1/conversations/123/status"},
+		{"GET", "/api/v1/statuses"}, {"POST", "/api/v1/statuses"}, {"PUT", "/api/v1/statuses/1"}, {"DELETE", "/api/v1/statuses/1"},
 	} {
 		handler, _ := g.Router.Lookup(route.method, route.path, &fasthttp.RequestCtx{})
 		if handler != nil {
 			t.Errorf("retired route still registered: %s %s", route.method, route.path)
 		}
 	}
-	for _, path := range []string{"/api/v1/conversations/all", "/api/v1/inboxes", "/api/v1/search/messages"} {
+	for _, path := range []string{"/api/v1/conversations/all", "/api/v1/inboxes", "/api/v1/addresses"} {
 		handler, _ := g.Router.Lookup("GET", path, &fasthttp.RequestCtx{})
 		if handler == nil {
 			t.Errorf("missing mailbox route: %s", path)

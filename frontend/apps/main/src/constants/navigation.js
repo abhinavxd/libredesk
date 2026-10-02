@@ -42,13 +42,6 @@ export const adminNavItems = [
     isTitleKeyPlural: true,
     children: [
       {
-        titleKey: 'globals.terms.status',
-        href: '/admin/conversations/statuses',
-        permission: 'status:manage',
-        isTitleKeyPlural: true,
-        icon: 'CircleDot'
-      },
-      {
         titleKey: 'globals.terms.template',
         href: '/admin/templates',
         createRouteName: 'new-template',

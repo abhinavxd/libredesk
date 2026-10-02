@@ -60,12 +60,8 @@ const routes = [
         props: true,
         meta: { titleKey: 'review.title', hidePageHeader: true }
       },
-      {
-        path: '/search',
-        name: 'search',
-        component: () => import('@main/views/search/SearchView.vue'),
-        meta: { titleKey: 'globals.terms.search', hidePageHeader: true }
-      },
+      // Search is retired; old bookmarks land on the first accessible address.
+      { path: '/search', redirect: '/addresses' },
       {
         path: '/conversation/:uuid',
         name: 'conversation-redirect',
@@ -169,17 +165,6 @@ const routes = [
               { path: '', name: 'webhook-list', component: () => import('@main/views/admin/webhooks/WebhookList.vue') },
               { path: ':id/edit', props: true, name: 'edit-webhook', component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'), meta: { titleKey: 'webhook.edit' } },
               { path: 'new', name: 'new-webhook', component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'), meta: { titleKey: 'webhook.new' } }
-            ]
-          },
-          {
-            path: 'conversations',
-            meta: { titleKey: 'globals.terms.conversation', titleCount: 2 },
-            children: [
-              {
-                path: 'statuses',
-                component: () => import('@main/views/admin/status/StatusView.vue'),
-                meta: { titleKey: 'globals.terms.status', titleCount: 2 }
-              }
             ]
           }
         ]

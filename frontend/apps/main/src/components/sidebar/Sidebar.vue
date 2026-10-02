@@ -18,7 +18,7 @@ import {
   SidebarMenuItem,
   SidebarProvider
 } from '@shared-ui/components/ui/sidebar'
-import { ArrowLeft, ChevronRight, Mail, Search, ShieldCheck, SquarePen } from 'lucide-vue-next'
+import { ArrowLeft, ChevronRight, Mail, ShieldCheck, SquarePen } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
@@ -53,7 +53,6 @@ const { navigateToAddress } = useAddressNavigation()
 const isActiveParent = (parentHref) => route.path.startsWith(parentHref)
 const isMailRoute = (path) =>
   path.startsWith('/addresses') ||
-  path.startsWith('/search') ||
   path.startsWith('/conversation') ||
   path.startsWith('/reviews')
 const canCompose = computed(() => userStore.can(perms.CONVERSATIONS_CREATE))
@@ -178,17 +177,10 @@ onMounted(() => {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <div class="flex w-full items-center justify-between px-1">
+              <div class="flex w-full items-center px-1">
                 <div class="min-w-0 text-xl font-semibold">
                   <BrandLogo :name="settingsStore.siteTitle" :logo="settingsStore.siteLogo" />
                 </div>
-                <router-link :to="{ name: 'search' }" class="mr-1 mt-1 transition-colors">
-                  <Search
-                    size="18"
-                    stroke-width="2.5"
-                    class="text-muted-foreground hover:text-foreground"
-                  />
-                </router-link>
               </div>
             </SidebarMenuItem>
           </SidebarMenu>

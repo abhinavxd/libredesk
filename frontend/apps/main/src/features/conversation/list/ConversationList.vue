@@ -18,31 +18,11 @@
       </DropdownMenu>
     </div>
 
-    <!-- Bulk Action Toolbar (when items selected) -->
-    <ConversationBulkActionToolbar v-if="hasSelection && canBulkAct" />
-
-    <!-- Filters (hidden when bulk selecting) -->
-    <div v-else class="p-2 flex justify-between items-center">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" class="w-30">
-            <div>
-              <span class="mr-1">{{ conversationStore.conversations.total }}</span>
-              <span>{{ conversationStore.getListStatus }}</span>
-            </div>
-            <ChevronDown class="w-4 h-4 ml-2 opacity-50" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem
-            v-for="status in conversationStore.statusOptions"
-            :key="status.value"
-            @click="handleStatusChange(status)"
-          >
-            {{ status.label }}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <!-- Every conversation is listed, whatever its status. -->
+    <div class="p-2 flex justify-between items-center">
+      <span class="px-3 text-sm font-medium text-muted-foreground">
+        {{ t('conversation.listCount', conversationStore.conversations.total) }}
+      </span>
 
       <!-- Sort dropdown-menu -->
       <DropdownMenu>
@@ -104,7 +84,7 @@
             key="empty"
             class="px-4 py-8"
             :title="t('conversation.noConversationsFound')"
-            :message="t('conversation.tryAdjustingFilters')"
+            :message="t('conversation.emptyAddress')"
             :icon="Inbox"
           />
 
@@ -199,16 +179,13 @@ import {
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
 import { useAddressStore } from '@/stores/address'
 import { useConversationStore } from '@/stores/conversation'
-import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
-import ConversationBulkActionToolbar from '@/features/conversation/list/ConversationBulkActionToolbar.vue'
 import ConversationListItem from '@/features/conversation/list/ConversationListItem.vue'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
 
 const conversationStore = useConversationStore()
 const addressStore = useAddressStore()
-const { canBulkAct } = useBulkActionPermissions()
 const route = useRoute()
 const { t } = useI18n()
 const emitter = useEmitter()
@@ -232,8 +209,6 @@ async function markAllAsRead() {
     markingRead.value = false
   }
 }
-
-const hasSelection = computed(() => conversationStore.selectedCount > 0)
 
 async function refreshCurrentAddress() {
   const addressID = Number(route.params.addressID)
@@ -264,10 +239,6 @@ const title = computed(() => {
   const address = addressStore.get(route.params.addressID)
   return address?.address || 'Addresses'
 })
-
-const handleStatusChange = (status) => {
-  conversationStore.setListStatus(status.label)
-}
 
 const handleSortChange = (order) => {
   conversationStore.setListSortField(order)

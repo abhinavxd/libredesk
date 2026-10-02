@@ -28,14 +28,11 @@ import (
 	accountmail "github.com/jakedolan443/fernmail/internal/accountmail"
 
 	"github.com/jakedolan443/fernmail/internal/resourceimage"
-	"github.com/jakedolan443/fernmail/internal/search"
 
 	umodels "github.com/jakedolan443/fernmail/internal/user/models"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/jakedolan443/fernmail/internal/conversation"
-
-	"github.com/jakedolan443/fernmail/internal/conversation/status"
 
 	"github.com/jakedolan443/fernmail/internal/importer"
 	"github.com/jakedolan443/fernmail/internal/inbox"
@@ -103,12 +100,10 @@ type App struct {
 	role           *role.Manager
 	user           *user.Manager
 	team           *team.Manager
-	status         *status.Manager
 	inbox          *inbox.Manager
 	address        *address.Manager
 	tmpl           *template.Manager
 	conversation   *conversation.Manager
-	search         *search.Manager
 	accountmail    *accountmail.Service
 	webhook        *webhook.Manager
 	rateLimit      *ratelimit.Limiter
@@ -201,7 +196,6 @@ func main() {
 	}
 
 	var (
-		unsnoozeInterval            = ko.MustDuration("conversation.unsnooze_interval")
 		draftRetentionDuration      = cmp.Or(ko.Duration("conversation.draft_retention_duration"), 360*time.Hour)
 		messageOutgoingQWorkers     = ko.MustDuration("message.outgoing_queue_workers")
 		messageIncomingQWorkers     = ko.MustDuration("message.incoming_queue_workers")
@@ -211,7 +205,6 @@ func main() {
 		constants                   = initConstants()
 		i18n                        = initI18n(fs)
 		oidc                        = initOIDC(db, settings, i18n)
-		status                      = initStatus(db, i18n)
 		ssrfControl                 = initSSRFControl()
 		auth                        = initAuth(oidc, rdb, i18n, ssrfControl)
 		template                    = initTemplate(db, fs, constants, i18n)
@@ -224,7 +217,7 @@ func main() {
 		user                        = initUser(i18n, db)
 		wsHub                       = initWS(user)
 		accountmail                 = initAccountMailer()
-		conversation                = initConversations(i18n, status, wsHub, db, inbox, user, media, settings, template, webhook, resourceImages)
+		conversation                = initConversations(i18n, wsHub, db, inbox, user, media, settings, template, webhook, resourceImages)
 		rateLimiter                 = initRateLimit(rdb)
 	)
 
@@ -249,7 +242,6 @@ func main() {
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
 
 	go conversation.Run(ctx, messageIncomingQWorkers, messageOutgoingQWorkers, messageOutgoingScanInterval)
-	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
 	go webhook.Run(ctx)
 	go accountmail.Run(ctx)
 	go media.DeleteUnlinkedMedia(ctx)
@@ -270,13 +262,11 @@ func main() {
 		address:        address,
 		user:           user,
 		team:           team,
-		status:         status,
 		tmpl:           template,
 		accountmail:    accountmail,
 		consts:         atomic.Value{},
 		conversation:   conversation,
 		authz:          initAuthz(i18n, inbox, address),
-		search:         initSearch(db, i18n, conversation),
 		role:           initRole(db, i18n),
 		importer:       initImporter(i18n),
 		webhook:        webhook,

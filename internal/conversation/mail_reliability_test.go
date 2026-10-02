@@ -27,7 +27,7 @@ func mailTestManager(t *testing.T) (*Manager, *sqlx.DB, int, int, int) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager, err := New(ws.NewHub(&lo, nil), i18n, nil, nil, users, receiptMediaStore{}, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
+	manager, err := New(ws.NewHub(&lo, nil), i18n, nil, users, receiptMediaStore{}, stubSettingsStore{}, nil, receiptWebhookStore{}, Opts{DB: db, Lo: &lo})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestDurableIncomingSurvivesRestartAndRetries(t *testing.T) {
 	db.MustExec(`INSERT INTO email_addresses(inbox_id,address,kind) VALUES($1,'a@example.test','mailbox')`, inboxID)
 	db.MustExec(`UPDATE incoming_mail_queue SET next_attempt_at=now()`)
 	// Fresh Manager using the same DB represents a process restart.
-	restarted, err := New(m.wsHub, m.i18n, m.statusStore, m.inboxStore, m.userStore, m.mediaStore, m.settingsStore, m.template, m.webhookStore, Opts{DB: db, Lo: m.lo})
+	restarted, err := New(m.wsHub, m.i18n, m.inboxStore, m.userStore, m.mediaStore, m.settingsStore, m.template, m.webhookStore, Opts{DB: db, Lo: m.lo})
 	if err != nil {
 		t.Fatal(err)
 	}

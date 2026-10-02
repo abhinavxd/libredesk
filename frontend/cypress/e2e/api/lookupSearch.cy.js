@@ -15,7 +15,11 @@ describe('API: retained agent lookup and retired directories', () => {
   })
   beforeEach(() => cy.login())
 
-  for (const path of ['/api/v1/tags', '/api/v1/teams', '/api/v1/teams/compact', '/api/v1/views']) {
+  // Search and conversation status management are retired too.
+  for (const path of [
+    '/api/v1/tags', '/api/v1/teams', '/api/v1/teams/compact', '/api/v1/views',
+    '/api/v1/statuses', '/api/v1/search/conversations', '/api/v1/search/messages', '/api/v1/messages/search'
+  ]) {
     it(`keeps ${path} unavailable`, () => {
       cy.api('GET', path, null, { failOnStatusCode: false }).its('status').should('eq', 404)
       cy.api('POST', path, { name: 'Retired' }, { failOnStatusCode: false }).its('status').should('eq', 404)

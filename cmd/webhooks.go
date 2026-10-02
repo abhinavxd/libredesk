@@ -189,7 +189,7 @@ func validateWebhook(app *App, webhook models.Webhook) error {
 	}
 	for _, event := range webhook.Events {
 		switch models.WebhookEvent(event) {
-		case models.EventConversationCreated, models.EventConversationStatusChanged, models.EventMessageCreated, models.EventMessageUpdated:
+		case models.EventConversationCreated, models.EventMessageCreated, models.EventMessageUpdated:
 		default:
 			return envelope.NewError(envelope.InputError, "Unsupported webhook event.", nil)
 		}
