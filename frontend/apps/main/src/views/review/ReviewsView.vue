@@ -16,9 +16,6 @@
         class="flex min-h-0 w-full shrink-0 flex-col border-r md:w-80 lg:w-96"
         :aria-label="$t('review.title')"
       >
-        <p class="border-b px-4 py-2 text-xs text-muted-foreground">
-          {{ reviewStore.isReviewer ? $t('review.queueHelp') : $t('review.mineHelp') }}
-        </p>
         <div v-if="reviewStore.loading && !reviewStore.loaded" class="space-y-2 p-3">
           <div v-for="n in 3" :key="n" class="h-20 animate-pulse rounded-md bg-muted" />
         </div>
@@ -41,7 +38,7 @@
               <div class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <component :is="item.kind === 'new' ? SquarePen : Reply" class="size-3.5 shrink-0" aria-hidden="true" />
                 <span class="truncate">{{ item.kind === 'new' ? $t('review.newEmail') : $t('review.reply') }} · {{ item.address_name || item.address }}</span>
-                <span v-if="item.status !== 'pending'" class="ml-auto shrink-0 rounded-full bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warning-600">{{ $t('review.returned') }}</span>
+                <Badge v-if="item.status !== 'pending'" variant="warning" class="ml-auto shrink-0 px-1.5 py-0 font-medium">{{ $t('review.returned') }}</Badge>
               </div>
               <div class="mt-1 truncate text-sm font-medium">{{ item.subject || item.conversation_subject || $t('review.noSubject') }}</div>
               <p class="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{{ item.preview }}</p>
@@ -56,7 +53,7 @@
           {{ reviewStore.items.length ? $t('review.select') : '' }}
         </div>
         <div v-else-if="loadingDetail && !current" class="space-y-3 p-6">
-          <div class="h-6 w-1/2 animate-pulse rounded bg-muted" />
+          <div class="h-6 w-1/2 animate-pulse rounded-md bg-muted" />
           <div class="h-40 animate-pulse rounded-lg bg-muted" />
         </div>
         <div v-else-if="current" class="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
@@ -179,6 +176,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeft, CheckCheck, ExternalLink, Pencil, Reply, Send, ShieldCheck, SquarePen, Undo2 } from 'lucide-vue-next'
+import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
 import {

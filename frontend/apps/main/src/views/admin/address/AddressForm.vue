@@ -26,10 +26,10 @@
             </div>
             <label class="block space-y-1.5">
               <span class="text-sm font-medium">{{ $t('address.selectTransport') }}</span>
-              <select v-model.number="form.inbox_id" required class="w-full rounded-md border bg-background px-3 py-2 disabled:cursor-not-allowed disabled:opacity-70" :disabled="isMailbox">
+              <NativeSelect v-model.number="form.inbox_id" required :disabled="isMailbox">
                 <option :value="0" disabled>Select a transport</option>
                 <option v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">{{ inbox.from || inbox.name }}</option>
-              </select>
+              </NativeSelect>
             </label>
           </div>
           <label class="flex cursor-pointer items-center gap-2 text-sm"><input v-model="form.enabled" type="checkbox" class="accent-primary" />{{ $t('address.enabled') }}</label>
@@ -67,6 +67,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@shared-ui/components/ui/button'
+import { NativeSelect } from '@shared-ui/components/ui/native-select'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter'

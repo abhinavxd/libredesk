@@ -30,7 +30,9 @@ import { useReviewStore } from '@main/stores/review'
 import { useComposeStore } from '@main/stores/compose'
 import { permissions as perms } from '@main/constants/permissions'
 import { useAddressNavigation } from '@main/composables/useAddressNavigation'
-import { Button } from '@shared-ui/components/ui/button'
+import { Button, buttonVariants } from '@shared-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import { cn } from '@shared-ui/lib/utils.js'
 import { navIconMap } from '@main/constants/navIcons'
 import { filterNavItems } from '@main/utils/nav-permissions'
 import { addressLabel } from '@main/utils/address-display'
@@ -56,6 +58,13 @@ const isMailRoute = (path) =>
   path.startsWith('/conversation') ||
   path.startsWith('/reviews')
 const canCompose = computed(() => userStore.can(perms.CONVERSATIONS_CREATE))
+const isReviewsRoute = computed(() => route.path.startsWith('/reviews'))
+// The icon link's label carries the waiting count, since the corner badge is visual only.
+const reviewLinkLabel = computed(() =>
+  reviewStore.badgeCount > 0
+    ? `${t('review.title')}, ${t('review.badgeLabel', { count: reviewStore.badgeCount })}`
+    : t('review.title')
+)
 const isActiveAddress = (addressID) => String(route.params.addressID) === String(addressID)
 const filteredAdminNavItems = computed(() => filterNavItems(adminNavItems, userStore.can))
 
@@ -138,12 +147,9 @@ onMounted(() => {
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton :isActive="isActiveParent(item.href)">
                       <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
-                      <Badge
-                        v-if="item.badge"
-                        variant="outline"
-                        class="ml-1.5 shrink-0 rounded-full border-warning/50 bg-warning/10 px-[5.5px] py-[3px] text-[9px] font-medium leading-none tracking-[0.07em] text-warning-600 uppercase"
-                        >{{ item.badge }}</Badge
-                      >
+                      <Badge v-if="item.badge" variant="warning" class="ml-1.5 shrink-0 px-1.5 py-0 font-medium">
+                        {{ item.badge }}
+                      </Badge>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />
@@ -175,48 +181,52 @@ onMounted(() => {
     <template v-if="route.path && isMailRoute(route.path)">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
         <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <div class="flex w-full items-center px-1">
-                <div class="min-w-0 text-xl font-semibold">
-                  <BrandLogo :name="settingsStore.siteTitle" :logo="settingsStore.siteLogo" />
-                </div>
-              </div>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <Button
-            v-if="canCompose"
-            variant="default"
-            class="h-10 w-full justify-start bg-success px-3 text-success-foreground hover:bg-success/90 max-md:h-12"
-            @click="composeStore.open()"
-          >
-            <SquarePen class="h-4 w-4" aria-hidden="true" />
-            {{ t('compose.button') }}
-          </Button>
+          <!-- The title truncates so the action buttons always keep their room. -->
+          <div class="flex w-full items-center gap-1.5 px-1">
+            <div class="flex min-w-0 flex-1 items-center text-xl font-semibold">
+              <BrandLogo fit :name="settingsStore.siteTitle" :logo="settingsStore.siteLogo" />
+            </div>
+            <Tooltip v-if="reviewStore.enabled" ignore-non-keyboard-focus>
+              <TooltipTrigger as-child>
+                <router-link
+                  :to="{ name: 'reviews' }"
+                  :aria-label="reviewLinkLabel"
+                  :class="
+                    cn(
+                      buttonVariants({ variant: 'outline', size: 'icon' }),
+                      'relative h-8 w-8 shrink-0 rounded-full max-md:h-10 max-md:w-10',
+                      isReviewsRoute && 'border-review/50 bg-review-soft hover:bg-review-soft'
+                    )
+                  "
+                >
+                  <ShieldCheck class="text-review" aria-hidden="true" />
+                  <SidebarCountBadge
+                    corner
+                    tone="review"
+                    :count="reviewStore.badgeCount"
+                    aria-hidden="true"
+                  />
+                </router-link>
+              </TooltipTrigger>
+              <TooltipContent>{{ t('review.title') }}</TooltipContent>
+            </Tooltip>
+            <Tooltip v-if="canCompose" ignore-non-keyboard-focus>
+              <TooltipTrigger as-child>
+                <Button
+                  size="icon"
+                  class="h-8 w-8 shrink-0 rounded-full bg-success text-success-foreground hover:bg-success/90 max-md:h-10 max-md:w-10"
+                  :aria-label="t('compose.button')"
+                  @click="composeStore.open()"
+                >
+                  <SquarePen aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ t('compose.button') }}</TooltipContent>
+            </Tooltip>
+          </div>
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup v-if="reviewStore.enabled" class="pb-0">
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  :isActive="route.path.startsWith('/reviews')"
-                  class="!h-auto min-h-10 px-2.5 py-2 max-md:min-h-12"
-                  asChild
-                >
-                  <router-link :to="{ name: 'reviews' }">
-                    <ShieldCheck class="h-4 w-4 text-review" aria-hidden="true" />
-                    <span class="flex-1 truncate text-base font-medium max-md:text-lg">{{ t('review.title') }}</span>
-                    <SidebarCountBadge
-                      tone="review"
-                      :count="reviewStore.badgeCount"
-                      :ariaLabel="t('review.badgeLabel', { count: reviewStore.badgeCount })"
-                    />
-                  </router-link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
           <SidebarGroup>
             <Collapsible class="group/collapsible" v-model:open="addressesOpen">
               <SidebarMenu>
@@ -230,21 +240,14 @@ onMounted(() => {
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenu class="max-md:gap-2">
+                    <SidebarMenu>
                       <SidebarMenuItem v-for="address in addressStore.addresses" :key="address.id">
                         <SidebarMenuButton
                           size="default"
                           :isActive="isActiveAddress(address.id)"
                           :title="addressLabel(address) + ' · ' + address.address"
-                          :class="[
-                            '!h-auto min-h-12 items-start px-2.5 py-2.5 max-md:min-h-16 max-md:rounded-xl max-md:border max-md:border-sidebar-border/80 max-md:bg-sidebar-accent/80 max-md:px-3 max-md:py-3 max-md:shadow-sm',
-                            {
-                              'opacity-60': !address.enabled,
-                              'max-md:border-success/50 max-md:bg-success/10': isActiveAddress(
-                                address.id
-                              )
-                            }
-                          ]"
+                          class="!h-auto min-h-12 items-start px-2.5 py-2.5 max-md:min-h-14 max-md:px-3"
+                          :class="{ 'opacity-60': !address.enabled }"
                           @click="navigateToAddress(address.id)"
                         >
                           <Mail class="mt-0.5 h-4 w-4 max-md:mt-1 max-md:h-5 max-md:w-5" />

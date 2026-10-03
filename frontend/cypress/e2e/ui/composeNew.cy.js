@@ -21,11 +21,11 @@ describe('Compose New', () => {
 
   it('replaces New conversation with Compose New', () => {
     cy.contains('New conversation').should('not.exist')
-    cy.contains('button', 'Compose New').should('be.visible')
+    cy.get('button[aria-label="Compose New"]').should('be.visible')
   })
 
   it('explains what is missing before sending and closes cleanly', () => {
-    cy.contains('button', 'Compose New').click()
+    cy.get('button[aria-label="Compose New"]').click()
     cy.get('[role="dialog"]').within(() => {
       cy.contains('New email').should('be.visible')
       cy.get('select').should('exist')
@@ -38,7 +38,7 @@ describe('Compose New', () => {
   })
 
   it('asks before discarding a started email', () => {
-    cy.contains('button', 'Compose New').click()
+    cy.get('button[aria-label="Compose New"]').click()
     cy.get('[role="dialog"] input[maxlength="998"]').type('Draft subject')
     cy.get('[role="dialog"]').contains('button', 'Cancel').click()
     cy.contains('Discard this email?').should('be.visible')

@@ -20,31 +20,31 @@
       <form v-else id="compose-form" class="flex min-h-0 flex-1 flex-col" @submit.prevent="send">
         <div class="space-y-2 border-b px-5 py-3 text-sm">
           <label class="flex items-center gap-3">
-            <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('compose.from') }}</span>
-            <select v-model.number="form.addressID" class="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5" :disabled="sending" required>
+            <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ $t('compose.from') }}</span>
+            <NativeSelect v-model.number="form.addressID" class="min-w-0 flex-1" :disabled="sending" required>
               <option v-for="address in sendableAddresses" :key="address.id" :value="address.id">
                 {{ addressLabel(address) }} &lt;{{ address.address }}&gt;
               </option>
-            </select>
+            </NativeSelect>
           </label>
           <label class="flex items-center gap-3">
-            <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('compose.to') }}</span>
-            <input v-model="form.to" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5" :placeholder="$t('compose.recipientsPlaceholder')" :disabled="sending" />
+            <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ $t('compose.to') }}</span>
+            <Input v-model="form.to" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1" :placeholder="$t('compose.recipientsPlaceholder')" :disabled="sending" />
             <Button v-if="!showCopies" type="button" variant="ghost" size="sm" @click="showCopies = true">{{ $t('compose.addCopies') }}</Button>
           </label>
           <template v-if="showCopies">
             <label class="flex items-center gap-3">
-              <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('compose.cc') }}</span>
-              <input v-model="form.cc" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5" :disabled="sending" />
+              <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ $t('compose.cc') }}</span>
+              <Input v-model="form.cc" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1" :disabled="sending" />
             </label>
             <label class="flex items-center gap-3">
-              <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('compose.bcc') }}</span>
-              <input v-model="form.bcc" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5" :disabled="sending" />
+              <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ $t('compose.bcc') }}</span>
+              <Input v-model="form.bcc" type="text" inputmode="email" autocomplete="off" class="min-w-0 flex-1" :disabled="sending" />
             </label>
           </template>
           <label class="flex items-center gap-3">
-            <span class="w-14 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('compose.subject') }}</span>
-            <input v-model="form.subject" type="text" maxlength="998" autocomplete="off" class="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5" :disabled="sending" />
+            <span class="w-14 shrink-0 text-sm text-muted-foreground">{{ $t('compose.subject') }}</span>
+            <Input v-model="form.subject" type="text" maxlength="998" autocomplete="off" class="min-w-0 flex-1" :disabled="sending" />
           </label>
         </div>
 
@@ -113,6 +113,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Paperclip, Send, ShieldCheck } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
+import { Input } from '@shared-ui/components/ui/input'
+import { NativeSelect } from '@shared-ui/components/ui/native-select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@shared-ui/components/ui/dialog'
 import {
   AlertDialog,

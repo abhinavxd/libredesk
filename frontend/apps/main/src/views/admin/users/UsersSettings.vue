@@ -46,8 +46,8 @@
                 </span>
                 <span class="flex shrink-0 flex-col items-end gap-1">
                   <Badge :variant="roleVariant(primaryRole(user.roles))" class="font-medium">{{ primaryRole(user.roles) || '—' }}</Badge>
-                  <span v-if="!user.enabled" class="text-[11px] text-muted-foreground">{{ $t('users.disabled') }}</span>
-                  <span v-else class="text-[11px] text-muted-foreground">{{ addressSummary(user) }}</span>
+                  <span v-if="!user.enabled" class="text-xs text-muted-foreground">{{ $t('users.disabled') }}</span>
+                  <span v-else class="text-xs text-muted-foreground">{{ addressSummary(user) }}</span>
                 </span>
               </button>
             </li>

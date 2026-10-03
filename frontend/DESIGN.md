@@ -179,7 +179,12 @@ Every button inside a `<form>` that is not the submit button needs an explicit
 click and gets activated when the user presses Enter in any input. This includes buttons in
 child components rendered inside a parent's form.
 
-**Badge** variants: `default`, `secondary`, `destructive`, `success`, `outline`.
+**Badge** variants: `default`, `secondary`, `destructive`, `success`, `warning`, `outline`.
+Status tags (Returned, Beta) are a Badge, not a hand-built pill.
+
+**Form fields** are `Input`, `Textarea`, `Select` (searchable/rich) or `NativeSelect` (short
+lists, where the platform picker is better on phones). No hand-styled `<input>` or `<select>`.
+Field labels are sentence case (`text-sm text-muted-foreground`), never uppercase micro labels.
 
 **AlertDialogAction** takes a `variant` prop, so destructive confirms use
 `variant="destructive"` instead of a hand-written class.
@@ -189,6 +194,9 @@ child components rendered inside a parent's form.
 
 **Tooltip** is `bg-foreground text-background`, not brand-colored.
 
+**Avatars** use the `Avatar` primitive with a neutral fallback (initials on `bg-secondary`).
+Do not tint avatars or initials with a status color.
+
 **Table row actions** stay hidden until hover: `[@media(hover:hover)]:opacity-0` with
 `group-hover/row:opacity-100`, plus `focus-within:!opacity-100` and
 `[&:has([data-state=open])]:!opacity-100`. The media query keeps them visible on touch and
@@ -196,7 +204,20 @@ focus-within keeps them reachable by keyboard.
 
 ---
 
-## 9. Checklist
+## 9. Avoid
+
+These read as generated rather than designed. Leave them out:
+
+- A bordered, tinted box nested inside a panel that already has its own edge (box in a box).
+- List rows drawn as separate bordered cards. Rows are rows; the active row uses `bg-sidebar-accent`.
+- Buttons that grow or shrink on hover/press (`hover:scale-*`). The variant already has hover states.
+- Uppercase, letter-spaced micro labels and pixel font sizes (`text-[10px]`). Use the type scale.
+- Instructional copy that explains an obvious control ("Pull to refresh", "Items wait here until...").
+- Icons or initials inside a tinted circle as decoration.
+
+---
+
+## 10. Checklist
 
 Before merging UI work:
 

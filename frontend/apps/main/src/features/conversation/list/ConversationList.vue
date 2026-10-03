@@ -54,18 +54,22 @@
 
     <!-- Content -->
     <div class="relative min-h-0 flex-grow overflow-hidden">
+      <!-- No visible title: per Apple's guidance the spinner says enough. -->
       <div
-        v-if="pullDistance > 0"
-        class="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-center gap-2 text-sm font-medium text-muted-foreground"
-        :class="{ 'transition-transform duration-200 ease-out': !isPulling }"
+        v-if="indicatorVisible"
+        class="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center"
         :style="indicatorStyle"
-        role="status"
-        aria-live="polite"
       >
-        <Loader2 v-if="refreshing" class="h-4 w-4 animate-spin text-primary" />
-        <RefreshCw v-else class="h-4 w-4 text-primary" />
-        <span>{{ indicatorText }}</span>
+        <RefreshSpinner
+          :progress="progress"
+          :spinning="spinning"
+          class="transition-[opacity,transform] duration-200 ease-out"
+          :class="{ 'scale-50 opacity-0': spinning && !refreshing }"
+        />
       </div>
+      <span class="sr-only" role="status" aria-live="polite">
+        {{ refreshing ? t('conversation.refreshing') : '' }}
+      </span>
 
       <div
         ref="scrollElement"
@@ -75,10 +79,7 @@
         @touchend="finishPull"
         @touchcancel="resetPull"
       >
-        <div
-          :class="{ 'transition-transform duration-200 ease-out': !isPulling }"
-          :style="contentStyle"
-        >
+        <div :style="contentStyle">
           <EmptyList
             v-if="showEmpty"
             key="empty"
@@ -136,7 +137,7 @@
               variant="outline"
               @click="conversationStore.fetchNextConversations"
               :disabled="conversationStore.conversations.fetching"
-              class="max-md:h-11 transition-all duration-200 ease-in-out transform hover:scale-105"
+              class="max-md:h-11"
             >
               <Loader2
                 v-if="conversationStore.conversations.fetching"
@@ -165,7 +166,7 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Inbox, MessageCircleWarning, ChevronDown, Loader2, RefreshCw, MoreHorizontal, MailCheck } from 'lucide-vue-next'
+import { Inbox, MessageCircleWarning, ChevronDown, Loader2, MoreHorizontal, MailCheck } from 'lucide-vue-next'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
 import { handleHTTPError } from '@shared-ui/utils/http'
@@ -183,6 +184,7 @@ import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
 import ConversationListItem from '@/features/conversation/list/ConversationListItem.vue'
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
+import RefreshSpinner from '@/features/conversation/list/RefreshSpinner.vue'
 
 const conversationStore = useConversationStore()
 const addressStore = useAddressStore()
@@ -225,13 +227,13 @@ const {
   contentStyle,
   finishPull,
   indicatorStyle,
-  indicatorText,
-  isPulling,
+  indicatorVisible,
   movePull,
-  pullDistance,
+  progress,
   refreshing,
   resetPull,
   scrollElement,
+  spinning,
   startPull
 } = usePullToRefresh(refreshCurrentAddress)
 

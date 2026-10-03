@@ -12,7 +12,7 @@
             variant="outline"
             @click="loadMore"
             :disabled="conversationStore.messages.fetching"
-            class="max-md:h-11 transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
+            class="max-md:h-11"
           >
             <Loader2
               v-if="conversationStore.messages.fetching"

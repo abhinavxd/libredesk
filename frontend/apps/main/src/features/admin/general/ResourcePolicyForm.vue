@@ -4,15 +4,11 @@
     <p class="text-sm text-muted-foreground">{{ t('admin.resourcePolicy.description') }}</p>
     <label class="block space-y-2">
       <span>{{ t('admin.resourcePolicy.mode') }}</span>
-      <select
-        v-model="mode"
-        class="block w-full rounded border bg-background p-2"
-        :disabled="loading || saving"
-      >
+      <NativeSelect v-model="mode" :disabled="loading || saving">
         <option value="block_all">{{ t('admin.resourcePolicy.blockAll') }}</option>
         <option value="allowlist">{{ t('admin.resourcePolicy.allowlist') }}</option>
         <option value="load_on_receipt">{{ t('admin.resourcePolicy.loadOnReceipt') }}</option>
-      </select>
+      </NativeSelect>
     </label>
     <p class="text-sm text-muted-foreground">{{ t(modeDescription) }}</p>
     <label v-if="mode === 'allowlist'" class="block space-y-2">
@@ -53,6 +49,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
+import { NativeSelect } from '@shared-ui/components/ui/native-select'
 import { Input } from '@shared-ui/components/ui/input'
 import { Textarea } from '@shared-ui/components/ui/textarea'
 import api from '@/api'

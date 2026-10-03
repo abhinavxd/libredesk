@@ -1,6 +1,6 @@
 <template>
   <section :aria-label="$t('review.earlierMessages')">
-    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{{ $t('review.earlierMessages') }}</h3>
+    <h3 class="mb-2 text-sm font-medium text-muted-foreground">{{ $t('review.earlierMessages') }}</h3>
     <div v-if="loading" class="space-y-2">
       <div v-for="n in 2" :key="n" class="h-20 animate-pulse rounded-lg bg-muted" />
     </div>
