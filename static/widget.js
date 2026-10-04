@@ -43,6 +43,7 @@
 
             this.config = config;
             this.iframe = null;
+            this.iframeHideTimer = null;
             this.toggleButton = null;
             this.isLauncherHovered = false;
             this.widgetButtonWrapper = null;
@@ -331,9 +332,6 @@
                 transition: ${this.iframeTransition(this.OPEN_MS)};
                 display: none;
             `;
-            this.iframe.addEventListener('transitionend', (e) => {
-                if (e.propertyName === 'opacity' && !this.isChatVisible) this.iframe.style.display = 'none';
-            });
 
             document.body.appendChild(this.widgetButtonWrapper);
             document.body.appendChild(this.iframe);
@@ -618,6 +616,7 @@
             this.renderPreviews();
 
             const iframe = this.iframe;
+            clearTimeout(this.iframeHideTimer);
             if (iframe.style.display === 'none') {
                 iframe.style.opacity = '0';
                 iframe.style.transform = this.iframeHiddenTransform();
@@ -649,6 +648,10 @@
             iframe.style.pointerEvents = 'none';
             iframe.style.opacity = '0';
             iframe.style.transform = this.iframeHiddenTransform();
+            clearTimeout(this.iframeHideTimer);
+            this.iframeHideTimer = setTimeout(() => {
+                if (this.iframe && !this.isChatVisible) this.iframe.style.display = 'none';
+            }, this.CLOSE_MS);
             this.isChatVisible = false;
             this.renderPreviews();
             this.applyLauncherScale();
