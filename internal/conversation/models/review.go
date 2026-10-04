@@ -51,8 +51,17 @@ type Review struct {
 	DismissedAt         null.Time          `db:"dismissed_at" json:"dismissed_at"`
 	MessageUUID         null.String        `db:"message_uuid" json:"message_uuid"`
 	Attachments         []ReviewAttachment `db:"-" json:"attachments"`
+	// ActivationKeys is set when the submission carries key placeholders.
+	ActivationKeys *ReviewKeySummary `db:"-" json:"activation_keys,omitempty"`
 	// Display is the sanitized HTML to show, prepared per response.
 	Display *resourcepolicy.Display `db:"-" json:"display,omitempty"`
+}
+
+// ReviewKeySummary tells a reviewer how many activation keys approving will send.
+type ReviewKeySummary struct {
+	Count   int    `json:"count"`
+	AppID   int    `json:"app_id"`
+	AppName string `json:"app_name"`
 }
 
 // ReviewAttachment is an upload held by a pending or returned submission.

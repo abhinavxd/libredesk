@@ -8,6 +8,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import ResizableImage from './extensions/ResizableImage'
+import ActivationKey from './extensions/ActivationKey'
 import mentionSuggestion from './mentionSuggestion'
 
 // Inline table styling so it survives email clients that strip <style>.
@@ -120,6 +121,7 @@ export function buildConversationExtensions({ getPlaceholder }) {
     CustomTable.configure({ resizable: false }),
     TableRow,
     CustomTableCell,
-    CustomTableHeader
+    CustomTableHeader,
+    ActivationKey
   ]
 }

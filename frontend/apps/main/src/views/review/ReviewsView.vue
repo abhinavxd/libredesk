@@ -38,6 +38,14 @@
               <div class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <component :is="item.kind === 'new' ? SquarePen : Reply" class="size-3.5 shrink-0" aria-hidden="true" />
                 <span class="truncate">{{ item.kind === 'new' ? $t('review.newEmail') : $t('review.reply') }} · {{ item.address_name || item.address }}</span>
+                <Badge
+                  v-if="item.activation_keys"
+                  variant="outline"
+                  class="shrink-0 gap-1 px-1.5 py-0 font-medium tabular-nums"
+                  :title="$t('keyDistribution.review.banner', { count: item.activation_keys.count, game: item.activation_keys.app_name }, item.activation_keys.count)"
+                >
+                  <KeyRound class="size-3" aria-hidden="true" />{{ item.activation_keys.count }}
+                </Badge>
                 <Badge v-if="item.status !== 'pending'" variant="warning" class="ml-auto shrink-0 px-1.5 py-0 font-medium">{{ $t('review.returned') }}</Badge>
               </div>
               <div class="mt-1 truncate text-sm font-medium">{{ item.subject || item.conversation_subject || $t('review.noSubject') }}</div>
@@ -70,6 +78,11 @@
               {{ $t('review.openConversation') }}<ExternalLink class="size-3.5" aria-hidden="true" />
             </router-link>
           </div>
+
+          <p v-if="current.activation_keys" class="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm" role="note">
+            <KeyRound class="size-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>{{ $t('keyDistribution.review.banner', { count: current.activation_keys.count, game: current.activation_keys.app_name }, current.activation_keys.count) }}</span>
+          </p>
 
           <ReviewContext v-if="current.kind === 'reply'" :conversationUUID="current.conversation_uuid" :refreshKey="contextKey" />
           <p v-else class="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">{{ $t('review.noEarlierMessages') }}</p>
@@ -106,6 +119,9 @@
           <AlertDialogTitle>{{ $t('review.approveTitle') }}</AlertDialogTitle>
           <AlertDialogDescription>
             {{ $t('review.approveDescription', { name: current?.author_name, address: current?.address, recipients: (current?.to || []).join(', ') }) }}
+            <template v-if="current?.activation_keys">
+              {{ $t('keyDistribution.review.approveNote', { count: current.activation_keys.count, game: current.activation_keys.app_name }, current.activation_keys.count) }}
+            </template>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -175,7 +191,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, CheckCheck, ExternalLink, Pencil, Reply, Send, ShieldCheck, SquarePen, Undo2 } from 'lucide-vue-next'
+import { ArrowLeft, CheckCheck, ExternalLink, KeyRound, Pencil, Reply, Send, ShieldCheck, SquarePen, Undo2 } from 'lucide-vue-next'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { Button } from '@shared-ui/components/ui/button'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
@@ -318,6 +334,15 @@ async function withdraw() {
   if (result) loadDetail(review.uuid)
 }
 
+// The display copy drops key placeholders' attributes, so a returned email
+// with keys reopens from its own content, inline images resolved as on display.
+function contentWithKeys(review) {
+  return (review.attachments || []).reduce(
+    (html, file) => (file.inline ? html.replaceAll(`cid:ldsk-${file.uuid.toLowerCase()}`, file.url) : html),
+    review.content
+  )
+}
+
 function editReturned() {
   const review = current.value
   if (!review) return
@@ -325,7 +350,7 @@ function editReturned() {
     review_uuid: review.uuid,
     address_id: review.address_id,
     subject: review.subject,
-    content: review.display?.html ?? review.content,
+    content: review.activation_keys ? contentWithKeys(review) : review.display?.html ?? review.content,
     to: review.to,
     cc: review.cc,
     bcc: review.bcc,

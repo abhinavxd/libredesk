@@ -86,6 +86,12 @@ const routes = [
             meta: { titleKey: 'globals.terms.general' }
           },
           {
+            path: 'key-distribution',
+            name: 'key-distribution',
+            component: () => import('@main/views/admin/keys/KeyDistribution.vue'),
+            meta: { titleKey: 'keyDistribution.title' }
+          },
+          {
             path: 'users',
             name: 'users',
             component: () => import('@main/views/admin/users/UsersSettings.vue'),

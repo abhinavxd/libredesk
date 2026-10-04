@@ -77,6 +77,9 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := maskActivationKeysFor(app, user, messages); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 
 	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
 	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)

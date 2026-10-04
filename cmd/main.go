@@ -19,6 +19,7 @@ import (
 
 	_ "time/tzdata"
 
+	"github.com/jakedolan443/fernmail/internal/activationkey"
 	"github.com/jakedolan443/fernmail/internal/address"
 	auth_ "github.com/jakedolan443/fernmail/internal/auth"
 	"github.com/jakedolan443/fernmail/internal/authz"
@@ -111,6 +112,7 @@ type App struct {
 	fc             *fastcache.FastCache
 	importer       *importer.Importer
 	wsHub          *ws.Hub
+	activationKeys *activationkey.Manager
 
 	// Flag to indicate if app restart is required for settings to take effect.
 	restartRequired bool
@@ -218,6 +220,7 @@ func main() {
 		wsHub                       = initWS(user)
 		accountmail                 = initAccountMailer()
 		conversation                = initConversations(i18n, wsHub, db, inbox, user, media, settings, template, webhook, resourceImages)
+		activationKeys              = initActivationKeys(db)
 		rateLimiter                 = initRateLimit(rdb)
 	)
 
@@ -238,6 +241,7 @@ func main() {
 	})
 
 	wsHub.SetConversationStore(conversation)
+	conversation.SetActivationKeys(activationKeys)
 
 	startInboxes(ctx, inbox, conversation, user, conversation.SignAvatarURL)
 
@@ -275,6 +279,7 @@ func main() {
 		resourceImages: resourceImages,
 		fc:             initFastCache(rdb),
 		wsHub:          wsHub,
+		activationKeys: activationKeys,
 	}
 	app.consts.Store(constants)
 

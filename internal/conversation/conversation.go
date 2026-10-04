@@ -78,6 +78,7 @@ type Manager struct {
 	mediaStore                 mediaStore
 	settingsStore              settingsStore
 	webhookStore               webhookStore
+	activationKeys             activationKeyStore
 	lo                         *logf.Logger
 	db                         *sqlx.DB
 	i18n                       *i18n.I18n

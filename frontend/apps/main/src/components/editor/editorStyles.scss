@@ -69,6 +69,28 @@
     font-weight: 500;
   }
 
+  // Generated, not typed: monospace on a dashed outline, removed whole.
+  .ld-activation-key {
+    display: inline-block;
+    margin: 0 1px;
+    padding: 0 0.375rem;
+    border: 1px dashed hsl(var(--primary) / 0.6);
+    border-radius: calc(var(--radius) - 2px);
+    background-color: hsl(var(--primary) / 0.08);
+    color: hsl(var(--primary));
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8125em;
+    line-height: 1.6;
+    white-space: nowrap;
+    user-select: all;
+    cursor: default;
+
+    &.ProseMirror-selectednode {
+      outline: 2px solid hsl(var(--ring));
+      outline-offset: 1px;
+    }
+  }
+
   .image-resizer {
     display: inline-block;
     position: relative;

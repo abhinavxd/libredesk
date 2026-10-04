@@ -13,4 +13,5 @@ const (
 	PermConversationsCreate         = "conversations:create"
 	PermReviewsSubmit               = "reviews:submit"
 	PermReviewsManage               = "reviews:manage"
+	PermActivationKeysManage        = "activation_keys:manage"
 )

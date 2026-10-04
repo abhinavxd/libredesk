@@ -88,6 +88,18 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/reviews/{uuid}/deny", perm(handleDenyReview, "reviews:manage"))
 	g.POST("/api/v1/reviews/{uuid}/withdraw", auth(handleWithdrawReview))
 	g.POST("/api/v1/reviews/{uuid}/dismiss", auth(handleDismissReview))
+	// Key Distribution: Admin-only pools, plus the composer's key card.
+	g.GET("/api/v1/activation-keys/settings", perm(handleGetKeyDistributionSettings, "activation_keys:manage"))
+	g.PUT("/api/v1/activation-keys/settings", perm(handleUpdateKeyDistributionSettings, "activation_keys:manage"))
+	g.GET("/api/v1/activation-keys/apps", perm(handleGetKeyApps, "activation_keys:manage"))
+	g.POST("/api/v1/activation-keys/apps", perm(handleCreateKeyApp, "activation_keys:manage"))
+	g.PUT("/api/v1/activation-keys/apps/{id}", perm(handleUpdateKeyApp, "activation_keys:manage"))
+	g.GET("/api/v1/activation-keys/apps/{id}/keys", perm(handleGetKeys, "activation_keys:manage"))
+	g.POST("/api/v1/activation-keys/apps/{id}/keys", perm(handleImportKeys, "activation_keys:manage"))
+	g.POST("/api/v1/activation-keys/keys/{id}/reveal", perm(handleRevealKey, "activation_keys:manage"))
+	g.POST("/api/v1/activation-keys/keys/{id}/void", perm(handleVoidKey, "activation_keys:manage"))
+	g.GET("/api/v1/activation-keys/composer", auth(handleGetKeyComposer))
+	g.PUT("/api/v1/activation-keys/composer/last-app", auth(handleSetKeyComposerApp))
 	// Draft endpoints
 	g.GET("/api/v1/drafts", auth(handleGetAllDrafts))
 	g.POST("/api/v1/conversations/{uuid}/draft", auth(handleUpsertConversationDraft))

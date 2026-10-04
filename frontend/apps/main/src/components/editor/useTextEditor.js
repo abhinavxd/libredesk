@@ -1,5 +1,6 @@
 import { ref, watch, onUnmounted } from 'vue'
 import { prepareEditorContent, serializeEditorContent } from './prepareEditorContent'
+import { stripKeyPlaceholders } from '@main/utils/activation-keys'
 import { useEditor } from '@tiptap/vue-3'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 
@@ -55,7 +56,8 @@ export function useTextEditor({
       attributes: { class: 'outline-none' },
       getSuggestions,
       enableMentions,
-      transformPastedHTML: prepare,
+      // Key chips come only from the key card, never from the clipboard.
+      transformPastedHTML: (html) => stripKeyPlaceholders(prepare(html)),
       handlePaste,
       handleDrop
     },

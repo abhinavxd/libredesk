@@ -64,6 +64,9 @@ func handleGetMessages(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := maskActivationKeysFor(app, user, messages); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 
 	// Process CSAT status for all messages (will only affect CSAT messages)
 
@@ -122,6 +125,9 @@ func handleGetMessage(r *fastglue.Request) error {
 
 	// Process CSAT status for the message (will only affect CSAT messages)
 	messages := []cmodels.Message{message}
+	if err := maskActivationKeysFor(app, user, messages); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 	message = messages[0]
 
 	// Strip CSAT UUID from agent sessions to prevent self-rating.

@@ -52,6 +52,7 @@
           <Editor
             v-if="editorKey"
             :key="editorKey"
+            ref="editorRef"
             v-model:htmlContent="form.html"
             v-model:textContent="form.text"
             :placeholder="$t('globals.terms.typeMessage')"
@@ -61,6 +62,13 @@
             :typingIndicator="false"
             @send="send"
             @filesDropped="uploadFiles"
+          />
+          <ActivationKeyCard
+            v-if="editorKey"
+            class="mt-2 shrink-0"
+            :html="form.html"
+            :editor="editorRef"
+            :disabled="sending"
           />
           <ReplyBoxAttachmentPreview
             v-if="mediaFiles.length || uploadingFiles.length"
@@ -129,6 +137,7 @@ import {
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
+import ActivationKeyCard from '@/features/conversation/ActivationKeyCard.vue'
 import { hasInlineImage, hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useFileUpload } from '@main/composables/useFileUpload'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -147,6 +156,7 @@ const emitter = useEmitter()
 const addressStore = useAddressStore()
 const composeStore = useComposeStore()
 const reviewStore = useReviewStore()
+const editorRef = ref(null)
 
 const emptyForm = () => ({ addressID: null, to: '', cc: '', bcc: '', subject: '', html: '', text: '' })
 const form = ref(emptyForm())

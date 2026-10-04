@@ -121,6 +121,9 @@ func (m *Manager) SubmitReview(authorID int, in models.ReviewInput) (models.Revi
 	if err != nil {
 		return models.Review{}, err
 	}
+	if err := m.ValidateActivationKeys(in.Content); err != nil {
+		return models.Review{}, err
+	}
 	if kind == models.ReviewKindReply {
 		in.Subject = ""
 	}
@@ -306,6 +309,7 @@ func (m *Manager) decorateReviews(reviews []*models.Review) error {
 		attachment.URL = m.mediaStore.GetURL(attachment.UUID, attachment.ContentType, attachment.Filename)
 		byID[row.ReviewID].Attachments = append(byID[row.ReviewID].Attachments, attachment)
 	}
+	m.summarizeReviewKeys(reviews)
 	return nil
 }
 
@@ -534,6 +538,9 @@ func (m *Manager) restoreReviewDraft(tx *sqlx.Tx, reviewID, conversationID, auth
 func (m *Manager) ResubmitReview(uuid string, authorID int, in models.ReviewInput) (models.Review, error) {
 	in, err := NormalizeOutgoing(in, true)
 	if err != nil {
+		return models.Review{}, err
+	}
+	if err := m.ValidateActivationKeys(in.Content); err != nil {
 		return models.Review{}, err
 	}
 	content, inline := m.normalizeInlineUploads(in.Content, 0, authorID)

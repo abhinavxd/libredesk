@@ -18,10 +18,10 @@ export function prepareEditorContent(content) {
   template.innerHTML = content
   template.content.querySelectorAll('script,style,link,iframe,object,embed,video,audio,source,track,svg,math,base,meta,template').forEach(el => el.remove())
   template.content.querySelectorAll('*').forEach(el => {
-    const classes = [...el.classList].filter(name => ['ld-mention', 'ld-conversation-reference', 'inline-image'].includes(name))
+    const classes = [...el.classList].filter(name => ['ld-mention', 'ld-conversation-reference', 'ld-activation-key', 'inline-image'].includes(name))
     const source = el.tagName === 'IMG' ? el.getAttribute('src') || el.getAttribute('data-libredesk-image-src') : null
     for (const attr of [...el.attributes]) {
-      if (!['href', 'alt', 'title', 'width', 'height', 'colspan', 'rowspan', 'data-type', 'data-id', 'data-label', 'data-conversation-uuid', 'data-reference-number'].includes(attr.name)) {
+      if (!['href', 'alt', 'title', 'width', 'height', 'colspan', 'rowspan', 'data-type', 'data-id', 'data-app-id', 'data-label', 'data-conversation-uuid', 'data-reference-number'].includes(attr.name)) {
         el.removeAttribute(attr.name)
       }
     }

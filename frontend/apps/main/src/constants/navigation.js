@@ -9,6 +9,12 @@ export const adminNavItems = [
         icon: 'Settings'
       },
       {
+        titleKey: 'keyDistribution.title',
+        href: '/admin/key-distribution',
+        permission: 'activation_keys:manage',
+        icon: 'KeyRound'
+      },
+      {
         titleKey: 'users.title',
         href: '/admin/users',
         permission: 'users:manage',

@@ -101,7 +101,11 @@ watch(
   (disabled) => editor.value?.setEditable(!disabled, false)
 )
 
-defineExpose({ focus, extractMentions })
+// Used by the composer's key card.
+const insertActivationKey = (appId) => editor.value?.chain().focus().insertActivationKey(appId).run()
+const setActivationKeyApp = (appId) => editor.value?.commands.setActivationKeyApp(appId)
+
+defineExpose({ focus, extractMentions, insertActivationKey, setActivationKeyApp })
 </script>
 
 <style lang="scss" src="./editorStyles.scss"></style>

@@ -8,6 +8,7 @@ export const permissions = {
   REVIEWS_SUBMIT: 'reviews:submit',
   REVIEWS_MANAGE: 'reviews:manage',
   GENERAL_SETTINGS_MANAGE: 'general_settings:manage',
+  ACTIVATION_KEYS_MANAGE: 'activation_keys:manage',
   OIDC_MANAGE: 'oidc:manage',
   USERS_MANAGE: 'users:manage',
   INBOXES_MANAGE: 'inboxes:manage',

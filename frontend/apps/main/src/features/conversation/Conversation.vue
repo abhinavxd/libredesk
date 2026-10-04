@@ -93,8 +93,12 @@ const imagePermissionMessages = computed(() =>
     (message) => message.display?.blocked_images > 0 || message.display?.sender_trusted
   )
 )
+// Contributors compose too; their replies go to review instead of out.
 const canCompose = computed(
-  () => userStore.can(perms.MESSAGES_WRITE) || userStore.can(perms.MESSAGES_WRITE_PRIVATE)
+  () =>
+    userStore.can(perms.MESSAGES_WRITE) ||
+    userStore.can(perms.MESSAGES_WRITE_PRIVATE) ||
+    userStore.can(perms.REVIEWS_SUBMIT)
 )
 // Give email recipients, the editor, and the action bar room to coexist by default.
 // The composer remains resizable down to a compact but usable 18% of the thread.

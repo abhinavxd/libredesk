@@ -152,6 +152,18 @@ const getConversationMessage = (cuuid, uuid) =>
 const allowMessageImages = (cuuid, uuid, scope) =>
   http.post(`/api/v1/conversations/${cuuid}/messages/${uuid}/images/allow/${scope}`)
 const getResourcePolicy = () => http.get('/api/v1/settings/resource-policy')
+// Key Distribution. Pool rows never include keys; reveal returns one at a time.
+const getKeyDistributionSettings = () => http.get('/api/v1/activation-keys/settings')
+const updateKeyDistributionSettings = (data) => http.put('/api/v1/activation-keys/settings', data)
+const getKeyApps = () => http.get('/api/v1/activation-keys/apps')
+const createKeyApp = (data) => http.post('/api/v1/activation-keys/apps', data)
+const updateKeyApp = (id, data) => http.put(`/api/v1/activation-keys/apps/${id}`, data)
+const getActivationKeys = (appID, params) => http.get(`/api/v1/activation-keys/apps/${appID}/keys`, { params })
+const importActivationKeys = (appID, keys) => http.post(`/api/v1/activation-keys/apps/${appID}/keys`, { keys })
+const revealActivationKey = (id) => http.post(`/api/v1/activation-keys/keys/${id}/reveal`)
+const voidActivationKey = (id) => http.post(`/api/v1/activation-keys/keys/${id}/void`)
+const getKeyComposer = () => http.get('/api/v1/activation-keys/composer')
+const setKeyComposerApp = (appID) => http.put('/api/v1/activation-keys/composer/last-app', { app_id: appID })
 const updateResourcePolicy = (data) => http.put('/api/v1/settings/resource-policy', data)
 const retryMessage = (cuuid, uuid) =>
   http.put(`/api/v1/conversations/${cuuid}/messages/${uuid}/retry`)
@@ -335,6 +347,17 @@ export default {
   getConversationMessage,
   allowMessageImages,
   getResourcePolicy,
+  getKeyDistributionSettings,
+  updateKeyDistributionSettings,
+  getKeyApps,
+  createKeyApp,
+  updateKeyApp,
+  getActivationKeys,
+  importActivationKeys,
+  revealActivationKey,
+  voidActivationKey,
+  getKeyComposer,
+  setKeyComposerApp,
   updateResourcePolicy,
   getConversationMessages,
   getConversationTranscript,

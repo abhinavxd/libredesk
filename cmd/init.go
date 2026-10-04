@@ -14,6 +14,7 @@ import (
 
 	"html/template"
 
+	"github.com/jakedolan443/fernmail/internal/activationkey"
 	"github.com/jakedolan443/fernmail/internal/address"
 	auth_ "github.com/jakedolan443/fernmail/internal/auth"
 	"github.com/jakedolan443/fernmail/internal/authz"
@@ -319,6 +320,19 @@ func initConversations(
 		log.Fatalf("error initializing conversation manager: %v", err)
 	}
 	return c
+}
+
+// initActivationKeys inits the Key Distribution pools.
+func initActivationKeys(db *sqlx.DB) *activationkey.Manager {
+	m, err := activationkey.New(activationkey.Opts{
+		DB:            db,
+		Lo:            initLogger("activation_keys"),
+		EncryptionKey: ko.MustString("app.encryption_key"),
+	})
+	if err != nil {
+		log.Fatalf("error initializing activation keys: %v", err)
+	}
+	return m
 }
 
 func initAddress(db *sqlx.DB) *address.Manager {

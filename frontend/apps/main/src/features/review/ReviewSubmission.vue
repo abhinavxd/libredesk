@@ -29,6 +29,13 @@
         <dt class="text-muted-foreground">{{ $t('review.subject') }}</dt>
         <dd class="break-words font-medium">{{ subject }}</dd>
       </template>
+      <template v-if="review.activation_keys">
+        <dt class="text-muted-foreground">{{ $t('keyDistribution.review.keys') }}</dt>
+        <dd class="inline-flex items-center gap-1 font-medium">
+          <KeyRound class="size-3.5 text-primary" aria-hidden="true" />
+          {{ $t('keyDistribution.review.summary', { count: review.activation_keys.count, game: review.activation_keys.app_name }, review.activation_keys.count) }}
+        </dd>
+      </template>
     </dl>
 
     <div v-if="!compact" class="rounded-md border bg-background p-3 text-sm">
@@ -56,7 +63,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Clock, Paperclip, Undo2 } from 'lucide-vue-next'
+import { Clock, KeyRound, Paperclip, Undo2 } from 'lucide-vue-next'
 import SafeMessageContent from '@shared-ui/components/SafeMessageContent.vue'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 

@@ -103,6 +103,14 @@
       />
     </div>
 
+    <ActivationKeyCard
+      v-if="messageType === 'reply' && conversationStore.current.inbox_channel === 'email'"
+      class="mt-2 shrink-0"
+      :html="htmlContent"
+      :editor="editorRef"
+      :disabled="isDraftLoading || isSending"
+    />
+
     <!-- Attachments preview -->
     <ReplyBoxAttachmentPreview
       :attachments="uploadedFiles"
@@ -153,6 +161,7 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useEmitter } from '@main/composables/useEmitter'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
+import ActivationKeyCard from '@/features/conversation/ActivationKeyCard.vue'
 import { useI18n } from 'vue-i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import api from '@main/api'

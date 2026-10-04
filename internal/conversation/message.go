@@ -213,9 +213,19 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
+	// Keys go in last, so the template never sees them.
+	keys, err := m.prepareActivationKeys(&message)
+	if handleError(err, "error preparing activation keys") {
+		return
+	}
+
 	// Render content in template
 	if err := m.RenderMessageInTemplate(inb.Channel(), &message); err != nil {
 		handleError(err, "error rendering content in template")
+		return
+	}
+
+	if err := keys.apply(&message); handleError(err, "error inserting activation keys") {
 		return
 	}
 
@@ -626,7 +636,9 @@ func (m *Manager) queueReply(media []mmodels.Media, inboxID, senderID, contactID
 
 	// Best-effort render template variables before saving so agents see rendered content immediately.
 	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
+		if content, err = m.renderKeepingPlaceholders(data, content); err != nil {
+			return models.Message{}, err
+		}
 	}
 
 	var parent string
@@ -725,6 +737,10 @@ func (m *Manager) insertMessage(ctx context.Context, message *models.Message, be
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	if err := m.allocateActivationKeys(tx, message); err != nil {
+		return err
+	}
+
 	if beforeCommit != nil {
 		if err := beforeCommit(tx, message); err != nil {
 			return err
@@ -754,10 +770,17 @@ func (m *Manager) insertMessage(ctx context.Context, message *models.Message, be
 		message.Author = refetchedMessage.Author
 	}
 
+	// The preview and the webhook share the message beyond its thread.
+	shared := *message
+	if refetchErr == nil {
+		shared = refetchedMessage
+	}
+	shared.Content, shared.TextContent = m.maskIncomingKeys(shared)
+
 	// Skip updating last_message and broadcasting for continuity emails.
 	if !message.IsContinuityMessage() {
 		// Hide CSAT message content as it contains a public link to the survey.
-		lastMessage := message.TextContent
+		lastMessage := shared.TextContent
 		if message.HasCSAT() {
 			lastMessage = "Please rate your experience with us"
 		}
@@ -790,7 +813,7 @@ func (m *Manager) insertMessage(ctx context.Context, message *models.Message, be
 	}
 
 	// Trigger webhook for new message created.
-	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, message)
+	m.webhookStore.TriggerEvent(wmodels.EventMessageCreated, &shared)
 
 	return nil
 }
