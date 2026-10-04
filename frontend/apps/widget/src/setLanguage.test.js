@@ -262,4 +262,124 @@ describe('App.vue SET_LANGUAGE handling', () => {
     // The widget must NOT revert to de-DE; it must remain zh-CN
     expect(i18n.global.locale.value).toBe('zh-CN')
   })
+
+  it('does not cancel a supported language change when an unknown code is sent while loading', async () => {
+    let resolveDe
+    const dePromise = new Promise((res) => {
+      resolveDe = res
+    })
+
+    getLanguageMock.mockImplementation((lang) => {
+      if (lang === 'de-DE') return dePromise
+      return Promise.resolve({ data: { greeting: `hello_${lang}` } })
+    })
+
+    await mountApp()
+
+    // 1. Trigger de-DE (supported, in-flight)
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    await nextTick()
+
+    // 2. Host sends unsupported language code 'xx'
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'xx' })
+    await nextTick()
+
+    // 3. de-DE completes loading
+    resolveDe({ data: { greeting: 'hello_de-DE' } })
+    for (let i = 0; i < 10; i++) await nextTick()
+
+    // The widget must switch to de-DE; 'xx' must not cancel it
+    expect(i18n.global.locale.value).toBe('de-DE')
+  })
+
+  it('shares pending available languages request across overlapping SET_LANGUAGE calls', async () => {
+    let resolveLanguages
+    const languagesPromise = new Promise((res) => {
+      resolveLanguages = res
+    })
+    getAvailableLanguagesMock.mockReturnValue(languagesPromise)
+
+    await mountApp()
+
+    // Trigger two language changes before languages resolve
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'zh-CN' })
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    await nextTick()
+
+    // getAvailableLanguages must only be called ONCE
+    expect(getAvailableLanguagesMock).toHaveBeenCalledTimes(1)
+
+    // Now resolve available languages
+    resolveLanguages({
+      data: {
+        status: 'success',
+        data: [
+          { code: 'en-US', name: 'English' },
+          { code: 'zh-CN', name: 'Chinese' },
+          { code: 'de-DE', name: 'German' }
+        ]
+      }
+    })
+    for (let i = 0; i < 10; i++) await nextTick()
+
+    // Second request (de-DE) arrived after zh-CN, so de-DE should be active
+    expect(i18n.global.locale.value).toBe('de-DE')
+  })
+
+  it('clears available languages promise on error so subsequent requests can retry', async () => {
+    getAvailableLanguagesMock.mockRejectedValueOnce(new Error('Network error'))
+
+    await mountApp()
+
+    // First request fails
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    for (let i = 0; i < 10; i++) await nextTick()
+    expect(getAvailableLanguagesMock).toHaveBeenCalledTimes(1)
+    expect(i18n.global.locale.value).toBe('en-US')
+
+    // Subsequent request succeeds
+    getAvailableLanguagesMock.mockResolvedValueOnce({
+      data: {
+        status: 'success',
+        data: [
+          { code: 'en-US', name: 'English' },
+          { code: 'de-DE', name: 'German' }
+        ]
+      }
+    })
+
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    for (let i = 0; i < 10; i++) await nextTick()
+    expect(getAvailableLanguagesMock).toHaveBeenCalledTimes(2)
+    expect(i18n.global.locale.value).toBe('de-DE')
+  })
+
+  it('allows reverting to active language while a new language is in-flight', async () => {
+    let resolveDe
+    const dePromise = new Promise((res) => {
+      resolveDe = res
+    })
+    getLanguageMock.mockImplementation((lang) => {
+      if (lang === 'de-DE') return dePromise
+      return Promise.resolve({ data: { greeting: `hello_${lang}` } })
+    })
+
+    await mountApp()
+    expect(i18n.global.locale.value).toBe('en-US')
+
+    // 1. Trigger de-DE (in-flight)
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    await nextTick()
+
+    // 2. Host changes mind and reverts to en-US before de-DE finishes
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'en-US' })
+    for (let i = 0; i < 5; i++) await nextTick()
+
+    // 3. de-DE finishes late
+    resolveDe({ data: { greeting: 'hello_de-DE' } })
+    for (let i = 0; i < 10; i++) await nextTick()
+
+    // The widget must NOT be overwritten by late de-DE; must remain en-US
+    expect(i18n.global.locale.value).toBe('en-US')
+  })
 })

@@ -112,13 +112,24 @@ const fetchInitialConversations = async () => {
 // Listen for messages from parent window (widget.js)
 let parentMessageListener = null
 let cachedAvailableCodes = null
-let languageRequestId = 0
+let availableCodesPromise = null
+let messageSequence = 0
+let latestValidSequence = 0
+let activeTargetLocale = null
 
-const fetchAvailableCodes = async () => {
-  if (cachedAvailableCodes) return cachedAvailableCodes
-  const availableResp = await api.getAvailableLanguages()
-  cachedAvailableCodes = availableResp.data.data.map((l) => l.code)
-  return cachedAvailableCodes
+const fetchAvailableCodes = () => {
+  if (availableCodesPromise) return availableCodesPromise
+  availableCodesPromise = api
+    .getAvailableLanguages()
+    .then((availableResp) => {
+      cachedAvailableCodes = availableResp?.data?.data?.map((l) => l.code) || []
+      return cachedAvailableCodes
+    })
+    .catch((err) => {
+      availableCodesPromise = null
+      throw err
+    })
+  return availableCodesPromise
 }
 
 const handleParentMessage = async (event) => {
@@ -209,26 +220,35 @@ const handleParentMessage = async (event) => {
     if (widgetStore.config?.language !== 'auto') return
     const requestedLang = event.data.language
     if (!requestedLang || typeof requestedLang !== 'string' || !requestedLang.trim()) return
-    const requestId = ++languageRequestId
+    const seq = ++messageSequence
     try {
       const availableCodes = await fetchAvailableCodes()
-      if (requestId !== languageRequestId) return
       const resolved = resolveLanguage(requestedLang, availableCodes)
-      if (!resolved || resolved === locale.value) return
+      if (!resolved || resolved === (activeTargetLocale || locale.value)) return
+      if (seq < latestValidSequence) return
+
+      latestValidSequence = seq
+      activeTargetLocale = resolved
 
       let langData = getLocaleMessage(resolved)
       if (!langData || Object.keys(langData).length === 0) {
         const langMessages = await api.getLanguage(resolved)
-        if (requestId !== languageRequestId) return
+        if (seq !== latestValidSequence) return
         langData = langMessages.data
         setLocaleMessage(resolved, langData)
       }
-      if (requestId !== languageRequestId) return
+      if (seq !== latestValidSequence) return
       locale.value = resolved
+      if (seq === latestValidSequence) {
+        activeTargetLocale = null
+      }
       if (widgetStore.config.help?.help_center_id) {
         await help.load(resolved)
       }
     } catch (err) {
+      if (seq === latestValidSequence) {
+        activeTargetLocale = null
+      }
       console.error('Failed to change widget language:', err)
     }
   } else if (event.data.type === 'OPEN_CONVERSATION') {
@@ -258,6 +278,8 @@ onUnmounted(() => {
     window.removeEventListener('message', parentMessageListener)
     parentMessageListener = null
   }
+  availableCodesPromise = null
+  activeTargetLocale = null
 })
 
 const initializeWebSocket = () => {
