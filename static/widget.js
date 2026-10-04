@@ -60,6 +60,7 @@
             this.isExpanded = false;
             this.hideLauncher = config.hideLauncher || false;
             this.widgetLoaded = false;
+            this._initialLanguage = config.language || null;
             this._onShowCallback = null;
             this._onHideCallback = null;
             this._onUnreadCountChangeCallback = null;
@@ -312,8 +313,13 @@
                 ? 'none'
                 : 'width 0.18s ease, height 0.18s ease, bottom 0.18s ease, border-radius 0.18s ease, box-shadow 0.18s ease';
 
+            let iframeSrc = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            if (this.config.language) {
+                iframeSrc += `&lang=${encodeURIComponent(this.config.language)}`;
+            }
+
             this.iframe = document.createElement('iframe');
-            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            this.iframe.src = iframeSrc;
             this.iframe.title = 'libredesk';
             this.iframe.style.cssText = `
                 position: fixed;
@@ -560,6 +566,11 @@
         handleVueAppReady () {
             this.startPageTracking();
             this.sendMobileState();
+
+            if (this.config.language && this.config.language !== this._initialLanguage) {
+                this.postToIframe({ type: 'SET_LANGUAGE', language: this.config.language });
+                this._initialLanguage = this.config.language;
+            }
 
             var visitorToken = this.getCookie(this.getCookieName('visitor'));
 
@@ -880,6 +891,12 @@
 
         trackEvent (name) {
             if (typeof name === 'string' && name.length <= 128) this.campaignEvent = name;
+        }
+
+        setLanguage (code) {
+            if (!code || typeof code !== 'string') return;
+            this.config.language = code;
+            this.postToIframe({ type: 'SET_LANGUAGE', language: code });
         }
 
         setUser (jwt) {

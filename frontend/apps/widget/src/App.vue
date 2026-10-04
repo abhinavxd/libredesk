@@ -13,18 +13,29 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch, getCurrentInstance } from 'vue'
+import { computed, onMounted, onUnmounted, watch, getCurrentInstance } from 'vue'
 import { useWidgetStore } from './store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from './store/user.js'
-import { initWidgetWS, closeWidgetWebSocket, sendPageVisit, skipInitialWsSync } from './websocket.js'
-import api, { setApiSessionToken, initVisitorToken, saveSession, registerStores } from '@widget/api/index.js'
+import {
+  initWidgetWS,
+  closeWidgetWebSocket,
+  sendPageVisit,
+  skipInitialWsSync
+} from './websocket.js'
+import api, {
+  setApiSessionToken,
+  initVisitorToken,
+  saveSession,
+  registerStores
+} from '@widget/api/index.js'
 import { useUnreadCount } from './composables/useUnreadCount.js'
 import { initAudioContext } from '@shared-ui/composables/useNotificationSound.js'
 import { hexToHSL, getContrastingHSL } from '@shared-ui/utils/color.js'
 import MainLayout from '@widget/layouts/MainLayout.vue'
 import { useHelpStore } from '@widget/store/help.js'
 import { useI18n } from 'vue-i18n'
+import { resolveLanguage } from './utils/language.js'
 import { useProactiveStore } from '@widget/store/proactive.js'
 import { useReplyPreviews } from '@widget/composables/useReplyPreviews.js'
 
@@ -33,7 +44,7 @@ const chatStore = useChatStore()
 const userStore = useUserStore()
 const help = useHelpStore()
 const proactive = useProactiveStore()
-const { locale } = useI18n()
+const { locale, setLocaleMessage, getLocaleMessage } = useI18n()
 useReplyPreviews()
 
 // Register stores for the global 401 response interceptor.
@@ -86,7 +97,9 @@ const fetchInitialConversations = async () => {
   if (success && chatStore.hasConversations) {
     try {
       await chatStore.loadConversation(chatStore.getConversations[0].uuid)
-    } catch { /* non-blocking */ }
+    } catch {
+      /* non-blocking */
+    }
   }
   const audience = userStore.isVisitor ? widgetStore.config?.visitors : widgetStore.config?.users
   const directToConversation =
@@ -97,102 +110,143 @@ const fetchInitialConversations = async () => {
 }
 
 // Listen for messages from parent window (widget.js)
-const setupParentMessageListeners = () => {
-  window.addEventListener('message', async (event) => {
-    if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return
-    const parentOrigin = new URLSearchParams(window.location.search).get('parent_origin')
-    if (parentOrigin && event.origin !== parentOrigin) return
-    if (event.data.campaignSessionKey) proactive.setSessionKey(event.data.campaignSessionKey)
-    if (event.data.campaignBrowserKey) proactive.setBrowserKey(event.data.campaignBrowserKey)
-    if (event.data.type == 'WIDGET_CLOSED') {
-      widgetStore.setOpen(false)
-    } else if (event.data.type === 'WIDGET_OPENED') {
-      widgetStore.setOpen(true)
-    } else if (event.data.type === 'SET_MOBILE_STATE') {
-      widgetStore.setMobileFullScreen(event.data.isMobile)
-    } else if (event.data.type === 'WIDGET_EXPANDED') {
-      widgetStore.setExpanded(event.data.isExpanded)
-    } else if (event.data.type === 'SESSION_DATA') {
-      if (event.data.visitorToken) {
-        initVisitorToken(event.data.visitorToken)
-      }
-      const sessionToken = event.data.sessionToken
-      try {
-        if (sessionToken) {
-          userStore.setSessionToken(sessionToken)
-          setApiSessionToken(sessionToken)
-          // Session exists, fetchInitialConversations will load data. Skip WS sync.
-          skipInitialWsSync()
-          // Fetch user metadata for returning visitors.
-          // Guard against stale response if SET_JWT_TOKEN exchange replaced the token.
-          try {
-            const meResp = await api.getAuthMe()
-            if (userStore.userSessionToken === sessionToken) {
-              userStore.setUserMeta(meResp.data.data)
-            }
-          } catch {
-            // 401 is handled by the global response interceptor.
-          }
-        }
-        await fetchInitialConversations()
-      } finally {
-        signalWidgetLoaded()
-      }
-    } else if (event.data.type === 'SET_JWT_TOKEN') {
-      if (event.data.visitorToken) {
-        initVisitorToken(event.data.visitorToken)
-      }
-      if (event.data.jwt) {
-        proactive.reset()
-        help.reset()
-        if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
-        chatStore.drafts = {}
-        chatStore.preChatDraft = {}
-        chatStore.handoffDraft = {}
-        chatStore.conversations = null
-        chatStore.setCurrentConversation(null)
+let parentMessageListener = null
+
+const handleParentMessage = async (event) => {
+  if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return
+  const parentOrigin = new URLSearchParams(window.location.search).get('parent_origin')
+  if (parentOrigin && event.origin !== parentOrigin) return
+  if (event.data.campaignSessionKey) proactive.setSessionKey(event.data.campaignSessionKey)
+  if (event.data.campaignBrowserKey) proactive.setBrowserKey(event.data.campaignBrowserKey)
+  if (event.data.type == 'WIDGET_CLOSED') {
+    widgetStore.setOpen(false)
+  } else if (event.data.type === 'WIDGET_OPENED') {
+    widgetStore.setOpen(true)
+  } else if (event.data.type === 'SET_MOBILE_STATE') {
+    widgetStore.setMobileFullScreen(event.data.isMobile)
+  } else if (event.data.type === 'WIDGET_EXPANDED') {
+    widgetStore.setExpanded(event.data.isExpanded)
+  } else if (event.data.type === 'SESSION_DATA') {
+    if (event.data.visitorToken) {
+      initVisitorToken(event.data.visitorToken)
+    }
+    const sessionToken = event.data.sessionToken
+    try {
+      if (sessionToken) {
+        userStore.setSessionToken(sessionToken)
+        setApiSessionToken(sessionToken)
+        // Session exists, fetchInitialConversations will load data. Skip WS sync.
+        skipInitialWsSync()
+        // Fetch user metadata for returning visitors.
+        // Guard against stale response if SET_JWT_TOKEN exchange replaced the token.
         try {
-          const resp = await api.exchangeJWTForSession(event.data.jwt)
-          const { session_token, user } = resp.data.data
-          saveSession(session_token, user, userStore)
-          // Session exists, fetchInitialConversations will load data. Skip WS sync.
-          skipInitialWsSync()
-          chatStore.conversations = null
-          await fetchInitialConversations()
-        } catch (err) {
-          console.error('Failed to exchange JWT for session:', err)
-        } finally {
-          signalWidgetLoaded()
+          const meResp = await api.getAuthMe()
+          if (userStore.userSessionToken === sessionToken) {
+            userStore.setUserMeta(meResp.data.data)
+          }
+        } catch {
+          // 401 is handled by the global response interceptor.
         }
       }
-    } else if (event.data.type === 'CLEAR_SESSION') {
+      await fetchInitialConversations()
+    } finally {
+      signalWidgetLoaded()
+    }
+  } else if (event.data.type === 'SET_JWT_TOKEN') {
+    if (event.data.visitorToken) {
+      initVisitorToken(event.data.visitorToken)
+    }
+    if (event.data.jwt) {
       proactive.reset()
+      help.reset()
+      if (widgetStore.currentView === 'help') widgetStore.navigateToHome()
       chatStore.drafts = {}
       chatStore.preChatDraft = {}
       chatStore.handoffDraft = {}
-      userStore.clearSessionToken()
       chatStore.conversations = null
       chatStore.setCurrentConversation(null)
-      help.reset()
-      widgetStore.navigateToHome()
-      signalWidgetLoaded()
-    } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
-      await proactive.next(event.data.context)
-    } else if (event.data.type === 'CAMPAIGN_EVENT') {
-      await proactive.event(event.data.event, event.data.id)
-    } else if (event.data.type === 'PAGE_VISIT') {
-      sendPageVisit(event.data.url, event.data.title)
-    } else if (event.data.type === 'OPEN_CONVERSATION') {
-      if (!chatStore.getConversations.some(conversation => conversation.uuid === event.data.uuid)) return
-      widgetStore.navigateToMessages()
-      if (await chatStore.loadConversation(event.data.uuid, true)) {
-        const seen = new Date(chatStore.currentConversation.contact_last_seen_at)
-        chatStore.previewUnreadUUID = chatStore.getCurrentConversationMessages.find(message => ['agent', 'ai_assistant'].includes(message.author?.type) && new Date(message.created_at) > seen)?.uuid || null
-        widgetStore.navigateToChat()
+      try {
+        const resp = await api.exchangeJWTForSession(event.data.jwt)
+        const { session_token, user } = resp.data.data
+        saveSession(session_token, user, userStore)
+        // Session exists, fetchInitialConversations will load data. Skip WS sync.
+        skipInitialWsSync()
+        chatStore.conversations = null
+        await fetchInitialConversations()
+      } catch (err) {
+        console.error('Failed to exchange JWT for session:', err)
+      } finally {
+        signalWidgetLoaded()
       }
     }
-  })
+  } else if (event.data.type === 'CLEAR_SESSION') {
+    proactive.reset()
+    chatStore.drafts = {}
+    chatStore.preChatDraft = {}
+    chatStore.handoffDraft = {}
+    userStore.clearSessionToken()
+    chatStore.conversations = null
+    chatStore.setCurrentConversation(null)
+    help.reset()
+    widgetStore.navigateToHome()
+    signalWidgetLoaded()
+  } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
+    await proactive.next(event.data.context)
+  } else if (event.data.type === 'CAMPAIGN_EVENT') {
+    await proactive.event(event.data.event, event.data.id)
+  } else if (event.data.type === 'PAGE_VISIT') {
+    sendPageVisit(event.data.url, event.data.title)
+  } else if (event.data.type === 'SET_LANGUAGE') {
+    if (widgetStore.config?.language !== 'auto') return
+    const requestedLang = event.data.language
+    if (!requestedLang || typeof requestedLang !== 'string') return
+    try {
+      const availableResp = await api.getAvailableLanguages()
+      const availableCodes = availableResp.data.data.map((l) => l.code)
+      const resolved = resolveLanguage(requestedLang, availableCodes)
+      if (!resolved || resolved === locale.value) return
+
+      let langData = getLocaleMessage(resolved)
+      if (!langData || Object.keys(langData).length === 0) {
+        const langMessages = await api.getLanguage(resolved)
+        langData = langMessages.data
+        setLocaleMessage(resolved, langData)
+      }
+      locale.value = resolved
+      if (widgetStore.config.help?.help_center_id) {
+        await help.load(resolved)
+      }
+    } catch (err) {
+      console.error('Failed to change widget language:', err)
+    }
+  } else if (event.data.type === 'OPEN_CONVERSATION') {
+    if (!chatStore.getConversations.some((conversation) => conversation.uuid === event.data.uuid))
+      return
+    widgetStore.navigateToMessages()
+    if (await chatStore.loadConversation(event.data.uuid, true)) {
+      const seen = new Date(chatStore.currentConversation.contact_last_seen_at)
+      chatStore.previewUnreadUUID =
+        chatStore.getCurrentConversationMessages.find(
+          (message) =>
+            ['agent', 'ai_assistant'].includes(message.author?.type) &&
+            new Date(message.created_at) > seen
+        )?.uuid || null
+      widgetStore.navigateToChat()
+    }
+  }
 }
+
+const setupParentMessageListeners = () => {
+  parentMessageListener = handleParentMessage
+  window.addEventListener('message', parentMessageListener)
+}
+
+onUnmounted(() => {
+  if (parentMessageListener) {
+    window.removeEventListener('message', parentMessageListener)
+    parentMessageListener = null
+  }
+})
 
 const initializeWebSocket = () => {
   const token = userStore.userSessionToken
