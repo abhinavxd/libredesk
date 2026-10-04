@@ -92,34 +92,24 @@
         :icon="MessageCircleWarning"
       />
 
-      <TransitionGroup
-        enter-active-class="transition-all duration-300 ease-in-out"
-        enter-from-class="opacity-0 transform translate-y-4"
-        enter-to-class="opacity-100 transform translate-y-0"
-        leave-active-class="transition-all duration-300 ease-in-out"
-        leave-from-class="opacity-100 transform translate-y-0"
-        leave-to-class="opacity-0 transform translate-y-4"
+      <div
+        v-if="!hasErrored && !conversationStore.conversations.loading"
+        class="divide-y divide-border"
+        :class="{ 'border-b border-border': hasConversations }"
       >
-        <div
-          v-if="!hasErrored && !conversationStore.conversations.loading"
-          key="list"
-          class="divide-y divide-border"
-          :class="{ 'border-b border-border': hasConversations }"
-        >
-          <ConversationListItem
-            v-for="conversation in conversationStore.conversationsList"
-            :key="conversation.uuid"
-            :conversation="conversation"
-            :currentConversation="conversationStore.current"
-            :contactFullName="conversationStore.getContactFullName(conversation.uuid)"
-            class="transition-colors duration-200"
-          />
-        </div>
+        <ConversationListItem
+          v-for="conversation in conversationStore.conversationsList"
+          :key="conversation.uuid"
+          :conversation="conversation"
+          :currentConversation="conversationStore.current"
+          :contactFullName="conversationStore.getContactFullName(conversation.uuid)"
+          class="transition-colors duration-200"
+        />
+      </div>
 
-        <div v-if="conversationStore.conversations.loading" key="loading">
-          <ConversationListItemSkeleton v-for="i in 12" :key="i" :index="i - 1" />
-        </div>
-      </TransitionGroup>
+      <div v-if="conversationStore.conversations.loading">
+        <ConversationListItemSkeleton v-for="i in 12" :key="i" :index="i - 1" />
+      </div>
 
       <!-- Load More -->
       <div
@@ -131,7 +121,7 @@
           variant="outline"
           @click="conversationStore.fetchNextConversations"
           :disabled="conversationStore.conversations.fetching"
-          class="max-md:h-11 transition-all duration-200 ease-in-out transform hover:scale-105"
+          class="max-md:h-11"
         >
           <Loader2 v-if="conversationStore.conversations.fetching" class="mr-2 h-4 w-4 animate-spin" />
           {{ conversationStore.conversations.fetching ? t('globals.terms.loading') : t('globals.terms.loadMore') }}

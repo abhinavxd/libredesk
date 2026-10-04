@@ -10,16 +10,22 @@
   font-family: inherit;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.15s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
+  /* Popovers, dialogs and sheets keep their fade but stop sliding and zooming. */
+  *,
+  *::before,
+  *::after {
+    --tw-enter-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+  }
+
+  .animate-shake,
+  .animate-slide-in {
+    animation: none !important;
   }
 }
 
