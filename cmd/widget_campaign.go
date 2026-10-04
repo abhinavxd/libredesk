@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,7 @@ type campaignCandidate struct {
 	snapshot proactive.Snapshot
 }
 
+// handleWidgetCampaign is called by the widget as the visitor browses the site and returns the campaign message to pop up for this visitor right now, or nothing.
 func handleWidgetCampaign(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	var ctx proactive.Context
@@ -47,6 +49,10 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 	config, err := getWidgetConfig(r)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+	cooldown, err := parseCampaignCooldown(config.CampaignCooldown)
+	if err != nil {
+		return sendErrorEnvelope(r, campaignInputError(app))
 	}
 	if err := checkConversationPermissions(app, config, ctx.Visitor, contact.ID, inbox.ID); err != nil {
 		return r.SendEnvelope(nil)
@@ -91,7 +97,7 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	for _, c := range candidates {
-		if proactive.Suppression(c.campaign, ctx, history, config.CampaignCooldownHours) != "" {
+		if proactive.Suppression(c.campaign, ctx, history, cooldown) != "" {
 			continue
 		}
 		delivery, err := app.proactive.Reserve(inbox.ID, c.campaign, ctx, c.snapshot)
@@ -103,6 +109,7 @@ func handleWidgetCampaign(r *fastglue.Request) error {
 	return r.SendEnvelope(nil)
 }
 
+// handleWidgetCampaignEvent is called by the widget when a campaign message is shown, opened or closed, for the campaign stats.
 func handleWidgetCampaignEvent(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	var req campaignEventRequest
@@ -138,6 +145,7 @@ func handleWidgetCampaignEvent(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
+// handleCampaignStats returns shown, opened, dismissed and replied counts for each campaign in an inbox over a date range.
 func handleCampaignStats(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
@@ -236,7 +244,10 @@ func campaignInputError(app *App) error {
 }
 
 func validateWidgetFeatures(app *App, config livechat.Config) error {
-	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || config.Previews.AutoHideSeconds < 0 || config.Previews.AutoHideSeconds > 300 || !slices.Contains([]string{"", "message", "generic"}, config.Previews.Content) || len(config.Campaigns) > 50 || config.CampaignCooldownHours < 0 || config.CampaignCooldownHours > 8760 {
+	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || len(config.Campaigns) > 50 {
+		return campaignInputError(app)
+	}
+	if _, err := parseCampaignCooldown(config.CampaignCooldown); err != nil {
 		return campaignInputError(app)
 	}
 	if config.Help.HelpCenterID > 0 {
@@ -270,4 +281,15 @@ func validateWidgetFeatures(app *App, config livechat.Config) error {
 		}
 	}
 	return nil
+}
+
+func parseCampaignCooldown(value string) (time.Duration, error) {
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, err
+	}
+	if duration < 0 {
+		return 0, errors.New("campaign cooldown cannot be negative")
+	}
+	return duration, nil
 }

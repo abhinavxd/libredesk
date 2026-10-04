@@ -11,6 +11,8 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+const maxTranscriptDownloadMessages = 1000
+
 func handleWidgetTranscript(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	config, err := getWidgetConfig(r)
@@ -26,7 +28,7 @@ func handleWidgetTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	private := false
-	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, 0)
+	messages, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, maxTranscriptDownloadMessages)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

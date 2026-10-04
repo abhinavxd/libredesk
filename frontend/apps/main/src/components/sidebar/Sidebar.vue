@@ -4,10 +4,10 @@ import {
   reportsNavItems,
   accountNavItems,
   contactNavItems
-} from '../../constants/navigation'
+} from '@main/constants/navigation'
 import { useRoute } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@shared-ui/components/ui/collapsible'
-import { Badge } from '@shared-ui/components/ui/badge'
+import BetaBadge from '@main/components/BetaBadge.vue'
 import {
   Sidebar,
   SidebarContent,
@@ -29,8 +29,8 @@ import {
   User,
   Search,
   Plus,
-  CircleDashed,
-  List,
+  UserRoundX,
+  Inbox,
   AtSign,
 } from 'lucide-vue-next'
 
@@ -83,11 +83,18 @@ const isInboxRoute = (path) => {
   return path.startsWith('/inboxes')
 }
 
+const sidebarProviderRef = ref(null)
+
+// An open mobile drawer treats taps on the view form as outside clicks and closes it.
+const closeMobileSidebar = () => sidebarProviderRef.value?.setOpenMobile(false)
+
 const openCreateViewDialog = () => {
+  closeMobileSidebar()
   emit('createView')
 }
 
 const editView = (view) => {
+  closeMobileSidebar()
   emit('editView', view)
 }
 
@@ -151,6 +158,7 @@ onMounted(() => {
 
 <template>
   <SidebarProvider
+    ref="sidebarProviderRef"
     style="--sidebar-width: 14rem"
     :default-open="sidebarOpen"
     v-on:update:open="sidebarOpen = $event"
@@ -270,13 +278,9 @@ onMounted(() => {
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton :isActive="isActiveParent(item.href)">
                       <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
-                      <Badge
-                        v-if="item.badge"
-                        variant="outline"
-                        class="ml-1.5 rounded-full uppercase tracking-[0.07em] font-medium text-[9px] leading-none px-[5.5px] py-[3px] bg-warning/10 text-warning-600 border-warning/50 shrink-0"
-                      >
+                      <BetaBadge v-if="item.badge" class="ml-1.5">
                         {{ item.badge }}
-                      </Badge>
+                      </BetaBadge>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
                       />
@@ -395,7 +399,7 @@ onMounted(() => {
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/unassigned')" @click="navigateToInbox('unassigned')">
-                    <CircleDashed />
+                    <UserRoundX />
                     <span class="flex-1 truncate">
                       {{ t('globals.terms.unassigned') }}
                     </span>
@@ -408,7 +412,7 @@ onMounted(() => {
 
               <SidebarMenuItem>
                 <SidebarMenuButton :isActive="isActiveParent('/inboxes/all')" @click="navigateToInbox('all')">
-                    <List />
+                    <Inbox />
                     <span class="flex-1 truncate">
                       {{ t('globals.messages.all') }}
                     </span>

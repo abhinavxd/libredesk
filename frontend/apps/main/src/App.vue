@@ -65,8 +65,10 @@
   <!-- Create conversation dialog -->
   <CreateConversation
     v-if="openCreateConversationDialog"
+    ref="createConversationRef"
     v-model="openCreateConversationDialog"
     :initial-contact="createConversationContact"
+    :start-minimized="createConversationMinimized"
   />
 
   <KeyboardShortcutsDialog v-model:open="showShortcuts" />
@@ -105,6 +107,7 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
+import { hasNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
@@ -163,8 +166,11 @@ const viewStore = useViewStore()
 const { open: showShortcuts } = useKeyboardShortcutsDialog()
 const view = ref({})
 const openCreateViewForm = ref(false)
-const openCreateConversationDialog = ref(false)
+const hasSavedDraft = hasNewConversationDraft(window.localStorage)
+const openCreateConversationDialog = ref(hasSavedDraft)
 const createConversationContact = ref(null)
+const createConversationMinimized = ref(hasSavedDraft)
+const createConversationRef = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
 const aiPromptStore = useAiPromptStore()
@@ -199,6 +205,8 @@ onMounted(() => {
 
 const openCreateConversation = ({ contact = null } = {}) => {
   createConversationContact.value = contact
+  createConversationMinimized.value = false
+  createConversationRef.value?.restore()
   openCreateConversationDialog.value = true
 }
 

@@ -1,5 +1,5 @@
 <script setup>
-const CAMPAIGN_ORDER_BUTTON_CLASS = 'size-6'
+const HINT_CLASS = 'text-xs text-muted-foreground'
 
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -41,22 +41,19 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@shared-ui/components/ui/collapsible'
+import Draggable from 'vuedraggable'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import SelectAgentCombobox from '@/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@/components/combobox/SelectTeamCombobox.vue'
 import WidgetConditions from './WidgetConditions.vue'
-import {
-  createCampaignSchema,
-  defaultCampaign,
-  moveCampaign,
-  newCampaignId
-} from './livechatFormSchema.js'
+import { createCampaignSchema, defaultCampaign, newCampaignId } from './livechatFormSchema.js'
 import { handleHTTPError } from '@shared-ui/utils/http'
+import { isGoDuration } from '@shared-ui/utils/string'
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronRight,
   ChevronDown,
+  GripVertical,
   Plus,
   CircleCheck,
   CircleSlash
@@ -64,10 +61,16 @@ import {
 
 const MAX_CAMPAIGNS = 50
 const STAT_KEYS = ['displayed', 'opened', 'dismissed', 'replied']
+const STAT_TRANSLATION_KEYS = {
+  displayed: 'globals.terms.displayed',
+  opened: 'globals.terms.opened',
+  dismissed: 'globals.terms.dismissed',
+  replied: 'globals.terms.replied'
+}
 const AUDIENCE_TRANSLATION_KEYS = {
-  all: 'widget.campaign.all',
+  all: 'globals.terms.everyone',
   visitors: 'admin.inbox.livechat.userSettings.visitors',
-  users: 'widget.campaign.users'
+  users: 'globals.terms.signedInUser'
 }
 const SELECT_FIELDS = [
   {
@@ -82,7 +85,7 @@ const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   inboxId: { type: Number, default: 0 },
   brandName: { type: String, default: '' },
-  cooldown: { type: Number, default: 24 },
+  cooldown: { type: String, default: '24h' },
   showErrors: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue', 'update:cooldown', 'update:preview'])
@@ -99,6 +102,9 @@ const stats = ref([])
 const from = ref(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
 const to = ref(new Date().toISOString().slice(0, 10))
 const brandSenderName = computed(() => props.brandName.trim() || t('widget.brandBot'))
+const campaignEventExample = computed(
+  () => `window.Libredesk.trackEvent(${JSON.stringify(campaign.value?.event || 'pricing_viewed')})`
+)
 const senderName = (id) => {
   const agent = usersStore.options.find((item) => String(item.value) === String(id))
   return agent?.label || brandSenderName.value
@@ -120,13 +126,10 @@ const campaignSectionError = (field) =>
     ?.message || ''
 const cooldownError = computed(() => {
   if (!props.showErrors) return ''
-  const value = Number(props.cooldown)
-  return Number.isInteger(value) && value >= 0 && value <= 8760
-    ? ''
-    : t('validation.minmaxNumber', { min: 0, max: 8760 })
+  return isGoDuration(props.cooldown) ? '' : t('validation.invalidDuration')
 })
 
-const audienceLabel = (item) => t(AUDIENCE_TRANSLATION_KEYS[item.audience])
+const audienceLabel = (audience) => t(AUDIENCE_TRANSLATION_KEYS[audience], 2)
 
 const pagesLabel = (item) =>
   item.include_urls.filter(Boolean).length
@@ -160,7 +163,15 @@ const update = (key, value) => {
     props.modelValue.map((item) => {
       if (item.id !== selected.value) return item
       const next = { ...item, [key]: value }
-      if (key === 'repeat' && value !== 'interval' && !(Number.isInteger(next.repeat_hours) && next.repeat_hours >= 1 && next.repeat_hours <= 8760)) {
+      if (
+        key === 'repeat' &&
+        value !== 'interval' &&
+        !(
+          Number.isInteger(next.repeat_hours) &&
+          next.repeat_hours >= 1 &&
+          next.repeat_hours <= 8760
+        )
+      ) {
         next.repeat_hours = defaultCampaign().repeat_hours
       }
       return next
@@ -174,8 +185,17 @@ const toggleEnabled = (id, enabled) =>
     props.modelValue.map((item) => (item.id === id ? { ...item, enabled } : item))
   )
 
-const reorder = (index, offset) =>
-  emit('update:modelValue', moveCampaign(props.modelValue, index, offset))
+const orderedCampaigns = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+})
+
+const moveCampaign = (index, direction) => {
+  const campaigns = [...props.modelValue]
+  const [campaign] = campaigns.splice(index, 1)
+  campaigns.splice(index + direction, 0, campaign)
+  emit('update:modelValue', campaigns)
+}
 
 const add = (source) => {
   const item = source
@@ -202,7 +222,7 @@ const remove = () => {
 }
 
 const showInvalidField = async (field) => {
-  if (field === 'config.campaign_cooldown_hours') {
+  if (field === 'config.campaign_cooldown') {
     root.value?.querySelector('#campaign-cooldown')?.focus()
     return
   }
@@ -242,6 +262,14 @@ const showInvalidField = async (field) => {
 
 defineExpose({ showInvalidField })
 
+const visibleStats = computed(() =>
+  stats.value.filter(
+    (row) =>
+      props.modelValue.some((item) => item.id === row.campaign_id) ||
+      STAT_KEYS.some((key) => row[key] > 0)
+  )
+)
+
 const refreshStats = async () => {
   if (!props.inboxId) return
   try {
@@ -277,83 +305,87 @@ onMounted(async () => {
         <Label for="campaign-cooldown">{{ t('widget.campaignCooldown') }}</Label>
         <Input
           id="campaign-cooldown"
-          type="number"
-          min="0"
-          max="8760"
+          type="text"
+          placeholder="1h"
           :model-value="cooldown"
-          @update:model-value="emit('update:cooldown', Number($event))"
+          aria-describedby="campaign-cooldown-hint"
+          @update:model-value="emit('update:cooldown', $event)"
           :aria-invalid="!!cooldownError"
         />
+        <p id="campaign-cooldown-hint" :class="HINT_CLASS">
+          {{ t('globals.messages.golangDurationHoursMinutes') }}
+        </p>
         <p v-if="cooldownError" role="alert" class="text-sm text-destructive">
           {{ cooldownError }}
         </p>
       </div>
 
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('widget.proactiveMessages') }}</h4>
+        <h4 class="text-base font-semibold text-foreground">
+          {{ t('globals.terms.proactiveMessage', 2) }}
+        </h4>
         <p v-if="modelValue.length > 1" class="text-sm text-muted-foreground">
           {{ t('widget.campaignPriorityHint') }}
         </p>
 
-        <div v-if="modelValue.length" class="space-y-2">
-          <div
-            v-for="(item, index) in modelValue"
-            :key="item.id"
-            class="flex items-center gap-3 border rounded-md hover:bg-accent/50 transition-colors"
-          >
-            <div v-if="modelValue.length > 1" class="ml-2 flex flex-col">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                :class="CAMPAIGN_ORDER_BUTTON_CLASS"
-                :disabled="index === 0"
-                :aria-label="t('globals.messages.moveUp')"
-                @click="reorder(index, -1)"
-              >
-                <ArrowUp class="size-3.5" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                :class="CAMPAIGN_ORDER_BUTTON_CLASS"
-                :disabled="index === modelValue.length - 1"
-                :aria-label="t('globals.messages.moveDown')"
-                @click="reorder(index, 1)"
-              >
-                <ArrowDown class="size-3.5" aria-hidden="true" />
-              </Button>
-            </div>
-            <Switch
-              :class="modelValue.length > 1 ? '' : 'ml-3'"
-              :checked="item.enabled"
-              :aria-label="t('globals.terms.enabled')"
-              @update:checked="toggleEnabled(item.id, $event)"
-            />
-            <button
-              type="button"
-              class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-3 text-left"
-              @click="selected = item.id"
+        <Draggable
+          v-if="modelValue.length"
+          v-model="orderedCampaigns"
+          item-key="id"
+          :animation="200"
+          handle=".drag-handle"
+          :force-fallback="true"
+          fallback-on-body
+          :fallback-tolerance="3"
+          ghost-class="drag-ghost"
+          class="space-y-2"
+        >
+          <template #item="{ element: item, index }">
+            <div
+              class="flex items-center gap-3 border rounded-md hover:bg-accent/50 transition-colors"
             >
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium text-foreground truncate">
-                    {{ item.name || t('widget.newCampaign') }}
-                  </span>
-                  <Badge variant="secondary" class="gap-1 shrink-0">
-                    <component :is="item.enabled ? CircleCheck : CircleSlash" class="size-3" />
-                    {{ item.enabled ? t('globals.terms.enabled') : t('globals.terms.paused') }}
-                  </Badge>
-                </div>
-                <p class="text-xs text-muted-foreground truncate mt-0.5">
-                  {{ audienceLabel(item) }} · {{ pagesLabel(item) }}
-                </p>
+              <div
+                v-if="modelValue.length > 1"
+                class="drag-handle ml-2 cursor-move text-muted-foreground"
+              >
+                <GripVertical class="size-4" aria-hidden="true" />
               </div>
-              <ChevronRight class="size-4 text-muted-foreground shrink-0" />
-            </button>
-          </div>
-        </div>
+              <ReorderButtons
+                v-if="modelValue.length > 1"
+                :index="index"
+                :length="modelValue.length"
+                @move="moveCampaign(index, $event)"
+              />
+              <Switch
+                :class="modelValue.length > 1 ? '' : 'ml-3'"
+                :checked="item.enabled"
+                :aria-label="t('globals.terms.enabled')"
+                @update:checked="toggleEnabled(item.id, $event)"
+              />
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-3 text-left"
+                @click="selected = item.id"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm font-medium text-foreground truncate">
+                      {{ item.name || t('widget.newCampaign') }}
+                    </span>
+                    <Badge variant="secondary" class="gap-1 shrink-0">
+                      <component :is="item.enabled ? CircleCheck : CircleSlash" class="size-3" />
+                      {{ item.enabled ? t('globals.terms.enabled') : t('globals.terms.paused') }}
+                    </Badge>
+                  </div>
+                  <p class="text-xs text-muted-foreground truncate mt-0.5">
+                    {{ audienceLabel(item.audience) }} · {{ pagesLabel(item) }}
+                  </p>
+                </div>
+                <ChevronRight class="size-4 text-muted-foreground shrink-0" />
+              </button>
+            </div>
+          </template>
+        </Draggable>
 
         <Button
           type="button"
@@ -365,7 +397,7 @@ onMounted(async () => {
           <Plus class="size-4" />
           {{ t('widget.addCampaign') }}
         </Button>
-        <p v-if="modelValue.length >= MAX_CAMPAIGNS" class="text-xs text-muted-foreground">
+        <p v-if="modelValue.length >= MAX_CAMPAIGNS" :class="HINT_CLASS">
           {{ t('widget.campaignLimitReached') }}
         </p>
       </div>
@@ -398,12 +430,12 @@ onMounted(async () => {
               <TableRow>
                 <TableHead>{{ t('globals.terms.name') }}</TableHead>
                 <TableHead v-for="key in STAT_KEYS" :key="key" class="text-right">
-                  {{ t(`widget.campaign.${key}`) }}
+                  {{ t(STAT_TRANSLATION_KEYS[key]) }}
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="row in stats" :key="row.campaign_id">
+              <TableRow v-for="row in visibleStats" :key="row.campaign_id">
                 <TableCell>
                   {{
                     modelValue.find((item) => item.id === row.campaign_id)?.name ||
@@ -414,7 +446,7 @@ onMounted(async () => {
                   {{ row[key] }}
                 </TableCell>
               </TableRow>
-              <TableRow v-if="!stats.length">
+              <TableRow v-if="!visibleStats.length">
                 <TableCell :colspan="STAT_KEYS.length + 1" class="text-muted-foreground">
                   {{ t('globals.messages.noResultsFound') }}
                 </TableCell>
@@ -522,7 +554,7 @@ onMounted(async () => {
               <SelectTrigger :id="`campaign-${field.key}`"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="value in field.values" :key="value" :value="value">
-                  {{ t(AUDIENCE_TRANSLATION_KEYS[value]) }}
+                  {{ audienceLabel(value) }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -584,7 +616,7 @@ onMounted(async () => {
             @update:model-value="update(key, $event.split('\n'))"
             :aria-invalid="!!campaignFieldError(key)"
           />
-          <p class="text-xs text-muted-foreground">{{ t('widget.urlPatternsHint') }}</p>
+          <p :class="HINT_CLASS">{{ t('widget.urlPatternsHint') }}</p>
           <p v-if="campaignFieldError(key)" role="alert" class="text-sm text-destructive">
             {{ campaignFieldError(key) }}
           </p>
@@ -616,9 +648,19 @@ onMounted(async () => {
             <Input
               id="campaign-event"
               :model-value="campaign.event"
+              placeholder="pricing_viewed"
               maxlength="128"
+              aria-describedby="campaign-event-hint campaign-event-example"
               @update:model-value="update('event', $event)"
             />
+            <p id="campaign-event-hint" :class="HINT_CLASS">
+              {{ t('widget.campaignEventHint') }}
+            </p>
+            <code
+              id="campaign-event-example"
+              class="block overflow-x-auto rounded-md border bg-muted px-3 py-2 text-xs"
+              >{{ campaignEventExample }}</code
+            >
           </div>
 
           <div class="space-y-2">
@@ -671,7 +713,7 @@ onMounted(async () => {
       <!-- Repeat -->
       <div class="space-y-4">
         <h4 class="text-base font-semibold text-foreground">
-          {{ t('widget.campaign.section.repeat') }}
+          {{ t('globals.terms.repeat') }}
         </h4>
 
         <div class="grid sm:grid-cols-2 gap-4">

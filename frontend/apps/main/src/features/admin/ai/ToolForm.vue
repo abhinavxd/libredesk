@@ -63,7 +63,7 @@
 
     <FormField v-slot="{ componentField, handleChange, meta }" name="headers">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.tool.headers') }}</FormLabel>
+        <FormLabel>{{ t('globals.terms.header', 2) }}</FormLabel>
         <FormControl>
           <ToolHeadersField
             :modelValue="componentField.modelValue"
@@ -125,7 +125,7 @@
 
     <div class="space-y-5 rounded-lg border border-border p-4">
       <div>
-        <h3 class="text-sm font-medium text-foreground">{{ t('globals.terms.agentAccess') }}</h3>
+        <h3 class="font-medium text-sm text-muted-foreground">{{ t('globals.terms.agentAccess') }}</h3>
       </div>
 
       <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">

@@ -15,7 +15,7 @@ const widgetStore = useWidgetStore()
 
 const src = computed(() => {
   const path = `${props.baseUrl}/${encodeURIComponent(props.article.locale)}/articles/${encodeURIComponent(props.article.slug)}?embed=1`
-  return widgetStore.config.dark_mode ? `${path}&theme=dark` : path
+  return widgetStore.isDark ? `${path}&theme=dark` : path
 })
 
 const frameOrigin = computed(() => {

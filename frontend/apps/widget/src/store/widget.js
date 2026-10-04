@@ -15,8 +15,25 @@ export const useWidgetStore = defineStore('widget', () => {
     const connected = ref(false)
 
 
+    const prefersDark = ref(false)
+    const darkQuery = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (darkQuery) {
+        prefersDark.value = darkQuery.matches
+        darkQuery.addEventListener('change', (event) => {
+            prefersDark.value = event.matches
+        })
+    }
+
     // Getters
     const isChatView = computed(() => isInChatView.value)
+
+    const isDark = computed(() => {
+        if (config.value.theme === 'dark') return true
+        if (config.value.theme === 'system') return prefersDark.value
+        return false
+    })
+
+    const branding = computed(() => config.value.branding?.[isDark.value ? 'dark' : 'light'] || {})
 
     // Actions
     const setOpen = (open) => {
@@ -141,6 +158,8 @@ export const useWidgetStore = defineStore('widget', () => {
 
         // Getters
         isChatView,
+        isDark,
+        branding,
 
         // Actions
         setOpen,

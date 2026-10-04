@@ -34,7 +34,7 @@ func TestConcurrentDeliveryAndOwnership(t *testing.T) {
 				t.Error(err)
 				return
 			}
-			if Suppression(c, ctx, history, 24) != "" {
+			if Suppression(c, ctx, history, 24*time.Hour) != "" {
 				return
 			}
 			delivery, err := m.Reserve(inboxID, c, ctx, Snapshot{Message: "Hello"})
@@ -83,7 +83,7 @@ func TestConcurrentDeliveryAndOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if Suppression(c, ctx, history, 24) != "repeat" {
+	if Suppression(c, ctx, history, 24*time.Hour) != "repeat" {
 		t.Fatal("identified contact lost delivery history")
 	}
 }

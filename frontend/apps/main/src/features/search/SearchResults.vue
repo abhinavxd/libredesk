@@ -22,9 +22,9 @@
           {{ t('globals.messages.clearFilters') }}
         </Button>
         <div class="ml-auto flex items-center gap-2">
-          <label for="search-sort" class="text-sm text-muted-foreground">
+          <Label for="search-sort" class="font-normal text-muted-foreground">
             {{ t('globals.messages.sortBy') }}
-          </label>
+          </Label>
           <Select
             :model-value="sorts[activeTab]"
             @update:model-value="emit('changeSort', { type: activeTab, sort: $event })"
@@ -82,6 +82,7 @@
 import { X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
+import { Label } from '@shared-ui/components/ui/label'
 import {
   Select,
   SelectContent,

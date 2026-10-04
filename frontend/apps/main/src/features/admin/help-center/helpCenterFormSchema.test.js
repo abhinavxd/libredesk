@@ -65,6 +65,27 @@ describe('Help Center Form Schema', () => {
     ).not.toThrow()
   })
 
+  test('theme color scheme and dark branding', () => {
+    const withTheme = (theme) => ({ ...validForm, theme })
+    for (const color_scheme of ['system', 'light', 'dark']) {
+      expect(() => schema.parse(withTheme({ color_scheme }))).not.toThrow()
+    }
+    expect(() => schema.parse(withTheme({ color_scheme: 'auto' }))).toThrow()
+    expect(() => schema.parse(withTheme({ color_dark: '#46ce8e' }))).not.toThrow()
+    expect(() => schema.parse(withTheme({ color_dark: 'green' }))).toThrow()
+    expect(() => schema.parse(withTheme({ logo_url_dark: 'not a url' }))).toThrow()
+  })
+
+  test('dark footer colors', () => {
+    const withFooter = (footer) => ({ ...validForm, theme: { footer } })
+    expect(() =>
+      schema.parse(withFooter({ background_color_dark: '#16181b', text_color_dark: '#e5e5e5' }))
+    ).not.toThrow()
+    expect(() => schema.parse(withFooter({ background_color_dark: '' }))).not.toThrow()
+    expect(() => schema.parse(withFooter({ background_color_dark: 'black' }))).toThrow()
+    expect(() => schema.parse(withFooter({ text_color_dark: '#zzz' }))).toThrow()
+  })
+
   test('name missing', () => {
     const { name, ...form } = validForm
     expect(() => schema.parse(form)).toThrow()

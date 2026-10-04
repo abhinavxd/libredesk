@@ -138,22 +138,21 @@ func handleMediaUploadWithMeta(r *fastglue.Request, extraMeta map[string]any) er
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		prepared, err := prepareImageUpload(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
-		}
-		if prepared.thumbnailErr != nil {
-			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+			app.lo.Warn("skipping thumbnail and dimensions, unsupported image format", "error", err)
 		} else {
-			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
-			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
-			if err != nil {
-				cleanUp = true
-				return sendErrorEnvelope(r, err)
+			if prepared.thumbnailErr != nil {
+				app.lo.Warn("skipping thumbnail, unsupported image format", "error", prepared.thumbnailErr)
+			} else {
+				// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
+				uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
+				if err != nil {
+					cleanUp = true
+					return sendErrorEnvelope(r, err)
+				}
+				thumbName = uploadedThumb
 			}
-			thumbName = uploadedThumb
+			meta = prepared.meta
 		}
-		meta = prepared.meta
 	}
 	if len(extraMeta) > 0 {
 		var values map[string]any
@@ -275,22 +274,19 @@ func serveMediaFile(r *fastglue.Request, app *App, uuid string, media *mmodels.M
 	consts := app.consts.Load().(*constants)
 	switch consts.UploadProvider {
 	case "fs":
-		disposition := "attachment"
-
-		// Inline images/videos/pdfs. SVG excluded.
-		if !forceDownload &&
-			media.ContentType != "image/svg+xml" &&
-			(strings.HasPrefix(media.ContentType, "image/") ||
-				strings.HasPrefix(media.ContentType, "video/") ||
-				media.ContentType == "application/pdf") {
-			disposition = "inline"
+		// Older rows hold content types exactly as the client sent them.
+		contentType := mmodels.NormalizeContentType(media.ContentType)
+		disposition := mmodels.ContentDisposition(contentType)
+		if forceDownload {
+			disposition = mmodels.DispositionAttachment
 		}
 
-		r.RequestCtx.Response.Header.Set("Content-Type", media.ContentType)
+		r.RequestCtx.Response.Header.Set("Content-Type", contentType)
 		r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": media.Filename}))
 		r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-		// Sandbox SVGs.
-		if media.ContentType == "image/svg+xml" {
+		// Chrome's video and PDF viewers break in a sandbox, and inline types run no script anyway.
+		// Downloads are sandboxed for webviews that render attachments inline.
+		if disposition == mmodels.DispositionAttachment {
 			r.RequestCtx.Response.Header.Set("Content-Security-Policy", "sandbox")
 		}
 		r.RequestCtx.Response.Header.Set("Cache-Control", fmt.Sprintf("%s, max-age=%d, immutable", cacheVisibility(media.Private), int(mediaCacheTTL.Seconds())))

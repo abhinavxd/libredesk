@@ -132,6 +132,9 @@
     :collection-id="editingArticle?.collection_id || createArticleCollectionId"
     :help-center-id="parseInt(id)"
     :help-center-name="helpCenter?.name || ''"
+    :help-center-slug="helpCenter?.slug || ''"
+    :help-center-color="helpCenter?.theme?.color || ''"
+    :help-center-color-dark="helpCenter?.theme?.color_dark || ''"
     :help-center-locales="helpCenter?.allowed_locales || ['en']"
     :default-locale="props.locale"
     :translation-source="translationSource"
@@ -142,7 +145,6 @@
     @create-translation="openCreateTranslation"
     @create-translation-collection="openCreateTranslationCollection"
     @open-translation="openTranslation"
-    @manage-languages="editHelpCenter"
   />
 
   <CollectionEditSheet

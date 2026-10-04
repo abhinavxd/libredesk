@@ -103,7 +103,7 @@ const config = computed(() => widgetStore.config)
 const quickReplies = computed(() => {
   if (chatStore.currentConversation?.uuid) return []
   const audience = userStore.isVisitor ? config.value.visitors : config.value.users
-  return audience?.quick_replies ?? config.value.quick_replies ?? []
+  return audience?.quick_replies ?? []
 })
 const mediaFiles = computed(() => chatStore.attachmentDrafts[draftKey.value] || [])
 const uploadingAttachmentIds = ref(new Set())

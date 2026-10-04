@@ -103,6 +103,8 @@ func matchesURL(patterns []string, raw string) bool {
 		switch {
 		case strings.HasPrefix(pattern, "/"):
 			candidate = target.RequestURI()
+		case !strings.Contains(pattern, "://") && !strings.Contains(pattern, "/"):
+			candidate = target.Hostname()
 		case !strings.Contains(pattern, "://"):
 			candidate = strings.TrimPrefix(candidate, target.Scheme+"://")
 		}

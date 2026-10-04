@@ -108,6 +108,12 @@ export const adminNavItems = [
         permission: 'inboxes:manage',
         isTitleKeyPlural: true,
         icon: 'Inbox'
+      },
+      {
+        titleKey: 'admin.whatsappTemplates.title',
+        href: '/admin/whatsapp/templates',
+        permission: 'inboxes:manage',
+        icon: 'WhatsApp'
       }
     ]
   },

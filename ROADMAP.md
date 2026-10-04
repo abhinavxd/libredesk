@@ -6,7 +6,7 @@ The open-source customer support platform you actually own. One inbox for email,
 - WhatsApp channel - WIP
 - Web / Customer Portal to manage tickets - WIP
 - 2FA for password login - WIP
-- Telegram channel - TODO
+- Telegram channel - WIP
 
 ## Mid Term
 - Extensive conversation reports - TODO

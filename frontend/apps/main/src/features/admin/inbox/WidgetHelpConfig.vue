@@ -11,6 +11,7 @@ import {
   SelectItem
 } from '@shared-ui/components/ui/select'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import { GripVertical, X, FileText } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
 
@@ -50,6 +51,13 @@ const featured = computed({
     )
 })
 
+const moveFeatured = (index, direction) => {
+  const ids = [...featuredIds.value]
+  const [id] = ids.splice(index, 1)
+  ids.splice(index + direction, 0, id)
+  update('featured_ids', ids)
+}
+
 const unusedArticles = computed(() =>
   props.articles.filter((article) => !featuredIds.value.includes(article.id))
 )
@@ -79,7 +87,7 @@ const unusedArticles = computed(() =>
     </div>
 
     <p v-if="failed" role="alert" class="text-sm text-destructive">
-      {{ t('widget.helpLoadError') }}
+      {{ t('globals.messages.helpLoadError') }}
     </p>
 
     <template v-if="modelValue.help_center_id">
@@ -108,7 +116,9 @@ const unusedArticles = computed(() =>
       </div>
 
       <div data-featured-articles class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('widget.featuredArticles') }}</h4>
+        <h4 class="text-base font-semibold text-foreground">
+          {{ t('globals.terms.featuredArticle', 2) }}
+        </h4>
         <p class="text-sm text-muted-foreground">{{ t('widget.featuredArticlesHint') }}</p>
 
         <Draggable
@@ -116,19 +126,28 @@ const unusedArticles = computed(() =>
           item-key="id"
           :animation="200"
           handle=".drag-handle"
+          :force-fallback="true"
+          fallback-on-body
+          :fallback-tolerance="3"
+          ghost-class="drag-ghost"
           class="space-y-2"
         >
           <template #item="{ element: item, index }">
             <div class="flex items-center gap-2 p-2 border rounded-md">
               <div class="drag-handle cursor-move text-muted-foreground">
-                <GripVertical class="size-4" />
+                <GripVertical class="size-4" aria-hidden="true" />
               </div>
+              <ReorderButtons
+                :index="index"
+                :length="featured.length"
+                @move="moveFeatured(index, $event)"
+              />
               <FileText class="size-4 shrink-0 text-muted-foreground" />
               <span
                 class="flex-1 min-w-0 text-sm break-words"
                 :class="{ 'text-muted-foreground': !item.title }"
               >
-                {{ item.title || t('widget.articleUnavailable') }}
+                {{ item.title || t('globals.messages.articleUnavailable') }}
               </span>
               <Button
                 type="button"
@@ -142,7 +161,7 @@ const unusedArticles = computed(() =>
                   )
                 "
               >
-                <X class="size-4" />
+                <X class="size-4" aria-hidden="true" />
               </Button>
             </div>
           </template>
@@ -154,7 +173,7 @@ const unusedArticles = computed(() =>
           @update:model-value="update('featured_ids', [...featuredIds, Number($event)])"
         >
           <SelectTrigger class="max-w-md">
-            <SelectValue :placeholder="t('widget.selectArticle')" />
+            <SelectValue :placeholder="t('placeholders.selectArticle')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem

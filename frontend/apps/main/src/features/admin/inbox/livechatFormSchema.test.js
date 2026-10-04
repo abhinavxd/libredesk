@@ -2,7 +2,6 @@
 import { describe, test, expect } from 'vitest'
 import {
   createFormSchema,
-  moveCampaign,
   normalizeAudienceConfig,
   normalizePrechatConfig
 } from './livechatFormSchema'
@@ -10,25 +9,34 @@ import {
 const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
 const schema = createFormSchema(mockT)
 
+const validBranding = {
+  colors: { primary: '#2563eb' },
+  logo_url: '',
+  launcher: { logo_url: '', color: '#2563eb' },
+  home_screen: {
+    header_text_color: 'white',
+    background: { type: 'solid', color: '#2563eb' },
+    fade_background: true
+  }
+}
+
 const validConfig = {
   brand_name: 'Acme',
-  dark_mode: false,
+  theme: 'light',
   show_powered_by: true,
   language: 'en',
   launcher: {
     position: 'right',
-    color: '#2563eb',
+    icon_scale: 100,
     spacing: { side: 20, bottom: 20 }
   },
   chat_introduction: 'Ask us anything',
   show_office_hours_in_chat: true,
   show_office_hours_after_assignment: false,
   notice_banner: { enabled: false },
-  colors: { primary: '#2563eb' },
-  home_screen: {
-    header_text_color: 'white',
-    background: { type: 'solid', color: '#2563eb' },
-    fade_background: true
+  branding: {
+    light: validBranding,
+    dark: validBranding
   },
   features: { file_upload: true, emoji: true },
   session_duration: '720h',
@@ -57,6 +65,21 @@ const validForm = {
 }
 
 const withConfig = (overrides) => ({ ...validForm, config: { ...validConfig, ...overrides } })
+const withVisitorReplies = (quickReplies) =>
+  withConfig({ visitors: { ...validConfig.visitors, quick_replies: quickReplies } })
+const withContinuity = (continuity) => ({
+  ...withConfig({ continuity }),
+  linked_email_inbox_id: 3
+})
+const withBranding = (overrides, theme = 'light') =>
+  withConfig({
+    branding: {
+      ...validConfig.branding,
+      [theme]: { ...validBranding, ...overrides }
+    }
+  })
+const withHomeScreen = (overrides, theme = 'light') =>
+  withBranding({ home_screen: { ...validBranding.home_screen, ...overrides } }, theme)
 const validCampaign = {
   id: '8a3660e6-e29b-461c-924f-314c7576f75a',
   name: 'Pricing invitation',
@@ -80,13 +103,7 @@ const validCampaign = {
 
 describe('Livechat Inbox Form Schema', () => {
   test('valid minimal form', () => {
-    const parsed = schema.parse(validForm)
-    expect(parsed.config.previews).toEqual({
-      desktop: true,
-      mobile: true,
-      content: 'message',
-      auto_hide_seconds: 0
-    })
+    expect(() => schema.parse(validForm)).not.toThrow()
   })
 
   test('help tab preserves audience placement and featured article order', () => {
@@ -124,23 +141,6 @@ describe('Livechat Inbox Form Schema', () => {
     ).toThrow()
   })
 
-  test('reply preview settings enforce the auto-hide range', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          previews: { desktop: true, mobile: false, content: 'generic', auto_hide_seconds: 300 }
-        })
-      )
-    ).not.toThrow()
-    expect(() =>
-      schema.parse(
-        withConfig({
-          previews: { desktop: true, mobile: true, content: 'message', auto_hide_seconds: 301 }
-        })
-      )
-    ).toThrow()
-  })
-
   test('valid complete form', () => {
     expect(() =>
       schema.parse({
@@ -155,7 +155,6 @@ describe('Livechat Inbox Form Schema', () => {
           greeting_message: 'Hi there',
           introduction_message: 'We reply fast',
           chat_reply_expectation_message: 'Usually within an hour',
-          quick_replies: 'Billing question\nReset my password',
           notice_banner: { enabled: true, text: 'We are on holiday' },
           continuity: {
             offline_threshold: '5m',
@@ -192,8 +191,8 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('quick replies accept empty and repeated values', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: '' }))).not.toThrow()
-    expect(() => schema.parse(withConfig({ quick_replies: 'Billing\nBilling' }))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies(''))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies('Billing\nBilling'))).not.toThrow()
   })
 
   test('campaigns trim and discard blank URL rows', () => {
@@ -269,7 +268,7 @@ describe('Livechat Inbox Form Schema', () => {
             repeat_hours: 0
           }
         ],
-        campaign_cooldown_hours: -1
+        campaign_cooldown: 'tomorrow'
       })
     )
     expect(result.success).toBe(false)
@@ -277,17 +276,26 @@ describe('Livechat Inbox Form Schema', () => {
       'widget.campaignUrlLimit {}',
       'validation.minmaxNumber {"min":0,"max":86400}',
       'validation.minmaxNumber {"min":1,"max":8760}',
-      'validation.minmaxNumber {"min":0,"max":8760}'
+      'validation.invalidDuration {}'
     ])
   })
 
+  test.each(['0s', '10m', '1h', '1h30m'])(
+    'campaign cooldown accepts %s',
+    (campaignCooldown) => {
+      expect(() =>
+        schema.parse(withConfig({ campaign_cooldown: campaignCooldown }))
+      ).not.toThrow()
+    }
+  )
+
   test('quick replies reject more than six non-empty lines', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: '1\n2\n3\n4\n5\n6\n7' }))).toThrow()
-    expect(() => schema.parse(withConfig({ quick_replies: '1\n2\n\n3\n4\n5\n6' }))).not.toThrow()
+    expect(() => schema.parse(withVisitorReplies('1\n2\n3\n4\n5\n6\n7'))).toThrow()
+    expect(() => schema.parse(withVisitorReplies('1\n2\n\n3\n4\n5\n6'))).not.toThrow()
   })
 
   test('quick replies reject entries over 120 characters', () => {
-    expect(() => schema.parse(withConfig({ quick_replies: 'x'.repeat(121) }))).toThrow()
+    expect(() => schema.parse(withVisitorReplies('x'.repeat(121)))).toThrow()
   })
 
   test('audience quick replies are validated independently', () => {
@@ -301,31 +309,13 @@ describe('Livechat Inbox Form Schema', () => {
     ).toThrow()
   })
 
-  test('legacy audience settings are copied without changing behavior', () => {
-    const config = {
-      ...validConfig,
-      quick_replies: ['Billing', 'Support'],
-      direct_to_conversation: true
-    }
+  test('legacy direct to conversation is copied to both audiences', () => {
+    const config = { ...validConfig, direct_to_conversation: true }
     expect(normalizeAudienceConfig(config, 'visitors')).toMatchObject({
-      quick_replies: 'Billing\nSupport',
       direct_to_conversation: true
     })
     expect(normalizeAudienceConfig(config, 'users')).toMatchObject({
-      quick_replies: 'Billing\nSupport',
       direct_to_conversation: true
-    })
-  })
-
-  test('explicit empty audience quick replies do not fall back to legacy replies', () => {
-    const config = {
-      ...validConfig,
-      quick_replies: ['Legacy'],
-      visitors: { ...validConfig.visitors, quick_replies: [], direct_to_conversation: false }
-    }
-    expect(normalizeAudienceConfig(config, 'visitors')).toMatchObject({
-      quick_replies: '',
-      direct_to_conversation: false
     })
   })
 
@@ -370,12 +360,6 @@ describe('Livechat Inbox Form Schema', () => {
         config: { ...validForm.config, prechat_form: config }
       })
     ).not.toThrow()
-  })
-
-  test('campaign priority follows saved array order', () => {
-    const campaigns = [{ id: 'first' }, { id: 'second' }, { id: 'third' }]
-    expect(moveCampaign(campaigns, 2, -1).map(({ id }) => id)).toEqual(['first', 'third', 'second'])
-    expect(campaigns.map(({ id }) => id)).toEqual(['first', 'second', 'third'])
   })
 
   test('name missing', () => {
@@ -425,15 +409,45 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('primary color invalid hex', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: 'blue' } }))).toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: 'blue' } }))).toThrow()
   })
 
   test('primary color three digit hex accepted', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: '#fff' } }))).not.toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: '#fff' } }))).not.toThrow()
   })
 
   test('primary color eight digit hex rejected', () => {
-    expect(() => schema.parse(withConfig({ colors: { primary: '#ffffff00' } }))).toThrow()
+    expect(() => schema.parse(withBranding({ colors: { primary: '#ffffff00' } }))).toThrow()
+  })
+
+  test('dark primary color validated too', () => {
+    expect(() => schema.parse(withBranding({ colors: { primary: 'blue' } }, 'dark'))).toThrow()
+  })
+
+  test('theme invalid', () => {
+    expect(() => schema.parse(withConfig({ theme: 'auto' }))).toThrow()
+  })
+
+  test.each(['system', 'light', 'dark'])('theme accepts %s', (theme) => {
+    expect(() => schema.parse(withConfig({ theme }))).not.toThrow()
+  })
+
+  test('launcher icon scale out of range', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 39 } }))
+    ).toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 101 } }))
+    ).toThrow()
+  })
+
+  test('launcher icon scale at boundaries', () => {
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 40 } }))
+    ).not.toThrow()
+    expect(() =>
+      schema.parse(withConfig({ launcher: { ...validConfig.launcher, icon_scale: 100 } }))
+    ).not.toThrow()
   })
 
   test('launcher position invalid', () => {
@@ -496,76 +510,43 @@ describe('Livechat Inbox Form Schema', () => {
   })
 
   test('home screen header_text_color invalid', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, header_text_color: 'grey' }
-        })
-      )
-    ).toThrow()
+    expect(() => schema.parse(withHomeScreen({ header_text_color: 'grey' }))).toThrow()
   })
 
   test('solid background without a color accepted', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'solid' } }
-        })
-      )
-    ).not.toThrow()
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'solid' } }))).not.toThrow()
   })
 
   test('gradient background requires both stops', () => {
     expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'gradient', gradient_start: '#000000' }
-          }
-        })
-      )
+      schema.parse(withHomeScreen({ background: { type: 'gradient', gradient_start: '#000000' } }))
     ).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'gradient', gradient_start: '#000000', gradient_end: '#ffffff' }
-          }
+        withHomeScreen({
+          background: { type: 'gradient', gradient_start: '#000000', gradient_end: '#ffffff' }
         })
       )
     ).not.toThrow()
   })
 
   test('image background requires an image url', () => {
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'image' } }))).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'image' } }
-        })
-      )
-    ).toThrow()
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: {
-            ...validConfig.home_screen,
-            background: { type: 'image', image_url: 'https://cdn.example.com/bg.png' }
-          }
+        withHomeScreen({
+          background: { type: 'image', image_url: 'https://cdn.example.com/bg.png' }
         })
       )
     ).not.toThrow()
   })
 
   test('background type invalid', () => {
-    expect(() =>
-      schema.parse(
-        withConfig({
-          home_screen: { ...validConfig.home_screen, background: { type: 'video' } }
-        })
-      )
-    ).toThrow()
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'video' } }))).toThrow()
+  })
+
+  test('dark background validated too', () => {
+    expect(() => schema.parse(withHomeScreen({ background: { type: 'image' } }, 'dark'))).toThrow()
   })
 
   test('session_duration invalid duration', () => {
@@ -588,15 +569,50 @@ describe('Livechat Inbox Form Schema', () => {
     expect(() => schema.parse(validForm)).not.toThrow()
   })
 
-  test('continuity offline_threshold invalid duration', () => {
+  test('continuity blank when no email inbox is linked', () => {
     expect(() =>
       schema.parse(
         withConfig({
-          continuity: {
-            offline_threshold: '5 min',
-            max_messages_per_email: 10,
-            min_email_interval: '30m'
-          }
+          continuity: { offline_threshold: '', max_messages_per_email: 0, min_email_interval: '' }
+        })
+      )
+    ).not.toThrow()
+    expect(() => schema.parse(withConfig({ continuity: {} }))).not.toThrow()
+  })
+
+  test('continuity required when an email inbox is linked', () => {
+    expect(() => schema.parse(withContinuity({}))).toThrow()
+    expect(() =>
+      schema.parse(
+        withContinuity({ offline_threshold: '', max_messages_per_email: 10, min_email_interval: '30m' })
+      )
+    ).toThrow()
+    expect(() =>
+      schema.parse(
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 10, min_email_interval: '' })
+      )
+    ).toThrow()
+  })
+
+  test('continuity offline_threshold invalid duration', () => {
+    expect(() =>
+      schema.parse(
+        withContinuity({
+          offline_threshold: '5 min',
+          max_messages_per_email: 10,
+          min_email_interval: '30m'
+        })
+      )
+    ).toThrow()
+  })
+
+  test('continuity max_messages_per_email rejects a fraction', () => {
+    expect(() =>
+      schema.parse(
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 1.5,
+          min_email_interval: '30m'
         })
       )
     ).toThrow()
@@ -605,23 +621,15 @@ describe('Livechat Inbox Form Schema', () => {
   test('continuity max_messages_per_email out of range', () => {
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 0,
-            min_email_interval: '30m'
-          }
-        })
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 0, min_email_interval: '30m' })
       )
     ).toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 101,
-            min_email_interval: '30m'
-          }
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 101,
+          min_email_interval: '30m'
         })
       )
     ).toThrow()
@@ -630,23 +638,15 @@ describe('Livechat Inbox Form Schema', () => {
   test('continuity max_messages_per_email at boundaries', () => {
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 1,
-            min_email_interval: '30m'
-          }
-        })
+        withContinuity({ offline_threshold: '5m', max_messages_per_email: 1, min_email_interval: '30m' })
       )
     ).not.toThrow()
     expect(() =>
       schema.parse(
-        withConfig({
-          continuity: {
-            offline_threshold: '5m',
-            max_messages_per_email: 100,
-            min_email_interval: '30m'
-          }
+        withContinuity({
+          offline_threshold: '5m',
+          max_messages_per_email: 100,
+          min_email_interval: '30m'
         })
       )
     ).not.toThrow()

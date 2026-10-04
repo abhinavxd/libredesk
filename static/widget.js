@@ -28,6 +28,8 @@
             this.EXPANDED_WIDTH = '750px';
             this.MOBILE_BREAKPOINT = 600;
             this.LAUNCHER_SIZE = 60;
+            this.LAUNCHER_IFRAME_GAP = 20;
+            this.DEFAULT_LAUNCHER_ICON_SCALE = 100;
             this.LAUNCHER_HOVER_SCALE = 1.08;
             this.LAUNCHER_OPEN_SCALE = 0.9;
             this.MOBILE_LAUNCHER_SIZE = 60;
@@ -45,8 +47,6 @@
             this.unreadCount = 0;
             this.previewData = null;
             this.previewHost = null;
-            this.previewTimers = new Map();
-            this.hiddenPreviews = new Set();
             this.campaignData = null;
             this.campaignActiveSeconds = 0;
             this.campaignURL = location.href;
@@ -161,13 +161,13 @@
                 }
                 this.createElements();
                 this.setLauncherPosition();
+                this.watchColorScheme();
                 this.widgetButtonWrapper.style.display = 'none';
                 this.iframe.addEventListener('load', () => {
                     this.sendMobileState();
                 });
                 this.setupMobileDetection();
                 this.setupEventListeners();
-                this.startPageTracking();
             } catch (error) {
                 console.error('Failed to initialize Libredesk Widget:', error);
             }
@@ -217,8 +217,7 @@
         }
 
         createElements () {
-            const launcher = this.widgetSettings.launcher;
-            const colors = this.widgetSettings.colors;
+            const branding = this.branding();
 
             this.toggleButton = document.createElement('div');
             this.toggleButton.style.cssText = `
@@ -227,7 +226,7 @@
                 z-index: 9999;
                 width: ${this.launcherSize()}px;
                 height: ${this.launcherSize()}px;
-                background-color: ${launcher.color || colors.primary};
+                background-color: ${this.launcherColor()};
                 border-radius: 50%;
                 display: flex;
                 justify-content: center;
@@ -247,13 +246,8 @@
             `;
 
             this.defaultIcon = document.createElement('img');
-            this.defaultIcon.src = launcher.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
-            this.defaultIcon.style.cssText = `
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                object-fit: cover;
-            `;
+            this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.styleLauncherIcon();
             this.iconContainer.appendChild(this.defaultIcon);
 
             this.arrowIcon = document.createElement('div');
@@ -264,7 +258,7 @@
             svg.setAttribute('fill', 'none');
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.setAttribute('d', 'M7 10L12 15L17 10');
-            path.setAttribute('stroke', this.contrastColor(launcher.color || colors.primary));
+            path.setAttribute('stroke', this.contrastColor(this.launcherColor()));
             path.setAttribute('stroke-width', '2');
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('stroke-linejoin', 'round');
@@ -353,9 +347,63 @@
             return this.isMobile ? this.MOBILE_LAUNCHER_SIZE : this.LAUNCHER_SIZE;
         }
 
+        launcherIconScale () {
+            return this.widgetSettings?.launcher?.icon_scale || this.DEFAULT_LAUNCHER_ICON_SCALE;
+        }
+
+        styleLauncherIcon () {
+            if (!this.defaultIcon) return;
+            const scale = this.launcherIconScale();
+            const full = scale >= 100;
+            const style = this.defaultIcon.style;
+            style.width = `${scale}%`;
+            style.height = `${scale}%`;
+            style.borderRadius = full ? '50%' : '0';
+            style.objectFit = full ? 'cover' : 'contain';
+        }
+
+        prefersDark () {
+            return Boolean(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        }
+
+        branding () {
+            const theme = this.widgetSettings.theme;
+            const isDark = theme === 'dark' || (theme === 'system' && this.prefersDark());
+            return this.widgetSettings.branding?.[isDark ? 'dark' : 'light'] || {};
+        }
+
+        launcherColor () {
+            const branding = this.branding();
+            return branding.launcher?.color || branding.colors?.primary || '#000000';
+        }
+
+        applyLauncherTheme () {
+            if (!this.toggleButton) return;
+            const branding = this.branding();
+            this.toggleButton.style.backgroundColor = this.launcherColor();
+            this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.styleLauncherIcon();
+            const path = this.arrowIcon.querySelector('path');
+            if (path) path.setAttribute('stroke', this.contrastColor(this.launcherColor()));
+        }
+
+        watchColorScheme () {
+            if (!window.matchMedia) return;
+            const query = window.matchMedia('(prefers-color-scheme: dark)');
+            const onChange = () => {
+                if (this.widgetSettings.theme === 'system') this.applyLauncherTheme();
+            };
+            // Safari 13.1 and older only have the deprecated addListener.
+            if (query.addEventListener) query.addEventListener('change', onChange);
+            else if (query.addListener) query.addListener(onChange);
+        }
+
+        iframeBottomOffset () {
+            return this.widgetSettings.launcher.spacing.bottom + this.launcherSize() + this.LAUNCHER_IFRAME_GAP;
+        }
+
         getNormalIframeHeight () {
-            const bottom = this.widgetSettings.launcher.spacing.bottom;
-            return `min(${this.IFRAME_HEIGHT}, calc(100vh - ${bottom + 100}px))`;
+            return `min(${this.IFRAME_HEIGHT}, calc(100vh - ${this.iframeBottomOffset() + this.LAUNCHER_IFRAME_GAP}px))`;
         }
 
         sendPageInfo () {
@@ -406,7 +454,7 @@
             } else {
                 iframe.style.width = this.IFRAME_WIDTH;
                 iframe.style.height = this.getNormalIframeHeight();
-                iframe.style.bottom = `${spacing.bottom + 80}px`;
+                iframe.style.bottom = `${this.iframeBottomOffset()}px`;
             }
         }
 
@@ -510,6 +558,7 @@
         }
 
         handleVueAppReady () {
+            this.startPageTracking();
             this.sendMobileState();
 
             var visitorToken = this.getCookie(this.getCookieName('visitor'));
@@ -670,23 +719,12 @@
             this.previewData = null;
             this.campaignData = null;
             this.dismissedPreviews = [];
-            this.hiddenPreviews.clear();
             this.previewHost?.remove();
             this.previewHost = null;
             this.previewSignature = '';
-            for (const timer of this.previewTimers.values()) clearTimeout(timer);
-            this.previewTimers.clear();
-        }
-
-        hidePreview (key) {
-            this.previewTimers.delete(key);
-            this.hiddenPreviews.add(key);
-            this.renderPreviews();
         }
 
         dismissPreview (key) {
-            clearTimeout(this.previewTimers.get(key));
-            this.previewTimers.delete(key);
             if (this.campaignData?.id === key) {
                 this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'dismissed', id: key });
                 this.campaignData = null;
@@ -707,13 +745,12 @@
             const invitation = this.campaignData;
             if (invitation && this.unreadCount === 0 && data) {
                 const snapshot = invitation.snapshot;
-                data = { ...data, identity: 'campaign', config: { desktop: true, mobile: true, auto_hide_seconds: 0 }, previews: [{
+                data = { ...data, identity: 'campaign', previews: [{
                     key: invitation.id, campaign: true, name: snapshot.sender, avatar: snapshot.avatar,
                     text: snapshot.message.slice(0, 240),
                 }] };
             }
-            const enabled = data?.config?.[this.isMobile ? 'mobile' : 'desktop'];
-            if (!data || !enabled || !this.widgetLoaded || this.isChatVisible || this.hideLauncher) {
+            if (!data || !this.widgetLoaded || this.isChatVisible || this.hideLauncher) {
                 this.previewHost?.remove();
                 this.previewHost = null;
                 this.previewSignature = '';
@@ -722,8 +759,8 @@
             const storageKey = `libredesk-previews-${this.config.inboxID}-${data.identity || 'visitor'}`;
             let dismissed = this.dismissedPreviews || [];
             try { dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch {}
-            const previews = data.previews.filter(item => !dismissed.includes(item.key) && !this.hiddenPreviews.has(item.key)).slice(0, 3);
-            const signature = JSON.stringify([previews, data.theme, data.labels, this.isMobile]);
+            const previews = data.previews.filter(item => !dismissed.includes(item.key)).slice(0, 3);
+            const signature = JSON.stringify([previews, data.theme, data.labels]);
             if (signature === this.previewSignature) return;
             this.previewSignature = signature;
             this.previewHost?.remove();
@@ -795,9 +832,6 @@
                 close.addEventListener('click', () => { this.dismissPreview(item.key); this.toggleButton.focus(); });
                 card.append(open, close);
                 stack.append(card);
-                if (data.config.auto_hide_seconds > 0 && !this.previewTimers.has(item.key)) {
-                    this.previewTimers.set(item.key, setTimeout(() => this.hidePreview(item.key), data.config.auto_hide_seconds * 1000));
-                }
             }
             if (previews.length > 1) {
                 const all = document.createElement('button');
@@ -830,6 +864,8 @@
                     elapsed = 0;
                     asked = false;
                     gap = firstGap();
+                    if (this.campaignData) this.dropCampaign(this.campaignData.id);
+                    this.renderPreviews();
                 }
                 if (document.hidden || this.isChatVisible || this.hideLauncher) return;
                 this.campaignActiveSeconds += delta;

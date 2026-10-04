@@ -79,7 +79,7 @@ function getAvatarUrl(conversation) {
     if (assignee?.id > 0) {
       return assignee.avatar_url || ''
     }
-    return widgetStore.config.launcher?.logo_url || ''
+    return widgetStore.branding?.launcher?.logo_url || ''
   }
   return author?.avatar_url || ''
 }

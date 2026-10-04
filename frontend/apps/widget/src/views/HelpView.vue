@@ -68,7 +68,8 @@ const search = async () => {
     if (!valid(identity) || help.query.trim() !== query) return
     help.results = response.data.data || []
   } catch {
-    if (valid(identity) && help.query.trim() === query) error.value = t('widget.helpLoadError')
+    if (valid(identity) && help.query.trim() === query)
+      error.value = t('globals.messages.helpLoadError')
   } finally {
     searching.value = false
   }
@@ -91,7 +92,7 @@ const openArticle = async ({ id, slug, locale: articleLocale }) => {
     await nextTick()
     backButton.value?.$el?.focus()
   } catch {
-    if (valid(identity)) error.value = t('widget.helpLoadError')
+    if (valid(identity)) error.value = t('globals.messages.helpLoadError')
   } finally {
     busy.value = false
   }
@@ -183,7 +184,7 @@ onMounted(async () => {
         <Spinner size="md" absolute />
       </div>
       <div v-if="error || help.failed" role="alert" class="p-4 text-sm">
-        <p>{{ error || t('widget.helpLoadError') }}</p>
+        <p>{{ error || t('globals.messages.helpLoadError') }}</p>
         <Button type="button" variant="outline" class="mt-2" @click="retry">{{
           t('globals.terms.tryAgain')
         }}</Button>
@@ -223,7 +224,7 @@ onMounted(async () => {
           >
             <FileQuestionMark class="w-10 h-10 text-muted-foreground mb-4" aria-hidden="true" />
             <p class="text-sm text-muted-foreground">
-              {{ t('widget.noResultsFor', { query: help.query.trim() }) }}
+              {{ t('globals.messages.noResultsFor', { query: help.query.trim() }) }}
             </p>
             <StartConversationButton class="mt-4" />
           </div>

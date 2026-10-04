@@ -93,9 +93,9 @@ type handoffFormReq struct {
 }
 
 type chatSettingsResponse struct {
-	Campaigns    *struct{} `json:"campaigns,omitempty"`
-	HasCampaigns bool      `json:"has_campaigns"`
-	CampaignDelaySeconds int `json:"campaign_delay_seconds"`
+	Campaigns            *struct{} `json:"campaigns,omitempty"`
+	HasCampaigns         bool      `json:"has_campaigns"`
+	CampaignDelaySeconds int       `json:"campaign_delay_seconds"`
 	livechat.Config
 	// Hide server-side fields from the public widget response.
 	TrustedDomains         *struct{}                     `json:"trusted_domains,omitempty"`
@@ -123,10 +123,7 @@ func handleGetChatLauncherSettings(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
 	}
 
-	return r.SendEnvelope(map[string]any{
-		"launcher": config.Launcher,
-		"colors":   config.Colors,
-	})
+	return r.SendEnvelope(chatLauncherSettings(config))
 }
 
 // handleGetChatSettings returns the live chat settings for the widget
@@ -136,11 +133,6 @@ func handleGetChatSettings(r *fastglue.Request) error {
 	config, err := getWidgetConfig(r)
 	if err != nil {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, err.Error(), nil))
-	}
-	if config.Previews.Content == "" {
-		config.Previews.Desktop = true
-		config.Previews.Mobile = true
-		config.Previews.Content = "message"
 	}
 	customAttributes := map[int]customAttributeWidget(nil)
 	if config.PreChatForm.Enabled {
@@ -609,6 +601,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	return sendChatMessageResponse(app, r, message.UUID)
 }
 
+// handleChatSubmitHandoffForm saves the form the AI agent asks the visitor to fill before it hands the chat to a human agent.
 func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	var (
 		app              = r.Context.(*App)
@@ -669,7 +662,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 		app.lo.Error("error completing AI handoff form", "conversation_uuid", conversation.UUID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
 	}
-	return r.SendEnvelope(map[string]bool{"handed_off": true})
+	return r.SendEnvelope(true)
 }
 
 // handleWidgetMediaUpload handles media uploads for the widget.
@@ -1415,4 +1408,22 @@ func canReply(r *fastglue.Request, conversation cmodels.Conversation) error {
 		return envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationClosed"), nil)
 	}
 	return nil
+}
+
+func launcherBranding(b livechat.Branding) map[string]any {
+	return map[string]any{
+		"colors":   b.Colors,
+		"launcher": b.Launcher,
+	}
+}
+
+func chatLauncherSettings(config livechat.Config) map[string]any {
+	return map[string]any{
+		"theme":    config.Theme,
+		"launcher": config.Launcher,
+		"branding": map[string]any{
+			"light": launcherBranding(config.Branding.Light),
+			"dark":  launcherBranding(config.Branding.Dark),
+		},
+	}
 }

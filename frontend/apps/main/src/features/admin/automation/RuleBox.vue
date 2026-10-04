@@ -42,7 +42,7 @@
               v-model="rule.field"
               @update:modelValue="(value) => handleFieldChange(value, index)"
             >
-              <SelectTrigger class="w-56">
+              <SelectTrigger :class="fieldClass">
                 <SelectValue :placeholder="t('placeholders.selectField')" />
               </SelectTrigger>
               <SelectContent>
@@ -53,7 +53,7 @@
                     {{ field.label }}
                   </SelectItem>
                   <!-- Contact custom attributes -->
-                  <SelectLabel>{{ $t('globals.terms.contact') }}</SelectLabel>
+                  <SelectLabel v-if="hasContactCustomAttributes">{{ $t('globals.terms.contact') }}</SelectLabel>
                   <SelectItem
                     v-for="(field, key) in contactCustomAttributes"
                     :key="key"
@@ -70,7 +70,7 @@
               v-model="rule.operator"
               @update:modelValue="(value) => handleOperatorChange(value, index)"
             >
-              <SelectTrigger class="w-56">
+              <SelectTrigger :class="fieldClass">
                 <SelectValue :placeholder="t('placeholders.selectOperator')" />
               </SelectTrigger>
               <SelectContent>
@@ -87,7 +87,7 @@
             </Select>
 
             <!-- Value -->
-            <div v-if="showInput(index)" class="flex-1">
+            <div v-if="showInput(index)" :class="fieldClass">
               <!-- Plain text input -->
               <Input
                 type="text"
@@ -180,17 +180,16 @@
               </Select>
             </div>
 
-            <!-- Placeholder for spacing -->
-            <div v-else class="flex-1"></div>
+            <div class="flex-1"></div>
 
             <!-- Remove condition -->
             <CloseButton :onClose="() => removeCondition(index)" />
           </div>
 
-          <div class="flex items-center space-x-2">
+          <div v-if="showCaseSensitive(index)" class="flex items-center space-x-2">
             <Checkbox
               id="terms"
-              :defaultChecked="rule.case_sensitive_match"
+              :checked="!!rule.case_sensitive_match"
               @update:checked="(value) => handleCaseSensitiveCheck(value, index)"
             />
             <label for="terms"> {{ $t('globals.messages.caseSensitiveMatch') }} </label>
@@ -253,12 +252,15 @@ const props = defineProps({
   }
 })
 
+const fieldClass = 'flex-1 min-w-0 max-w-xs'
+
 const fieldTypeConstants = {
   conversation: 'conversation',
   contact_custom_attribute: 'contact_custom_attribute'
 }
 const { conversationFilters, newConversationFilters, contactCustomAttributes } =
   useConversationFilters()
+const hasContactCustomAttributes = computed(() => Object.keys(contactCustomAttributes.value).length > 0)
 const { ruleGroup } = toRefs(props)
 const emit = defineEmits(['update-group', 'add-condition', 'remove-condition'])
 const { t } = useI18n()
@@ -302,17 +304,15 @@ const handleFieldChange = (value, ruleIndex) => {
 
   ruleGroup.value.rules[ruleIndex].operator = ''
   ruleGroup.value.rules[ruleIndex].value = ''
+  ruleGroup.value.rules[ruleIndex].case_sensitive_match = false
   ruleGroup.value.rules[ruleIndex].field = value
   ruleGroup.value.rules[ruleIndex].field_type = fieldType
   emitUpdate()
 }
 
 const handleOperatorChange = (value, ruleIndex) => {
-  if (['contains', 'not contains'].includes(value)) {
-    ruleGroup.value.rules[ruleIndex].value = []
-  } else {
-    ruleGroup.value.rules[ruleIndex].value = ''
-  }
+  // Every operator stores its value as a comma separated string, multi-value ones included.
+  ruleGroup.value.rules[ruleIndex].value = ''
   ruleGroup.value.rules[ruleIndex].operator = value
   emitUpdate()
 }
@@ -413,5 +413,14 @@ const inputType = (index) => {
 const showInput = (index) => {
   const operator = ruleGroup.value.rules[index]?.operator
   return !['set', 'not set'].includes(operator)
+}
+
+const showCaseSensitive = (index) => {
+  const rule = ruleGroup.value.rules[index]
+  const field =
+    rule?.field_type === fieldTypeConstants.contact_custom_attribute
+      ? contactCustomAttributes.value[rule.field]
+      : currentFilters.value[rule?.field]
+  return field?.allowCaseSensitive === true
 }
 </script>

@@ -1,5 +1,7 @@
 <template>
-  <div class="relative w-full h-[750px] rounded-xl border border-border bg-muted overflow-hidden">
+  <div
+    class="relative w-full h-[calc(100vh-13rem)] min-h-[620px] max-h-[880px] rounded-xl border border-border bg-muted overflow-hidden"
+  >
     <!-- Widget window, themed independently of the admin app. -->
     <transition name="ld-preview-window">
       <div
@@ -213,107 +215,114 @@
                   class="pointer-events-none absolute inset-x-0 top-0"
                   :style="[headerStyle, { height: `${headerHeight}px` }]"
                 >
-                  <div v-if="showFade" class="absolute inset-x-0 bottom-0 h-20" :style="fadeStyle"></div>
+                  <div
+                    v-if="showFade"
+                    class="absolute inset-x-0 bottom-0 h-20"
+                    :style="fadeStyle"
+                  ></div>
                 </div>
                 <div class="relative h-full overflow-y-auto">
-                <div ref="headerRef">
-                  <div class="px-7 pb-7 pt-7">
-                    <img
-                      v-if="config.logo_url"
-                      :src="config.logo_url"
-                      :alt="config.brand_name"
-                      class="max-h-7 max-w-full"
-                    />
-                    <div class="mt-20" :class="textColorClass">
-                      <h2
-                        class="text-3xl font-semibold leading-tight tracking-tight break-words"
-                        :class="subTextColorClass"
+                  <div ref="headerRef">
+                    <div class="px-7 pb-7 pt-7">
+                      <img
+                        v-if="config.logo_url"
+                        :src="config.logo_url"
+                        :alt="config.brand_name"
+                        class="max-h-7 max-w-full"
+                      />
+                      <div class="mt-20" :class="textColorClass">
+                        <h2
+                          class="text-3xl font-semibold leading-tight tracking-tight break-words"
+                          :class="subTextColorClass"
+                        >
+                          {{ parsedGreeting }}
+                        </h2>
+                        <p
+                          class="mt-2 text-3xl font-semibold leading-tight tracking-tight break-words"
+                        >
+                          {{ parsedIntroduction }}
+                        </p>
+                      </div>
+                    </div>
+                    <div v-if="canStartConversation" class="relative z-10 px-4 pb-5">
+                      <Button
+                        type="button"
+                        size="lg"
+                        class="w-full font-semibold shadow-md"
+                        @click="startNew"
                       >
-                        {{ parsedGreeting }}
-                      </h2>
-                      <p class="mt-2 text-3xl font-semibold leading-tight tracking-tight break-words">
-                        {{ parsedIntroduction }}
-                      </p>
+                        {{ startButtonText }}
+                        <ArrowRight :size="16" aria-hidden="true" />
+                      </Button>
                     </div>
                   </div>
-                  <div v-if="canStartConversation" class="relative z-10 px-4 pb-5">
-                    <Button
-                      type="button"
-                      size="lg"
-                      class="w-full font-semibold shadow-md"
-                      @click="startNew"
-                    >
-                      {{ startButtonText }}
-                      <ArrowRight :size="16" aria-hidden="true" />
-                    </Button>
-                  </div>
-                </div>
 
-                <div v-if="homeItems.length" class="flex flex-col gap-3 px-4 pt-1 pb-5">
-                  <template v-for="(item, index) in homeItems" :key="index">
-                    <section
-                      v-if="item.type === 'help'"
-                      class="space-y-1 rounded-xl border border-border/80 bg-card p-2 shadow-sm"
-                    >
-                      <Button
-                        type="button"
-                        variant="outline"
-                        class="h-10 w-full justify-between px-2"
-                        @click="view = 'help'"
+                  <div v-if="homeItems.length" class="flex flex-col gap-3 px-4 pt-1 pb-5">
+                    <template v-for="(item, index) in homeItems" :key="index">
+                      <section
+                        v-if="item.type === 'help'"
+                        class="space-y-1 rounded-xl border border-border/80 bg-card p-2 shadow-sm"
                       >
-                        {{ $t('widget.searchArticles') }}
-                        <Search class="size-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        v-for="article in featuredArticles"
-                        :key="article.id"
-                        type="button"
-                        variant="ghost"
-                        class="w-full h-auto justify-start px-2 py-1.5 text-left whitespace-normal"
-                        @click="view = 'help'"
+                        <Button
+                          type="button"
+                          variant="outline"
+                          class="h-10 w-full justify-between px-2"
+                          @click="view = 'help'"
+                        >
+                          {{ $t('widget.searchArticles') }}
+                          <Search class="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          v-for="article in featuredArticles"
+                          :key="article.id"
+                          type="button"
+                          variant="ghost"
+                          class="w-full h-auto justify-start px-2 py-1.5 text-left whitespace-normal"
+                          @click="view = 'help'"
+                        >
+                          {{ article.title }}
+                        </Button>
+                      </section>
+                      <Card
+                        v-else-if="item.type === 'announcement'"
+                        class="overflow-hidden rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
                       >
-                        {{ article.title }}
-                      </Button>
-                    </section>
-                    <Card
-                      v-else-if="item.type === 'announcement'"
-                      class="overflow-hidden rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
-                    >
-                      <img
-                        v-if="item.image_url"
-                        :src="item.image_url"
-                        :alt="item.title"
-                        class="w-full h-auto"
-                      />
-                      <CardContent class="p-4 text-sm">
-                        <div class="font-semibold leading-snug">
-                          {{ item.title || $t('globals.terms.announcement') }}
-                        </div>
-                        <div
-                          v-if="item.description"
-                          class="mt-1 text-muted-foreground leading-relaxed"
-                        >
-                          {{ item.description }}
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card
-                      v-else
-                      class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
-                    >
-                      <CardContent class="flex items-center gap-3 p-4">
-                        <span class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground"
-                          >{{ item.text || item.url }}</span
-                        >
-                        <ExternalLink
-                          :size="15"
-                          class="shrink-0 text-muted-foreground"
-                          aria-hidden="true"
+                        <img
+                          v-if="item.image_url"
+                          :src="item.image_url"
+                          :alt="item.title"
+                          class="w-full h-auto"
                         />
-                      </CardContent>
-                    </Card>
-                  </template>
-                </div>
+                        <CardContent class="p-4 text-sm">
+                          <div class="font-semibold leading-snug">
+                            {{ item.title || $t('globals.terms.announcement') }}
+                          </div>
+                          <div
+                            v-if="item.description"
+                            class="mt-1 text-muted-foreground leading-relaxed"
+                          >
+                            {{ item.description }}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card
+                        v-else
+                        class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+                      >
+                        <CardContent class="flex items-center gap-3 p-4">
+                          <span
+                            class="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground"
+                            >{{ item.text || item.url }}</span
+                          >
+                          <ExternalLink
+                            :size="15"
+                            class="shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                        </CardContent>
+                      </Card>
+                    </template>
+                  </div>
                 </div>
               </div>
 
@@ -475,7 +484,13 @@
         :style="{ color: launcherIconColor }"
         aria-hidden="true"
       />
-      <img v-else :src="launcherLogo" alt="" class="w-full h-full rounded-full object-cover" />
+      <img
+        v-else
+        :src="launcherLogo"
+        alt=""
+        :class="launcherIconFull ? 'rounded-full object-cover' : 'object-contain'"
+        :style="launcherIconStyle"
+      />
     </button>
   </div>
 </template>
@@ -519,6 +534,7 @@ import { renderTemplate } from '@shared-ui/utils/string'
 const DEFAULT_LAUNCHER_LOGO = '/static/public/launcher-logo.png'
 const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
 const LAUNCHER_SIZE = 52
+const DEFAULT_LAUNCHER_ICON_SCALE = 100
 const SNIPPET_LENGTH = 240
 
 const props = defineProps({
@@ -551,7 +567,7 @@ const openExisting = () => {
   view.value = 'chat'
 }
 
-const isDark = computed(() => Boolean(props.config.dark_mode))
+const isDark = computed(() => Boolean(props.config.dark))
 
 const primaryStyle = computed(() => {
   const primary = props.config.colors?.primary
@@ -688,7 +704,7 @@ watch(
 )
 const campaignText = computed(() => campaign.value?.message?.slice(0, SNIPPET_LENGTH) || '')
 const quickReplies = computed(() => {
-  const replies = userTypeConfig.value.quick_replies ?? props.config.quick_replies
+  const replies = userTypeConfig.value.quick_replies
   if (Array.isArray(replies)) return replies
   return typeof replies === 'string'
     ? replies
@@ -722,6 +738,14 @@ const clampSpacing = (value) => Math.min(Number(value) || 20, 40)
 const clampedSide = computed(() => clampSpacing(props.config.launcher?.spacing?.side))
 const clampedBottom = computed(() => clampSpacing(props.config.launcher?.spacing?.bottom))
 const windowBottom = computed(() => clampedBottom.value + LAUNCHER_SIZE + 12)
+const launcherIconScale = computed(
+  () => Number(props.config.launcher?.icon_scale) || DEFAULT_LAUNCHER_ICON_SCALE
+)
+const launcherIconFull = computed(() => launcherIconScale.value >= 100)
+const launcherIconStyle = computed(() => ({
+  width: launcherIconScale.value + '%',
+  height: launcherIconScale.value + '%'
+}))
 
 const launcherColor = computed(() => {
   const c = props.config.launcher?.color

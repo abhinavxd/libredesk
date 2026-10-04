@@ -9,6 +9,7 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+// handleWidgetCampaignReply runs when a visitor replies to a campaign pop-up, adding the reply to its conversation or starting a new one.
 func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imodels.Inbox, config livechat.Config) error {
 	app := r.Context.(*App)
 	if !validCampaignKey(req.DeliveryID) || !validCampaignKey(req.BrowserKey) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -147,6 +148,12 @@ type helpArticleResponse struct {
 type previewTOCItem struct {
 	ID    string
 	Title string
+}
+
+type colorSchemeResult struct {
+	dark         bool
+	showToggle   bool
+	followSystem bool
 }
 
 func (w helpCenterCacheLogWriter) Write(p []byte) (int, error) {
@@ -580,6 +587,67 @@ func handleUpdateArticleStatus(r *fastglue.Request) error {
 	return r.SendEnvelope(article)
 }
 
+// handleGetLinkableArticles lists articles in the other locales that can still be linked as a translation.
+func handleGetLinkableArticles(r *fastglue.Request) error {
+	var (
+		app           = r.Context.(*App)
+		id, _         = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+		excludeLocale = strings.TrimSpace(string(r.RequestCtx.QueryArgs().Peek("exclude_locale")))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if excludeLocale == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`exclude_locale`"), nil, envelope.InputError)
+	}
+	articles, err := app.helpcenter.GetLinkableArticles(id, excludeLocale)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(articles)
+}
+
+// handleLinkArticleTranslation moves an existing article into this article's translation group.
+func handleLinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app = r.Context.(*App)
+		req = struct {
+			TranslationOfID int `json:"translation_of_id"`
+		}{}
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	if err := r.Decode(&req, "json"); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+	}
+	if req.TranslationOfID <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`translation_of_id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.LinkArticleTranslation(id, req.TranslationOfID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
+// handleUnlinkArticleTranslation detaches an article from its translation group.
+func handleUnlinkArticleTranslation(r *fastglue.Request) error {
+	var (
+		app   = r.Context.(*App)
+		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
+	)
+	if id <= 0 {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "`id`"), nil, envelope.InputError)
+	}
+	article, err := app.helpcenter.UnlinkArticleTranslation(id)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(article)
+}
+
 // handleRedirectHelpCenterHome redirects bare /hc/{slug} to the default-locale home so the locale is always in the path.
 func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	var (
@@ -593,8 +661,12 @@ func handleRedirectHelpCenterHome(r *fastglue.Request) error {
 	if redirectHelpCenterCanonicalHost(r, helpCenter) {
 		return nil
 	}
+	uri := helpCenterHomePath(helpCenter, helpCenter.DefaultLocale)
+	if qs := r.RequestCtx.URI().QueryString(); len(qs) > 0 {
+		uri += "?" + string(qs)
+	}
 	// 302, not 301: the default locale is mutable and browsers cache permanent redirects.
-	redirectPath(r.RequestCtx, helpCenterHomePath(helpCenter, helpCenter.DefaultLocale), fasthttp.StatusFound)
+	redirectPath(r.RequestCtx, uri, fasthttp.StatusFound)
 	return nil
 }
 
@@ -1187,7 +1259,7 @@ func cacheHCPage(h fastglue.FastRequestHandler, noIndex bool) fastglue.FastReque
 
 // isEmbedRequest reports whether the page is framed by the chat widget.
 func isEmbedRequest(r *fastglue.Request) bool {
-	return string(r.RequestCtx.QueryArgs().Peek("embed")) == "1"
+	return r.RequestCtx.QueryArgs().GetBool("embed")
 }
 
 func isMarkdownRequest(r *fastglue.Request) bool {
@@ -1713,6 +1785,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	if pageTemplate == "" {
 		pageTemplate = hcmodels.TemplateClassic
 	}
+	embed := isEmbedRequest(r)
+	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1722,9 +1796,11 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"PageTitle":         hc.PageTitle,
 		"HeaderText":        theme.Header.Heading,
 		"LogoURL":           publicAssetPaths(app, theme.LogoURL),
-		"LogoURLDark":       publicAssetPaths(app, theme.LogoURLDark),
-		"HideThemeToggle":   theme.HideThemeToggle,
+		"LogoURLDark":       publicAssetPaths(app, cmp.Or(theme.LogoURLDark, theme.LogoURL)),
 		"Color":             theme.Color,
+		"ColorDark":         cmp.Or(theme.ColorDark, theme.Color),
+		"ShowThemeToggle":   scheme.showToggle,
+		"FollowSystemTheme": scheme.followSystem,
 		"DefaultLocale":     hc.DefaultLocale,
 		"CurrentLocale":     locale,
 		"OGLocale":          strings.ReplaceAll(locale, "-", "_"),
@@ -1733,6 +1809,7 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"NavLinks":          theme.NavLinks,
 		"Theme":             theme,
 		"ThemeCSS":          buildThemeCSSVars(theme),
+		"ThemeCSSDark":      buildDarkThemeCSSVars(theme),
 		"AnnouncementKey":   announcementKey(hc.Slug, theme.Announcement),
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
@@ -1741,8 +1818,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"CustomJS":          template.JS(hc.CustomJS),
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
-		"Embed":             isEmbedRequest(r),
-		"Dark":              string(r.RequestCtx.QueryArgs().Peek("theme")) == "dark",
+		"Embed":             embed,
+		"Dark":              scheme.dark,
 	}
 }
 
@@ -1804,6 +1881,38 @@ func buildThemeCSSVars(t hcmodels.Theme) template.CSS {
 		fmt.Fprintf(&b, "--hc-footer-text:%s;", t.Footer.TextColor)
 	}
 	return template.CSS(b.String())
+}
+
+// buildDarkThemeCSSVars swaps in the dark footer colors and resets light-only colors to the dark defaults.
+func buildDarkThemeCSSVars(t hcmodels.Theme) template.CSS {
+	var b strings.Builder
+	if t.Header.TextColor != "" && !hasHeaderBackground(t.Header) {
+		b.WriteString("--hc-header-text:initial;")
+	}
+	writeDarkVar(&b, "--hc-footer-bg", t.Footer.BackgroundColorDark, t.Footer.BackgroundColor)
+	writeDarkVar(&b, "--hc-footer-text", t.Footer.TextColorDark, t.Footer.TextColor)
+	return template.CSS(b.String())
+}
+
+func writeDarkVar(b *strings.Builder, name, dark, light string) {
+	switch {
+	case dark != "":
+		fmt.Fprintf(b, "%s:%s;", name, dark)
+	case light != "":
+		fmt.Fprintf(b, "%s:initial;", name)
+	}
+}
+
+func hasHeaderBackground(h hcmodels.HeaderTheme) bool {
+	switch h.BackgroundType {
+	case "image":
+		return h.BackgroundImage != ""
+	case "gradient":
+		return h.GradientFrom != "" && h.GradientTo != ""
+	case "solid":
+		return h.BackgroundColor != ""
+	}
+	return false
 }
 
 // renderHelpCenterNotFound renders the help center's themed 404, falling back to the
@@ -2048,4 +2157,15 @@ func redirectPath(ctx *fasthttp.RequestCtx, uri string, statusCode int) {
 	ctx.Response.Header.SetCanonical([]byte(fasthttp.HeaderLocation), u.RequestURI())
 	ctx.SetStatusCode(statusCode)
 	ctx.Response.SetBodyString("")
+}
+
+// resolveColorScheme lets the widget embed and the admin preview override the admin's scheme.
+func resolveColorScheme(scheme, requested string, embed bool) colorSchemeResult {
+	res := colorSchemeResult{dark: scheme == hcmodels.ColorSchemeDark}
+	if requested != "" || embed {
+		res.dark = requested == hcmodels.ColorSchemeDark
+	}
+	res.showToggle = scheme == hcmodels.ColorSchemeSystem && !embed
+	res.followSystem = res.showToggle && requested == ""
+	return res
 }

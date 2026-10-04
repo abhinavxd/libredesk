@@ -27,6 +27,53 @@ const goDurationSeconds = (value) => {
   if (!match) return 0
   return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0)
 }
+const branding = (t) =>
+  z.object({
+    colors: z.object({
+      primary: hexColor(t)
+    }),
+    logo_url: optionalUrl(t),
+    launcher: z.object({
+      logo_url: optionalUrl(t),
+      color: hexColor(t)
+    }),
+    home_screen: z.object({
+      header_text_color: z.enum(['black', 'white']),
+      background: z
+        .object({
+          type: z.enum(['solid', 'gradient', 'image']),
+          color: optionalHexColor(t),
+          gradient_start: optionalHexColor(t),
+          gradient_end: optionalHexColor(t),
+          image_url: optionalUrl(t)
+        })
+        .superRefine((bg, ctx) => {
+          // An empty solid color falls back to the page background, gradients and images render nothing.
+          if (bg.type === 'gradient') {
+            if (!bg.gradient_start)
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['gradient_start'],
+                message: t('globals.messages.required')
+              })
+            if (!bg.gradient_end)
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['gradient_end'],
+                message: t('globals.messages.required')
+              })
+          } else if (bg.type === 'image' && !bg.image_url) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['image_url'],
+              message: t('globals.messages.required')
+            })
+          }
+        }),
+      fade_background: z.boolean()
+    })
+  })
+
 const quickReplies = (t) =>
   z
     .string()
@@ -67,12 +114,6 @@ export const defaultWidgetHelp = () => ({
   visitors: { tab: true },
   users: { tab: true },
   featured_ids: []
-})
-export const defaultWidgetPreviews = () => ({
-  desktop: true,
-  mobile: true,
-  content: 'message',
-  auto_hide_seconds: 0
 })
 export const createWidgetConditionsSchema = (t) =>
   z.object({
@@ -117,25 +158,12 @@ export const defaultCampaign = () => ({
   repeat: 'once',
   repeat_hours: 24
 })
-export const moveCampaign = (campaigns, index, offset) => {
-  const target = index + offset
-  if (index < 0 || index >= campaigns.length || target < 0 || target >= campaigns.length) {
-    return campaigns
-  }
-  const reordered = [...campaigns]
-  const [campaign] = reordered.splice(index, 1)
-  reordered.splice(target, 0, campaign)
-  return reordered
-}
 export const normalizeAudienceConfig = (config, audience) => {
   const audienceConfig = { ...config?.[audience] }
   const replies = audienceConfig.quick_replies
-  const legacyReplies = Array.isArray(config?.quick_replies)
-    ? config.quick_replies.join('\n')
-    : (config?.quick_replies ?? '')
   return {
     ...audienceConfig,
-    quick_replies: Array.isArray(replies) ? replies.join('\n') : (replies ?? legacyReplies),
+    quick_replies: Array.isArray(replies) ? replies.join('\n') : (replies ?? ''),
     direct_to_conversation:
       audienceConfig.direct_to_conversation ?? config?.direct_to_conversation ?? false
   }
@@ -214,7 +242,11 @@ export const createFormSchema = (t) =>
     linked_email_inbox_id: z.number().nullable().optional(),
     config: z.object({
       campaigns: z.array(createCampaignSchema(t)).max(50).default([]),
-      campaign_cooldown_hours: rangeInteger(t, 0, 8760).default(24),
+      campaign_cooldown: z
+        .string()
+        .min(1, { message: t('globals.messages.required') })
+        .refine(isGoDuration, { message: t('validation.invalidDuration') })
+        .default('24h'),
       help: z
         .object({
           help_center_id: z.number().int().min(0),
@@ -223,25 +255,19 @@ export const createFormSchema = (t) =>
           featured_ids: z.array(z.number().int().positive()).max(10)
         })
         .default(defaultWidgetHelp),
-      previews: z
-        .object({
-          desktop: z.boolean(),
-          mobile: z.boolean(),
-          content: z.enum(['message', 'generic']),
-          auto_hide_seconds: z.number().int().min(0).max(300)
-        })
-        .default(defaultWidgetPreviews),
       brand_name: z.string().min(1, { message: t('globals.messages.required') }),
       website_url: optionalUrl(t),
-      dark_mode: z.boolean(),
+      theme: z.enum(['system', 'light', 'dark']),
       show_powered_by: z.boolean(),
       language: z.string().min(1, { message: t('globals.messages.required') }),
       fallback_language: z.string().optional(),
-      logo_url: optionalUrl(t),
+      branding: z.object({
+        light: branding(t),
+        dark: branding(t)
+      }),
       launcher: z.object({
         position: z.enum(['left', 'right']),
-        logo_url: optionalUrl(t),
-        color: hexColor(t),
+        icon_scale: rangeInteger(t, 40, 100),
         spacing: z.object({
           side: spacingNumber(t),
           bottom: spacingNumber(t)
@@ -250,7 +276,6 @@ export const createFormSchema = (t) =>
       greeting_message: z.string().optional(),
       introduction_message: z.string().optional(),
       chat_introduction: z.string(),
-      quick_replies: quickReplies(t).optional(),
       show_office_hours_in_chat: z.boolean(),
       show_office_hours_after_assignment: z.boolean(),
       chat_reply_expectation_message: z.string().optional(),
@@ -268,44 +293,6 @@ export const createFormSchema = (t) =>
             })
           }
         }),
-      colors: z.object({
-        primary: hexColor(t)
-      }),
-      home_screen: z.object({
-        header_text_color: z.enum(['black', 'white']),
-        background: z
-          .object({
-            type: z.enum(['solid', 'gradient', 'image']),
-            color: optionalHexColor(t),
-            gradient_start: optionalHexColor(t),
-            gradient_end: optionalHexColor(t),
-            image_url: optionalUrl(t)
-          })
-          .superRefine((bg, ctx) => {
-            // Empty solid colors use the page background, but empty gradients and images render nothing.
-            if (bg.type === 'gradient') {
-              if (!bg.gradient_start)
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: ['gradient_start'],
-                  message: t('globals.messages.required')
-                })
-              if (!bg.gradient_end)
-                ctx.addIssue({
-                  code: z.ZodIssueCode.custom,
-                  path: ['gradient_end'],
-                  message: t('globals.messages.required')
-                })
-            } else if (bg.type === 'image' && !bg.image_url) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['image_url'],
-                message: t('globals.messages.required')
-              })
-            }
-          }),
-        fade_background: z.boolean()
-      }),
       features: z.object({
         file_upload: z.boolean(),
         emoji: z.boolean(),
@@ -313,15 +300,9 @@ export const createFormSchema = (t) =>
       }),
       continuity: z
         .object({
-          offline_threshold: z
-            .string()
-            .min(1, { message: t('globals.messages.required') })
-            .refine(isGoDuration, { message: t('validation.invalidDuration') }),
-          max_messages_per_email: rangeNumber(t, 1, 100),
-          min_email_interval: z
-            .string()
-            .min(1, { message: t('globals.messages.required') })
-            .refine(isGoDuration, { message: t('validation.invalidDuration') })
+          offline_threshold: z.string().optional().or(z.literal('')),
+          max_messages_per_email: z.coerce.number().optional(),
+          min_email_interval: z.string().optional().or(z.literal(''))
         })
         .optional(),
       session_duration: z
@@ -373,3 +354,30 @@ export const createFormSchema = (t) =>
       })
     })
   })
+    .superRefine((values, ctx) => {
+      if (!values.linked_email_inbox_id) return
+      const continuity = values.config?.continuity ?? {}
+      for (const field of ['offline_threshold', 'min_email_interval']) {
+        if (!continuity[field]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['config', 'continuity', field],
+            message: t('globals.messages.required')
+          })
+        } else if (!isGoDuration(continuity[field])) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['config', 'continuity', field],
+            message: t('validation.invalidDuration')
+          })
+        }
+      }
+      const max = Number(continuity.max_messages_per_email)
+      if (!Number.isInteger(max) || max < 1 || max > 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['config', 'continuity', 'max_messages_per_email'],
+          message: t('validation.minmaxNumber', { min: 1, max: 100 })
+        })
+      }
+    })

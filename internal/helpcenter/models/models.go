@@ -13,6 +13,10 @@ const (
 
 	TemplateDocs    = "docs"
 	TemplateClassic = "classic"
+
+	ColorSchemeSystem = "system"
+	ColorSchemeLight  = "light"
+	ColorSchemeDark   = "dark"
 )
 
 type HelpCenter struct {
@@ -36,21 +40,22 @@ type HelpCenter struct {
 
 // Theme holds the customizable branding for a help center's public pages.
 type Theme struct {
-	Color           string            `json:"color"`
-	LogoURL         string            `json:"logo_url"`
-	LogoURLDark     string            `json:"logo_url_dark"`
-	HideThemeToggle bool              `json:"hide_theme_toggle"`
-	NavLinks        []NavLink         `json:"nav_links"`
-	Favicon         string            `json:"favicon"`
-	Tagline         string            `json:"tagline"`
-	Header          HeaderTheme       `json:"header"`
-	Footer          FooterTheme       `json:"footer"`
-	FooterLinks     []NavLink         `json:"footer_links"`
-	SocialLinks     []SocialLink      `json:"social_links"`
-	Article         ArticleTheme      `json:"article"`
-	Layout          LayoutTheme       `json:"layout"`
-	Cards           CardTheme         `json:"cards"`
-	Announcement    AnnouncementTheme `json:"announcement"`
+	ColorScheme  string            `json:"color_scheme"`
+	Color        string            `json:"color"`
+	ColorDark    string            `json:"color_dark"`
+	LogoURL      string            `json:"logo_url"`
+	LogoURLDark  string            `json:"logo_url_dark"`
+	NavLinks     []NavLink         `json:"nav_links"`
+	Favicon      string            `json:"favicon"`
+	Tagline      string            `json:"tagline"`
+	Header       HeaderTheme       `json:"header"`
+	Footer       FooterTheme       `json:"footer"`
+	FooterLinks  []NavLink         `json:"footer_links"`
+	SocialLinks  []SocialLink      `json:"social_links"`
+	Article      ArticleTheme      `json:"article"`
+	Layout       LayoutTheme       `json:"layout"`
+	Cards        CardTheme         `json:"cards"`
+	Announcement AnnouncementTheme `json:"announcement"`
 }
 
 // AnnouncementTheme is the dismissible banner shown above the header on every public page.
@@ -88,9 +93,11 @@ type CardTheme struct {
 }
 
 type FooterTheme struct {
-	BackgroundColor string `json:"background_color"`
-	TextColor       string `json:"text_color"`
-	Tagline         string `json:"tagline"`
+	BackgroundColor     string `json:"background_color"`
+	TextColor           string `json:"text_color"`
+	BackgroundColorDark string `json:"background_color_dark"`
+	TextColorDark       string `json:"text_color_dark"`
+	Tagline             string `json:"tagline"`
 }
 
 type SocialLink struct {
@@ -160,6 +167,13 @@ type ArticleTranslation struct {
 	Status       string `db:"status" json:"status"`
 }
 
+type LinkableArticle struct {
+	ID             int    `db:"id" json:"id"`
+	Title          string `db:"title" json:"title"`
+	Locale         string `db:"locale" json:"locale"`
+	CollectionName string `db:"collection_name" json:"collection_name"`
+}
+
 // NavLink is a single header navigation link on the public help center pages.
 type NavLink struct {
 	Label string `json:"label"`
@@ -209,9 +223,10 @@ type Insights struct {
 // DefaultTheme enables the show-flags for elements that must keep rendering when a stored theme predates the flag.
 func DefaultTheme() Theme {
 	return Theme{
-		Color:   "#1f93ff",
-		Layout:  LayoutTheme{ShowPopularArticles: true},
-		Cards:   CardTheme{ShowIconTile: true},
-		Article: ArticleTheme{ShowAuthor: true},
+		ColorScheme: ColorSchemeLight,
+		Color:       "#1f93ff",
+		Layout:      LayoutTheme{ShowPopularArticles: true},
+		Cards:       CardTheme{ShowIconTile: true},
+		Article:     ArticleTheme{ShowAuthor: true},
 	}
 }

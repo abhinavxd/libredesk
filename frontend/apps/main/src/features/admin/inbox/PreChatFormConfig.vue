@@ -35,9 +35,9 @@
 
         <div v-if="audienceConfig.enabled" class="space-y-6">
           <div>
-            <label class="text-sm font-medium">
+            <Label>
               {{ $t('admin.inbox.livechat.prechatForm.title') }}
-            </label>
+            </Label>
             <Input
               type="text"
               v-model="audienceConfig.title"
@@ -58,15 +58,25 @@
                   (field) => field.key || `field_${field.custom_attribute_id || 'unknown'}`
                 "
                 :animation="200"
+                handle=".drag-handle"
+                :force-fallback="true"
+                fallback-on-body
+                :fallback-tolerance="3"
+                ghost-class="drag-ghost"
                 class="space-y-3"
               >
                 <template #item="{ element: field, index }">
                   <div :key="field.key || `field-${index}`" class="border rounded-lg p-4 space-y-4">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center space-x-3">
-                        <div class="cursor-move text-muted-foreground">
-                          <GripVertical class="w-4 h-4" />
+                        <div class="drag-handle cursor-move text-muted-foreground">
+                          <GripVertical class="w-4 h-4" aria-hidden="true" />
                         </div>
+                        <ReorderButtons
+                          :index="index"
+                          :length="draggableFields.length"
+                          @move="moveField(index, $event)"
+                        />
                         <div>
                           <div class="font-medium">{{ field.label }}</div>
                           <div class="text-sm text-muted-foreground">
@@ -96,7 +106,7 @@
                     <div v-if="field.enabled" class="space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                         <div>
-                          <label class="text-sm font-medium">{{ $t('globals.terms.label') }}</label>
+                          <Label>{{ $t('globals.terms.label') }}</Label>
                           <Input
                             v-model="field.label"
                             :placeholder="$t('placeholders.fieldLabel')"
@@ -105,9 +115,9 @@
                         </div>
 
                         <div>
-                          <label class="text-sm font-medium">
+                          <Label>
                             {{ $t('globals.terms.placeholder') }}
-                          </label>
+                          </Label>
                           <Input
                             v-model="field.placeholder"
                             :placeholder="$t('placeholders.fieldPlaceholder')"
@@ -118,7 +128,7 @@
 
                       <div v-if="field.type !== 'checkbox'" class="flex items-center space-x-2">
                         <Checkbox v-model:checked="field.required" />
-                        <label class="text-sm">{{ $t('globals.terms.required') }}</label>
+                        <Label class="font-normal">{{ $t('globals.terms.required') }}</Label>
                       </div>
                     </div>
                   </div>
@@ -194,9 +204,11 @@ export const getDefaultPrechatFields = () => [
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Input } from '@shared-ui/components/ui/input'
+import { Label } from '@shared-ui/components/ui/label'
 import { Button } from '@shared-ui/components/ui/button'
 import { Switch } from '@shared-ui/components/ui/switch'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
+import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X, GripVertical } from 'lucide-vue-next'
@@ -250,6 +262,13 @@ const draggableFields = computed({
     audienceConfig.value.fields = fieldsWithUpdatedOrder
   }
 })
+
+const moveField = (index, direction) => {
+  const fields = [...draggableFields.value]
+  const [field] = fields.splice(index, 1)
+  fields.splice(index + direction, 0, field)
+  draggableFields.value = fields
+}
 
 const removeField = (index) => {
   const fields = formFields.value.filter((_, i) => i !== index)

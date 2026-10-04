@@ -6,7 +6,7 @@
         <Button
           v-if="isMobile"
           variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0 shrink-0 -ml-2 md:-ml-1"
+          class="w-11 h-11 lg:w-8 lg:h-8 p-0 shrink-0 -ml-2 lg:-ml-1"
           :aria-label="t('globals.messages.back')"
           @click="goBackToList"
         >
@@ -18,7 +18,7 @@
         <Button
           v-if="isMobile"
           variant="ghost"
-          class="w-11 h-11 md:w-8 md:h-8 p-0"
+          :class="MOBILE_ICON_BUTTON_CLASS"
           :aria-label="t('globals.terms.contact')"
           @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
         >
@@ -39,9 +39,11 @@
           <DropdownMenuTrigger>
             <div
               v-if="conversationStore.current?.status"
-              class="flex items-center space-x-1 cursor-pointer bg-primary px-3 py-3 md:px-2 md:py-1 rounded-md text-sm"
+              class="flex h-11 lg:h-8 items-center cursor-pointer"
             >
-              <span class="text-primary-foreground font-medium inline-block">
+              <span
+                class="rounded-md bg-primary px-2.5 py-1 text-xs lg:text-sm font-medium text-primary-foreground"
+              >
                 {{ conversationStore.current?.status }}
               </span>
             </div>
@@ -58,7 +60,11 @@
         </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <Button variant="ghost" class="w-11 h-11 md:w-8 md:h-8 p-0">
+            <Button
+              variant="ghost"
+              :class="MOBILE_ICON_BUTTON_CLASS"
+              :aria-label="t('globals.messages.moreActions')"
+            >
               <MoreHorizontal class="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -81,12 +87,15 @@
     <!-- Messages & reply box -->
     <div class="flex flex-col flex-grow overflow-hidden">
       <MessageList class="flex-1 overflow-y-auto" />
-      <ReplyBox v-if="canCompose" />
+      <WhatsAppComposer v-if="isWhatsAppChannel && canCompose" />
+      <ReplyBox v-else-if="canCompose" />
     </div>
   </div>
 </template>
 
 <script setup>
+const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
+
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
@@ -104,9 +113,11 @@ import { formatMessageTimestamp } from '@shared-ui/utils/datetime.js'
 import { Button } from '@shared-ui/components/ui/button'
 import MessageList from '@/features/conversation/message/MessageList.vue'
 import ReplyBox from './ReplyBox.vue'
+import WhatsAppComposer from './WhatsAppComposer.vue'
+import { WHATSAPP_CHANNEL } from '@main/features/conversation/whatsappTemplate'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents.js'
-import { useCommandPalette } from '@/features/command/useCommandPalette'
-import { SNOOZE_COMMAND } from '@/features/command/providers/useConversationCommands'
+import { useCommandPalette } from '@main/features/command/useCommandPalette'
+import { SNOOZE_COMMAND } from '@main/features/command/providers/useConversationCommands'
 import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
@@ -157,6 +168,10 @@ const downloadTranscript = async () => {
     })
   }
 }
+
+const isWhatsAppChannel = computed(
+  () => conversationStore.current?.inbox_channel === WHATSAPP_CHANNEL
+)
 
 const isSummarizing = ref(false)
 

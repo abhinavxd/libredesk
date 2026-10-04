@@ -127,4 +127,21 @@ describe('Widget websocket client', () => {
 
     expect(widgetStore.setConnectionFailed).not.toHaveBeenCalled()
   })
+
+  test('page visits wait for an open socket', () => {
+    const client = connected()
+
+    client.sendPageVisit('https://example.com/docs', 'Docs')
+    expect(sockets[0].sent).toHaveLength(0)
+
+    sockets[0].readyState = FakeSocket.OPEN
+    client.sendPageVisit('https://example.com/docs', 'Docs')
+
+    expect(sockets[0].sent).toEqual([
+      JSON.stringify({
+        type: 'page_visit',
+        data: { url: 'https://example.com/docs', title: 'Docs' }
+      })
+    ])
+  })
 })

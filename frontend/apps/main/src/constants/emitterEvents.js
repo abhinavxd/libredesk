@@ -6,11 +6,13 @@ export const EMITTER_EVENTS = {
     NEW_MESSAGE: 'new-message',
     CONVERSATION_SIDEBAR_TOGGLE: 'conversation-sidebar-toggle',
     SCROLL_TO_MESSAGE: 'scroll-to-message',
+    WHATSAPP_TEMPLATE_PICKER_OPEN: 'whatsapp-template-picker-open',
     COPILOT_INSERT_REPLY: 'copilot-insert-reply',
     OPEN_CREATE_CONVERSATION: 'open-create-conversation',
     OPEN_VIEW_FORM: 'open-view-form',
     REPLY_BOX_FOCUS: 'reply-box-focus',
     REPLY_BOX_SET_TYPE: 'reply-box-set-type',
+    REPLY_BOX_TOGGLE_MINIMIZE: 'reply-box-toggle-minimize',
     CONVERSATION_ACTION: 'conversation-action',
     CONTACT_ACTION: 'contact-action'
 }
