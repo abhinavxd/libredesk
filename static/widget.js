@@ -60,6 +60,7 @@
             this.isExpanded = false;
             this.hideLauncher = config.hideLauncher || false;
             this.widgetLoaded = false;
+            this._iframeLanguage = (typeof config.language === 'string' && config.language.trim()) || null;
             this._onShowCallback = null;
             this._onHideCallback = null;
             this._onUnreadCountChangeCallback = null;
@@ -312,8 +313,13 @@
                 ? 'none'
                 : 'width 0.18s ease, height 0.18s ease, bottom 0.18s ease, border-radius 0.18s ease, box-shadow 0.18s ease';
 
+            let iframeSrc = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            if (this._iframeLanguage) {
+                iframeSrc += `&lang=${encodeURIComponent(this._iframeLanguage)}`;
+            }
+
             this.iframe = document.createElement('iframe');
-            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            this.iframe.src = iframeSrc;
             this.iframe.title = 'libredesk';
             this.iframe.style.cssText = `
                 position: fixed;
@@ -560,6 +566,10 @@
         handleVueAppReady () {
             this.startPageTracking();
             this.sendMobileState();
+
+            if (this.config.language && this.config.language !== this._iframeLanguage) {
+                this.postToIframe({ type: 'SET_LANGUAGE', language: this.config.language });
+            }
 
             var visitorToken = this.getCookie(this.getCookieName('visitor'));
 
@@ -882,6 +892,13 @@
             if (typeof name === 'string' && name.length <= 128) this.campaignEvent = name;
         }
 
+        setLanguage (code) {
+            if (!code || typeof code !== 'string' || !code.trim()) return;
+            const trimmed = code.trim();
+            this.config.language = trimmed;
+            this.postToIframe({ type: 'SET_LANGUAGE', language: trimmed });
+        }
+
         setUser (jwt) {
             this.clearPreviews();
             this.postToIframe({ type: 'SET_JWT_TOKEN', jwt: jwt });
@@ -914,6 +931,7 @@
                 this.iframe = null;
             }
             this.isChatVisible = false;
+            this._iframeLanguage = null;
             this._onShowCallback = null;
             this._onHideCallback = null;
             this._onUnreadCountChangeCallback = null;
