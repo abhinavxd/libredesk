@@ -2,6 +2,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 describe('static/widget.js loader', () => {
   let widgetCode
@@ -27,27 +30,30 @@ describe('static/widget.js loader', () => {
     }))
 
     // Mock fetch for settings
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        status: 'success',
-        data: {
-          launcher: {
-            position: 'right',
-            spacing: { bottom: 20, side: 20 },
-            icon_scale: 100
-          },
-          theme: 'light',
-          branding: {
-            light: {
-              launcher: { color: '#000000', logo_url: '' },
-              colors: { primary: '#000000' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'success',
+          data: {
+            launcher: {
+              position: 'right',
+              spacing: { bottom: 20, side: 20 },
+              icon_scale: 100
+            },
+            theme: 'light',
+            branding: {
+              light: {
+                launcher: { color: '#000000', logo_url: '' },
+                colors: { primary: '#000000' }
+              }
             }
           }
-        }
+        })
       })
-    })
+    )
 
     if (!widgetCode) {
       const widgetJsPath = path.resolve(__dirname, '../../../../static/widget.js')
@@ -144,11 +150,48 @@ describe('static/widget.js loader', () => {
     instance.iframe.contentWindow.postMessage = postMessageSpy
 
     window.Libredesk.setLanguage('')
+    window.Libredesk.setLanguage('   ')
     window.Libredesk.setLanguage(null)
     window.Libredesk.setLanguage(123)
 
     expect(instance.config.language).toBe('en-US')
     expect(postMessageSpy).not.toHaveBeenCalled()
+  })
+
+  it('posts directly when setLanguage is called after VUE_APP_READY', async () => {
+    new Function(widgetCode)()
+
+    const instance = window.initLibredesk({
+      baseURL: 'https://help.example.com',
+      inboxID: 'inbox-123',
+      language: 'en-US'
+    })
+
+    await vi.waitFor(() => {
+      expect(instance.iframe).not.toBeNull()
+    })
+
+    const postMessageSpy = vi.fn()
+    instance.iframe.contentWindow.postMessage = postMessageSpy
+
+    // Trigger VUE_APP_READY from iframe
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: { type: 'VUE_APP_READY' },
+        origin: 'https://help.example.com',
+        source: instance.iframe.contentWindow
+      })
+    )
+
+    postMessageSpy.mockClear()
+
+    // Call setLanguage now that vue app is ready
+    window.Libredesk.setLanguage('es-ES')
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: 'SET_LANGUAGE', language: 'es-ES' },
+      'https://help.example.com'
+    )
+    expect(instance.config.language).toBe('es-ES')
   })
 
   it('queues setLanguage and delivers it when VUE_APP_READY arrives if changed before ready', async () => {

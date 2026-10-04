@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import api from './api/index.js'
-import { resolveLanguage, determineInitialLanguage } from './utils/language.js'
+import { determineInitialLanguage } from './utils/language.js'
 import '@shared-ui/assets/styles/main.scss'
 
 async function initWidget() {
@@ -24,8 +24,13 @@ async function initWidget() {
     let lang
     const fallbackLang = widgetConfig.fallback_language || 'en-US'
     if (widgetConfig.language === 'auto') {
-      const availableResp = await api.getAvailableLanguages()
-      const availableCodes = availableResp.data.data.map((l) => l.code)
+      let availableCodes = []
+      try {
+        const availableResp = await api.getAvailableLanguages()
+        availableCodes = availableResp.data.data.map((l) => l.code)
+      } catch (err) {
+        console.warn('Failed to fetch available languages during initialization:', err)
+      }
       const browserLang = navigator.language || navigator.languages?.[0] || ''
       lang = determineInitialLanguage({
         widgetConfig,

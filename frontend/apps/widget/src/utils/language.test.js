@@ -30,6 +30,27 @@ describe('resolveLanguage', () => {
     expect(resolveLanguage('EN-US', available)).toBe('en-US')
   })
 
+  it('matches underscore-separated locale formats like zh_CN, en_US', () => {
+    expect(resolveLanguage('zh_CN', available)).toBe('zh-CN')
+    expect(resolveLanguage('zh_cn', available)).toBe('zh-CN')
+    expect(resolveLanguage('en_US', available)).toBe('en-US')
+    expect(resolveLanguage('de_DE', available)).toBe('de-DE')
+    expect(resolveLanguage('pt_PT', available)).toBe('pt-PT')
+    expect(resolveLanguage('pt_BR', available)).toBe('pt-BR')
+  })
+
+  it('matches primary tag when candidate uses underscore', () => {
+    expect(resolveLanguage('zh_TW', available)).toBe('zh-CN')
+    expect(resolveLanguage('de_AT', available)).toBe('de-DE')
+    expect(resolveLanguage('fr_CA', available)).toBe('fr-FR')
+  })
+
+  it('handles candidate with surrounding whitespace', () => {
+    expect(resolveLanguage('  zh-CN  ', available)).toBe('zh-CN')
+    expect(resolveLanguage('  de  ', available)).toBe('de-DE')
+    expect(resolveLanguage('  en_US  ', available)).toBe('en-US')
+  })
+
   it('matches bare primary tags', () => {
     expect(resolveLanguage('zh', available)).toBe('zh-CN')
     expect(resolveLanguage('de', available)).toBe('de-DE')

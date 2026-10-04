@@ -111,6 +111,15 @@ const fetchInitialConversations = async () => {
 
 // Listen for messages from parent window (widget.js)
 let parentMessageListener = null
+let cachedAvailableCodes = null
+let languageRequestId = 0
+
+const fetchAvailableCodes = async () => {
+  if (cachedAvailableCodes) return cachedAvailableCodes
+  const availableResp = await api.getAvailableLanguages()
+  cachedAvailableCodes = availableResp.data.data.map((l) => l.code)
+  return cachedAvailableCodes
+}
 
 const handleParentMessage = async (event) => {
   if (event.source !== window.parent || !event.data || typeof event.data !== 'object') return
@@ -199,10 +208,10 @@ const handleParentMessage = async (event) => {
   } else if (event.data.type === 'SET_LANGUAGE') {
     if (widgetStore.config?.language !== 'auto') return
     const requestedLang = event.data.language
-    if (!requestedLang || typeof requestedLang !== 'string') return
+    if (!requestedLang || typeof requestedLang !== 'string' || !requestedLang.trim()) return
+    const requestId = ++languageRequestId
     try {
-      const availableResp = await api.getAvailableLanguages()
-      const availableCodes = availableResp.data.data.map((l) => l.code)
+      const availableCodes = await fetchAvailableCodes()
       const resolved = resolveLanguage(requestedLang, availableCodes)
       if (!resolved || resolved === locale.value) return
 
@@ -212,6 +221,7 @@ const handleParentMessage = async (event) => {
         langData = langMessages.data
         setLocaleMessage(resolved, langData)
       }
+      if (requestId !== languageRequestId) return
       locale.value = resolved
       if (widgetStore.config.help?.help_center_id) {
         await help.load(resolved)

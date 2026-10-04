@@ -188,13 +188,78 @@ describe('App.vue SET_LANGUAGE handling', () => {
     expect(getLanguageMock).not.toHaveBeenCalled()
   })
 
-  it('ignores invalid or unknown language codes', async () => {
+  it('ignores invalid, unknown, or whitespace-only language codes', async () => {
     await mountApp()
 
     dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'xx' })
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: '   ' })
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: '' })
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: null })
     for (let i = 0; i < 10; i++) await nextTick()
 
     expect(i18n.global.locale.value).toBe('en-US')
     expect(getLanguageMock).not.toHaveBeenCalled()
+  })
+
+  it('resolves underscore format like "zh_CN" to "zh-CN"', async () => {
+    await mountApp()
+
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'zh_CN' })
+    for (let i = 0; i < 10; i++) await nextTick()
+
+    expect(getLanguageMock).toHaveBeenCalledWith('zh-CN')
+    expect(i18n.global.locale.value).toBe('zh-CN')
+  })
+
+  it('caches available language codes across multiple SET_LANGUAGE calls', async () => {
+    await mountApp()
+
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'zh-CN' })
+    for (let i = 0; i < 10; i++) await nextTick()
+    expect(getAvailableLanguagesMock).toHaveBeenCalledTimes(1)
+
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    for (let i = 0; i < 10; i++) await nextTick()
+    // getAvailableLanguagesMock should NOT be called again
+    expect(getAvailableLanguagesMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('prevents race conditions when requests resolve out of order', async () => {
+    let resolveDe
+    let resolveZh
+    const dePromise = new Promise((res) => {
+      resolveDe = res
+    })
+    const zhPromise = new Promise((res) => {
+      resolveZh = res
+    })
+
+    getLanguageMock.mockImplementation((lang) => {
+      if (lang === 'de-DE') return dePromise
+      if (lang === 'zh-CN') return zhPromise
+      return Promise.resolve({ data: { greeting: `hello_${lang}` } })
+    })
+
+    await mountApp()
+
+    // 1. Trigger de-DE (slow)
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'de-DE' })
+    await nextTick()
+
+    // 2. Trigger zh-CN (fast)
+    dispatchParentMessage({ type: 'SET_LANGUAGE', language: 'zh-CN' })
+    await nextTick()
+
+    // 3. zh-CN resolves first
+    resolveZh({ data: { greeting: 'hello_zh-CN' } })
+    for (let i = 0; i < 10; i++) await nextTick()
+    expect(i18n.global.locale.value).toBe('zh-CN')
+
+    // 4. de-DE resolves later (out of order)
+    resolveDe({ data: { greeting: 'hello_de-DE' } })
+    for (let i = 0; i < 10; i++) await nextTick()
+
+    // The widget must NOT revert to de-DE; it must remain zh-CN
+    expect(i18n.global.locale.value).toBe('zh-CN')
   })
 })

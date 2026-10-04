@@ -15,20 +15,22 @@ export function resolveLanguage(candidate, availableCodes) {
     return null
   }
 
-  const normalized = candidate.trim().toLowerCase()
+  const normalize = (code) =>
+    typeof code === 'string' ? code.trim().replace(/_/g, '-').toLowerCase() : ''
+  const normalized = normalize(candidate)
   if (!normalized) {
     return null
   }
 
-  // 1. Exact match (case-insensitive)
-  const exact = availableCodes.find((code) => code.toLowerCase() === normalized)
+  // 1. Exact match (case-insensitive and delimiter-agnostic)
+  const exact = availableCodes.find((code) => normalize(code) === normalized)
   if (exact) {
     return exact
   }
 
-  // 2. Primary tag match (e.g. "zh" or "zh-TW" -> "zh-CN")
+  // 2. Primary tag match (e.g. "zh" or "zh-TW" or "zh_CN" -> "zh-CN")
   const primary = normalized.split('-')[0]
-  const primaryMatch = availableCodes.find((code) => code.toLowerCase().split('-')[0] === primary)
+  const primaryMatch = availableCodes.find((code) => normalize(code).split('-')[0] === primary)
   if (primaryMatch) {
     return primaryMatch
   }
