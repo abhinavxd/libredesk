@@ -212,12 +212,14 @@ const handleParentMessage = async (event) => {
     const requestId = ++languageRequestId
     try {
       const availableCodes = await fetchAvailableCodes()
+      if (requestId !== languageRequestId) return
       const resolved = resolveLanguage(requestedLang, availableCodes)
       if (!resolved || resolved === locale.value) return
 
       let langData = getLocaleMessage(resolved)
       if (!langData || Object.keys(langData).length === 0) {
         const langMessages = await api.getLanguage(resolved)
+        if (requestId !== languageRequestId) return
         langData = langMessages.data
         setLocaleMessage(resolved, langData)
       }

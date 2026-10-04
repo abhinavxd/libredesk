@@ -60,8 +60,7 @@
             this.isExpanded = false;
             this.hideLauncher = config.hideLauncher || false;
             this.widgetLoaded = false;
-            this._vueAppReady = false;
-            this._pendingLanguage = null;
+            this._iframeLanguage = (typeof config.language === 'string' && config.language.trim()) || null;
             this._onShowCallback = null;
             this._onHideCallback = null;
             this._onUnreadCountChangeCallback = null;
@@ -315,8 +314,8 @@
                 : 'width 0.18s ease, height 0.18s ease, bottom 0.18s ease, border-radius 0.18s ease, box-shadow 0.18s ease';
 
             let iframeSrc = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
-            if (this.config.language && typeof this.config.language === 'string' && this.config.language.trim()) {
-                iframeSrc += `&lang=${encodeURIComponent(this.config.language.trim())}`;
+            if (this._iframeLanguage) {
+                iframeSrc += `&lang=${encodeURIComponent(this._iframeLanguage)}`;
             }
 
             this.iframe = document.createElement('iframe');
@@ -567,11 +566,9 @@
         handleVueAppReady () {
             this.startPageTracking();
             this.sendMobileState();
-            this._vueAppReady = true;
 
-            if (this._pendingLanguage) {
-                this.postToIframe({ type: 'SET_LANGUAGE', language: this._pendingLanguage });
-                this._pendingLanguage = null;
+            if (this.config.language && this.config.language !== this._iframeLanguage) {
+                this.postToIframe({ type: 'SET_LANGUAGE', language: this.config.language });
             }
 
             var visitorToken = this.getCookie(this.getCookieName('visitor'));
@@ -899,12 +896,7 @@
             if (!code || typeof code !== 'string' || !code.trim()) return;
             const trimmed = code.trim();
             this.config.language = trimmed;
-            if (this._vueAppReady) {
-                this.postToIframe({ type: 'SET_LANGUAGE', language: trimmed });
-            } else {
-                this._pendingLanguage = trimmed;
-                this.postToIframe({ type: 'SET_LANGUAGE', language: trimmed });
-            }
+            this.postToIframe({ type: 'SET_LANGUAGE', language: trimmed });
         }
 
         setUser (jwt) {
@@ -939,8 +931,7 @@
                 this.iframe = null;
             }
             this.isChatVisible = false;
-            this._vueAppReady = false;
-            this._pendingLanguage = null;
+            this._iframeLanguage = null;
             this._onShowCallback = null;
             this._onHideCallback = null;
             this._onUnreadCountChangeCallback = null;
