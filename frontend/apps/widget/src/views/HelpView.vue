@@ -33,6 +33,7 @@ const originArticleID = ref(null)
 watch(
   () => help.identity,
   () => {
+    error.value = ''
     articleHistory.value = []
     originArticleID.value = null
   }
