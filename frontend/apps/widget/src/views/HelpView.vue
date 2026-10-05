@@ -30,6 +30,13 @@ const backButton = ref(null)
 const searchInput = ref(null)
 const articleHistory = ref([])
 const originArticleID = ref(null)
+watch(
+  () => help.identity,
+  () => {
+    articleHistory.value = []
+    originArticleID.value = null
+  }
+)
 const currentCollection = computed(() => help.collectionPath.at(-1))
 const collections = computed(() => currentCollection.value?.children || help.data?.tree || [])
 const items = computed(() => help.results ?? currentCollection.value?.articles ?? [])

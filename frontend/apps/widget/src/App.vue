@@ -97,16 +97,22 @@ const fetchInitialConversations = async () => {
   }
 }
 
+let languageRequest = 0
 const setLanguage = async (requested) => {
   if (widgetStore.config.language !== 'auto') return
+  const request = ++languageRequest
   try {
     const available = await api.getAvailableLanguages()
     const code = matchLanguage(requested, available.data.data.map((l) => l.code))
-    if (!code || code === locale.value) return
+    if (request !== languageRequest || !code || code === locale.value) return
     const messages = await api.getLanguage(code)
+    if (request !== languageRequest) return
     setLocaleMessage(code, messages.data)
     locale.value = code
-    if (widgetStore.config.help?.help_center_id) await help.load(code)
+    if (widgetStore.config.help?.help_center_id) {
+      help.reset()
+      await help.load(code)
+    }
   } catch (error) {
     console.error('Error switching widget language:', error)
   }
