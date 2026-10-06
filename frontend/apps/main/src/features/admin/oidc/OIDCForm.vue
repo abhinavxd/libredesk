@@ -71,8 +71,11 @@
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.clientID') }}</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="" v-bind="componentField" />
+            <Input type="text" placeholder="" v-bind="componentField" :disabled="credentialsFromConfig" />
           </FormControl>
+          <FormDescription v-if="credentialsFromConfig">
+            {{ $t('admin.sso.credentialsFromConfigNote') }}
+          </FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -81,8 +84,11 @@
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.clientSecret') }}</FormLabel>
           <FormControl>
-            <Input type="password" placeholder="" v-bind="componentField" />
+            <Input type="password" placeholder="" v-bind="componentField" :disabled="credentialsFromConfig" />
           </FormControl>
+          <FormDescription v-if="credentialsFromConfig">
+            {{ $t('admin.sso.credentialsFromConfigNote') }}
+          </FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -160,8 +166,13 @@ const submitLabel = computed(() => {
   return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
 })
 
+// Credentials of a provider set in the server config (oidc.client_id / oidc.client_secret) are read-only here.
+const credentialsFromConfig = computed(() => !!props.initialValues?.client_secret_from_config)
+
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: computed(() =>
+    toTypedSchema(createFormSchema(t, { credentialsFromConfig: credentialsFromConfig.value }))
+  ),
 })
 
 const onSubmit = form.handleSubmit((values) => {

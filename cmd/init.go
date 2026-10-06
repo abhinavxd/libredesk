@@ -970,7 +970,7 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 			ProviderURL:  config.ProviderURL,
 			RedirectURL:  func() (string, error) { return o.RedirectURL(config.ID) },
 			ClientID:     config.ClientID,
-			ClientSecret: config.ClientSecret,
+			ClientSecret: o.ClientSecret(config),
 		})
 	}
 	return providers, nil
@@ -980,10 +980,12 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Manager {
 	lo := initLogger("oidc")
 	o, err := oidc.New(oidc.Opts{
-		DB:            db,
-		Lo:            lo,
-		I18n:          i18n,
-		EncryptionKey: ko.MustString("app.encryption_key"),
+		DB:                 db,
+		Lo:                 lo,
+		I18n:               i18n,
+		EncryptionKey:      ko.MustString("app.encryption_key"),
+		ConfigClientID:     ko.String("oidc.client_id"),
+		ConfigClientSecret: ko.String("oidc.client_secret"),
 	}, settings)
 	if err != nil {
 		log.Fatalf("error initializing oidc: %v", err)

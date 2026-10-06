@@ -41,6 +41,14 @@ keepalive_timeout = "10s"
 # If an enabled provider is unavailable or misconfigured, set auth.local_login_enabled = true to restore password login.
 local_login_enabled = true
 
+# Optional client credentials for one OIDC provider, read from here instead of the database.
+# Can also be set with LIBREDESK_OIDC__CLIENT_ID and LIBREDESK_OIDC__CLIENT_SECRET.
+# When both are set, the SSO provider with this client ID uses this client secret, and its
+# client ID and secret cannot be edited in Admin -> Security -> SSO. Leave empty to manage them there.
+[oidc]
+client_id = ""
+client_secret = ""
+
 # File upload provider to use, either `fs` or `s3`.
 [upload]
 provider = "fs"
