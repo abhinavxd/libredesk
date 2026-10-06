@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
 	"path/filepath"
 	"slices"
@@ -532,24 +533,10 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 	srcFileName := stringutil.SanitizeFilename(fileHeader.Filename)
 	srcContentType := fileHeader.Header.Get("Content-Type")
 
-	resized, err := image.Downscale(image.AvatarMaxDim, file)
-	if err != nil {
-		app.lo.Error("error downscaling avatar", "user_id", user.ID, "error", err)
-		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil)
-	}
-	srcFileSize := resized.Len()
-
-	linkedModel := null.StringFrom(mmodels.ModelUser)
-	linkedID := null.IntFrom(user.ID)
-	disposition := null.NewString("", false)
-	contentID := ""
-	meta := []byte("{}")
 	// Agent and AI assistant avatars are public: both appear as authors on the help center.
 	private := user.Type != models.UserTypeAgent && user.Type != models.UserTypeAIAssistant
-	media, err := app.media.UploadAndInsert(srcFileName, srcContentType, contentID, linkedModel, linkedID, resized, srcFileSize, disposition, meta, private)
-	if err != nil {
-		app.lo.Error("error uploading file", "user_id", user.ID, "error", err)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
+	if _, err := saveUserAvatar(app, user.ID, srcFileName, srcContentType, file, private); err != nil {
+		return err
 	}
 
 	// Delete current avatar.
@@ -559,12 +546,25 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 			app.lo.Error("error deleting user avatar", "user_id", user.ID, "error", err)
 		}
 	}
-
-	if err := app.user.UpdateAvatar(user.ID, "/uploads/"+media.UUID); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
 	app.user.InvalidateAgentCache(user.ID)
 	return nil
+}
+
+func saveUserAvatar(app *App, userID int, fileName, contentType string, src io.ReadSeeker, private bool) (mmodels.Media, error) {
+	resized, err := image.Downscale(image.AvatarMaxDim, src)
+	if err != nil {
+		app.lo.Error("error downscaling avatar", "user_id", userID, "error", err)
+		return mmodels.Media{}, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil)
+	}
+	media, err := app.media.UploadAndInsert(fileName, contentType, "" /** content_id **/, null.StringFrom(mmodels.ModelUser), null.IntFrom(userID), resized, resized.Len(), null.String{} /** disposition **/, []byte("{}") /** meta **/, private)
+	if err != nil {
+		app.lo.Error("error uploading file", "user_id", userID, "error", err)
+		return mmodels.Media{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorUploadingFile"), nil)
+	}
+	if err := app.user.UpdateAvatar(userID, "/uploads/"+media.UUID); err != nil {
+		return mmodels.Media{}, err
+	}
+	return media, nil
 }
 
 // handleGenerateAPIKey generates a new API key for a user

@@ -1,10 +1,21 @@
 <template>
   <Card
-    class="flex flex-col p-4 max-w-xs cursor-pointer transition-shadow hover:shadow-md"
-    @click="handleClick">
+    class="flex flex-col p-4 max-w-xs cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    role="button"
+    tabindex="0"
+    @keydown.enter.prevent="handleClick"
+    @keydown.space.prevent="handleClick"
+    @click="handleClick"
+  >
     <div class="flex items-center mb-2">
-      <img v-if="typeof icon === 'string'" :src="icon" class="w-6 h-6 mr-2" />
-      <component v-else :is="icon" size="24" class="mr-2 text-primary" />
+      <img v-if="typeof icon === 'string'" :src="icon" class="size-6 shrink-0 mr-2" alt="" />
+      <component
+        v-else
+        :is="icon"
+        size="24"
+        class="size-6 shrink-0 mr-2 text-primary"
+        aria-hidden="true"
+      />
       <h3 class="text-lg font-medium">{{ title }}</h3>
       <BetaBadge v-if="badge" class="ml-2">{{ badge }}</BetaBadge>
     </div>

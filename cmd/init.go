@@ -34,6 +34,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
+	telegramChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/telegram"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/macro"
@@ -53,6 +54,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
 	"github.com/abhinavxd/libredesk/internal/team"
+	"github.com/abhinavxd/libredesk/internal/telegram"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/abhinavxd/libredesk/internal/view"
@@ -818,13 +820,19 @@ func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, c
 }
 
 // makeInboxInitializer creates an inbox initializer function.
-func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
+func makeInboxInitializer(mgr *inbox.Manager, signAvatarURL func(*null.String), waClient *whatsappapi.Client, tgClient *telegram.Client, sourceUpdater *conversation.Manager, authStatusHook email.AuthStatusCallback) func(imodels.Inbox, inbox.MessageStore, inbox.UserStore) (inbox.Inbox, error) {
 	return func(inboxR imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore) (inbox.Inbox, error) {
 		switch inboxR.Channel {
 		case inbox.ChannelEmail:
 			return initEmailInbox(inboxR, msgStore, usrStore, mgr, authStatusHook)
 		case inbox.ChannelLiveChat:
 			return initLiveChatInbox(inboxR, msgStore, usrStore, signAvatarURL)
+		case inbox.ChannelTelegram:
+			var config telegramChannel.Config
+			if err := json.Unmarshal(inboxR.Config, &config); err != nil {
+				return nil, err
+			}
+			return telegramChannel.New(telegramChannel.Opts{ID: inboxR.ID, Name: inboxR.Name, Config: config, Client: tgClient, Store: sourceUpdater, Lo: initLogger("telegram_inbox"), AuthStatus: authStatusHook})
 		case inbox.ChannelWhatsApp:
 			return initWhatsAppInbox(inboxR, msgStore, waClient, sourceUpdater)
 		default:
@@ -840,15 +848,15 @@ func reloadInbox(app *App, id int) error {
 	if err := ensureWhatsAppIngester(app); err != nil {
 		app.lo.Error("error starting whatsapp ingester after an inbox change", "id", id, "error", err)
 	}
-	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.conversation, makeInboxAuthStatusHook(app)))
+	return app.inbox.ReloadInbox(app.ctx, id, makeInboxInitializer(app.inbox, app.conversation.SignAvatarURL, app.whatsappClient, app.telegramClient, app.conversation, makeInboxAuthStatusHook(app)))
 }
 
 // startInboxes registers the active inboxes and starts receiver for each.
-func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String), waClient *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater, authStatusHook email.AuthStatusCallback) {
+func startInboxes(ctx context.Context, mgr *inbox.Manager, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String), waClient *whatsappapi.Client, tgClient *telegram.Client, sourceUpdater *conversation.Manager, authStatusHook email.AuthStatusCallback) {
 	mgr.SetMessageStore(msgStore)
 	mgr.SetUserStore(usrStore)
 
-	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL, waClient, sourceUpdater, authStatusHook)); err != nil {
+	if err := mgr.InitInboxes(makeInboxInitializer(mgr, signAvatarURL, waClient, tgClient, sourceUpdater, authStatusHook)); err != nil {
 		log.Fatalf("error initializing inboxes: %v", err)
 	}
 

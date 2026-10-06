@@ -25,6 +25,12 @@
       :available-languages="availableLanguages"
       v-else-if="inbox.channel === 'livechat'"
     />
+    <TelegramInboxForm
+      v-else-if="inbox.channel === 'telegram'"
+      :initialValues="inbox"
+      :submitForm="submitForm"
+      :isLoading="isLoading"
+    />
     <WhatsAppInboxForm
       :initialValues="inbox"
       :submitForm="submitForm"
@@ -39,6 +45,7 @@ import { onMounted, ref } from 'vue'
 import api from '@/api'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
+import TelegramInboxForm from '@main/features/admin/inbox/TelegramInboxForm.vue'
 import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import CopyButton from '@/components/button/CopyButton.vue'
@@ -109,7 +116,7 @@ const submitForm = (values) => {
       channel: inbox.value.channel,
       config: values.config
     }
-  } else if (inbox.value.channel === 'whatsapp') {
+  } else if (['whatsapp', 'telegram'].includes(inbox.value.channel)) {
     payload = {
       name: values.name,
       from: values.from,
@@ -134,7 +141,8 @@ const submitForm = (values) => {
 const updateInbox = async (payload) => {
   try {
     isLoading.value = true
-    await api.updateInbox(inbox.value.id, payload)
+    const response = await api.updateInbox(inbox.value.id, payload)
+    if (inbox.value.channel === 'telegram') inbox.value = response.data.data
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })

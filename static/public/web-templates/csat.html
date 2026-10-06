@@ -3,34 +3,34 @@
 <div class="csat-container">
     <p class="csat-title">{{ L.T "csat.rateYourInteraction" }}</p>
 
-    <form action="/csat/{{ .Data.CSAT.UUID }}" method="POST" class="csat-form" novalidate>
+    <form action="/csat/{{ .Data.CSAT.UUID }}" method="POST" class="csat-form" data-feedback-pending="{{ .Data.CSAT.FeedbackPending }}" novalidate>
         <div class="rating-container">
             <div class="rating-options">
-                <input type="radio" id="rating-1" name="rating" value="1" required>
+                <input type="radio" id="rating-1" name="rating" value="1" {{ if .Data.CSAT.FeedbackPending }}disabled{{ end }} {{ if eq .Data.CSAT.Rating 1 }}checked{{ end }} required>
                 <label for="rating-1" class="rating-option" tabindex="0">
                     <span class="emoji">😢</span>
                     <span class="rating-label">{{ L.T "globals.terms.poor" }}</span>
                 </label>
 
-                <input type="radio" id="rating-2" name="rating" value="2">
+                <input type="radio" id="rating-2" name="rating" value="2" {{ if .Data.CSAT.FeedbackPending }}disabled{{ end }} {{ if eq .Data.CSAT.Rating 2 }}checked{{ end }}>
                 <label for="rating-2" class="rating-option" tabindex="0">
                     <span class="emoji">😕</span>
                     <span class="rating-label">{{ L.T "globals.terms.fair" }}</span>
                 </label>
 
-                <input type="radio" id="rating-3" name="rating" value="3">
+                <input type="radio" id="rating-3" name="rating" value="3" {{ if .Data.CSAT.FeedbackPending }}disabled{{ end }} {{ if eq .Data.CSAT.Rating 3 }}checked{{ end }}>
                 <label for="rating-3" class="rating-option" tabindex="0">
                     <span class="emoji">😊</span>
                     <span class="rating-label">{{ L.T "globals.terms.good" }}</span>
                 </label>
 
-                <input type="radio" id="rating-4" name="rating" value="4">
+                <input type="radio" id="rating-4" name="rating" value="4" {{ if .Data.CSAT.FeedbackPending }}disabled{{ end }} {{ if eq .Data.CSAT.Rating 4 }}checked{{ end }}>
                 <label for="rating-4" class="rating-option" tabindex="0">
                     <span class="emoji">😃</span>
                     <span class="rating-label">{{ L.T "globals.terms.great" }}</span>
                 </label>
 
-                <input type="radio" id="rating-5" name="rating" value="5">
+                <input type="radio" id="rating-5" name="rating" value="5" {{ if .Data.CSAT.FeedbackPending }}disabled{{ end }} {{ if eq .Data.CSAT.Rating 5 }}checked{{ end }}>
                 <label for="rating-5" class="rating-option" tabindex="0">
                     <span class="emoji">🤩</span>
                     <span class="rating-label">{{ L.T "globals.terms.excellent" }}</span>
@@ -69,6 +69,13 @@
         var msg = document.getElementById('ratingValidationMessage');
         var btn = document.getElementById('submitBtn');
 
+        var feedback = document.getElementById('feedback');
+        if (this.dataset.feedbackPending === 'true' && !feedback.value.trim()) {
+            e.preventDefault();
+            feedback.required = true;
+            feedback.reportValidity();
+            return;
+        }
         if (!rating) {
             e.preventDefault();
             msg.classList.add('show');

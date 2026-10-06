@@ -987,7 +987,7 @@ WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
 -- Keeping the old wamid or provider_status would let a late webhook re-fail the retried row.
 UPDATE conversation_messages m
 SET status = 'pending',
-    source_id = CASE WHEN inb.channel = 'whatsapp' THEN NULL ELSE m.source_id END,
+    source_id = CASE WHEN inb.channel IN ('whatsapp', 'telegram') THEN NULL ELSE m.source_id END,
     meta = COALESCE(m.meta, '{}'::jsonb)
              - 'provider_status' - 'provider_status_updated_at' - 'provider_sent_at'
              - 'provider_delivered_at' - 'provider_read_at' - 'provider_failed_at'
@@ -1271,3 +1271,91 @@ WHERE id = $1;
 
 -- name: assign-proactive-team
 UPDATE conversations SET assigned_team_id = NULLIF($2, 0) WHERE id = $1;
+
+-- name: update-telegram-message
+WITH edited AS (
+    UPDATE conversation_messages m
+    SET content = $2, text_content = $4, content_type = $5::content_type,
+        meta = COALESCE(m.meta, '{}'::jsonb) || jsonb_build_object('telegram_edit_date', $3::bigint),
+        updated_at = NOW()
+    FROM conversations c
+    JOIN inboxes i ON i.id = c.inbox_id
+    WHERE c.inbox_id = $6
+        AND c.contact_id = (SELECT contact_id FROM contact_channel_identities WHERE channel = 'telegram' AND identifier = $7)
+        AND m.conversation_id = c.id AND (m.source_id = $1 OR m.meta->'telegram_source_ids' ? $1)
+        AND i.channel = 'telegram' AND i.deleted_at IS NULL
+        AND m.type IN ('incoming', 'outgoing') AND m.private = false
+        AND COALESCE((m.meta->>'telegram_edit_date')::bigint, 0) < $3
+    RETURNING m.uuid, c.uuid AS conversation_uuid, m.conversation_id, m.created_at
+), refreshed AS (
+    UPDATE conversations c
+    SET last_message = CASE WHEN c.last_message_at = e.created_at THEN $4 ELSE c.last_message END,
+        last_interaction = CASE WHEN c.last_interaction_at = e.created_at THEN $4 ELSE c.last_interaction END
+    FROM edited e
+    WHERE c.id = e.conversation_id
+    RETURNING c.id, c.last_message, c.last_interaction
+)
+SELECT e.uuid, e.conversation_uuid, r.last_message, r.last_interaction
+FROM edited e JOIN refreshed r ON r.id = e.conversation_id;
+
+-- name: get-telegram-conversation-target
+SELECT inbox_id, contact_id, COALESCE(meta, '{}'::jsonb) AS meta FROM conversations WHERE uuid = $1;
+
+-- name: get-telegram-conversation
+SELECT c.id, c.uuid
+FROM conversations c
+JOIN conversation_statuses s ON s.id = c.status_id
+WHERE c.contact_id = $1 AND c.inbox_id = $2
+    AND COALESCE(c.meta->'telegram'->>'business_connection_id', '') = $4
+    AND COALESCE((c.meta->'telegram'->>'message_thread_id')::bigint, 0) = $5
+    AND (s.category != 'resolved' OR ($3 > 0 AND c.last_resolved_at >= NOW() - make_interval(hours => $3)))
+ORDER BY (s.category != 'resolved') DESC,
+    CASE WHEN s.category = 'resolved' THEN c.last_resolved_at ELSE c.created_at END DESC
+LIMIT 1;
+
+-- name: get-telegram-reply-target
+SELECT m.source_id, m.text_content AS content
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE m.uuid = $1 AND c.uuid = $2
+    AND m.private = false AND m.type IN ('incoming', 'outgoing') AND m.source_id IS NOT NULL;
+
+-- name: record-telegram-send
+UPDATE conversation_messages
+SET source_id = $2, meta = COALESCE(meta, '{}'::jsonb) || jsonb_build_object('telegram_source_ids', $3::jsonb)
+WHERE uuid = $1;
+
+-- name: submit-telegram-rating
+UPDATE csat_responses r
+SET rating = $2, response_timestamp = NOW(), updated_at = NOW(),
+    meta = COALESCE(r.meta, '{}'::jsonb) || '{"feedback_pending":true}'::jsonb
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+JOIN inboxes i ON i.id = c.inbox_id
+WHERE m.source_id = $1 AND m.type = 'outgoing' AND m.private = false
+    AND m.meta->>'is_csat' = 'true' AND r.uuid::text = m.meta->>'csat_uuid'
+    AND r.conversation_id = c.id AND r.response_timestamp IS NULL
+    AND i.channel = 'telegram' AND i.deleted_at IS NULL
+RETURNING m.uuid, c.uuid AS conversation_uuid;
+
+-- name: get-telegram-reply-uuid
+SELECT m.uuid
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE c.uuid = $2 AND m.private = false AND m.type IN ('incoming', 'outgoing')
+    AND (m.source_id = $1 OR m.meta->'telegram_source_ids' ? $1)
+LIMIT 1;
+
+-- name: get-telegram-auto-reply-state
+SELECT c.uuid AS conversation_uuid, c.contact_id,
+    EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
+        AND r.type = 'outgoing' AND r.private = false AND r.status != 'failed') AS has_outgoing,
+    EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
+        AND r.type = 'outgoing' AND r.private = false AND r.status != 'failed' AND r.created_at > NOW() - INTERVAL '5 minutes'
+        AND COALESCE(r.meta->>'is_automated', 'false') != 'true') AS recent_reply,
+    EXISTS (SELECT 1 FROM conversation_messages r WHERE r.conversation_id = c.id
+        AND r.meta->>'telegram_automatic_reply' = 'away' AND r.status != 'failed'
+        AND (r.created_at AT TIME ZONE $2)::date = (NOW() AT TIME ZONE $2)::date) AS away_sent_today
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE m.source_id = $1 AND m.type = 'incoming';
