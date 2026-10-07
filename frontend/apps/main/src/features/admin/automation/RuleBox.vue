@@ -270,11 +270,12 @@ const currentFilters = computed(() => {
   if (props.contactsOnly) return {}
   if (props.type === 'new_conversation') return newConversationFilters.value
   if (props.type === 'conversation_update') return conversationFilters.value
-  // previous_* values only exist on conversation update events.
+  // previous_* values only exist on conversation update events, and business hours are checked at event time.
   const filters = { ...conversationFilters.value }
   for (const key of Object.keys(filters)) {
     if (key.startsWith('previous_')) delete filters[key]
   }
+  delete filters.business_hours_status
   return filters
 })
 

@@ -277,6 +277,7 @@ func main() {
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
+	automation.SetBusinessHoursChecker(&automationBusinessHours{team: team, settings: settings, businessHours: businessHours})
 	systemUser, err := user.GetSystemUser()
 	if err != nil {
 		log.Fatalf("error fetching system user: %v", err)
