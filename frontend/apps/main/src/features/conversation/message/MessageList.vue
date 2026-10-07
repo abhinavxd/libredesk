@@ -11,7 +11,7 @@
             variant="outline"
             @click="loadMore"
             :disabled="conversationStore.messages.fetching"
-            class="max-md:h-11 transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
+            class="max-md:h-11"
           >
             <Loader2
               v-if="conversationStore.messages.fetching"
@@ -25,7 +25,12 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
+        <TransitionGroup
+          v-else
+          :key="conversationStore.current?.uuid"
+          :enter-active-class="loadingOlder ? '' : 'animate-slide-in'"
+          tag="div"
+        >
           <div
             v-for="row in messageRows"
             :key="row.message.render_key || row.message.uuid"
@@ -120,6 +125,7 @@ const readReady = ref(false)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 const showAssignNudge = ref(false)
+const loadingOlder = ref(false)
 const { canAssignAgent } = useBulkActionPermissions()
 let currentConversationUUID = ''
 let openScrollDone = false
@@ -273,9 +279,14 @@ const loadMore = async () => {
   if (!thread) return
   const prevHeight = thread.scrollHeight
   const prevTop = thread.scrollTop
-  await conversationStore.fetchNextMessages()
-  await nextTick()
-  thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+  loadingOlder.value = true
+  try {
+    await conversationStore.fetchNextMessages()
+    await nextTick()
+    thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+  } finally {
+    loadingOlder.value = false
+  }
 }
 
 const messageRows = computed(() => {
@@ -297,13 +308,6 @@ const messageRows = computed(() => {
 </script>
 
 <style scoped>
-/* Leaving messages must be out of flow during a conversation swap, else they shift the target's offsetTop mid-scroll. */
-.message-leaving {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Highlight via an opacity-faded overlay, not the element's own background, to avoid a text repaint flicker when it ends. */
 .highlight-mention {
   position: relative;
