@@ -295,7 +295,7 @@ func TestAliasReplyRouting(t *testing.T) {
 		replyTo     string
 		disablePlus bool
 	}{
-		{name: "forwarding alias", from: "billing@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
+		{name: "alias", from: "billing@example.com", want: "billing+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
 		{name: "primary", from: "support@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
 		{name: "explicit override", from: "billing@example.com", override: "replies@example.com", want: "replies@example.com"},
 		{name: "alias with receiving mailbox", from: "Billing <billing@example.com>", replyTo: "Replies <replies@example.net>", want: "replies+conv-550e8400-e29b-41d4-a716-446655440000@example.net"},

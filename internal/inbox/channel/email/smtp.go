@@ -1,7 +1,6 @@
 package email
 
 import (
-	"cmp"
 	"crypto/tls"
 	"fmt"
 	"math/rand"
@@ -173,12 +172,8 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	}
 
 	inboxReplyTo := e.replyTo
-	if !strings.EqualFold(emailAddress, e.PrimaryAddress()) {
-		if e.enablePlusAddressing {
-			inboxReplyTo = cmp.Or(inboxReplyTo, e.PrimaryAddress())
-		} else {
-			inboxReplyTo = ""
-		}
+	if !e.enablePlusAddressing && !strings.EqualFold(emailAddress, e.PrimaryAddress()) {
+		inboxReplyTo = ""
 	}
 	if rt := resolveReplyTo(m.ReplyTo, inboxReplyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
 		email.Headers.Set("Reply-To", rt)

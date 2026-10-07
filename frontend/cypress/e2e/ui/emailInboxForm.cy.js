@@ -290,8 +290,11 @@ describe('Email inbox form', () => {
       email: `alias${index}@example.com`,
       verification_status: status
     }))
-    cy.intercept('POST', `**/api/v1/inboxes/${inboxId}/aliases/verify`, {
-      body: { data: true }
+    cy.intercept('POST', `**/api/v1/inboxes/${inboxId}/aliases/verify`, (req) => {
+      inbox.aliases = inbox.aliases.map((alias) =>
+        alias.email === req.body.email ? { ...alias, verification_status: 'pending' } : alias
+      )
+      req.reply({ data: true })
     }).as('verifyAlias')
     cy.visit(editPath)
     field('name').clear().type('Unsaved name')
