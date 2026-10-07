@@ -26,6 +26,10 @@ import (
 	"github.com/zerodha/fastglue"
 )
 
+type conversationReadReq struct {
+	MessageUUID string `json:"message_uuid"`
+}
+
 type assigneeChangeReq struct {
 	AssigneeID int `json:"assignee_id"`
 }
@@ -442,7 +446,11 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		uuid  = r.RequestCtx.UserValue("uuid").(string)
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		req   = conversationReadReq{}
 	)
+	if err := r.Decode(&req, "json"); err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -457,20 +465,23 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		readSourceID string
 	)
 	if conv.InboxChannel == whatsappChannel.ChannelWhatsApp {
-		readInboxID, readSourceID, err = app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID)
+		readInboxID, readSourceID, err = app.conversation.WhatsAppReadReceiptTarget(uuid, auser.ID, req.MessageUUID)
 		if err != nil {
 			app.lo.Error("error resolving whatsapp read receipt target", "conversation_uuid", uuid, "error", err)
 		}
 	}
 
-	if err = app.conversation.UpdateUserLastSeen(uuid, auser.ID); err != nil {
+	cutoff, err := app.conversation.UpdateUserLastSeen(uuid, auser.ID, req.MessageUUID)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
 	if readSourceID != "" {
 		go markWhatsAppMessageRead(app, readInboxID, readSourceID)
 	}
-	return r.SendEnvelope(true)
+	state := map[string]any{"conversation_uuid": uuid, "last_seen_at": cutoff}
+	app.conversation.BroadcastConversationRead(auser.ID, state)
+	return r.SendEnvelope(state)
 }
 
 // handleMarkConversationAsUnread marks a conversation as unread for the current user.

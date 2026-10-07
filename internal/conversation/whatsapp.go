@@ -46,12 +46,12 @@ var sendableTemplateHeaderTypes = []string{"", "NONE", "TEXT"}
 var templatePlaceholderPattern = regexp.MustCompile(`\{\{[A-Za-z0-9_]+\}\}`)
 
 // WhatsAppReadReceiptTarget returns the inbox ID and wamid of the latest unseen inbound message, or empty values when there is nothing to mark read.
-func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int) (int, string, error) {
+func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int, messageUUID string) (int, string, error) {
 	var row struct {
 		SourceID string `db:"source_id"`
 		InboxID  int    `db:"inbox_id"`
 	}
-	if err := m.q.GetWhatsAppReadReceiptTarget.Get(&row, uuid, userID); err != nil {
+	if err := m.q.GetWhatsAppReadReceiptTarget.Get(&row, uuid, userID, messageUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, "", nil
 		}

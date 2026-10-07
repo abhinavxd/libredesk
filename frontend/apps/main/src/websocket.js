@@ -106,7 +106,7 @@ export class WebSocketClient {
             }
           }
 
-          if (!isOpen && this.convStore.isConversationInList(uuid)) {
+          if (this.convStore.isConversationInList(uuid)) {
             this.convStore.incrementUnread(uuid)
           }
 
@@ -128,6 +128,7 @@ export class WebSocketClient {
             this.convStore.refreshSidebarCounts()
           }
         },
+        [WS_EVENT.CONVERSATION_READ]: () => this.convStore.applyConversationRead(data.data),
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)

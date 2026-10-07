@@ -30,7 +30,7 @@ type fakeChannelProvider struct {
 	notificationID null.Int
 }
 
-func (p *fakePushSender) Send(userID int, payload models.PushPayload) bool {
+func (p *fakePushSender) Send(userID int, payload models.PushPayload, _ models.NotificationReference) bool {
 	p.userID = userID
 	p.payload = payload
 	return true

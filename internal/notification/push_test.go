@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
+	"time"
 	"unicode/utf8"
 
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
@@ -17,9 +20,15 @@ import (
 	"github.com/zerodha/logf"
 )
 
+type replyDeliveryStub struct{ allowed atomic.Bool }
+
 type fakePushSettings struct {
 	values  map[string]string
 	updates int
+}
+
+func (s *replyDeliveryStub) ShouldDeliver(_ int, ref nmodels.NotificationReference, _ nmodels.NotificationChannel) (bool, error) {
+	return !nmodels.IsReply(ref.Type) || s.allowed.Load(), nil
 }
 
 func (s *fakePushSettings) Get(key string) (types.JSONText, error) {
@@ -61,6 +70,7 @@ func TestPushManagerDeliverSendsEverySubscription(t *testing.T) {
 	var endpoints []string
 	m := &PushManager{
 		store:      store,
+		checker:    &replyDeliveryStub{},
 		publicKey:  "public",
 		privateKey: "private",
 		subject:    "https://desk.example",
@@ -92,7 +102,8 @@ func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 			original := nmodels.PushPayload{Title: content, Body: content, Tag: "mention_" + strings.Repeat("a", 36), URL: "/inboxes/mentioned/conversation/123?scrollTo=456"}
 			called := false
 			m := &PushManager{
-				store: &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
+				store:   &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
+				checker: &replyDeliveryStub{},
 				sender: func(_ context.Context, payload []byte, _ PushSubscription, _, _, _ string) (*http.Response, error) {
 					called = true
 					if len(payload) > 3993 {
@@ -129,7 +140,8 @@ func TestPushManagerDeliverBoundsPreview(t *testing.T) {
 func TestPushManagerDeliverDeletesExpiredSubscription(t *testing.T) {
 	store := &fakePushStore{subscriptions: []PushSubscription{{ID: 23, Endpoint: "https://push.example/expired"}}}
 	m := &PushManager{
-		store: store,
+		store:   store,
+		checker: &replyDeliveryStub{},
 		sender: func(context.Context, []byte, PushSubscription, string, string, string) (*http.Response, error) {
 			return &http.Response{StatusCode: http.StatusGone, Body: io.NopCloser(strings.NewReader(""))}, nil
 		},
@@ -229,4 +241,51 @@ func TestLoadVAPIDKeysCreatesMissingPair(t *testing.T) {
 	if settings.updates != 1 {
 		t.Fatalf("updated VAPID keys %d times, want 1", settings.updates)
 	}
+}
+
+func TestReplyPushWaitsAndRechecksWithoutDelayingMentions(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		checker := &replyDeliveryStub{}
+		sent := make(chan string, 4)
+		lo := logf.New(logf.Opts{})
+		manager := &PushManager{
+			store: &fakePushStore{subscriptions: []PushSubscription{{ID: 1}}},
+			lo:    &lo, publicKey: "public", privateKey: "private", concurrency: 1,
+			queue: make(chan pushDelivery, 2), checker: checker,
+			sender: func(_ context.Context, payload []byte, _ PushSubscription, _, _, _ string) (*http.Response, error) {
+				var p nmodels.PushPayload
+				if err := json.Unmarshal(payload, &p); err != nil {
+					return nil, err
+				}
+				sent <- p.Title
+				return nil, nil
+			},
+		}
+		go manager.Run(ctx)
+		if !manager.Send(7, nmodels.PushPayload{Title: "Reply"}, nmodels.NotificationReference{Type: nmodels.NotificationTypeNewReply}) {
+			t.Fatal("reply rejected")
+		}
+		if !manager.Send(7, nmodels.PushPayload{Title: "Mention"}, nmodels.NotificationReference{Type: nmodels.NotificationTypeMention}) {
+			t.Fatal("mention rejected")
+		}
+		synctest.Wait()
+		if len(sent) != 1 || <-sent != "Mention" {
+			t.Fatal("mention did not arrive immediately")
+		}
+		checker.allowed.Store(false)
+		time.Sleep(pushReplyDelay)
+		synctest.Wait()
+		if len(sent) != 0 {
+			t.Fatal("seen or ineligible reply was pushed")
+		}
+		checker.allowed.Store(true)
+		manager.Send(7, nmodels.PushPayload{Title: "Unread reply"}, nmodels.NotificationReference{Type: nmodels.NotificationTypeNewReply})
+		time.Sleep(pushReplyDelay)
+		synctest.Wait()
+		if len(sent) != 1 || <-sent != "Unread reply" {
+			t.Fatal("unread reply was not pushed after delay")
+		}
+	})
 }

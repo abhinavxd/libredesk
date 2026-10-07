@@ -581,9 +581,13 @@ WHERE uuid = $1;
 
 -- name: upsert-user-last-seen
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-VALUES ($1, (SELECT id FROM conversations WHERE uuid = $2), NOW())
+SELECT $1, m.conversation_id, m.created_at
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE c.uuid = $2 AND m.uuid = $3
 ON CONFLICT (conversation_id, user_id)
-DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
+DO UPDATE SET last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at), updated_at = NOW()
+RETURNING last_seen_at;
 
 -- name: update-conversation-last-message
 -- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
@@ -1044,6 +1048,7 @@ JOIN conversations c ON c.id = cm.conversation_id
 JOIN inboxes i ON i.id = c.inbox_id
 WHERE c.uuid = $1
   AND i.channel = 'whatsapp'
+  AND cm.created_at <= (SELECT created_at FROM conversation_messages WHERE conversation_id = c.id AND uuid = $3)
   AND cm.type = 'incoming'
   AND COALESCE(cm.source_id, '') != ''
   AND cm.created_at > COALESCE(
@@ -1204,6 +1209,14 @@ last_msg AS (
     WHERE conversation_id = (SELECT id FROM target)
       AND (meta IS NULL OR NOT COALESCE((meta->>'continuity_email')::boolean, false))
     ORDER BY created_at DESC LIMIT 1
+),
+read_replies AS (
+    UPDATE user_notifications n SET is_read = true, updated_at = NOW()
+    FROM conversation_messages m, conversation_last_seen ls
+    WHERE n.user_id = $1 AND n.conversation_id = (SELECT id FROM target) AND NOT n.is_read
+      AND n.notification_type = ANY($3::user_notification_type[])
+      AND m.id = n.message_id
+      AND ls.user_id = $1 AND ls.conversation_id = n.conversation_id AND ls.last_seen_at >= m.created_at
 )
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
 SELECT $1, (SELECT id FROM target), ts FROM last_msg

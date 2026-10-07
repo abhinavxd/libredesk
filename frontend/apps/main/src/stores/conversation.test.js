@@ -1,0 +1,83 @@
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { ref } from 'vue'
+import { useConversationStore } from './conversation'
+
+const { api } = vi.hoisted(() => ({ api: { getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn() } }))
+vi.mock('@main/api', () => ({ default: api }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ currentRoute: ref({ params: { uuid: 'conversation-a' } }) }) }))
+vi.mock('@main/stores/user', () => ({ useUserStore: () => ({ userID: 7, user: {}, can: () => true }) }))
+vi.mock('@main/composables/useEmitter', () => ({ useEmitter: () => ({ emit: vi.fn() }) }))
+vi.mock('@main/websocket', () => ({ subscribeToConversation: vi.fn(), sendTypingIndicator: vi.fn(), subscribeListReplace: vi.fn() }))
+vi.mock('@main/i18n', () => ({ getI18n: () => ({ global: { t: key => key } }) }))
+vi.mock('@shared-ui/utils/http.js', () => ({ handleHTTPError: error => error }))
+
+const oldMessage = { id: 1, uuid: 'old-message', created_at: '2026-01-01T00:00:00Z', type: 'incoming' }
+const reply = { id: 2, uuid: 'new-reply', created_at: '2026-01-01T00:00:01Z', type: 'incoming', conversation_uuid: 'conversation-a' }
+const activity = { id: 3, uuid: 'activity', created_at: '2026-01-01T00:00:02Z', type: 'activity', conversation_uuid: 'conversation-a' }
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  vi.clearAllMocks()
+})
+
+const setup = () => {
+  const store = useConversationStore()
+  store.conversation.data = { uuid: 'conversation-a' }
+  store.messages.data.addMessages('conversation-a', [oldMessage], 1, 1)
+  store.conversations.data = [{ uuid: 'conversation-a', unread_message_count: 2, last_message_at: reply.created_at }]
+  return store
+}
+
+describe('conversation read state', () => {
+  it('blocks acknowledgements while an earlier reply body is still loading', async () => {
+    const store = setup()
+    let finish
+    api.getConversationMessage.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const incoming = store.updateConversationMessage(reply)
+    await store.updateConversationMessage(activity)
+    expect(store.conversationMessages.at(-1).uuid).toBe('activity')
+    expect(store.hasPendingMessages).toBe(true)
+    finish({ data: { data: reply } })
+    await incoming
+    expect(store.hasPendingMessages).toBe(false)
+  })
+
+  it('keeps failed message loads unread until refreshed successfully', async () => {
+    const store = setup()
+    api.getConversationMessage.mockRejectedValueOnce(new Error('offline'))
+    api.getConversationMessages.mockRejectedValueOnce(new Error('offline'))
+    await store.updateConversationMessage(reply)
+    await store.updateConversationMessage(activity)
+    expect(store.hasPendingMessages).toBe(true)
+    api.getConversationMessages.mockResolvedValueOnce({ data: { data: { results: [oldMessage, reply, activity] } } })
+    await store.fetchMessages('conversation-a')
+    expect(store.hasPendingMessages).toBe(false)
+  })
+
+  it('recovers a missing single-message response from the latest page', async () => {
+    const store = setup()
+    api.getConversationMessage.mockResolvedValueOnce({ data: { data: null } })
+    api.getConversationMessages.mockResolvedValueOnce({ data: { data: { results: [oldMessage, reply] } } })
+    await store.updateConversationMessage(reply)
+    expect(store.hasPendingMessages).toBe(false)
+    expect(store.conversationMessages.at(-1).uuid).toBe(reply.uuid)
+  })
+
+  it('stops blocking acknowledgements when a refresh shows the message no longer exists', async () => {
+    const store = setup()
+    api.getConversationMessage.mockRejectedValueOnce(new Error('not found'))
+    api.getConversationMessages.mockResolvedValueOnce({ data: { data: { results: [oldMessage] } } })
+    await store.updateConversationMessage(reply)
+    expect(store.hasPendingMessages).toBe(false)
+  })
+
+  it('clears the list badge only when the read reaches the last message', () => {
+    const store = setup()
+    store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: oldMessage.created_at })
+    expect(store.conversations.data[0].unread_message_count).toBe(2)
+    store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: reply.created_at })
+    expect(store.conversations.data[0].unread_message_count).toBe(0)
+  })
+})
