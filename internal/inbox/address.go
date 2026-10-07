@@ -63,7 +63,8 @@ func SendableEmailAddresses(from string, aliases models.EmailAliases) ([]string,
 	}
 	addresses := []string{primary}
 	for _, alias := range normalized {
-		if alias.VerificationStatus == models.AliasVerificationVerified {
+		if alias.VerificationStatus == models.AliasVerificationVerified ||
+			(alias.VerificationStatus == models.AliasVerificationPending && alias.VerifiedAt != nil) {
 			addresses = append(addresses, alias.Email)
 		}
 	}

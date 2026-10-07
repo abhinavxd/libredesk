@@ -21,6 +21,14 @@ describe('resolveEmailSender', () => {
 })
 
 describe('sendableAddresses', () => {
+  test('matches normalized sender selections to mixed-case address options', () => {
+    const addresses = sendableAddresses('Support <Support@Example.COM>', [
+      { email: 'Billing@Example.COM', verification_status: 'verified' }
+    ])
+    expect(addresses).toEqual(['support@example.com', 'billing@example.com'])
+    const selected = resolveEmailSender({ type: 'incoming', meta: { inbox_address: 'Support@Example.COM' } }, addresses)
+    expect(addresses).toContain(selected)
+  })
   test('lists the primary address and verified aliases only', () => {
     const aliases = [
       { email: 'billing@example.com', verification_status: 'verified' },

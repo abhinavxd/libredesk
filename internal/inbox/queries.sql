@@ -45,29 +45,43 @@ SET config = $2, updated_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: delete-inbox-email-addresses
-DELETE FROM inbox_email_addresses WHERE inbox_id = $1;
+DELETE FROM inbox_email_addresses
+WHERE inbox_id = $1 AND (NOT (LOWER(email) = ANY($2)) OR (kind = 'primary' AND LOWER(email) != $3));
+
+-- name: lock-inbox
+SELECT id FROM inboxes WHERE id = $1 AND deleted_at IS NULL FOR UPDATE;
+
+-- name: reset-alias-verification
+UPDATE inbox_email_addresses
+SET verification_status = 'not_verified', verification_token = NULL, verification_started_at = NULL, verified_at = NULL
+WHERE inbox_id = $1 AND kind = 'alias';
 
 -- name: insert-inbox-email-address
-INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status, verification_token, verification_started_at, verified_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (inbox_id, LOWER(email)) DO UPDATE
+SET kind = EXCLUDED.kind, position = EXCLUDED.position,
+    verification_status = CASE WHEN EXCLUDED.kind = 'primary' THEN 'verified' ELSE inbox_email_addresses.verification_status END,
+    verification_token = CASE WHEN EXCLUDED.kind = 'primary' THEN NULL ELSE inbox_email_addresses.verification_token END;
 
 -- name: get-alias-verification-states
-SELECT email, verification_status, verification_token, verification_started_at, verified_at
+SELECT email, verification_status, verified_at
 FROM inbox_email_addresses
 WHERE inbox_id = $1 AND kind = 'alias'
 FOR UPDATE;
 
 -- name: start-alias-verification
 UPDATE inbox_email_addresses
-SET verification_status = CASE WHEN verification_status = $5 THEN verification_status ELSE $3 END,
+SET verification_status = $3,
     verification_token = $4,
     verification_started_at = NOW(),
-    verified_at = CASE WHEN verification_status = $5 THEN verified_at ELSE NULL END
+    verified_at = CASE WHEN verification_status IN ('verified', 'pending') THEN verified_at ELSE NULL END
 WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias';
 
 -- name: fail-alias-verification
 UPDATE inbox_email_addresses
-SET verification_status = $3, verification_token = NULL
-WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias';
+SET verification_status = $3, verification_token = NULL, verified_at = NULL
+WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias' AND verification_token = $4;
 
 -- name: complete-alias-verification
 UPDATE inbox_email_addresses
@@ -77,5 +91,10 @@ WHERE inbox_id = $1 AND verification_token = $2 AND LOWER(email) = $3
 
 -- name: fail-alias-verification-by-token
 UPDATE inbox_email_addresses
-SET verification_status = $3, verification_token = NULL
+SET verification_status = $3, verification_token = NULL, verified_at = NULL
 WHERE inbox_id = $1 AND verification_token = $2 AND kind = 'alias' AND verification_status = $4;
+
+-- name: expire-alias-verifications
+UPDATE inbox_email_addresses
+SET verification_status = $2, verification_token = NULL, verified_at = NULL
+WHERE inbox_id = $1 AND kind = 'alias' AND verification_status = $3 AND verification_started_at < $4;

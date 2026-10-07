@@ -2,8 +2,10 @@
 package email
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,8 +42,6 @@ type Email struct {
 	from                      string
 	primary                   string
 	receiveAddresses          map[string]struct{}
-	sendAddresses             map[string]struct{}
-	addressesMu               sync.RWMutex
 	fromNameTemplate          string
 	replyTo                   string
 	enablePlusAddressing      bool
@@ -50,6 +50,7 @@ type Email struct {
 	wg                        sync.WaitGroup
 	tokenRefreshCallback      TokenRefreshCallback
 	aliasVerificationCallback func(context.Context, string, string) error
+	aliasExpiryCallback       func(context.Context, time.Time) error
 	authStatusCallback        AuthStatusCallback
 }
 
@@ -71,6 +72,7 @@ type Opts struct {
 	Lo                        *logf.Logger
 	TokenRefreshCallback      TokenRefreshCallback // Optional callback for token refresh
 	AliasVerificationCallback func(context.Context, string, string) error
+	AliasExpiryCallback       func(context.Context, time.Time) error
 	AuthStatusCallback        AuthStatusCallback
 }
 
@@ -88,14 +90,12 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 
 	primary, err := inbox.NormalizeEmailAddress(opts.Config.From)
 	receiveSet := make(map[string]struct{})
-	sendSet := make(map[string]struct{})
 	if err != nil {
 		if opts.Lo != nil {
 			opts.Lo.Warn("could not normalize email inbox from address; address ownership will be empty", "from", opts.Config.From, "error", err)
 		}
 	} else {
 		receiveSet[primary] = struct{}{}
-		sendSet[primary] = struct{}{}
 	}
 	for _, alias := range opts.Aliases {
 		address, err := inbox.NormalizeEmailAddress(alias.Email)
@@ -106,9 +106,6 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 			continue
 		}
 		receiveSet[address] = struct{}{}
-		if alias.VerificationStatus == models.AliasVerificationVerified {
-			sendSet[address] = struct{}{}
-		}
 	}
 
 	e := &Email{
@@ -119,7 +116,6 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		from:                      opts.Config.From,
 		primary:                   primary,
 		receiveAddresses:          receiveSet,
-		sendAddresses:             sendSet,
 		fromNameTemplate:          opts.Config.FromNameTemplate,
 		replyTo:                   opts.Config.ReplyTo,
 		smtpCfg:                   opts.Config.SMTP,
@@ -134,6 +130,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback:      opts.TokenRefreshCallback,
 		aliasVerificationCallback: opts.AliasVerificationCallback,
+		aliasExpiryCallback:       opts.AliasExpiryCallback,
 		authStatusCallback:        opts.AuthStatusCallback,
 	}
 	return e, nil
@@ -151,52 +148,24 @@ func (e *Email) PrimaryAddress() string {
 
 // ReceivesAddress reports whether the address is configured to receive mail.
 func (e *Email) ReceivesAddress(value string) bool {
-	return e.hasAddress(e.receiveAddresses, value)
-}
-
-// SendsAddress reports whether the address is currently authorized for From.
-func (e *Email) SendsAddress(value string) bool {
-	return e.hasAddress(e.sendAddresses, value)
-}
-
-func (e *Email) hasAddress(set map[string]struct{}, value string) bool {
 	address, err := inbox.NormalizeEmailAddress(value)
 	if err != nil {
 		return false
 	}
-	e.addressesMu.RLock()
-	defer e.addressesMu.RUnlock()
-	_, ok := set[address]
+	_, ok := e.receiveAddresses[address]
 	return ok
-}
-
-// SetAliasSendable allows or blocks an alias as a From address.
-func (e *Email) SetAliasSendable(value string, send bool) {
-	address, err := inbox.NormalizeEmailAddress(value)
-	if err != nil {
-		return
-	}
-	e.addressesMu.Lock()
-	defer e.addressesMu.Unlock()
-	if send {
-		if e.sendAddresses == nil {
-			e.sendAddresses = make(map[string]struct{})
-		}
-		e.sendAddresses[address] = struct{}{}
-	} else {
-		delete(e.sendAddresses, address)
-	}
 }
 
 // StartAliasVerification sends a verification message using this inbox's SMTP pool.
 func (e *Email) StartAliasVerification(alias, token string) error {
+	_, domain, _ := strings.Cut(e.PrimaryAddress(), "@")
 	return e.Send(conversationmodels.OutboundMessage{
 		From:                   alias,
-		To:                     []string{e.PrimaryAddress()},
+		To:                     []string{cmp.Or(e.ReplyToAddress(), e.PrimaryAddress())},
 		Subject:                "libredesk alias verification",
 		ContentType:            conversationmodels.ContentTypeText,
 		Content:                "This message verifies the sending capability of a libredesk email alias.",
-		SourceID:               "alias-verification-" + token,
+		SourceID:               "alias-verification-" + token + "@" + domain,
 		AliasVerificationToken: token,
 	})
 }

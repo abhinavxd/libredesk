@@ -1,15 +1,142 @@
 package email
 
 import (
+	"context"
+	"errors"
+	"io"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/emersion/go-imap/v2/imapserver"
+	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
+	"github.com/stretchr/testify/require"
+	"github.com/zerodha/logf"
 )
+
+func TestAliasVerificationRetriesAfterFailure(t *testing.T) {
+	user := imapmemserver.NewUser("test", "" /* password */)
+	require.NoError(t, user.Create("INBOX", nil /* options */))
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return imapmemserver.NewUserSession(user), &imapserver.GreetingData{PreAuth: true}, nil
+		},
+		Caps: imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapUIDPlus: {}},
+	})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { server.Close() })
+	go server.Serve(listener)
+	client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+	require.NoError(t, err)
+	t.Cleanup(func() { client.Close() })
+	raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+		headerAliasVerification + ": test-token\r\n" +
+		headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+	appendCmd := client.Append("INBOX", int64(len(raw)), nil /* options */)
+	_, err = io.WriteString(appendCmd, raw)
+	require.NoError(t, err)
+	require.NoError(t, appendCmd.Close())
+	_, err = appendCmd.Wait()
+	require.NoError(t, err)
+	_, err = client.Select("INBOX", nil /* options */).Wait()
+	require.NoError(t, err)
+
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	attempts := 0
+	e := &Email{
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
+		lo:      &logger,
+		aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+			attempts++
+			require.Equal(t, "test-token", token)
+			require.Equal(t, "billing@example.com", from)
+			if attempts == 1 {
+				return errors.New("database unavailable")
+			}
+			return nil
+		},
+	}
+	for _, remaining := range []int{1, 0} {
+		results, err := client.Search(&imap.SearchCriteria{NotFlag: []imap.Flag{imap.FlagSeen, imap.FlagDeleted}}, nil /* options */).Wait()
+		require.NoError(t, err)
+		require.Len(t, results.AllSeqNums(), 1)
+		require.NoError(t, e.fetchAndProcessMessages(t.Context(), client, results, e.id))
+		results, err = client.Search(&imap.SearchCriteria{}, nil /* options */).Wait()
+		require.NoError(t, err)
+		require.Len(t, results.AllSeqNums(), remaining)
+	}
+	require.Equal(t, 2, attempts)
+}
+
+func TestMailboxCheckExpiresAliasVerificationsAfterCompletingFoundOnes(t *testing.T) {
+	user := imapmemserver.NewUser("test", "secret")
+	require.NoError(t, user.Create("INBOX", nil /* options */))
+	mem := imapmemserver.New()
+	mem.AddUser(user)
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return mem.NewSession(), nil, nil
+		},
+		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapUIDPlus: {}},
+		InsecureAuth: true,
+	})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { server.Close() })
+	go server.Serve(listener)
+	client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+	require.NoError(t, err)
+	t.Cleanup(func() { client.Close() })
+	require.NoError(t, client.Login("test", "secret").Wait())
+	raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+		headerAliasVerification + ": test-token\r\n" +
+		headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+	appendCmd := client.Append("INBOX", int64(len(raw)), nil /* options */)
+	_, err = io.WriteString(appendCmd, raw)
+	require.NoError(t, err)
+	require.NoError(t, appendCmd.Close())
+	_, err = appendCmd.Wait()
+	require.NoError(t, err)
+
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	var calls []string
+	var cutoff time.Time
+	e := &Email{
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
+		lo:      &logger,
+		aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+			calls = append(calls, "complete")
+			return nil
+		},
+		aliasExpiryCallback: func(ctx context.Context, startedBefore time.Time) error {
+			calls = append(calls, "expire")
+			cutoff = startedBefore
+			return nil
+		},
+	}
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	portNum, err := strconv.Atoi(port)
+	require.NoError(t, err)
+	cfg := imodels.IMAPConfig{Host: host, Port: portNum, Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none"}
+	checkStarted := time.Now()
+	require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+	require.Equal(t, []string{"complete", "expire"}, calls)
+	require.WithinDuration(t, checkStarted.Add(-aliasVerificationTimeout), cutoff, time.Minute)
+}
 
 func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 	e := &Email{}
@@ -82,9 +209,10 @@ func TestResolveInboxAddress(t *testing.T) {
 		primary: "support@example.com",
 		uuid:    "inbox-uuid",
 		receiveAddresses: map[string]struct{}{
-			"support@example.com": {},
-			"billing@example.com": {},
-			"sales@example.com":   {},
+			"support@example.com":    {},
+			"billing@example.com":    {},
+			"sales@example.com":      {},
+			"billing+eu@example.com": {},
 		},
 	}
 	tests := []struct {
@@ -99,6 +227,20 @@ func TestResolveInboxAddress(t *testing.T) {
 		{"original before delivered", "X-Original-To: billing@example.com\r\nDelivered-To: sales@example.com\r\n", "billing@example.com"},
 		{"ignore unowned delivery", "X-Original-To: other@example.com\r\nDelivered-To: billing@example.com\r\n", "billing@example.com"},
 		{"fallback primary", "To: customer@example.net\r\n", "support@example.com"},
+		{"quoted comma in display name", "To: \"Billing, Team\" <billing@example.com>\r\n", "billing@example.com"},
+		{"quoted semicolon in display name", "To: \"Billing; Team\" <billing@example.com>\r\n", "billing@example.com"},
+		{"address group", "To: Support: billing@example.com, sales@example.com;\r\n", "billing@example.com"},
+		{"empty group then owned recipient", "To: Undisclosed:;, sales@example.com\r\n", "sales@example.com"},
+		{"original recipient type prefix", "Original-Recipient: rfc822; billing@example.com\r\n", "billing@example.com"},
+		{"encoded display name", "To: =?UTF-8?Q?Billing=3B_Team?= <billing@example.com>\r\n", "billing@example.com"},
+		{"plus addressed alias", "To: billing+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "billing@example.com"},
+		{"plus addressed alias before bare Cc", "To: BILLING+CONV-550e8400-e29b-41d4-a716-446655440000@example.com\r\nCc: sales@example.com\r\n", "billing@example.com"},
+		{"plus addressed delivery header", "Delivered-To: sales+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "sales@example.com"},
+		{"alias with existing plus tag", "To: billing+eu+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "billing+eu@example.com"},
+		{"unowned plus address", "To: other+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\nCc: sales@example.com\r\n", "sales@example.com"},
+		{"ordinary plus tag preserved", "To: billing+eu@example.com\r\n", "billing+eu@example.com"},
+		{"unknown plus tag ignored", "To: billing+unknown@example.com\r\n", "support@example.com"},
+		{"invalid conversation tag ignored", "To: billing+conv-invalid@example.com\r\n", "support@example.com"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,35 +270,15 @@ func TestLoopMessageIdentity(t *testing.T) {
 	}
 }
 
-func TestEmailAliasCapabilities(t *testing.T) {
-	e := &Email{
-		from: "support@company.com",
-		receiveAddresses: map[string]struct{}{
-			"support@company.com": {}, "billing@company.com": {}, "support@otherbrand.com": {},
-		},
-		sendAddresses: map[string]struct{}{
-			"support@company.com": {}, "support@otherbrand.com": {},
-		},
+func TestEmailReceivesAliases(t *testing.T) {
+	e := &Email{receiveAddresses: map[string]struct{}{
+		"support@example.com": {}, "billing@example.com": {}, "support@otherbrand.example": {},
+	}}
+	for _, address := range []string{"support@example.com", "BILLING@EXAMPLE.COM", "support@otherbrand.example"} {
+		require.True(t, e.ReceivesAddress(address))
 	}
-	if !e.ReceivesAddress("BILLING@COMPANY.COM") || e.SendsAddress("billing@company.com") {
-		t.Fatal("unverified alias capability was not enforced")
-	}
-	if !e.SendsAddress("SUPPORT@OTHERBRAND.COM") || !e.ReceivesAddress("support@otherbrand.com") {
-		t.Fatal("verified alias capability was not enforced")
-	}
-}
-
-func TestSetAliasSendable(t *testing.T) {
-	e := &Email{sendAddresses: map[string]struct{}{}}
-
-	e.SetAliasSendable("Alias@Example.com", true)
-	if !e.SendsAddress("alias@example.com") {
-		t.Fatal("expected alias to become sendable")
-	}
-
-	e.SetAliasSendable("alias@example.com", false)
-	if e.SendsAddress("alias@example.com") {
-		t.Fatal("expected alias to stop being sendable")
+	for _, address := range []string{"", "invalid", "other@example.com"} {
+		require.False(t, e.ReceivesAddress(address))
 	}
 }
 

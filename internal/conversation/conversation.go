@@ -1279,9 +1279,17 @@ func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUU
 	if inb.Channel() != inbox.ChannelEmail {
 		return fmt.Errorf("cannot send email through non-email inbox %d", inboxID)
 	}
+	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		return fmt.Errorf("fetching inbox sender addresses: %w", err)
+	}
+	sender, err := m.resolveSendFrom(conversationUUID, inboxRecord, "" /* requested */)
+	if err != nil {
+		return err
+	}
 	references, inReplyTo := m.BuildEmailThreadingHeaders(conversationID, "")
 	return inb.Send(models.OutboundMessage{
-		From:             inb.FromAddress(),
+		From:             m.emailFromAddress(inb, models.Message{}, sender),
 		To:               to,
 		Subject:          subject,
 		Content:          htmlContent,

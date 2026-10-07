@@ -758,6 +758,9 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		AliasVerificationCallback: func(ctx context.Context, token, from string) error {
 			return mgr.CompleteAliasVerification(ctx, inboxRecord.ID, token, from)
 		},
+		AliasExpiryCallback: func(ctx context.Context, startedBefore time.Time) error {
+			return mgr.ExpireAliasVerifications(ctx, inboxRecord.ID, startedBefore)
+		},
 	})
 
 	if err != nil {

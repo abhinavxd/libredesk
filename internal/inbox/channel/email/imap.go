@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
-	"net/mail"
 	"strings"
 	"time"
 
@@ -22,8 +21,9 @@ import (
 )
 
 const (
-	defaultReadInterval   = time.Duration(5 * time.Minute)
-	defaultScanInboxSince = time.Duration(48 * time.Hour)
+	defaultReadInterval      = time.Duration(5 * time.Minute)
+	defaultScanInboxSince    = time.Duration(48 * time.Hour)
+	aliasVerificationTimeout = 10 * time.Minute
 )
 
 // Direct recipient headers come first, then the headers MTAs add when forwarding.
@@ -127,7 +127,8 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	}
 
 	// Scan emails since the specified duration.
-	since := time.Now().Add(-scanInboxSince)
+	scanStarted := time.Now()
+	since := scanStarted.Add(-scanInboxSince)
 
 	e.lo.Info("searching emails", "since", since, "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
 
@@ -137,7 +138,10 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("error searching messages: %w", err)
 	}
 
-	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
+	if err := e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier()); err != nil {
+		return err
+	}
+	return e.expireAliasVerifications(ctx, scanStarted.Add(-aliasVerificationTimeout))
 }
 
 // searchMessages searches for messages in the specified time range.
@@ -315,6 +319,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			}
 			if err := e.processAliasVerification(ctx, msgData.env, msgData.verificationToken); err != nil {
 				e.lo.Error("error processing alias verification", "error", err, "inbox_id", inboxID)
+				continue
 			}
 			verificationUIDs = append(verificationUIDs, msgData.uid)
 			continue
@@ -642,7 +647,8 @@ func (e *Email) isLoopMessage(envelope *enmime.Envelope) bool {
 
 func (e *Email) resolveInboxAddress(envelope *enmime.Envelope) string {
 	for _, header := range recipientHeaders {
-		for _, address := range parseHeaderAddresses(envelope.GetHeader(header)) {
+		for _, address := range parseHeaderAddresses(envelope, header) {
+			address = stringutil.RemoveConvPlusAddress(address)
 			if e.ReceivesAddress(address) {
 				normalized, _ := inbox.NormalizeEmailAddress(address)
 				return normalized
@@ -663,21 +669,27 @@ func (e *Email) processAliasVerification(ctx context.Context, env *imap.Envelope
 	return e.aliasVerificationCallback(ctx, token, from)
 }
 
-func parseHeaderAddresses(value string) []string {
-	value = strings.TrimSpace(value)
-	if value == "" {
+func (e *Email) expireAliasVerifications(ctx context.Context, startedBefore time.Time) error {
+	if e.aliasExpiryCallback == nil {
 		return nil
 	}
-	if i := strings.LastIndex(value, ";"); i >= 0 {
-		value = strings.TrimSpace(value[i+1:])
+	if err := e.aliasExpiryCallback(ctx, startedBefore); err != nil {
+		return fmt.Errorf("expiring alias verifications: %w", err)
 	}
-	parsed, err := mail.ParseAddressList(value)
-	if err != nil {
-		if address, singleErr := mail.ParseAddress(value); singleErr == nil {
-			parsed = []*mail.Address{address}
-		} else {
-			return nil
+	return nil
+}
+
+func parseHeaderAddresses(envelope *enmime.Envelope, header string) []string {
+	parsed, err := envelope.AddressList(header)
+	if !enmime.AddressHeaders[strings.ToLower(header)] {
+		value := strings.TrimSpace(envelope.GetHeader(header))
+		if prefix, address, ok := strings.Cut(value, ";"); ok && strings.EqualFold(strings.TrimSpace(prefix), "rfc822") {
+			value = strings.TrimSpace(address)
 		}
+		parsed, err = enmime.ParseAddressList(value)
+	}
+	if err != nil {
+		return nil
 	}
 	addresses := make([]string, 0, len(parsed))
 	for _, address := range parsed {

@@ -1,6 +1,7 @@
 package email
 
 import (
+	"cmp"
 	"crypto/tls"
 	"fmt"
 	"math/rand"
@@ -171,10 +172,13 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		email.Headers.Set(headerAliasVerification, m.AliasVerificationToken)
 	}
 
-	// Replies from an alias go back to that alias, so the inbox Reply-To only applies to the primary address.
 	inboxReplyTo := e.replyTo
 	if !strings.EqualFold(emailAddress, e.PrimaryAddress()) {
-		inboxReplyTo = ""
+		if e.enablePlusAddressing {
+			inboxReplyTo = cmp.Or(inboxReplyTo, e.PrimaryAddress())
+		} else {
+			inboxReplyTo = ""
+		}
 	}
 	if rt := resolveReplyTo(m.ReplyTo, inboxReplyTo, emailAddress, m.ConversationUUID, e.enablePlusAddressing); rt != "" {
 		email.Headers.Set("Reply-To", rt)
@@ -215,7 +219,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 
 	// Set email content
 	switch m.ContentType {
-	case "plain":
+	case "plain", models.ContentTypeText:
 		email.Text = []byte(m.Content)
 	default:
 		email.HTML = []byte(m.Content)

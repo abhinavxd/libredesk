@@ -23,6 +23,7 @@ import (
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
@@ -45,11 +46,9 @@ var (
 type initFn func(imodels.Inbox, MessageStore, UserStore) (Inbox, error)
 
 type aliasVerificationState struct {
-	Email      string         `db:"email"`
-	Status     string         `db:"verification_status"`
-	Token      sql.NullString `db:"verification_token"`
-	StartedAt  sql.NullTime   `db:"verification_started_at"`
-	VerifiedAt *time.Time     `db:"verified_at"`
+	Email      string     `db:"email"`
+	Status     string     `db:"verification_status"`
+	VerifiedAt *time.Time `db:"verified_at"`
 }
 
 // Closer provides a function for closing an inbox.
@@ -84,8 +83,6 @@ type Inbox interface {
 type EmailInbox interface {
 	Inbox
 	PrimaryAddress() string
-	SendsAddress(string) bool
-	SetAliasSendable(string, bool)
 	StartAliasVerification(string, string) error
 }
 
@@ -129,23 +126,26 @@ type Manager struct {
 
 // Prepared queries.
 type queries struct {
-	GetInbox        *sqlx.Stmt `query:"get-inbox"`
-	GetInboxByUUID  *sqlx.Stmt `query:"get-inbox-by-uuid"`
-	GetActive       *sqlx.Stmt `query:"get-active-inboxes"`
-	GetAll          *sqlx.Stmt `query:"get-all-inboxes"`
-	Update          *sqlx.Stmt `query:"update"`
-	Toggle          *sqlx.Stmt `query:"toggle"`
-	SoftDelete      *sqlx.Stmt `query:"soft-delete"`
-	InsertInbox     *sqlx.Stmt `query:"insert-inbox"`
-	UpdateConfig    *sqlx.Stmt `query:"update-config"`
-	DeleteAddresses *sqlx.Stmt `query:"delete-inbox-email-addresses"`
-	InsertAddress   *sqlx.Stmt `query:"insert-inbox-email-address"`
+	GetInbox               *sqlx.Stmt `query:"get-inbox"`
+	GetInboxByUUID         *sqlx.Stmt `query:"get-inbox-by-uuid"`
+	GetActive              *sqlx.Stmt `query:"get-active-inboxes"`
+	GetAll                 *sqlx.Stmt `query:"get-all-inboxes"`
+	Update                 *sqlx.Stmt `query:"update"`
+	Toggle                 *sqlx.Stmt `query:"toggle"`
+	SoftDelete             *sqlx.Stmt `query:"soft-delete"`
+	InsertInbox            *sqlx.Stmt `query:"insert-inbox"`
+	UpdateConfig           *sqlx.Stmt `query:"update-config"`
+	LockInbox              *sqlx.Stmt `query:"lock-inbox"`
+	ResetAliasVerification *sqlx.Stmt `query:"reset-alias-verification"`
+	DeleteAddresses        *sqlx.Stmt `query:"delete-inbox-email-addresses"`
+	InsertAddress          *sqlx.Stmt `query:"insert-inbox-email-address"`
 
 	GetAliasVerificationStates   *sqlx.Stmt `query:"get-alias-verification-states"`
 	StartAliasVerification       *sqlx.Stmt `query:"start-alias-verification"`
 	FailAliasVerification        *sqlx.Stmt `query:"fail-alias-verification"`
 	CompleteAliasVerification    *sqlx.Stmt `query:"complete-alias-verification"`
 	FailAliasVerificationByToken *sqlx.Stmt `query:"fail-alias-verification-by-token"`
+	ExpireAliasVerifications     *sqlx.Stmt `query:"expire-alias-verifications"`
 }
 
 // New returns a new inbox manager.
@@ -308,7 +308,7 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 		return imodels.Inbox{}, m.persistenceError("creating inbox", err)
 	}
 	if inbox.Channel == ChannelEmail {
-		if err := m.insertEmailAddresses(tx, createdInbox.ID, primary, inbox.Aliases, nil); err != nil {
+		if err := m.insertEmailAddresses(tx, createdInbox.ID, primary, inbox.Aliases); err != nil {
 			return imodels.Inbox{}, err
 		}
 		createdInbox.Aliases = inbox.Aliases
@@ -388,15 +388,31 @@ func (m *Manager) ReloadInbox(ctx context.Context, id int, initFn initFn) error 
 
 // Update updates an inbox in the DB.
 func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
-	current, err := m.GetDBRecord(id)
+	tx, err := m.db.Beginx()
 	if err != nil {
-		return imodels.Inbox{}, err
+		return imodels.Inbox{}, m.persistenceError("starting inbox update", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var lockedID int
+	if err := tx.Stmtx(m.queries.LockInbox).Get(&lockedID, id); err != nil {
+		return imodels.Inbox{}, m.persistenceError("locking inbox", err)
+	}
+	var current imodels.Inbox
+	if err := tx.Stmtx(m.queries.GetInbox).Get(&current, id); err != nil {
+		return imodels.Inbox{}, m.persistenceError("fetching inbox", err)
+	}
+	current.Config, err = m.decryptInboxConfig(current.Config)
+	if err != nil {
+		return imodels.Inbox{}, m.persistenceError("decrypting inbox config", err)
 	}
 	if inbox.Channel != current.Channel {
 		return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.badRequest"), nil)
 	}
 	var primary string
 	if current.Channel == ChannelEmail {
+		if inbox.Aliases == nil {
+			inbox.Aliases = current.Aliases
+		}
 		if primary, inbox.Aliases, err = m.normalizeEmailAddresses(inbox.From, inbox.Aliases); err != nil {
 			return imodels.Inbox{}, err
 		}
@@ -501,41 +517,46 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	tx, err := m.db.Beginx()
-	if err != nil {
-		return imodels.Inbox{}, m.persistenceError("starting inbox update", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	var updatedInbox imodels.Inbox
-	verificationStates := make(map[string]aliasVerificationState)
-	if current.Channel == ChannelEmail {
-		var states []aliasVerificationState
-		if err := tx.Stmtx(m.queries.GetAliasVerificationStates).Select(&states, id); err != nil {
-			return imodels.Inbox{}, m.persistenceError("fetching inbox alias verification state", err)
-		}
-		for _, state := range states {
-			verificationStates[strings.ToLower(state.Email)] = state
-		}
-		for i := range inbox.Aliases {
-			state, ok := verificationStates[inbox.Aliases[i].Email]
-			if !ok {
-				state.Status = imodels.AliasVerificationNotVerified
-			}
-			inbox.Aliases[i].VerificationStatus = state.Status
-			inbox.Aliases[i].VerifiedAt = state.VerifiedAt
-		}
-	}
 	if err := tx.Stmtx(m.queries.Update).Get(&updatedInbox, id, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.ReopenWindowHours, inbox.Enabled, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
 		m.lo.Error("error updating inbox", "error", err)
 		return imodels.Inbox{}, m.persistenceError("updating inbox", err)
 	}
-	if _, err := tx.Stmtx(m.queries.DeleteAddresses).Exec(id); err != nil {
-		return imodels.Inbox{}, m.persistenceError("clearing inbox addresses", err)
-	}
 	if current.Channel == ChannelEmail {
-		if err := m.insertEmailAddresses(tx, id, primary, inbox.Aliases, verificationStates); err != nil {
+		addresses := []string{primary}
+		for _, alias := range inbox.Aliases {
+			addresses = append(addresses, alias.Email)
+		}
+		if _, err := tx.Stmtx(m.queries.DeleteAddresses).Exec(id, pq.Array(addresses), primary); err != nil {
+			return imodels.Inbox{}, m.persistenceError("removing inbox addresses", err)
+		}
+		if err := m.insertEmailAddresses(tx, id, primary, inbox.Aliases); err != nil {
 			return imodels.Inbox{}, err
+		}
+		var currentConfig, updatedConfig imodels.Config
+		if err := json.Unmarshal(current.Config, &currentConfig); err != nil {
+			return imodels.Inbox{}, m.persistenceError("reading current email config", err)
+		}
+		if err := json.Unmarshal(inbox.Config, &updatedConfig); err != nil {
+			return imodels.Inbox{}, m.persistenceError("reading updated email config", err)
+		}
+		if emailSendingConfigChanged(currentConfig, updatedConfig) {
+			if _, err := tx.Stmtx(m.queries.ResetAliasVerification).Exec(id); err != nil {
+				return imodels.Inbox{}, m.persistenceError("resetting alias verification", err)
+			}
+		}
+		var states []aliasVerificationState
+		if err := tx.Stmtx(m.queries.GetAliasVerificationStates).Select(&states, id); err != nil {
+			return imodels.Inbox{}, m.persistenceError("fetching alias verification state", err)
+		}
+		for i := range inbox.Aliases {
+			for _, state := range states {
+				if state.Email == inbox.Aliases[i].Email {
+					inbox.Aliases[i].VerificationStatus = state.Status
+					inbox.Aliases[i].VerifiedAt = state.VerifiedAt
+					break
+				}
+			}
 		}
 		updatedInbox.Aliases = inbox.Aliases
 	}
@@ -633,7 +654,6 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	if idx < 0 {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.inbox.aliases.saveBeforeVerify"), nil)
 	}
-	alreadyVerified := inbox.Aliases[idx].VerificationStatus == imodels.AliasVerificationVerified
 	runtimeInbox, err := m.Get(id)
 	if err != nil {
 		return envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
@@ -648,18 +668,13 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 		m.lo.Error("error generating alias verification token", "inbox_id", id, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	if _, err := m.queries.StartAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationPending, token, imodels.AliasVerificationVerified); err != nil {
+	if _, err := m.queries.StartAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationPending, token); err != nil {
 		return m.persistenceError("starting alias verification", err)
-	}
-	if !alreadyVerified {
-		emailInbox.SetAliasSendable(normalized, false)
 	}
 	if err := emailInbox.StartAliasVerification(normalized, token); err != nil {
 		m.lo.Error("error sending alias verification email", "inbox_id", id, "alias", normalized, "error", err)
-		if !alreadyVerified {
-			if _, err := m.queries.FailAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationFailed); err != nil {
-				m.lo.Error("error marking alias verification failed", "inbox_id", id, "alias", normalized, "error", err)
-			}
+		if _, err := m.queries.FailAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationFailed, token); err != nil {
+			m.lo.Error("error marking alias verification failed", "inbox_id", id, "alias", normalized, "error", err)
 		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("admin.inbox.aliases.verificationSendFailed"), nil)
 	}
@@ -675,11 +690,6 @@ func (m *Manager) CompleteAliasVerification(ctx context.Context, id int, token, 
 			return err
 		}
 		if affected, _ := result.RowsAffected(); affected > 0 {
-			if runtimeInbox, err := m.Get(id); err == nil {
-				if emailInbox, ok := runtimeInbox.(EmailInbox); ok {
-					emailInbox.SetAliasSendable(normalized, true)
-				}
-			}
 			return nil
 		}
 	}
@@ -689,13 +699,18 @@ func (m *Manager) CompleteAliasVerification(ctx context.Context, id int, token, 
 	return normalizeErr
 }
 
-func (m *Manager) insertEmailAddresses(tx *sqlx.Tx, inboxID int, primary string, aliases imodels.EmailAliases, verificationStates map[string]aliasVerificationState) error {
-	if _, err := tx.Stmtx(m.queries.InsertAddress).Exec(inboxID, primary, "primary", 0 /** position **/, imodels.AliasVerificationVerified, nil /** verification_token **/, nil /** verification_started_at **/, nil /** verified_at **/); err != nil {
+// ExpireAliasVerifications marks verifications still pending from before the given time as failed.
+func (m *Manager) ExpireAliasVerifications(ctx context.Context, id int, startedBefore time.Time) error {
+	_, err := m.queries.ExpireAliasVerifications.ExecContext(ctx, id, imodels.AliasVerificationFailed, imodels.AliasVerificationPending, startedBefore)
+	return err
+}
+
+func (m *Manager) insertEmailAddresses(tx *sqlx.Tx, inboxID int, primary string, aliases imodels.EmailAliases) error {
+	if _, err := tx.Stmtx(m.queries.InsertAddress).Exec(inboxID, primary, "primary", 0 /** position **/, imodels.AliasVerificationVerified); err != nil {
 		return m.persistenceError("claiming inbox address", err)
 	}
 	for position, alias := range aliases {
-		state := verificationStates[alias.Email]
-		if _, err := tx.Stmtx(m.queries.InsertAddress).Exec(inboxID, alias.Email, "alias", position+1, alias.VerificationStatus, state.Token, state.StartedAt, alias.VerifiedAt); err != nil {
+		if _, err := tx.Stmtx(m.queries.InsertAddress).Exec(inboxID, alias.Email, "alias", position+1, imodels.AliasVerificationNotVerified); err != nil {
 			return m.persistenceError("claiming inbox address", err)
 		}
 	}
@@ -996,4 +1011,25 @@ func (m *Manager) decryptInboxSecret(inbox *imodels.Inbox) {
 		}
 		inbox.Secret = null.StringFrom(decrypted)
 	}
+}
+
+func emailSendingConfigChanged(current, updated imodels.Config) bool {
+	if (current.AuthType == imodels.AuthTypeOAuth2) != (updated.AuthType == imodels.AuthTypeOAuth2) {
+		return true
+	}
+	if !slices.EqualFunc(current.SMTP, updated.SMTP, func(a, b imodels.SMTPConfig) bool {
+		return strings.EqualFold(a.Host, b.Host) && a.Port == b.Port &&
+			a.Username == b.Username && a.Password == b.Password && a.AuthProtocol == b.AuthProtocol
+	}) {
+		return true
+	}
+	if updated.AuthType != imodels.AuthTypeOAuth2 {
+		return false
+	}
+	if current.OAuth == nil || updated.OAuth == nil {
+		return current.OAuth != updated.OAuth
+	}
+	a, b := current.OAuth, updated.OAuth
+	return a.Provider != b.Provider || a.ClientID != b.ClientID || a.ClientSecret != b.ClientSecret ||
+		a.TenantID != b.TenantID || a.RefreshToken != b.RefreshToken
 }

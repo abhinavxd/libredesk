@@ -720,7 +720,8 @@ const pickSender = (value) => {
 // Keep the agent's own sender pick while it is still allowed, since currentFrom changes whenever a new message arrives.
 watch(
   [currentConversationUUID, () => conversationStore.currentFrom],
-  ([uuid, value]) => {
+  ([uuid, value], [previousUUID] = []) => {
+    if (uuid !== previousUUID) senderPickedFor.value = null
     const picked =
       senderPickedFor.value === uuid &&
       conversationStore.currentFromOptions.includes(sendFrom.value)

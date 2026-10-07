@@ -175,17 +175,16 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	outbound := message.ToOutbound()
 
 	if inb.Channel() == inbox.ChannelEmail {
-		emailInbox, ok := inb.(inbox.EmailInbox)
-		if !ok {
-			handleError(errors.New("email inbox does not expose its sender addresses"), "invalid email inbox")
+		inboxRecord, err := m.inboxStore.GetDBRecord(message.InboxID)
+		if handleError(err, "error fetching inbox sender addresses") {
 			return
 		}
 		selected := message.SendFrom()
 		if selected == "" {
-			selected = emailInbox.PrimaryAddress()
+			selected = inboxRecord.From
 		}
-		if !emailInbox.SendsAddress(selected) {
-			handleError(errors.New("message sender address is no longer owned by the inbox"), "invalid email sender")
+		selected, err = m.resolveSendFrom(message.ConversationUUID, inboxRecord, selected)
+		if handleError(err, "invalid email sender") {
 			return
 		}
 		outbound.From = m.emailFromAddress(inb, message, selected)
@@ -1717,13 +1716,14 @@ func (m *Manager) findExistingMedia(rawContentID, conversationUUID string) (stri
 	return storedCID, exists, mediaUUID
 }
 
-// emailFromAddress returns the From header, applying the inbox from-name template for agent senders
-// Falls back to the inbox's default from address if the template is empty, the sender is not an agent, or any errors occur.
-// emailFromAddress keeps the inbox From (with its display name) for the primary address and uses the bare alias otherwise.
+// emailFromAddress returns the From header for the sender address, named after the inbox From or the from-name template for agents.
 func (m *Manager) emailFromAddress(inb inbox.Inbox, message models.Message, sender string) string {
 	from := inb.FromAddress()
 	if emailInbox, ok := inb.(inbox.EmailInbox); ok && sender != emailInbox.PrimaryAddress() {
 		from = sender
+		if addr, err := mail.ParseAddress(inb.FromAddress()); err == nil && addr.Name != "" {
+			from = (&mail.Address{Name: addr.Name, Address: sender}).String()
+		}
 	}
 
 	tpl := inb.FromNameTemplate()
