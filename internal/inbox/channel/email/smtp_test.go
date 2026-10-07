@@ -295,11 +295,14 @@ func TestAliasReplyRouting(t *testing.T) {
 		replyTo     string
 		disablePlus bool
 	}{
-		{name: "alias", from: "billing@example.com", want: "billing+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
+		{name: "alias", from: "billing@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
 		{name: "primary", from: "support@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
 		{name: "explicit override", from: "billing@example.com", override: "replies@example.com", want: "replies@example.com"},
 		{name: "alias with receiving mailbox", from: "Billing <billing@example.com>", replyTo: "Replies <replies@example.net>", want: "replies+conv-550e8400-e29b-41d4-a716-446655440000@example.net"},
 		{name: "alias without plus addressing", from: "billing@example.com", replyTo: "replies@example.net", disablePlus: true},
+		{name: "alias without plus addressing or reply-to", from: "billing@example.com", disablePlus: true},
+		{name: "primary with reply-to", from: "support@example.com", replyTo: "replies@example.net", want: "replies+conv-550e8400-e29b-41d4-a716-446655440000@example.net"},
+		{name: "primary with reply-to without plus addressing", from: "support@example.com", replyTo: "replies@example.net", disablePlus: true, want: "replies@example.net"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			message := captureSMTPMessage(t, func(e *Email) error {

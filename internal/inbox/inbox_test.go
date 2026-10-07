@@ -130,6 +130,9 @@ func TestInboxEmailAddresses(t *testing.T) {
 	record, err := mgr.GetDBRecord(first.ID)
 	require.NoError(t, err)
 	require.Equal(t, imodels.AliasVerificationFailed, record.Aliases[0].VerificationStatus)
+	sendable, err := SendableEmailAddresses(record.From, record.Aliases)
+	require.NoError(t, err)
+	require.Contains(t, sendable, "accounts@example.com")
 
 	mgr.inboxes[first.ID] = &aliasVerificationTestInbox{send: func(alias, token string) error {
 		return mgr.CompleteAliasVerification(ctx, first.ID, token, alias)
@@ -158,7 +161,7 @@ func TestInboxEmailAddresses(t *testing.T) {
 	record, err = mgr.GetDBRecord(first.ID)
 	require.NoError(t, err)
 	require.Equal(t, imodels.AliasVerificationFailed, record.Aliases[0].VerificationStatus)
-	require.Nil(t, record.Aliases[0].VerifiedAt)
+	require.NotNil(t, record.Aliases[0].VerifiedAt)
 
 	var newConfig imodels.Config
 	require.NoError(t, json.Unmarshal(record.Config, &newConfig))

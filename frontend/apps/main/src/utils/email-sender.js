@@ -6,8 +6,7 @@ export function sendableAddresses (from, aliases) {
   return [
     extractEmailAddress(from),
     ...(aliases || []).filter(alias =>
-      alias.verification_status === 'verified' ||
-      (alias.verification_status === 'pending' && alias.verified_at)
+      alias.verification_status === 'verified' || alias.verified_at
     ).map(alias => alias.email)
   ].filter(Boolean).map(address => address.toLowerCase())
 }

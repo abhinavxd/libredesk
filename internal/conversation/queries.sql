@@ -811,12 +811,12 @@ and source_id > ''
 ORDER BY id DESC
 LIMIT $2;
 
--- name: get-latest-public-email-message
+-- name: get-email-sender-message
 SELECT m.type, m.meta
 FROM conversation_messages m
 JOIN conversations c ON c.id = m.conversation_id
 WHERE c.uuid = $1 AND m.private = false AND m.type IN ('incoming', 'outgoing')
-ORDER BY m.id DESC
+ORDER BY (m.type = 'outgoing') DESC, m.id DESC
 LIMIT 1;
 
 -- name: get-outgoing-pending-messages

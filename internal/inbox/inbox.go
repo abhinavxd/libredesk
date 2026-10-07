@@ -45,12 +45,6 @@ var (
 
 type initFn func(imodels.Inbox, MessageStore, UserStore) (Inbox, error)
 
-type aliasVerificationState struct {
-	Email      string     `db:"email"`
-	Status     string     `db:"verification_status"`
-	VerifiedAt *time.Time `db:"verified_at"`
-}
-
 // Closer provides a function for closing an inbox.
 type Closer interface {
 	Close() error
@@ -96,6 +90,12 @@ type MessageStore interface {
 type UserStore interface {
 	GetAgent(id int, email string) (umodels.User, error)
 	IsEmailBlocked(email string) (bool, error)
+}
+
+type aliasVerificationState struct {
+	Email      string     `db:"email"`
+	Status     string     `db:"verification_status"`
+	VerifiedAt *time.Time `db:"verified_at"`
 }
 
 // Opts contains the options for initializing the inbox manager.
@@ -640,7 +640,7 @@ func (m *Manager) normalizeEmailAddresses(from string, aliases imodels.EmailAlia
 	}
 }
 
-// StartAliasVerification emails a verification token from the alias to the primary address.
+// StartAliasVerification emails a token from the alias to the inbox's reply-to address, else its primary address.
 func (m *Manager) StartAliasVerification(ctx context.Context, id int, address string) error {
 	normalized, err := NormalizeEmailAddress(address)
 	if err != nil {

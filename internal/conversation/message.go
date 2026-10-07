@@ -1793,7 +1793,7 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 	}
 
 	var latest models.Message
-	if err := m.q.GetLatestPublicEmailMessage.Get(&latest, conversationUUID); err != nil && err != sql.ErrNoRows {
+	if err := m.q.GetEmailSenderMessage.Get(&latest, conversationUUID); err != nil && err != sql.ErrNoRows {
 		m.lo.Error("error fetching latest message for sender address", "conversation_uuid", conversationUUID, "error", err)
 		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

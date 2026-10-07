@@ -475,7 +475,8 @@ export const useConversationStore = defineStore('conversation', () => {
       return
     }
 
-    currentFrom.value = resolveEmailSender(latestMessage, senders)
+    const lastSent = msgData.getLatestMessage(conv.uuid, ['outgoing'], true, false)
+    currentFrom.value = resolveEmailSender(lastSent || latestMessage, senders)
     const { to, cc, bcc } = computeRecipientsFromMessage(
       latestMessage,
       conv.contact?.email || '',

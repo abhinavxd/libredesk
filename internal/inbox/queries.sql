@@ -74,13 +74,12 @@ FOR UPDATE;
 UPDATE inbox_email_addresses
 SET verification_status = $3,
     verification_token = $4,
-    verification_started_at = NOW(),
-    verified_at = CASE WHEN verification_status IN ('verified', 'pending') THEN verified_at ELSE NULL END
+    verification_started_at = NOW()
 WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias';
 
 -- name: fail-alias-verification
 UPDATE inbox_email_addresses
-SET verification_status = $3, verification_token = NULL, verified_at = NULL
+SET verification_status = $3, verification_token = NULL
 WHERE inbox_id = $1 AND LOWER(email) = LOWER($2) AND kind = 'alias' AND verification_token = $4;
 
 -- name: complete-alias-verification
@@ -91,10 +90,10 @@ WHERE inbox_id = $1 AND verification_token = $2 AND LOWER(email) = $3
 
 -- name: fail-alias-verification-by-token
 UPDATE inbox_email_addresses
-SET verification_status = $3, verification_token = NULL, verified_at = NULL
+SET verification_status = $3, verification_token = NULL
 WHERE inbox_id = $1 AND verification_token = $2 AND kind = 'alias' AND verification_status = $4;
 
 -- name: expire-alias-verifications
 UPDATE inbox_email_addresses
-SET verification_status = $2, verification_token = NULL, verified_at = NULL
+SET verification_status = $2, verification_token = NULL
 WHERE inbox_id = $1 AND kind = 'alias' AND verification_status = $3 AND verification_started_at < $4;

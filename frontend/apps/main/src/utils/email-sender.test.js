@@ -37,4 +37,9 @@ describe('sendableAddresses', () => {
     expect(sendableAddresses('Support <support@example.com>', aliases))
       .toEqual(['support@example.com', 'billing@example.com'])
   })
+  test('keeps an alias that was verified before a failed re-verification', () => {
+    const aliases = [{ email: 'billing@example.com', verification_status: 'failed', verified_at: '2026-10-01T00:00:00Z' }]
+    expect(sendableAddresses('support@example.com', aliases))
+      .toEqual(['support@example.com', 'billing@example.com'])
+  })
 })
