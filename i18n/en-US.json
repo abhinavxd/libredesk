@@ -253,7 +253,6 @@
   "admin.inbox.aliases.description": "Aliases must forward to this inbox's mailbox, and your SMTP provider must allow sending as each alias.",
   "admin.inbox.aliases.saveBeforeVerify": "This alias is not saved yet. Save the inbox, then verify sending.",
   "admin.inbox.aliases.sendingVerificationStarted": "Verification email sent to this inbox.",
-  "admin.inbox.aliases.verificationSendFailed": "The verification email could not be sent. Check that your SMTP provider allows sending as this address, then try again.",
   "admin.general.allowedFileUploadExtensions": "Allowed file upload extensions",
   "admin.general.allowedFileUploadExtensions.description": "Use `*` to permit all file types. For example: `jpg, png, pdf`",
   "admin.general.businessHours.placeholder": "Select business hours",

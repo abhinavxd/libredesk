@@ -162,7 +162,6 @@ const verifyAlias = async (email) => {
     await api.verifyInboxAlias(inbox.value.id, { email })
     const key = email.trim().toLowerCase()
     aliasVerificationState.value[key] = { verification_status: 'pending' }
-    startVerificationPolling()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('admin.inbox.aliases.sendingVerificationStarted')
     })
@@ -173,6 +172,7 @@ const verifyAlias = async (email) => {
     })
   } finally {
     await pollAliasVerification(true /* force */)
+    if (hasPendingAlias()) startVerificationPolling()
   }
 }
 

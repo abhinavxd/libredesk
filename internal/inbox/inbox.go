@@ -671,13 +671,14 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	if _, err := m.queries.StartAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationPending, token); err != nil {
 		return m.persistenceError("starting alias verification", err)
 	}
-	if err := emailInbox.StartAliasVerification(normalized, token); err != nil {
-		m.lo.Error("error sending alias verification email", "inbox_id", id, "alias", normalized, "error", err)
-		if _, err := m.queries.FailAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationFailed, token); err != nil {
-			m.lo.Error("error marking alias verification failed", "inbox_id", id, "alias", normalized, "error", err)
+	go func() {
+		if err := emailInbox.StartAliasVerification(normalized, token); err != nil {
+			m.lo.Error("error sending alias verification email", "inbox_id", id, "alias", normalized, "error", err)
+			if _, err := m.queries.FailAliasVerification.Exec(id, normalized, imodels.AliasVerificationFailed, token); err != nil {
+				m.lo.Error("error marking alias verification failed", "inbox_id", id, "alias", normalized, "error", err)
+			}
 		}
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("admin.inbox.aliases.verificationSendFailed"), nil)
-	}
+	}()
 	return nil
 }
 

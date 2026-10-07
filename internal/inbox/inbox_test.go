@@ -126,10 +126,12 @@ func TestInboxEmailAddresses(t *testing.T) {
 	mgr.inboxes[first.ID] = &aliasVerificationTestInbox{send: func(alias, token string) error {
 		return errors.New("SMTP rejected sender")
 	}}
-	require.Error(t, mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com"))
-	record, err := mgr.GetDBRecord(first.ID)
-	require.NoError(t, err)
-	require.Equal(t, imodels.AliasVerificationFailed, record.Aliases[0].VerificationStatus)
+	require.NoError(t, mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com"))
+	var record imodels.Inbox
+	require.Eventually(t, func() bool {
+		record, err = mgr.GetDBRecord(first.ID)
+		return err == nil && record.Aliases[0].VerificationStatus == imodels.AliasVerificationFailed
+	}, 5*time.Second, 20*time.Millisecond)
 	sendable, err := SendableEmailAddresses(record.From, record.Aliases)
 	require.NoError(t, err)
 	require.Contains(t, sendable, "accounts@example.com")
@@ -138,9 +140,10 @@ func TestInboxEmailAddresses(t *testing.T) {
 		return mgr.CompleteAliasVerification(ctx, first.ID, token, alias)
 	}}
 	require.NoError(t, mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com"))
-	record, err = mgr.GetDBRecord(first.ID)
-	require.NoError(t, err)
-	require.Equal(t, imodels.AliasVerificationVerified, record.Aliases[0].VerificationStatus)
+	require.Eventually(t, func() bool {
+		record, err = mgr.GetDBRecord(first.ID)
+		return err == nil && record.Aliases[0].VerificationStatus == imodels.AliasVerificationVerified
+	}, 5*time.Second, 20*time.Millisecond)
 
 	_, err = mgr.queries.StartAliasVerification.Exec(first.ID, "accounts@example.com", imodels.AliasVerificationPending, "latest-token")
 	require.NoError(t, err)
