@@ -581,10 +581,10 @@ WHERE uuid = $1;
 
 -- name: upsert-user-last-seen
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-SELECT $1, m.conversation_id, m.created_at
-FROM conversation_messages m
-JOIN conversations c ON c.id = m.conversation_id
-WHERE c.uuid = $2 AND m.uuid = $3
+SELECT $1, c.id, COALESCE(m.created_at, NOW())
+FROM conversations c
+LEFT JOIN conversation_messages m ON m.conversation_id = c.id AND m.uuid = NULLIF($3::text, '')::uuid
+WHERE c.uuid = $2 AND ($3::text = '' OR m.id IS NOT NULL)
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at), updated_at = NOW()
 RETURNING last_seen_at;
@@ -1048,7 +1048,7 @@ JOIN conversations c ON c.id = cm.conversation_id
 JOIN inboxes i ON i.id = c.inbox_id
 WHERE c.uuid = $1
   AND i.channel = 'whatsapp'
-  AND cm.created_at <= (SELECT created_at FROM conversation_messages WHERE conversation_id = c.id AND uuid = $3)
+  AND ($3::text = '' OR cm.created_at <= (SELECT created_at FROM conversation_messages WHERE conversation_id = c.id AND uuid = NULLIF($3::text, '')::uuid))
   AND cm.type = 'incoming'
   AND COALESCE(cm.source_id, '') != ''
   AND cm.created_at > COALESCE(

@@ -618,11 +618,13 @@ func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit i
 	return refs, nil
 }
 
-// UpdateUserLastSeen moves the user's last seen timestamp forward to the given message and returns the new value.
+// UpdateUserLastSeen moves the user's last seen timestamp forward to the given message, or to now when messageUUID is empty.
 func (c *Manager) UpdateUserLastSeen(conversationUUID string, userID int, messageUUID string) (time.Time, error) {
 	var lastSeen time.Time
-	if _, err := uuid.Parse(messageUUID); err != nil {
-		return lastSeen, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
+	if messageUUID != "" {
+		if _, err := uuid.Parse(messageUUID); err != nil {
+			return lastSeen, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
+		}
 	}
 	if err := c.q.UpsertUserLastSeen.Get(&lastSeen, userID, conversationUUID, messageUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -448,8 +448,10 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 		req   = conversationReadReq{}
 	)
-	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	if len(r.RequestCtx.PostBody()) > 0 {
+		if err := r.Decode(&req, "json"); err != nil {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		}
 	}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {

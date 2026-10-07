@@ -391,4 +391,7 @@ func TestMarkAsUnreadKeepsReplyNotificationsRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	unread(0)
+	if now, err := m.UpdateUserLastSeen(conv.UUID, userID, ""); err != nil || !now.After(latest) {
+		t.Fatalf("empty message uuid did not mark read up to now: %v err=%v", now, err)
+	}
 }
