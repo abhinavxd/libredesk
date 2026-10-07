@@ -32,12 +32,18 @@
             this.DEFAULT_LAUNCHER_ICON_SCALE = 100;
             this.LAUNCHER_HOVER_SCALE = 1.08;
             this.LAUNCHER_OPEN_SCALE = 0.9;
+            this.EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+            this.EASE_POP = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+            this.OPEN_MS = 200;
+            this.CLOSE_MS = 150;
+            this.reducedMotion = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
             this.MOBILE_LAUNCHER_SIZE = 60;
             this.CAMPAIGN_POLL_MIN = 2;
             this.CAMPAIGN_POLL_MAX = 60;
 
             this.config = config;
             this.iframe = null;
+            this.iframeHideTimer = null;
             this.toggleButton = null;
             this.isLauncherHovered = false;
             this.widgetButtonWrapper = null;
@@ -242,11 +248,14 @@
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                transition: transform 0.3s ease;
+                position: relative;
             `;
+
+            const iconTransition = `opacity ${this.OPEN_MS}ms ${this.EASE_OUT}, transform ${this.OPEN_MS}ms ${this.EASE_OUT}`;
 
             this.defaultIcon = document.createElement('img');
             this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
+            this.defaultIcon.style.transition = iconTransition;
             this.styleLauncherIcon();
             this.iconContainer.appendChild(this.defaultIcon);
 
@@ -265,13 +274,15 @@
             svg.appendChild(path);
             this.arrowIcon.appendChild(svg);
             this.arrowIcon.style.cssText = `
-                width: 100%;
-                height: 100%;
-                display: none;
+                position: absolute;
+                inset: 0;
+                display: flex;
                 justify-content: center;
                 align-items: center;
+                transition: ${iconTransition};
             `;
             this.iconContainer.appendChild(this.arrowIcon);
+            this.setLauncherIcon(false /** open **/);
 
             this.toggleButton.appendChild(this.iconContainer);
 
@@ -307,11 +318,6 @@
             this.toggleButton.style.position = 'relative';
             this.widgetButtonWrapper = widgetButtonWrapper;
 
-            const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const iframeTransition = reducedMotion
-                ? 'none'
-                : 'width 0.18s ease, height 0.18s ease, bottom 0.18s ease, border-radius 0.18s ease, box-shadow 0.18s ease';
-
             this.iframe = document.createElement('iframe');
             this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
             this.iframe.title = 'libredesk';
@@ -323,7 +329,7 @@
                 z-index: 9999;
                 width: ${this.IFRAME_WIDTH};
                 height: ${this.IFRAME_HEIGHT};
-                transition: ${iframeTransition};
+                transition: ${this.iframeTransition(this.OPEN_MS)};
                 display: none;
             `;
 
@@ -426,6 +432,7 @@
             const iframe = this.iframe;
 
             if (this.isMobile) {
+                iframe.style.transformOrigin = 'bottom center';
                 iframe.style.top = '0';
                 iframe.style.left = '0';
                 iframe.style.right = '0';
@@ -445,6 +452,7 @@
             iframe.style.right = '';
             iframe.style.borderRadius = this.IFRAME_BORDER_RADIUS;
             iframe.style.boxShadow = this.IFRAME_BOX_SHADOW;
+            iframe.style.transformOrigin = `bottom ${side}`;
             iframe.style[side] = `${spacing.side}px`;
 
             if (this.isExpanded) {
@@ -532,6 +540,8 @@
         setupEventListeners () {
             this.toggleButton.addEventListener('click', () => this.toggle());
             this.toggleButton.addEventListener('mouseenter', () => {
+                const canHover = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+                if (!canHover) return;
                 this.isLauncherHovered = true;
                 this.applyLauncherScale();
             });
@@ -605,15 +615,25 @@
             this.isChatVisible = true;
             this.renderPreviews();
 
-            this.iframe.style.display = 'block';
+            const iframe = this.iframe;
+            clearTimeout(this.iframeHideTimer);
+            if (iframe.style.display === 'none') {
+                iframe.style.opacity = '0';
+                iframe.style.transform = this.iframeHiddenTransform();
+                iframe.style.display = 'block';
+            }
             this.applyIframeLayout();
+            iframe.style.transition = this.iframeTransition(this.OPEN_MS);
+            // Read layout so the browser commits the hidden start state, else the open transition is skipped.
+            void iframe.offsetWidth;
+            iframe.style.pointerEvents = '';
+            iframe.style.opacity = '1';
+            iframe.style.transform = 'none';
             this.updateLauncherVisibility();
 
             this.applyLauncherScale();
             this.unreadBadge.style.display = 'none';
-
-            if (this.defaultIcon) this.defaultIcon.style.display = 'none';
-            this.arrowIcon.style.display = 'flex';
+            this.setLauncherIcon(true /** open **/);
 
             this.postToIframe({ type: 'WIDGET_OPENED' });
 
@@ -623,19 +643,22 @@
         hideChat () {
             if (!this.iframe) return;
 
-            this.iframe.style.display = 'none';
+            const iframe = this.iframe;
+            iframe.style.transition = this.iframeTransition(this.CLOSE_MS);
+            iframe.style.pointerEvents = 'none';
+            iframe.style.opacity = '0';
+            iframe.style.transform = this.iframeHiddenTransform();
+            clearTimeout(this.iframeHideTimer);
+            this.iframeHideTimer = setTimeout(() => {
+                if (this.iframe && !this.isChatVisible) this.iframe.style.display = 'none';
+            }, this.CLOSE_MS);
             this.isChatVisible = false;
             this.renderPreviews();
             this.applyLauncherScale();
             this.updateLauncherVisibility();
+            this.setLauncherIcon(false /** open **/);
 
-            if (this.defaultIcon) this.defaultIcon.style.display = 'block';
-            this.arrowIcon.style.display = 'none';
-
-            if (this.unreadCount > 0) {
-                this.unreadBadge.textContent = this.formatBadgeCount(this.unreadCount);
-                this.unreadBadge.style.display = 'flex';
-            }
+            if (this.unreadCount > 0) this.showUnreadBadge(this.unreadCount);
 
             this.postToIframe({ type: 'WIDGET_CLOSED' });
 
@@ -649,13 +672,43 @@
             this.toggleButton.style.transform = `scale(${scale})`;
         }
 
+        setLauncherIcon (open) {
+            const hidden = (deg) => this.reducedMotion ? 'none' : `rotate(${deg}deg) scale(0.9)`;
+            if (this.defaultIcon) {
+                this.defaultIcon.style.opacity = open ? '0' : '1';
+                this.defaultIcon.style.transform = open ? hidden(45) : 'none';
+            }
+            this.arrowIcon.style.opacity = open ? '1' : '0';
+            this.arrowIcon.style.transform = open ? 'none' : hidden(-45);
+        }
+
+        iframeTransition (durationMs) {
+            const fade = `opacity ${durationMs}ms ${this.EASE_OUT}`;
+            if (this.reducedMotion) return fade;
+            return `width 0.18s ease, height 0.18s ease, bottom 0.18s ease, border-radius 0.18s ease, box-shadow 0.18s ease, ${fade}, transform ${durationMs}ms ${this.EASE_OUT}`;
+        }
+
+        iframeHiddenTransform () {
+            return this.reducedMotion ? 'none' : 'translateY(8px) scale(0.95)';
+        }
+
+        showUnreadBadge (count) {
+            const badge = this.unreadBadge;
+            const wasHidden = badge.style.display === 'none';
+            badge.textContent = this.formatBadgeCount(count);
+            badge.style.display = 'flex';
+            if (!wasHidden || typeof badge.animate !== 'function') return;
+            const from = this.reducedMotion ? { opacity: 0 } : { opacity: 0, transform: 'scale(0.9)' };
+            const to = this.reducedMotion ? { opacity: 1 } : { opacity: 1, transform: 'none' };
+            badge.animate([from, to], { duration: this.OPEN_MS, easing: this.EASE_POP });
+        }
+
         updateUnreadCount (count) {
             this.unreadCount = count;
             if (this._onUnreadCountChangeCallback) this._onUnreadCountChangeCallback(count);
 
             if (count > 0 && !this.isChatVisible) {
-                this.unreadBadge.textContent = this.formatBadgeCount(count);
-                this.unreadBadge.style.display = 'flex';
+                this.showUnreadBadge(count);
             } else {
                 this.unreadBadge.style.display = 'none';
             }

@@ -10,7 +10,7 @@
         size="sm"
         @click="startAddingNote"
         v-if="!isAddingNote && !isLoading && (notes.length !== 0 || compact) && userStore.can('contact_notes:write')"
-        class="transition-all hover:bg-primary/10 hover:border-primary/30"
+        class="transition-colors hover:bg-primary/10 hover:border-primary/30"
       >
         <PlusIcon size="18" />
         {{ $t('contact.newNote') }}
@@ -53,7 +53,7 @@
       <Card
         v-for="note in visibleNotes"
         :key="note.id"
-        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow-md"
+        class="overflow-hidden hover:border-border transition-[border-color,box-shadow] duration-200 box hover:shadow-md"
       >
         <!-- Header -->
         <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">

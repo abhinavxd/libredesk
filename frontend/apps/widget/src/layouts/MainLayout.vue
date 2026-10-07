@@ -17,8 +17,18 @@
           <HomeView />
         </TabsContent>
         <TabsContent value="messages" class="h-full mt-0">
-          <ConversationsView v-if="!widgetStore.isChatView" />
-          <ChatView v-else />
+          <Transition
+            mode="out-in"
+            enter-active-class="transition duration-200 ease-drawer"
+            :enter-from-class="
+              widgetStore.isChatView
+                ? 'opacity-0 motion-safe:translate-x-3'
+                : 'opacity-0 motion-safe:-translate-x-3'
+            "
+          >
+            <ConversationsView v-if="!widgetStore.isChatView" />
+            <ChatView v-else />
+          </Transition>
         </TabsContent>
         <TabsContent value="help" class="h-full mt-0"><HelpView /></TabsContent>
       </main>

@@ -1,4 +1,4 @@
-export function applyTemporaryClass (containerID, className, timeMs = 300) {
+export function applyTemporaryClass (containerID, className, timeMs = 500) {
   const container = document.getElementById(containerID)
   if (!container) return
   container.classList.add(className)
