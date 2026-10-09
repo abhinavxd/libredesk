@@ -162,9 +162,6 @@ const verifyAlias = async (email) => {
     await api.verifyInboxAlias(inbox.value.id, { email })
     const key = email.trim().toLowerCase()
     aliasVerificationState.value[key] = { verification_status: 'pending' }
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('admin.inbox.aliases.sendingVerificationStarted')
-    })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

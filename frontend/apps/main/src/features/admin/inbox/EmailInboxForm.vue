@@ -117,7 +117,7 @@
         <div class="space-y-1.5">
           <div class="flex items-center justify-between gap-4">
             <h3 id="inbox-aliases-heading" class="text-sm font-semibold">
-              {{ $t('admin.inbox.aliases') }}
+              {{ $t('globals.terms.emailAlias', 2) }}
             </h3>
             <Button type="button" variant="outline" size="sm" class="shrink-0" @click="addAlias">
               <Plus class="size-4" aria-hidden="true" />
@@ -972,7 +972,7 @@ const ALIAS_STATUS = {
     class: 'text-success',
     icon: CheckCircle2,
     label: 'globals.terms.verified',
-    action: 'globals.messages.verifyAgain'
+    action: 'globals.messages.verify'
   },
   failed: {
     class: 'text-destructive',
