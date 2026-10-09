@@ -102,6 +102,7 @@ type App struct {
 	fs                 stuffbin.FileSystem
 	consts             atomic.Value
 	auth               *auth_.Auth
+	sessionsMu         sync.RWMutex
 	authz              *authz.Enforcer
 	i18n               *i18n.I18n
 	lo                 *logf.Logger
@@ -257,7 +258,7 @@ func main() {
 		businessHours               = initBusinessHours(db, i18n)
 		webhook                     = initWebhook(db, i18n, ssrfControl)
 		user                        = initUser(i18n, db)
-		auth                        = initAuth(oidc, rdb, i18n, ssrfControl, user)
+		auth                        = initAuth(oidc, rdb, i18n, ssrfControl)
 		wsHub                       = initWS(user)
 		notifier                    = initNotifier()
 		userNotification            = initUserNotification(db, i18n)

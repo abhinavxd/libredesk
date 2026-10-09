@@ -518,19 +518,19 @@ func (u *Manager) GetUserIDsByRole(roleID int) ([]int, error) {
 }
 
 // ChangeSystemUserPassword updates the system user's password with a newly prompted one.
-func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) error {
+func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) (int, error) {
 	// Prompt for password and get hashed password
 	hashedPassword, err := promptAndHashPassword(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Update system user's password in the database.
-	if err := updateSystemUserPassword(db, hashedPassword); err != nil {
-		return fmt.Errorf("error updating system user password: %v", err)
+	id, err := updateSystemUserPassword(db, hashedPassword)
+	if err != nil {
+		return 0, fmt.Errorf("error updating system user password: %v", err)
 	}
-	fmt.Println("password updated successfully. Login with email 'System' and the new password.")
-	return nil
+	return id, nil
 }
 
 // CreateSystemUser creates a system user with the provided password or a random one.
@@ -611,12 +611,13 @@ func promptAndHashPassword(ctx context.Context) ([]byte, error) {
 }
 
 // updateSystemUserPassword updates the password of the system user in the database.
-func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
-	_, err := db.Exec(`UPDATE users SET password = $1, session_version = session_version + 1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
+func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) (int, error) {
+	var id int
+	err := db.Get(&id, `UPDATE users SET password = $1 WHERE email = $2 RETURNING id`, hashedPassword, models.SystemUserEmail)
 	if err != nil {
-		return fmt.Errorf("failed to update system user password: %v", err)
+		return 0, fmt.Errorf("failed to update system user password: %v", err)
 	}
-	return nil
+	return id, nil
 }
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.

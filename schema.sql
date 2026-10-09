@@ -175,7 +175,6 @@ CREATE TABLE users (
     phone_number TEXT NULL,
     country TEXT NULL,
     "password" VARCHAR(150) NULL,
-    session_version INT NOT NULL DEFAULT 1,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
 	external_user_id TEXT NULL,

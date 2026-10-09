@@ -300,6 +300,18 @@ func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHa
 // validatePageSession returns the session user and clears a revoked or expired session.
 func validatePageSession(r *fastglue.Request, app *App) (models.User, error) {
 	user, err := app.auth.ValidateSession(r)
+	if err == nil && user.ID > 0 {
+		agent, lookupErr := app.user.GetAgentCachedOrLoad(user.ID)
+		if lookupErr != nil {
+			if e, ok := lookupErr.(envelope.Error); ok && e.ErrorType == envelope.NotFoundError {
+				err = simplesessions.ErrInvalidSession
+			} else {
+				return models.User{}, lookupErr
+			}
+		} else if !agent.Enabled {
+			err = simplesessions.ErrInvalidSession
+		}
+	}
 	if err == nil {
 		return user, nil
 	}
@@ -310,5 +322,23 @@ func validatePageSession(r *fastglue.Request, app *App) (models.User, error) {
 	if err := app.auth.DestroySession(r); err != nil {
 		app.lo.Error("error destroying session", "error", err)
 	}
-	return user, nil
+	return models.User{}, nil
+}
+
+func sessionLogin(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		app.sessionsMu.RLock()
+		defer app.sessionsMu.RUnlock()
+		return handler(r)
+	}
+}
+
+func sessionChange(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		app.sessionsMu.Lock()
+		defer app.sessionsMu.Unlock()
+		return handler(r)
+	}
 }
