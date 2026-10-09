@@ -1,8 +1,12 @@
 package models
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/volatiletech/null/v9"
 )
 
 func TestTranscript(t *testing.T) {
@@ -81,5 +85,53 @@ func TestShouldEvaluateAutomation(t *testing.T) {
 				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestConversationSeenByJSON(t *testing.T) {
+	seenAt := time.Date(2026, 9, 10, 14, 30, 0, 0, time.UTC)
+	conv := Conversation{
+		UUID: "test-conv-uuid",
+		SeenBy: []ConversationSeenBy{
+			{
+				UserID:     2,
+				FirstName:  "Jane",
+				LastName:   "Doe",
+				AvatarURL:  null.StringFrom("https://example.com/avatar.png"),
+				LastSeenAt: seenAt,
+			},
+		},
+	}
+
+	b, err := json.Marshal(conv)
+	if err != nil {
+		t.Fatalf("failed to marshal conversation: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(b, &parsed); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v", err)
+	}
+
+	seenByRaw, ok := parsed["seen_by"].([]any)
+	if !ok || len(seenByRaw) != 1 {
+		t.Fatalf("expected seen_by array with 1 item, got %v", parsed["seen_by"])
+	}
+
+	item := seenByRaw[0].(map[string]any)
+	if item["user_id"] != float64(2) {
+		t.Errorf("expected user_id 2, got %v", item["user_id"])
+	}
+	if item["first_name"] != "Jane" {
+		t.Errorf("expected first_name Jane, got %v", item["first_name"])
+	}
+	if item["last_name"] != "Doe" {
+		t.Errorf("expected last_name Doe, got %v", item["last_name"])
+	}
+	if item["avatar_url"] != "https://example.com/avatar.png" {
+		t.Errorf("expected avatar_url https://example.com/avatar.png, got %v", item["avatar_url"])
+	}
+	if item["last_seen_at"] != "2026-09-10T14:30:00Z" {
+		t.Errorf("expected last_seen_at 2026-09-10T14:30:00Z, got %v", item["last_seen_at"])
 	}
 }
