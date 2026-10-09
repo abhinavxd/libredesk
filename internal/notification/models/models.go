@@ -58,6 +58,12 @@ var NotificationChannels = []NotificationChannel{
 	NotificationChannelPush,
 }
 
+var ReplyTypes = []NotificationType{
+	NotificationTypeNewReply,
+	NotificationTypeNewReplyParticipating,
+	NotificationTypeConversationReopened,
+}
+
 // defaultDisabledTypes are off until an agent opts in. Every other type defaults to on.
 var defaultDisabledTypes = []NotificationType{
 	NotificationTypeNewReply,
@@ -98,11 +104,19 @@ type EmailNotification struct {
 	Delay     time.Duration
 }
 
+type NotificationReference struct {
+	Type           NotificationType
+	ConversationID null.Int
+	MessageID      null.Int
+	NotificationID null.Int
+}
+
 type Email struct {
 	UserID         int
 	NotificationID null.Int
 	Type           NotificationType
 	ConversationID null.Int
+	MessageID      null.Int
 	Recipient      string
 	Subject        string
 	Content        string
@@ -152,4 +166,8 @@ type UserNotification struct {
 type NotificationStats struct {
 	UnreadCount int `db:"unread_count" json:"unread_count"`
 	TotalCount  int `db:"total_count" json:"total_count"`
+}
+
+func IsReply(nType NotificationType) bool {
+	return slices.Contains(ReplyTypes, nType)
 }

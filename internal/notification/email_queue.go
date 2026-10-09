@@ -25,7 +25,6 @@ type EmailSender interface {
 }
 
 type emailQueueQueries struct {
-	IsSeen  *sqlx.Stmt `query:"is-notification-seen"`
 	Enqueue *sqlx.Stmt `query:"enqueue-notification-email"`
 	Claim   *sqlx.Stmt `query:"claim-due-notification-emails"`
 	Delete  *sqlx.Stmt `query:"delete-claimed-notification-email"`
@@ -39,21 +38,23 @@ type queuedEmail struct {
 	NotificationID null.Int                `db:"notification_id"`
 	Type           models.NotificationType `db:"notification_type"`
 	ConversationID null.Int                `db:"conversation_id"`
+	MessageID      null.Int                `db:"message_id"`
 	Attempts       int                     `db:"attempts"`
 	Recipient      string                  `db:"recipient_email"`
 	Subject        string                  `db:"subject"`
 	Content        string                  `db:"content"`
-	QueuedAt       time.Time               `db:"queued_at"`
 }
 
 type EmailQueue struct {
 	q        emailQueueQueries
+	checker  DeliveryChecker
 	outbound EmailSender
 	lo       *logf.Logger
 }
 
 type EmailQueueOpts struct {
 	DB       *sqlx.DB
+	Checker  DeliveryChecker
 	Outbound EmailSender
 	Lo       *logf.Logger
 }
@@ -65,6 +66,7 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 	}
 	return &EmailQueue{
 		q:        q,
+		checker:  opts.Checker,
 		outbound: opts.Outbound,
 		lo:       opts.Lo,
 	}, nil
@@ -85,7 +87,7 @@ func (q *EmailQueue) Send(e models.Email) bool {
 
 func (q *EmailQueue) SendAfter(e models.Email, delay time.Duration) bool {
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
-		e.Subject, e.Content, time.Now().Add(delay)); err != nil {
+		e.Subject, e.Content, time.Now().Add(delay), e.MessageID); err != nil {
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
 	}
@@ -102,11 +104,14 @@ func (q *EmailQueue) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 			for _, e := range q.due() {
-				seen, err := q.seen(e)
+				deliver, err := q.checker.ShouldDeliver(e.UserID, models.NotificationReference{
+					Type: e.Type, ConversationID: e.ConversationID, MessageID: e.MessageID, NotificationID: e.NotificationID,
+				}, models.NotificationChannelEmail)
 				if err != nil {
+					q.lo.Error("error checking notification email eligibility", "user_id", e.UserID, "error", err)
 					continue
 				}
-				if seen {
+				if !deliver {
 					q.delete(e)
 					continue
 				}
@@ -123,15 +128,6 @@ func (q *EmailQueue) due() []queuedEmail {
 		return nil
 	}
 	return due
-}
-
-func (q *EmailQueue) seen(e queuedEmail) (bool, error) {
-	var seen bool
-	if err := q.q.IsSeen.Get(&seen, e.UserID, e.NotificationID, e.ConversationID, e.QueuedAt); err != nil {
-		q.lo.Error("error checking notification seen state", "user_id", e.UserID, "type", e.Type, "error", err)
-		return false, err
-	}
-	return seen, nil
 }
 
 func (q *EmailQueue) deliver(e queuedEmail) bool {

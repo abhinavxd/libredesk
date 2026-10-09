@@ -33,6 +33,7 @@ func (p *email) Send(delivery Delivery) Result {
 		NotificationID: delivery.NotificationID,
 		Type:           delivery.Notification.Type,
 		ConversationID: delivery.Notification.ConversationID,
+		MessageID:      delivery.Notification.MessageID,
 		Recipient:      notification.Recipient,
 		Subject:        notification.Subject,
 		Content:        notification.Content,
