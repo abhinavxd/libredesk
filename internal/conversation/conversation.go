@@ -619,30 +619,34 @@ func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit i
 }
 
 // UpdateUserLastSeen moves the user's last seen timestamp forward to the given message, or to now when messageUUID is empty.
-func (c *Manager) UpdateUserLastSeen(conversationUUID string, userID int, messageUUID string) (time.Time, error) {
-	var lastSeen time.Time
+func (c *Manager) UpdateUserLastSeen(conversationUUID string, userID int, messageUUID string) (models.ConversationReadState, error) {
+	var state models.ConversationReadState
 	if messageUUID != "" {
 		if _, err := uuid.Parse(messageUUID); err != nil {
-			return lastSeen, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
 		}
 	}
-	if err := c.q.UpsertUserLastSeen.Get(&lastSeen, userID, conversationUUID, messageUUID); err != nil {
+	if err := c.q.UpsertUserLastSeen.Get(&state, userID, conversationUUID, messageUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return lastSeen, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
 		}
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
-		return lastSeen, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return lastSeen, nil
+	return state, nil
 }
 
 // MarkAsUnread marks a conversation as unread for a specific user by setting last_seen to before the last message.
-func (c *Manager) MarkAsUnread(uuid string, userID int) error {
-	if _, err := c.q.MarkConversationUnread.Exec(userID, uuid, pq.Array(nmodels.ReplyTypes)); err != nil {
+func (c *Manager) MarkAsUnread(uuid string, userID int) (models.ConversationReadState, error) {
+	var state models.ConversationReadState
+	if err := c.q.MarkConversationUnread.Get(&state, userID, uuid, pq.Array(nmodels.ReplyTypes)); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+		}
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return nil
+	return state, nil
 }
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.

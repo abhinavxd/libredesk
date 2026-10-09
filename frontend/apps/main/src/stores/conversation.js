@@ -38,7 +38,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
   const selectedUUIDs = ref(new Set())
-  const readCutoffs = new Map()
+  const readStates = new Map()
 
   const sidebarCounts = reactive({
     assigned: 0,
@@ -389,25 +389,24 @@ export const useConversationStore = defineStore('conversation', () => {
     return messages.data.getAllPagesMessages(conversation.data?.uuid)
   })
 
-  function applyConversationRead ({ conversation_uuid: uuid, last_seen_at: lastSeenAt }) {
+  function applyConversationRead (state) {
+    const { conversation_uuid: uuid, last_seen_at: lastSeenAt, read_version: readVersion, is_unread: isUnread } = state
+    const previous = readStates.get(uuid)
+    if (previous && readVersion <= previous.read_version) return
+    readStates.set(uuid, state)
     notificationStore.refreshConversationRead(uuid)
-    const cutoff = Date.parse(lastSeenAt)
-    if (cutoff > (readCutoffs.get(uuid) ?? -Infinity)) {
-      readCutoffs.set(uuid, cutoff)
-    }
     const row = conversations.data.find(conv => conv.uuid === uuid)
-    if (row && Date.parse(row.last_message_at) <= readCutoffs.get(uuid)) {
+    if (row && isUnread) {
+      row.unread_message_count = Math.max(1, row.unread_message_count || 0)
+    } else if (row && Date.parse(row.last_message_at) <= Date.parse(lastSeenAt)) {
       row.unread_message_count = 0
     }
   }
 
   async function markAsUnread (uuid) {
     try {
-      await api.markConversationAsUnread(uuid)
-      const index = conversations.data.findIndex(conv => conv.uuid === uuid)
-      if (index !== -1) {
-        conversations.data[index].unread_message_count = 1
-      }
+      const response = await api.markConversationAsUnread(uuid)
+      applyConversationRead(response.data.data)
     } catch (err) {
       handleHTTPError(err)
     }
@@ -415,7 +414,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function incrementUnread (uuid, createdAt) {
     const row = conversations.data.find(c => c.uuid === uuid)
-    if (!row || Date.parse(createdAt) <= readCutoffs.get(uuid)) return
+    if (!row || Date.parse(createdAt) <= Date.parse(readStates.get(uuid)?.last_seen_at)) return
     row.unread_message_count = Math.min((row.unread_message_count || 0) + 1, 10)
   }
 
@@ -561,7 +560,7 @@ export const useConversationStore = defineStore('conversation', () => {
       }
     }
 
-    if (!fetchNextPage && messages.data.getAllPagesMessages(uuid).length > 0) {
+    if (!fetchNextPage && messages.data.getLastFetchedPage(uuid) > 0) {
       return
     }
 

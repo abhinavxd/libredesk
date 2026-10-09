@@ -580,14 +580,16 @@ SET priority_id = (SELECT id FROM conversation_priorities WHERE name = $2),
 WHERE uuid = $1;
 
 -- name: upsert-user-last-seen
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-SELECT $1, c.id, COALESCE(m.created_at, NOW())
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at, updated_at)
+SELECT $1, c.id, COALESCE(m.created_at, NOW()), clock_timestamp()
 FROM conversations c
 LEFT JOIN conversation_messages m ON m.conversation_id = c.id AND m.uuid = NULLIF($3::text, '')::uuid
 WHERE c.uuid = $2 AND ($3::text = '' OR m.id IS NOT NULL)
 ON CONFLICT (conversation_id, user_id)
-DO UPDATE SET last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at), updated_at = NOW()
-RETURNING last_seen_at;
+DO UPDATE SET
+    last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at),
+    updated_at = GREATEST(conversation_last_seen.updated_at + INTERVAL '1 microsecond', clock_timestamp())
+RETURNING last_seen_at, (EXTRACT(EPOCH FROM updated_at) * 1000000)::bigint AS read_version;
 
 -- name: update-conversation-last-message
 -- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
@@ -1218,12 +1220,13 @@ read_replies AS (
       AND m.id = n.message_id
       AND ls.user_id = $1 AND ls.conversation_id = n.conversation_id AND ls.last_seen_at >= m.created_at
 )
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-SELECT $1, (SELECT id FROM target), ts FROM last_msg
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at, updated_at)
+SELECT $1, (SELECT id FROM target), ts, clock_timestamp() FROM last_msg
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET
     last_seen_at = EXCLUDED.last_seen_at,
-    updated_at = NOW();
+    updated_at = GREATEST(conversation_last_seen.updated_at + INTERVAL '1 microsecond', clock_timestamp())
+RETURNING last_seen_at, (EXTRACT(EPOCH FROM updated_at) * 1000000)::bigint AS read_version;
 
 -- name: get-active-livechat-conversations-by-agent
 SELECT c.uuid, c.contact_id, c.inbox_id

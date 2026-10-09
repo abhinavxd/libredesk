@@ -13,6 +13,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const hasMore = ref(true)
   const emitter = useEmitter()
   let statsRequest = 0
+  let notificationsRequest = 0
 
   const unreadNotifications = computed(() =>
     notifications.value.filter(n => !n.is_read)
@@ -24,12 +25,14 @@ export const useNotificationStore = defineStore('notification', () => {
 
   // Fetch notifications with pagination
   const fetchNotifications = async (limit = 30, offset = 0, append = false) => {
+    const request = ++notificationsRequest
     isLoading.value = true
     try {
       const data = []
       while (data.length < limit) {
         const pageLimit = Math.min(100, limit - data.length)
         const response = await api.getNotifications({ limit: pageLimit, offset: offset + data.length })
+        if (request !== notificationsRequest) return
         const page = response?.data?.data || []
         data.push(...page)
         if (page.length < pageLimit) break
@@ -43,12 +46,13 @@ export const useNotificationStore = defineStore('notification', () => {
 
       hasMore.value = data.length === limit
     } catch (error) {
+      if (request !== notificationsRequest) return
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
         description: handleHTTPError(error).message
       })
     } finally {
-      isLoading.value = false
+      if (request === notificationsRequest) isLoading.value = false
     }
   }
 

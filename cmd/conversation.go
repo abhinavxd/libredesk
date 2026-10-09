@@ -473,7 +473,7 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 		}
 	}
 
-	cutoff, err := app.conversation.UpdateUserLastSeen(uuid, auser.ID, req.MessageUUID)
+	read, err := app.conversation.UpdateUserLastSeen(uuid, auser.ID, req.MessageUUID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -481,7 +481,7 @@ func handleUpdateConversationAssigneeLastSeen(r *fastglue.Request) error {
 	if readSourceID != "" {
 		go markWhatsAppMessageRead(app, readInboxID, readSourceID)
 	}
-	state := map[string]any{"conversation_uuid": uuid, "last_seen_at": cutoff}
+	state := map[string]any{"conversation_uuid": uuid, "last_seen_at": read.LastSeenAt, "read_version": read.ReadVersion}
 	app.conversation.BroadcastConversationRead(auser.ID, state)
 	return r.SendEnvelope(state)
 }
@@ -502,10 +502,13 @@ func handleMarkConversationAsUnread(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	if err = app.conversation.MarkAsUnread(uuid, auser.ID); err != nil {
+	unread, err := app.conversation.MarkAsUnread(uuid, auser.ID)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	return r.SendEnvelope(true)
+	state := map[string]any{"conversation_uuid": uuid, "last_seen_at": unread.LastSeenAt, "read_version": unread.ReadVersion, "is_unread": true}
+	app.conversation.BroadcastConversationRead(auser.ID, state)
+	return r.SendEnvelope(state)
 }
 
 // handleGetConversationParticipants retrieves participants of a conversation.

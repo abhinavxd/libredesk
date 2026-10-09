@@ -381,17 +381,21 @@ func TestMarkAsUnreadKeepsReplyNotificationsRead(t *testing.T) {
 	}
 	unread(0)
 	older, err := m.UpdateUserLastSeen(conv.UUID, userID, messages[0].UUID)
-	if err != nil || !older.Equal(latest) {
+	if err != nil || !older.LastSeenAt.Equal(latest.LastSeenAt) || older.ReadVersion <= latest.ReadVersion {
 		t.Fatalf("older message moved last seen back: %v err=%v", older, err)
 	}
 	if _, err := m.UpdateUserLastSeen(conv.UUID, userID, "not-a-uuid"); err == nil {
 		t.Fatal("invalid message uuid accepted")
 	}
-	if err := m.MarkAsUnread(conv.UUID, userID); err != nil {
+	markedUnread, err := m.MarkAsUnread(conv.UUID, userID)
+	if err != nil {
 		t.Fatal(err)
 	}
+	if !markedUnread.LastSeenAt.Before(latest.LastSeenAt) || markedUnread.ReadVersion <= older.ReadVersion {
+		t.Fatalf("mark unread did not return a newer state: %+v", markedUnread)
+	}
 	unread(0)
-	if now, err := m.UpdateUserLastSeen(conv.UUID, userID, ""); err != nil || !now.After(latest) {
+	if now, err := m.UpdateUserLastSeen(conv.UUID, userID, "" /** messageUUID **/); err != nil || !now.LastSeenAt.After(latest.LastSeenAt) || now.ReadVersion <= markedUnread.ReadVersion {
 		t.Fatalf("empty message uuid did not mark read up to now: %v err=%v", now, err)
 	}
 }
