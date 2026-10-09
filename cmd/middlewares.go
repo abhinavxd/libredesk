@@ -187,17 +187,9 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
 
-		// Validate session.
-		user, err := app.auth.ValidateSession(r)
+		user, err := validatePageSession(r, app)
 		if err != nil {
-			// Session is not valid, destroy it and redirect to login.
-			if err != simplesessions.ErrInvalidSession {
-				app.lo.Error("error validating session", "error", err)
-				return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
-			}
-			if err := app.auth.DestroySession(r); err != nil {
-				app.lo.Error("error destroying session", "error", err)
-			}
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 		}
 
 		// User is authenticated.
@@ -220,10 +212,8 @@ func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandle
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
 
-		// Validate session.
-		user, err := app.auth.ValidateSession(r)
+		user, err := validatePageSession(r, app)
 		if err != nil {
-			app.lo.Error("error validating session", "error", err)
 			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSessionClearCookie"), nil, envelope.GeneralError)
 		}
 
@@ -303,6 +293,52 @@ func authOrSignedURL(handler fastglue.FastRequestHandler) fastglue.FastRequestHa
 
 		// Mark as signed URL access (no user context).
 		r.RequestCtx.SetUserValue("auth_method", authMethodSignedURL)
+		return handler(r)
+	}
+}
+
+// validatePageSession returns the session user and clears a revoked or expired session.
+func validatePageSession(r *fastglue.Request, app *App) (models.User, error) {
+	user, err := app.auth.ValidateSession(r)
+	if err == nil && user.ID > 0 {
+		agent, lookupErr := app.user.GetAgentCachedOrLoad(user.ID)
+		if lookupErr != nil {
+			if e, ok := lookupErr.(envelope.Error); ok && e.ErrorType == envelope.NotFoundError {
+				err = simplesessions.ErrInvalidSession
+			} else {
+				return models.User{}, lookupErr
+			}
+		} else if !agent.Enabled {
+			err = simplesessions.ErrInvalidSession
+		}
+	}
+	if err == nil {
+		return user, nil
+	}
+	if err != simplesessions.ErrInvalidSession {
+		app.lo.Error("error validating session", "error", err)
+		return user, err
+	}
+	if err := app.auth.DestroySession(r); err != nil {
+		app.lo.Error("error destroying session", "error", err)
+	}
+	return models.User{}, nil
+}
+
+func sessionLogin(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		app.sessionsMu.RLock()
+		defer app.sessionsMu.RUnlock()
+		return handler(r)
+	}
+}
+
+func sessionChange(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
+	return func(r *fastglue.Request) error {
+		app := r.Context.(*App)
+		app.sessionsMu.Lock()
+		defer app.sessionsMu.Unlock()
 		return handler(r)
 	}
 }

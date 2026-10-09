@@ -335,7 +335,7 @@ const updateConversationPriority = (uuid, data) =>
       'Content-Type': 'application/json'
     }
   })
-const updateAssigneeLastSeen = (uuid) => http.put(`/api/v1/conversations/${uuid}/last-seen`)
+const updateAssigneeLastSeen = (uuid, messageUUID) => http.put(`/api/v1/conversations/${uuid}/last-seen`, { message_uuid: messageUUID })
 const markConversationAsUnread = (uuid) => http.put(`/api/v1/conversations/${uuid}/mark-unread`)
 const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)

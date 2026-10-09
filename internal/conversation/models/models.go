@@ -63,6 +63,11 @@ var (
 	ContentTypeHTML = "html"
 )
 
+type ConversationReadState struct {
+	LastSeenAt  time.Time `db:"last_seen_at" json:"last_seen_at"`
+	ReadVersion int64     `db:"read_version" json:"read_version"`
+}
+
 type ContinuityConversation struct {
 	ID                        int         `db:"id"`
 	UUID                      string      `db:"uuid"`
@@ -328,6 +333,7 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
+	UploadUserID      int                    `db:"-" json:"-"`
 	Total             int                    `db:"total" json:"-"`
 	ID                int                    `db:"id" json:"id"`
 	CreatedAt         time.Time              `db:"created_at" json:"created_at"`

@@ -24,129 +24,43 @@ func (p *emailDeliveryProvider) Name() string {
 	return ProviderEmail
 }
 
-func TestDelayedReplyEmailUsesQueueTime(t *testing.T) {
-	db := testutil.NewDB(t, "reply_email_time")
-	var userID, inboxID, convID int
-	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'read@example.com', 'Agent', '') RETURNING id`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Test', 'email') RETURNING id`); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Get(&convID, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, userID, inboxID); err != nil {
-		t.Fatal(err)
-	}
-	lo := logf.New(logf.Opts{})
-	provider := &emailDeliveryProvider{}
-	outbound := NewService(map[string]Notifier{ProviderEmail: provider}, 1, 1, &lo)
-	queue, err := NewEmailQueue(EmailQueueOpts{DB: db, Outbound: outbound, Lo: &lo})
+func TestDelayedReplyEmailKeepsMessageReference(t *testing.T) {
+	f := newReplyFixture(t, "reply_email_reference")
+	queue, err := NewEmailQueue(EmailQueueOpts{DB: f.db, Lo: f.manager.lo, Checker: f.checker})
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := NewDispatcher(DispatcherOpts{
-		Pipeline: channels.NewPipeline(channels.NewEmail(queue)),
-		Prefs:    fakePreferences{channels: map[int][]models.NotificationChannel{userID: {models.NotificationChannelEmail}}},
-	})
-	n := models.Notification{
-		Type: models.NotificationTypeNewReply,
-		Recipients: []models.Recipient{{
-			UserID: userID,
-			Email: &models.EmailNotification{
-				Recipient: "read@example.com",
-				Subject:   "Reply",
-				Content:   "First reply",
-				Delay:     time.Minute,
-			},
-		}},
-		ConversationID: null.IntFrom(convID),
+	email := models.Email{UserID: f.userID, Type: models.NotificationTypeNewReply,
+		ConversationID: null.IntFrom(f.convID), MessageID: null.IntFrom(f.messageIDs[0]),
+		Recipient: "agent@example.com", Subject: "Reply", Content: "First reply"}
+	f.markSeen(t, 0)
+	if !queue.SendAfter(email, time.Minute) {
+		t.Fatal("enqueue failed")
 	}
-	db.MustExec(`INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at) VALUES ($1, $2, now() - interval '1 hour')`, userID, convID)
-	for _, tt := range []struct {
-		name       string
-		readOffset time.Duration
-		want       bool
-	}{
-		{"read before queue", -time.Second, false},
-		{"read at queue", 0, true},
-		{"read after queue", time.Second, true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			d.Send(n)
-			var queuedAt time.Time
-			if err := db.Get(&queuedAt, `SELECT queued_at FROM notification_email_queue`); err != nil {
-				t.Fatal(err)
-			}
-			db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, queuedAt.Add(tt.readOffset))
-			db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-			due := queue.due()
-			if len(due) != 1 {
-				t.Fatalf("queued emails = %d, want 1", len(due))
-			}
-			got, err := queue.seen(due[0])
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != tt.want {
-				t.Fatalf("seen = %v, want %v", got, tt.want)
-			}
-		})
-	}
-
-	t.Run("coalesced reply uses latest message", func(t *testing.T) {
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = now() - interval '1 hour'`)
-		d.Send(n)
-		var firstSendAt time.Time
-		if err := db.Get(&firstSendAt, `SELECT send_at FROM notification_email_queue`); err != nil {
-			t.Fatal(err)
-		}
-		n.Recipients[0].Email.Content = "Second reply"
-		n.Recipients[0].Email.Delay = 2 * time.Minute
-		d.Send(n)
-		var second struct {
-			SendAt   time.Time `db:"send_at"`
-			QueuedAt time.Time `db:"queued_at"`
-		}
-		if err := db.Get(&second, `SELECT send_at, queued_at FROM notification_email_queue`); err != nil {
-			t.Fatal(err)
-		}
-		if !second.SendAt.After(firstSendAt) {
-			t.Fatalf("coalesced email send time = %v, want after %v", second.SendAt, firstSendAt)
-		}
-		db.MustExec(`UPDATE notification_email_queue SET send_at = now() - interval '1 second'`)
-		due := queue.due()
-		if len(due) != 1 || due[0].Content != "Second reply" {
-			t.Fatalf("unexpected coalesced emails: %#v", due)
-		}
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, second.QueuedAt.Add(-time.Second))
-		seen, err := queue.seen(due[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if seen {
-			t.Fatal("unread second reply suppressed")
-		}
-		db.MustExec(`UPDATE conversation_last_seen SET last_seen_at = $1`, second.QueuedAt)
-		seen, err = queue.seen(due[0])
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !seen {
-			t.Fatal("read second reply was not suppressed")
-		}
-	})
-}
-
-func TestDelayedEmailSeenCheckReturnsDatabaseError(t *testing.T) {
-	db := testutil.NewDB(t, "notification_email_seen_error")
-	lo := logf.New(logf.Opts{})
-	queue, err := NewEmailQueue(EmailQueueOpts{DB: db, Lo: &lo})
-	if err != nil {
+	var queued queuedEmail
+	if err := f.db.Get(&queued, `SELECT user_id, notification_type, conversation_id, message_id FROM notification_email_queue WHERE user_id = $1`, f.userID); err != nil {
 		t.Fatal(err)
 	}
-	db.MustExec(`DROP TABLE conversation_last_seen`)
-
-	if _, err := queue.seen(queuedEmail{}); err == nil {
-		t.Fatal("seen-state database error was ignored")
+	ref := models.NotificationReference{Type: queued.Type, ConversationID: queued.ConversationID, MessageID: queued.MessageID}
+	deliver, err := f.checker.ShouldDeliver(queued.UserID, ref, models.NotificationChannelEmail)
+	if err != nil || deliver {
+		t.Fatalf("seen before enqueue: deliver=%v err=%v", deliver, err)
+	}
+	email.MessageID = null.IntFrom(f.messageIDs[1])
+	email.Content = "Second reply"
+	if !queue.SendAfter(email, time.Minute) {
+		t.Fatal("replacement enqueue failed")
+	}
+	if err := f.db.Get(&queued, `SELECT user_id, notification_type, conversation_id, message_id, content FROM notification_email_queue WHERE user_id = $1`, f.userID); err != nil {
+		t.Fatal(err)
+	}
+	if queued.MessageID != email.MessageID || queued.Content != email.Content {
+		t.Fatalf("replacement = %#v", queued)
+	}
+	ref.MessageID = queued.MessageID
+	deliver, err = f.checker.ShouldDeliver(queued.UserID, ref, models.NotificationChannelEmail)
+	if err != nil || !deliver {
+		t.Fatalf("unseen replacement: deliver=%v err=%v", deliver, err)
 	}
 }
 

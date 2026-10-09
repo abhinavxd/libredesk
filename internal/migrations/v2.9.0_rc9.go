@@ -6,12 +6,9 @@ import (
 	"strings"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/koanf/v2"
-	"github.com/knadh/stuffbin"
 )
 
-// V2_9_0_RC9 adds the inbox email addresses table with alias verification state.
-func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func migrateInboxEmailAddresses(db *sqlx.DB) error {
 	tx, err := db.Beginx()
 	if err != nil {
 		return err

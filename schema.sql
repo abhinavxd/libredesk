@@ -452,11 +452,13 @@ CREATE TABLE media (
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
 	private BOOLEAN NOT NULL DEFAULT true,
+	uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );
 CREATE INDEX index_media_on_model_type_and_model_id ON media(model_type, model_id);
 CREATE INDEX index_media_on_content_id ON media(content_id);
+CREATE INDEX index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
 
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (
@@ -1056,6 +1058,7 @@ CREATE TABLE notification_email_queue (
 	notification_id BIGINT REFERENCES user_notifications(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	notification_type user_notification_type NOT NULL,
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	recipient_email TEXT NOT NULL,
 	subject TEXT NOT NULL,
 	content TEXT NOT NULL,

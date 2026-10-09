@@ -22,10 +22,10 @@ const (
 // initHandlers initializes the HTTP routes and handlers for the application.
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
-	g.POST("/api/v1/auth/login", rateLimit(handleLogin, "auth"))
+	g.POST("/api/v1/auth/login", rateLimit(sessionLogin(handleLogin), "auth"))
 	g.GET("/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
-	g.GET("/api/v1/oidc/{id}/finish", rateLimit(handleOIDCCallback, "auth"))
+	g.GET("/api/v1/oidc/{id}/finish", rateLimit(sessionLogin(handleOIDCCallback), "auth"))
 
 	// i18n.
 	g.GET("/api/v1/lang", handleGetAvailableLanguages)
@@ -145,14 +145,14 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/api/v1/agents", perm(handleGetAgents, "users:manage"))
 	g.GET("/api/v1/agents/{id}", perm(handleGetAgent, "users:manage"))
 	g.POST("/api/v1/agents", perm(handleCreateAgent, "users:manage"))
-	g.PUT("/api/v1/agents/{id}", perm(clearsHCCache(handleUpdateAgent), "users:manage"))
-	g.DELETE("/api/v1/agents/{id}", perm(clearsHCCache(handleDeleteAgent), "users:manage"))
+	g.PUT("/api/v1/agents/{id}", perm(clearsHCCache(sessionChange(handleUpdateAgent)), "users:manage"))
+	g.DELETE("/api/v1/agents/{id}", perm(clearsHCCache(sessionChange(handleDeleteAgent)), "users:manage"))
 	g.POST("/api/v1/agents/import", perm(clearsHCCache(handleImportAgents), "users:manage"))
 	g.GET("/api/v1/agents/import/status", perm(handleGetAgentImportStatus, "users:manage"))
 	g.POST("/api/v1/agents/{id}/api-key", perm(handleGenerateAPIKey, "users:manage"))
 	g.DELETE("/api/v1/agents/{id}/api-key", perm(handleRevokeAPIKey, "users:manage"))
 	g.POST("/api/v1/agents/reset-password", rateLimit(tryAuth(handleResetPassword), "auth"))
-	g.POST("/api/v1/agents/set-password", rateLimit(tryAuth(handleSetPassword), "auth"))
+	g.POST("/api/v1/agents/set-password", rateLimit(tryAuth(sessionChange(handleSetPassword)), "auth"))
 
 	// Contacts.
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))
@@ -465,6 +465,9 @@ func serveIndexPage(r *fastglue.Request) error {
 	r.RequestCtx.Response.Header.Add("Cache-Control", "no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
 	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
 	r.RequestCtx.Response.Header.Add("Expires", "-1")
+
+	r.RequestCtx.Response.Header.Set("Content-Security-Policy", "frame-ancestors 'self'")
+	r.RequestCtx.Response.Header.Set("X-Frame-Options", "SAMEORIGIN")
 
 	// Serve the index.html file from the embedded filesystem.
 	file, err := app.fs.Get(path.Join(frontendDir, "index.html"))
