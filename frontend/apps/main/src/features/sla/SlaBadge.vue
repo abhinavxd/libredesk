@@ -52,7 +52,7 @@ watch(
 
 <style scoped>
 .sla-badge {
-  @apply inline-flex items-center px-1.5 py-0.5 rounded-md border transition-all
+  @apply inline-flex items-center px-1.5 py-0.5 rounded-md border transition-colors
          text-xs font-medium tracking-tight space-x-1 hover:shadow-sm;
 }
 

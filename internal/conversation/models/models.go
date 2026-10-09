@@ -62,6 +62,11 @@ var (
 	ContentTypeHTML = "html"
 )
 
+type ConversationReadState struct {
+	LastSeenAt  time.Time `db:"last_seen_at" json:"last_seen_at"`
+	ReadVersion int64     `db:"read_version" json:"read_version"`
+}
+
 type ContinuityConversation struct {
 	ID                        int         `db:"id"`
 	UUID                      string      `db:"uuid"`
@@ -224,6 +229,7 @@ type Conversation struct {
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+	IncomingTo                []string               `db:"-" json:"-"`
 }
 
 type ConversationContact struct {

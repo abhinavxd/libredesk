@@ -38,6 +38,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
   const selectedUUIDs = ref(new Set())
+  const readStates = new Map()
 
   const sidebarCounts = reactive({
     assigned: 0,
@@ -245,6 +246,8 @@ export const useConversationStore = defineStore('conversation', () => {
 
   const messages = reactive({
     data: new MessageCache(),
+    pending: new Map(),
+    fetchingLatest: false,
     loading: false,
     fetching: false,
     page: 1,
@@ -386,32 +389,32 @@ export const useConversationStore = defineStore('conversation', () => {
     return messages.data.getAllPagesMessages(conversation.data?.uuid)
   })
 
-  function markConversationAsRead (uuid) {
-    const index = conversations.data.findIndex(conv => conv.uuid === uuid)
-    if (index !== -1) {
-      setTimeout(() => {
-        if (conversations.data?.[index]) {
-          conversations.data[index].unread_message_count = 0
-        }
-      }, 3000)
+  function applyConversationRead (state) {
+    const { conversation_uuid: uuid, last_seen_at: lastSeenAt, read_version: readVersion, is_unread: isUnread } = state
+    const previous = readStates.get(uuid)
+    if (previous && readVersion <= previous.read_version) return
+    readStates.set(uuid, state)
+    notificationStore.refreshConversationRead(uuid)
+    const row = conversations.data.find(conv => conv.uuid === uuid)
+    if (row && isUnread) {
+      row.unread_message_count = Math.max(1, row.unread_message_count || 0)
+    } else if (row && Date.parse(row.last_message_at) <= Date.parse(lastSeenAt)) {
+      row.unread_message_count = 0
     }
   }
 
   async function markAsUnread (uuid) {
     try {
-      await api.markConversationAsUnread(uuid)
-      const index = conversations.data.findIndex(conv => conv.uuid === uuid)
-      if (index !== -1) {
-        conversations.data[index].unread_message_count = 1
-      }
+      const response = await api.markConversationAsUnread(uuid)
+      applyConversationRead(response.data.data)
     } catch (err) {
       handleHTTPError(err)
     }
   }
 
-  function incrementUnread (uuid) {
+  function incrementUnread (uuid, createdAt) {
     const row = conversations.data.find(c => c.uuid === uuid)
-    if (!row) return
+    if (!row || Date.parse(createdAt) <= Date.parse(readStates.get(uuid)?.last_seen_at)) return
     row.unread_message_count = Math.min((row.unread_message_count || 0) + 1, 10)
   }
 
@@ -518,8 +521,17 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  const hasPendingMessages = computed(() => [...messages.pending.values()].includes(conversation.data?.uuid))
+
+  function clearPendingMessages (uuid) {
+    for (const [messageUUID, conversationUUID] of messages.pending) {
+      if (conversationUUID === uuid && messages.data.hasMessage(uuid, messageUUID)) messages.pending.delete(messageUUID)
+    }
+  }
+
   async function fetchMessages (uuid, fetchNextPage = false) {
     if (staleConversationUUIDs.has(uuid) && messages.data.hasConversation(uuid)) {
+      messages.fetchingLatest = true
       try {
         const response = await api.getConversationMessages(uuid, { page: 1, page_size: MESSAGE_LIST_PAGE_SIZE })
         const newMessages = response.data?.data?.results || []
@@ -531,6 +543,7 @@ export const useConversationStore = defineStore('conversation', () => {
           }
         }
         staleConversationUUIDs.delete(uuid)
+        clearPendingMessages(uuid)
         if (lastAdded) {
           incrementMessageVersion()
           setTimeout(() => {
@@ -542,11 +555,12 @@ export const useConversationStore = defineStore('conversation', () => {
           variant: 'destructive',
           description: handleHTTPError(error).message
         })
+      } finally {
+        messages.fetchingLatest = false
       }
     }
 
-    if (!fetchNextPage && messages.data.getAllPagesMessages(uuid).length > 0) {
-      markConversationAsRead(uuid)
+    if (!fetchNextPage && messages.data.getLastFetchedPage(uuid) > 0) {
       return
     }
 
@@ -556,8 +570,8 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       const response = await api.getConversationMessages(uuid, { page, page_size: MESSAGE_LIST_PAGE_SIZE })
       const result = response.data?.data || {}
-      markConversationAsRead(uuid)
       messages.data.addMessages(uuid, result.results || [], result.page, result.total_pages)
+      clearPendingMessages(uuid)
       incrementMessageVersion()
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -575,11 +589,13 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function fetchMessage (conversationUUID, messageUUID) {
+    messages.pending.set(messageUUID, conversationUUID)
     try {
       const response = await api.getConversationMessage(conversationUUID, messageUUID)
       if (response?.data?.data) {
         const newMsg = response.data.data
         messages.data.addMessage(conversationUUID, newMsg)
+        messages.pending.delete(messageUUID)
         incrementMessageVersion()
         return newMsg
       }
@@ -589,6 +605,11 @@ export const useConversationStore = defineStore('conversation', () => {
         description: handleHTTPError(error).message
       })
     }
+    staleConversationUUIDs.add(conversationUUID)
+    const isCurrent = conversation.data?.uuid === conversationUUID
+    if (isCurrent) await fetchMessages(conversationUUID)
+    if (!isCurrent || !staleConversationUUIDs.has(conversationUUID)) messages.pending.delete(messageUUID)
+    return messages.data.getAllPagesMessages(conversationUUID).find(message => message.uuid === messageUUID)
   }
 
   async function deleteMessage (conversationUUID, messageUUID) {
@@ -878,10 +899,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function updateAssigneeLastSeen (uuid) {
+  async function updateAssigneeLastSeen (uuid, messageUUID) {
     if (!isViewingConversation(uuid)) return
-    markConversationAsRead(uuid)
-    api.updateAssigneeLastSeen(uuid).catch(() => { })
+    const response = await api.updateAssigneeLastSeen(uuid, messageUUID)
+    applyConversationRead(response.data.data)
   }
 
   function isConversationInList (uuid) {
@@ -927,7 +948,6 @@ export const useConversationStore = defineStore('conversation', () => {
           created_at: message.created_at
         })
         incrementMessageVersion()
-        updateAssigneeLastSeen(message.conversation_uuid)
         return
       }
 
@@ -950,9 +970,6 @@ export const useConversationStore = defineStore('conversation', () => {
             message: activityMessage
           })
         }, 100)
-        if (!document.hidden) {
-          updateAssigneeLastSeen(message.conversation_uuid)
-        }
         return
       }
 
@@ -965,10 +982,6 @@ export const useConversationStore = defineStore('conversation', () => {
             message: fetchedMessage
           })
         }, 100)
-      }
-
-      if (!document.hidden) {
-        updateAssigneeLastSeen(message.conversation_uuid)
       }
     }
   }
@@ -1271,6 +1284,7 @@ export const useConversationStore = defineStore('conversation', () => {
     messages,
     conversationsList,
     conversationMessages,
+    hasPendingMessages,
     currentConversationHasMoreMessages,
     isConversationOpen,
     current,
@@ -1289,6 +1303,7 @@ export const useConversationStore = defineStore('conversation', () => {
     fetchNextConversations,
     mergeMessageUpdate,
     updateAssigneeLastSeen,
+    applyConversationRead,
     markAsUnread,
     incrementUnread,
     updateConversationMessage,

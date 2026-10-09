@@ -1043,6 +1043,7 @@ CREATE TABLE notification_email_queue (
 	notification_id BIGINT REFERENCES user_notifications(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	notification_type user_notification_type NOT NULL,
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	recipient_email TEXT NOT NULL,
 	subject TEXT NOT NULL,
 	content TEXT NOT NULL,

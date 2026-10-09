@@ -1563,8 +1563,21 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 
 	// Handle new conversation events.
 	if isNewConversation {
+		var recipients struct {
+			To []string `json:"to"`
+		}
+		if len(message.Meta) > 0 {
+			if err := json.Unmarshal(message.Meta, &recipients); err != nil {
+				m.lo.Warn("error reading incoming message recipients", "conversation_uuid", conversationUUID, "error", err)
+			}
+		}
+		for i, addr := range recipients.To {
+			recipients.To[i] = stringutil.RemoveConvPlusAddress(addr)
+		}
+
 		conversation, err := m.GetConversation(0, conversationUUID, "")
 		if err == nil {
+			conversation.IncomingTo = recipients.To
 			m.webhookStore.TriggerEvent(wmodels.EventConversationCreated, conversation)
 			m.automation.EvaluateNewConversationRules(conversation)
 		}

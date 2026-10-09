@@ -84,6 +84,14 @@ func (m *Manager) BroadcastConversationUpdate(conversationUUID string, data map[
 	})
 }
 
+// BroadcastConversationRead sends a user's new read state for a conversation to that user's open tabs.
+func (m *Manager) BroadcastConversationRead(userID int, state map[string]any) {
+	m.broadcastToUsers([]int{userID}, wsmodels.Message{
+		Type: wsmodels.MessageTypeConversationRead,
+		Data: state,
+	})
+}
+
 func (m *Manager) BroadcastContactUpdate(contactID int, data map[string]any) {
 	data["contact_id"] = contactID
 	var uuids []string

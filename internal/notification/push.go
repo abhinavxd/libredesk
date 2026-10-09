@@ -25,6 +25,7 @@ const (
 	pushPublicKeySetting  = "notification.push.vapid_public_key"
 	pushPrivateKeySetting = "notification.push.vapid_private_key"
 	pushTTL               = 86400
+	pushReplyDelay        = 5 * time.Second
 	pushTitleRunes        = 100
 	pushBodyRunes         = 400
 )
@@ -32,8 +33,9 @@ const (
 type pushSender func(context.Context, []byte, PushSubscription, string, string, string) (*http.Response, error)
 
 type pushDelivery struct {
-	UserID  int
-	Payload nmodels.PushPayload
+	UserID    int
+	Payload   nmodels.PushPayload
+	Reference nmodels.NotificationReference
 }
 
 type pushSettingStore interface {
@@ -49,6 +51,7 @@ type PushManager struct {
 	privateKey  string
 	subject     string
 	queue       chan pushDelivery
+	checker     DeliveryChecker
 	concurrency int
 	sender      pushSender
 }
@@ -61,6 +64,7 @@ type PushManagerOpts struct {
 	RootURL     string
 	Concurrency int
 	QueueSize   int
+	Checker     DeliveryChecker
 }
 
 func NewPushManager(opts PushManagerOpts) (*PushManager, error) {
@@ -80,6 +84,7 @@ func NewPushManager(opts PushManagerOpts) (*PushManager, error) {
 		privateKey:  privateKey,
 		subject:     vapidSubject(opts.RootURL),
 		queue:       make(chan pushDelivery, opts.QueueSize),
+		checker:     opts.Checker,
 		concurrency: opts.Concurrency,
 	}
 	pushHTTPClient := newPushHTTPClient(opts.Lo)
@@ -128,15 +133,24 @@ func (m *PushManager) Delete(userID int, endpoint string) error {
 	return nil
 }
 
-func (m *PushManager) Send(userID int, payload nmodels.PushPayload) bool {
+func (m *PushManager) Send(userID int, payload nmodels.PushPayload, reference nmodels.NotificationReference) bool {
 	if m.publicKey == "" || m.privateKey == "" {
 		return false
 	}
+	delivery := pushDelivery{UserID: userID, Payload: payload, Reference: reference}
+	if nmodels.IsReply(reference.Type) {
+		time.AfterFunc(pushReplyDelay, func() { m.enqueue(delivery) })
+		return true
+	}
+	return m.enqueue(delivery)
+}
+
+func (m *PushManager) enqueue(delivery pushDelivery) bool {
 	select {
-	case m.queue <- pushDelivery{UserID: userID, Payload: payload}:
+	case m.queue <- delivery:
 		return true
 	default:
-		m.lo.Error("push notification queue is full", "user_id", userID)
+		m.lo.Error("push notification queue is full", "user_id", delivery.UserID)
 		return false
 	}
 }
@@ -163,6 +177,10 @@ func (m *PushManager) worker(ctx context.Context) {
 }
 
 func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error {
+	deliver, err := m.checker.ShouldDeliver(delivery.UserID, delivery.Reference, nmodels.NotificationChannelPush)
+	if err != nil || !deliver {
+		return err
+	}
 	subscriptions, err := m.store.List(delivery.UserID)
 	if err != nil {
 		return err

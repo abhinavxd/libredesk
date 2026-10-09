@@ -100,6 +100,10 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)'
       },
+      transitionTimingFunction: {
+        out: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        drawer: 'cubic-bezier(0.32, 0.72, 0, 1)'
+      },
       keyframes: {
         'dot-flashing': {
           '0%': { opacity: '0.2' },
@@ -160,14 +164,13 @@ module.exports = {
             transform: 'translateY(0)'
           }
         },
-        'bounce-in': {
+        pop: {
           '0%': {
-            transform: 'scale(0)'
-          },
-          '50%': {
-            transform: 'scale(1.2)'
+            opacity: '0',
+            transform: 'scale(0.9)'
           },
           '100%': {
+            opacity: '1',
             transform: 'scale(1)'
           }
         },
@@ -214,13 +217,12 @@ module.exports = {
         'collapsible-down': 'collapsible-down 0.2s ease-in-out',
         'collapsible-up': 'collapsible-up 0.2s ease-in-out',
         'fade-in-down': 'fade-in-down 0.3s ease-out',
-        'bounce-in': 'bounce-in 0.3s',
-        'bounce-out': 'bounce-in 0.3s reverse',
         'fade-in': 'fade-in 0.3s ease-out',
-        'fade-out': 'fade-out 0.3s ease-in',
-        'slide-in': 'slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        'fade-out': 'fade-out 0.3s ease-out',
+        'slide-in': 'slide-in 200ms cubic-bezier(0.23, 1, 0.32, 1)',
         'slide-out': 'slide-out 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         'shake': 'shake 0.5s ease-in-out',
+        'pop': 'pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         'dot-flashing': 'dot-flashing 1s infinite linear alternate',
       }
     }

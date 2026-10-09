@@ -25,7 +25,12 @@
         />
 
         <!-- Messages -->
-        <TransitionGroup tag="div" enter-active-class="animate-slide-in" class="flex flex-col">
+        <TransitionGroup
+          :key="chatStore.currentConversation?.uuid"
+          tag="div"
+          enter-active-class="animate-slide-in"
+          class="flex flex-col"
+        >
           <div
             v-for="{ message, groupWithPrev, groupWithNext } in messageRows"
             :key="message.uuid"
@@ -47,7 +52,7 @@
             <div
               v-else
               :class="[
-                'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-all duration-200',
+                'max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-5 break-words transition-colors duration-200',
                 message.author.type === 'contact' || message.author.type === 'visitor'
                   ? [
                       'text-primary-foreground',
@@ -83,7 +88,7 @@
                 role="button"
                 :aria-expanded="isQuotedTextVisible(message.uuid)"
                 :class="[
-                  'text-xs cursor-pointer px-2 py-1 w-max rounded-md transition-all mt-1',
+                  'text-xs cursor-pointer px-2 py-1 w-max rounded-md transition-colors mt-1',
                   message.author.type === 'contact' || message.author.type === 'visitor'
                     ? 'text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-primary'

@@ -61,7 +61,7 @@
     <button
       v-if="showContent && !isMobile && !sidebarOpen"
       @click="toggleSidebar"
-      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-all duration-200 border shadow-md hover:scale-105 z-50"
+      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-colors duration-200 border shadow-md z-50"
     >
       <ChevronLeft size="16" />
     </button>
@@ -72,8 +72,7 @@
 const DEFAULT_PANEL_SIZES = [70, 30]
 
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import { useStorage, useDocumentVisibility } from '@vueuse/core'
+import { useStorage } from '@vueuse/core'
 import { ChevronLeft } from 'lucide-vue-next'
 import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -89,7 +88,6 @@ const props = defineProps({
 })
 
 const conversationStore = useConversationStore()
-const route = useRoute()
 const emitter = useEmitter()
 const isMobile = useIsMobile()
 const sidebarPanelRef = ref(null)
@@ -148,13 +146,6 @@ onMounted(() => {
   })
 })
 
-const visibility = useDocumentVisibility()
-watch(visibility, (state) => {
-  if (state === 'visible' && props.uuid) {
-    conversationStore.updateAssigneeLastSeen(props.uuid)
-  }
-})
-
 onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE, toggleSidebar)
 })
@@ -164,7 +155,6 @@ const fetchConversation = async (uuid) => {
     conversationStore.fetchConversation(uuid),
     conversationStore.fetchMessages(uuid)
   ])
-  await conversationStore.updateAssigneeLastSeen(uuid)
 }
 
 // Initial fetch
@@ -177,17 +167,7 @@ watch(
   (newUUID, oldUUID) => {
     sheetSidebarOpen.value = false
     if (!newUUID || newUUID === oldUUID) return
-    const canTransition = oldUUID && !route.query.scrollTo && typeof document.startViewTransition === 'function'
-    if (!canTransition) {
-      fetchConversation(newUUID)
-      return
-    }
-    const transition = document.startViewTransition(async () => {
-      fetchConversation(newUUID)
-      await nextTick()
-    })
-    transition.ready.catch(() => {})
-    transition.finished.catch(() => {})
+    fetchConversation(newUUID)
   }
 )
 </script>
