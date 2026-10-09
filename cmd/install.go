@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/colorlog"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/user"
@@ -69,7 +70,16 @@ func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempoten
 
 // setSystemUserPass prompts for pass and sets system user password.
 func setSystemUserPass(ctx context.Context, db *sqlx.DB) {
-	user.ChangeSystemUserPassword(ctx, db)
+	rd := initRedis()
+	defer rd.Close()
+	id, err := user.ChangeSystemUserPassword(ctx, db)
+	if err != nil {
+		log.Fatalf("error changing system user password: %v", err)
+	}
+	if err := auth_.DestroyUserSessions(ctx, rd, id); err != nil {
+		log.Fatalf("error destroying system user sessions: %v", err)
+	}
+	fmt.Println("password updated successfully. Login with email 'System' and the new password.")
 }
 
 // checkSchema verifies if the DB schema is already installed by querying a table.

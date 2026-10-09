@@ -436,11 +436,13 @@ CREATE TABLE media (
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
 	private BOOLEAN NOT NULL DEFAULT true,
+	uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );
 CREATE INDEX index_media_on_model_type_and_model_id ON media(model_type, model_id);
 CREATE INDEX index_media_on_content_id ON media(content_id);
+CREATE INDEX index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
 
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (

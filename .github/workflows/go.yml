@@ -8,7 +8,7 @@ jobs:
 
     services:
       db:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         ports:
           - 5432:5432
         env:

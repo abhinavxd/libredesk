@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +28,12 @@ import (
 	"github.com/zerodha/simplesessions/v3"
 
 	"golang.org/x/oauth2"
+)
+
+const (
+	defaultSessionLifetime = 9 * time.Hour
+	sessionKeyPrefix       = "session:"
+	userSessionKeyPrefix   = "user_sessions:"
 )
 
 // ErrOIDCInvalidClient reports the provider rejecting the client credentials, typically an expired or wrong client secret.
@@ -55,9 +63,6 @@ type Config struct {
 	SecureCookies   bool
 	SessionLifetime time.Duration
 }
-
-// defaultSessionLifetime is used when Config.SessionLifetime is unset or non-positive.
-const defaultSessionLifetime = 9 * time.Hour
 
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
@@ -106,6 +111,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	if lifetime <= 0 {
 		lifetime = defaultSessionLifetime
 	}
+	cfg.SessionLifetime = lifetime
 
 	sess := simplesessions.New(simplesessions.Options{
 		EnableAutoCreate: true,
@@ -120,6 +126,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	})
 
 	st := sessredisstore.New(context.TODO(), rd)
+	st.SetPrefix(sessionKeyPrefix)
 	st.SetTTL(lifetime, false)
 	sess.UseStore(st)
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
@@ -135,17 +142,6 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		rd:           rd,
 		oidcClient:   oidcClient,
 	}, nil
-}
-
-// newOIDCClient builds the HTTP client used for OIDC discovery.
-func newOIDCClient(dialControl ssrf.Control) *http.Client {
-	transport := ssrf.NewTransport(dialControl, 3*time.Second)
-	transport.TLSHandshakeTimeout = 5 * time.Second
-	transport.ResponseHeaderTimeout = 5 * time.Second
-	return &http.Client{
-		Timeout:   10 * time.Second,
-		Transport: transport,
-	}
 }
 
 // TestProvider tests the OIDC provider url by doing a discovery on it.
@@ -188,12 +184,20 @@ func (a *Auth) Reload(cfg Config) error {
 		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
-	a.cfg = cfg
+	a.cfg.Providers = cfg.Providers
 	a.oauthCfgs = oauthCfgs
 	a.verifiers = verifiers
 	a.redirectURLs = redirectURLs
 
 	return nil
+}
+
+func (a *Auth) RemoveProvider(id int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.oauthCfgs, id)
+	delete(a.verifiers, id)
+	delete(a.redirectURLs, id)
 }
 
 // LoginURL returns the login URL for the given provider.
@@ -266,6 +270,10 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
+	if strings.TrimSpace(claims.Email) == "" {
+		a.logger.Error("oidc id_token has no email, check that the provider sends the email claim", "provider_id", providerID)
+		return "", OIDCclaim{}, errors.New("oidc id_token has no email")
+	}
 	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
 	return rawIDTk, claims, nil
 }
@@ -281,8 +289,19 @@ func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
 		return err
 	}
 
-	if err := sess.SetMulti(map[string]interface{}{
+	indexKey := userSessionKeyPrefix + strconv.Itoa(user.ID)
+	p := a.rd.TxPipeline()
+	p.SAdd(r.RequestCtx, indexKey, sess.ID())
+	p.ExpireNX(r.RequestCtx, indexKey, a.cfg.SessionLifetime)
+	p.ExpireGT(r.RequestCtx, indexKey, a.cfg.SessionLifetime)
+	if _, err := p.Exec(r.RequestCtx); err != nil {
+		a.logger.Error("error indexing login session", "user_id", user.ID, "error", err)
+		return err
+	}
+
+	if err := sess.SetMulti(map[string]any{
 		"id":         user.ID,
+		"indexed":    true,
 		"email":      user.Email,
 		"first_name": user.FirstName,
 		"last_name":  user.LastName,
@@ -366,7 +385,7 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 		return models.User{}, err
 	}
 
-	sessVals, err := sess.GetMulti("id", "email", "first_name", "last_name")
+	sessVals, err := sess.GetMulti("id", "email", "first_name", "last_name", "indexed")
 	if err != nil {
 		a.logger.Error("error fetching session variables", "error", err)
 		return models.User{}, err
@@ -378,6 +397,13 @@ func (a *Auth) ValidateSession(r *fastglue.Request) (models.User, error) {
 		firstName, _ = sess.String(sessVals["first_name"], nil)
 		lastName, _  = sess.String(sessVals["last_name"], nil)
 	)
+
+	if userID > 0 {
+		indexed, err := sess.Bool(sessVals["indexed"], nil /** err **/)
+		if err != nil || !indexed {
+			return models.User{}, simplesessions.ErrInvalidSession
+		}
+	}
 
 	return models.User{
 		ID:        userID,
@@ -397,9 +423,30 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 		a.logger.Error("error acquiring session", "error", err)
 		return err
 	}
+	userID, err := sess.Int(sess.Get("id"))
+	if err != nil && !errors.Is(err, simplesessions.ErrNil) && !errors.Is(err, simplesessions.ErrInvalidSession) {
+		return err
+	}
 	if err := sess.Destroy(); err != nil {
 		a.logger.Error("error clearing session", "error", err)
 		return err
+	}
+	if userID > 0 {
+		if err := a.rd.SRem(r.RequestCtx, userSessionKeyPrefix+strconv.Itoa(userID), sess.ID()).Err(); err != nil {
+			a.logger.Error("error removing session index entry", "user_id", userID, "error", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *Auth) DestroyUserSessions(ctx context.Context, userID int) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if err := DestroyUserSessions(ctx, a.rd, userID); err != nil {
+		a.logger.Error("error destroying user sessions", "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, a.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil
 }
@@ -411,6 +458,33 @@ func (a *Auth) resolveRedirectURL(providerID int) (string, error) {
 		return "", fmt.Errorf("no redirect URL resolver for provider: %d", providerID)
 	}
 	return fn()
+}
+
+func DestroyUserSessions(ctx context.Context, rd *redis.Client, userID int) error {
+	indexKey := userSessionKeyPrefix + strconv.Itoa(userID)
+	ids, err := rd.SMembers(ctx, indexKey).Result()
+	if err != nil {
+		return fmt.Errorf("fetching user sessions: %w", err)
+	}
+	keys := make([]string, 0, len(ids)+1)
+	keys = append(keys, indexKey)
+	for _, id := range ids {
+		keys = append(keys, sessionKeyPrefix+id)
+	}
+	if err := rd.Del(ctx, keys...).Err(); err != nil {
+		return fmt.Errorf("destroying user sessions: %w", err)
+	}
+	return nil
+}
+
+func newOIDCClient(dialControl ssrf.Control) *http.Client {
+	transport := ssrf.NewTransport(dialControl, 3*time.Second)
+	transport.TLSHandshakeTimeout = 5 * time.Second
+	transport.ResponseHeaderTimeout = 5 * time.Second
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
+	}
 }
 
 // generateCSRFToken creates a random base64 encoded str.
@@ -437,9 +511,7 @@ func getRequestCookie(name string, r *fastglue.Request) (*fasthttp.Cookie, error
 	return c, nil
 }
 
-// simpleSessGetCookieCB is the simplessesions callback for retrieving the session cookie
-// from a fastglue request.
-func simpleSessGetCookieCB(name string, r interface{}) (*http.Cookie, error) {
+func simpleSessGetCookieCB(name string, r any) (*http.Cookie, error) {
 	req, ok := r.(*fastglue.Request)
 	if !ok {
 		return nil, errors.New("session callback doesn't have fastglue.Request")
@@ -470,9 +542,7 @@ func simpleSessGetCookieCB(name string, r interface{}) (*http.Cookie, error) {
 	}, nil
 }
 
-// simpleSessSetCookieCB is the simplessesions callback for setting the session cookie
-// to a fastglue request.
-func simpleSessSetCookieCB(c *http.Cookie, w interface{}) error {
+func simpleSessSetCookieCB(c *http.Cookie, w any) error {
 	req, ok := w.(*fastglue.Request)
 	if !ok {
 		return errors.New("session callback doesn't have fastglue.Request")

@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -24,7 +25,10 @@ func (m *Manager) BroadcastNewConversation(conv *cmodels.ConversationListItem) {
 
 // BroadcastConvReassignment notifies the union of agents authorized under old and new assignee state, so agents losing access receive the updated payload and their frontend can filter the conv out.
 func (m *Manager) BroadcastConvReassignment(oldConv, newConv *cmodels.ConversationListItem) {
-	m.broadcastConvToAuthorized(newConv, oldConv)
+	allowed := m.broadcastConvToAuthorized(newConv, oldConv)
+	if newConv != nil {
+		m.wsHub.RetainSubscribers(newConv.UUID, allowed)
+	}
 }
 
 func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.ConversationListItem, preview string) {
@@ -153,12 +157,15 @@ func (m *Manager) BroadcastTypingToWidgetClientsOnly(conversationUUID string, is
 	m.broadcastTypingToWidgetClients(conversationUUID, isTyping)
 }
 
-func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationListItem) {
+// broadcastConvToAuthorized returns the connected agents authorized under conv's current assignment.
+func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationListItem) []int {
 	if conv == nil {
-		return
+		return nil
 	}
-	userIDs := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	authorized := m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID)
+	userIDs := authorized
 	if oldConv != nil {
+		userIDs = slices.Clone(authorized)
 		seen := make(map[int]struct{}, len(userIDs))
 		for _, id := range userIDs {
 			seen[id] = struct{}{}
@@ -171,12 +178,21 @@ func (m *Manager) broadcastConvToAuthorized(conv, oldConv *cmodels.ConversationL
 		}
 	}
 	if len(userIDs) == 0 {
-		return
+		return authorized
 	}
 	m.broadcastToUsers(userIDs, wsmodels.Message{
 		Type: wsmodels.MessageTypeNewConversation,
 		Data: convToBroadcast(conv),
 	})
+	return authorized
+}
+
+// retainAuthorizedSubscribers drops live-update subscriptions of agents who can no longer read the conversation.
+func (m *Manager) retainAuthorizedSubscribers(conv *cmodels.ConversationListItem) {
+	if conv == nil {
+		return
+	}
+	m.wsHub.RetainSubscribers(conv.UUID, m.AuthorizedConnectedAgentIDs(conv.AssignedUserID, conv.AssignedTeamID))
 }
 
 // broadcastToUsers broadcasts a message to a list of users, if the list is empty it broadcasts to all users.
