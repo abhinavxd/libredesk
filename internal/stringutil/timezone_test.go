@@ -1,6 +1,7 @@
 package stringutil
 
 import (
+	"runtime"
 	"testing"
 	"time"
 )
@@ -61,6 +62,10 @@ func TestFrontendPickerTimezonesAreValid(t *testing.T) {
 }
 
 func TestNormalizeTimezoneFallsBackToUTC(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("Timezone validation should not be run " +
+			"locally on Darwin because timezones are case-insensitive.")
+	}
 	cases := []string{
 		"",
 		"   ",
