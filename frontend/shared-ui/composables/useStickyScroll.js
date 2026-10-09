@@ -1,9 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
-// Sticks the scroll container to the bottom while the user hasn't scrolled away.
-// Programmatic scroll events are distinguished from user scrolls via a one-shot flag.
-// Apply `overflow-anchor: none` to the scroll container to prevent browser scroll anchoring
-// from firing spurious scroll events during content growth.
 export function useStickyScroll (scrollEl, contentEl, options = {}) {
   const {
     tolerance = 100,
@@ -12,6 +8,7 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
   } = options
 
   const hasUserScrolled = ref(false)
+  let lastScrollTop = 0
   let isProgrammaticScroll = false
   let resizeObserver = null
 
@@ -20,6 +17,7 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
     if (!el) return
     isProgrammaticScroll = true
     el.scrollTop = el.scrollHeight
+    lastScrollTop = el.scrollTop
     requestAnimationFrame(() => { isProgrammaticScroll = false })
   }
 
@@ -28,16 +26,23 @@ export function useStickyScroll (scrollEl, contentEl, options = {}) {
     if (!el) return
     isProgrammaticScroll = true
     el.scrollTop = top
+    lastScrollTop = el.scrollTop
     requestAnimationFrame(() => { isProgrammaticScroll = false })
   }
 
   const handleScroll = () => {
-    if (isProgrammaticScroll) return
     const el = scrollEl.value
     if (!el) return
+    const scrolledUp = el.scrollTop < lastScrollTop
+    lastScrollTop = el.scrollTop
+    if (isProgrammaticScroll) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= tolerance
-    hasUserScrolled.value = !atBottom
-    if (atBottom) onArriveBottom()
+    if (atBottom) {
+      hasUserScrolled.value = false
+      onArriveBottom()
+    } else if (scrolledUp) {
+      hasUserScrolled.value = true
+    }
   }
 
   const onContentResize = () => {

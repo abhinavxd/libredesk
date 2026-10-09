@@ -274,7 +274,7 @@ article.hc-article .hc-meta { color: var(--hc-faint); font-size: .86rem; margin:
 
 /* Related articles */
 .hc-related {
-    max-width: var(--hc-article-width); margin-top: 3rem; padding: 1.1rem 1.25rem;
+    max-width: var(--hc-article-width); margin-top: 3rem; padding: 1.1rem 1.25rem .35rem;
     background: var(--hc-bg);
     border: 1px solid var(--hc-border); border-radius: var(--hc-radius); box-shadow: var(--hc-shadow);
 }
