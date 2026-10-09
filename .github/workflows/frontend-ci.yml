@@ -21,7 +21,7 @@ jobs:
         shard: [1, 2, 3, 4, 5]
     services:
       db:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         ports:
           - 5432:5432
         env:
@@ -34,11 +34,11 @@ jobs:
           --health-timeout=5s
           --health-retries=5
       redis:
-        image: redis
+        image: mirror.gcr.io/library/redis:latest
         ports:
           - 6379:6379
       mailhog:
-        image: mailhog/mailhog
+        image: mirror.gcr.io/mailhog/mailhog:latest
         ports:
           - 1025:1025
           - 8025:8025
