@@ -107,7 +107,7 @@ export class WebSocketClient {
           }
 
           if (this.convStore.isConversationInList(uuid)) {
-            this.convStore.incrementUnread(uuid)
+            this.convStore.incrementUnread(uuid, data.data.created_at)
           }
 
           this.convStore.updateConversationMessage(data.data)

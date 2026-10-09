@@ -3,13 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { useConversationStore } from './conversation'
+import { WebSocketClient } from '@main/websocket'
 
 const { api } = vi.hoisted(() => ({ api: { getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn() } }))
 vi.mock('@main/api', () => ({ default: api }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ currentRoute: ref({ params: { uuid: 'conversation-a' } }) }) }))
 vi.mock('@main/stores/user', () => ({ useUserStore: () => ({ userID: 7, user: {}, can: () => true }) }))
 vi.mock('@main/composables/useEmitter', () => ({ useEmitter: () => ({ emit: vi.fn() }) }))
-vi.mock('@main/websocket', () => ({ subscribeToConversation: vi.fn(), sendTypingIndicator: vi.fn(), subscribeListReplace: vi.fn() }))
+vi.mock('@main/websocket', async importOriginal => ({
+  ...await importOriginal(),
+  subscribeToConversation: vi.fn(),
+  sendTypingIndicator: vi.fn(),
+  subscribeListReplace: vi.fn()
+}))
 vi.mock('@main/i18n', () => ({ getI18n: () => ({ global: { t: key => key } }) }))
 vi.mock('@shared-ui/utils/http.js', () => ({ handleHTTPError: error => error }))
 
@@ -79,5 +85,53 @@ describe('conversation read state', () => {
     expect(store.conversations.data[0].unread_message_count).toBe(2)
     store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: reply.created_at })
     expect(store.conversations.data[0].unread_message_count).toBe(0)
+  })
+
+  it('keeps an acknowledged cached reply read when its broadcasts arrive late', async () => {
+    const store = setup()
+    store.messages.data.addMessage('conversation-a', reply)
+    api.updateAssigneeLastSeen.mockResolvedValueOnce({ data: { data: {
+      conversation_uuid: 'conversation-a', last_seen_at: reply.created_at
+    } } })
+    await store.updateAssigneeLastSeen('conversation-a', reply.uuid)
+    const client = new WebSocketClient()
+    client.socket = {}
+
+    for (const message of [oldMessage, reply, reply]) {
+      client.handleMessage({ target: client.socket, data: JSON.stringify({
+        type: 'new_message', data: { ...message, conversation_uuid: 'conversation-a' }
+      }) })
+    }
+
+    expect(store.conversations.data[0].unread_message_count).toBe(0)
+    expect(api.getConversationMessage).not.toHaveBeenCalled()
+  })
+
+  it('keeps the latest cutoff when read events arrive out of order', () => {
+    const store = setup()
+    store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: reply.created_at })
+    store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: oldMessage.created_at })
+    store.incrementUnread('conversation-a', reply.created_at)
+    expect(store.conversations.data[0].unread_message_count).toBe(0)
+    store.incrementUnread('conversation-a', activity.created_at)
+    expect(store.conversations.data[0].unread_message_count).toBe(1)
+  })
+
+  it('preserves a read event received before the conversation enters the list', () => {
+    const store = setup()
+    const [row] = store.conversations.data
+    store.conversations.data = []
+    store.applyConversationRead({ conversation_uuid: 'conversation-a', last_seen_at: reply.created_at })
+    store.conversations.data = [{ ...row, unread_message_count: 0 }]
+    store.incrementUnread('conversation-a', reply.created_at)
+    expect(store.conversations.data[0].unread_message_count).toBe(0)
+  })
+
+  it('increments unread messages in conversations without a saved cutoff', () => {
+    const store = setup()
+    store.incrementUnread('conversation-a', reply.created_at)
+    expect(store.conversations.data[0].unread_message_count).toBe(3)
+    store.incrementUnread('missing-conversation', reply.created_at)
+    expect(store.conversations.data[0].unread_message_count).toBe(3)
   })
 })

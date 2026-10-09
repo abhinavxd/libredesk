@@ -26,8 +26,14 @@ export const useNotificationStore = defineStore('notification', () => {
   const fetchNotifications = async (limit = 30, offset = 0, append = false) => {
     isLoading.value = true
     try {
-      const response = await api.getNotifications({ limit, offset })
-      const data = response?.data?.data || []
+      const data = []
+      while (data.length < limit) {
+        const pageLimit = Math.min(100, limit - data.length)
+        const response = await api.getNotifications({ limit: pageLimit, offset: offset + data.length })
+        const page = response?.data?.data || []
+        data.push(...page)
+        if (page.length < pageLimit) break
+      }
 
       if (append) {
         notifications.value = [...notifications.value, ...data]
@@ -101,7 +107,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const refreshConversationRead = (uuid) => {
     fetchStats()
     if (notifications.value.some(n => !n.is_read && n.conversation_uuid === uuid)) {
-      fetchNotifications()
+      fetchNotifications(Math.max(30, notifications.value.length))
     }
   }
 

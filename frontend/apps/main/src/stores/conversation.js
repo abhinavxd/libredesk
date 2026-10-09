@@ -38,6 +38,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
 
   const selectedUUIDs = ref(new Set())
+  const readCutoffs = new Map()
 
   const sidebarCounts = reactive({
     assigned: 0,
@@ -390,8 +391,12 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function applyConversationRead ({ conversation_uuid: uuid, last_seen_at: lastSeenAt }) {
     notificationStore.refreshConversationRead(uuid)
+    const cutoff = Date.parse(lastSeenAt)
+    if (cutoff > (readCutoffs.get(uuid) ?? -Infinity)) {
+      readCutoffs.set(uuid, cutoff)
+    }
     const row = conversations.data.find(conv => conv.uuid === uuid)
-    if (row && Date.parse(row.last_message_at) <= Date.parse(lastSeenAt)) {
+    if (row && Date.parse(row.last_message_at) <= readCutoffs.get(uuid)) {
       row.unread_message_count = 0
     }
   }
@@ -408,9 +413,9 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function incrementUnread (uuid) {
+  function incrementUnread (uuid, createdAt) {
     const row = conversations.data.find(c => c.uuid === uuid)
-    if (!row) return
+    if (!row || Date.parse(createdAt) <= readCutoffs.get(uuid)) return
     row.unread_message_count = Math.min((row.unread_message_count || 0) + 1, 10)
   }
 
