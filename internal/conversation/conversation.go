@@ -469,6 +469,61 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 	return id, uuid, nil
 }
 
+// CreateConversationWithMessage creates a conversation and its initial message atomically.
+func (c *Manager) CreateConversationWithMessage(contactID, inboxID int, meta, customAttributes map[string]any, maxConversations int, rateLimitWindow time.Duration, message *models.Message) (int, string, error) {
+	if meta == nil {
+		meta = map[string]any{}
+	}
+	if customAttributes == nil {
+		customAttributes = map[string]any{}
+	}
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		return 0, "", err
+	}
+	customAttrsJSON, err := json.Marshal(customAttributes)
+	if err != nil {
+		return 0, "", err
+	}
+
+	var since time.Time
+	if maxConversations > 0 {
+		since = time.Now().Add(-rateLimitWindow)
+	}
+	tx, err := c.db.Beginx()
+	if err != nil {
+		return 0, "", envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer tx.Rollback()
+
+	var id int
+	var uuid string
+	err = tx.Stmtx(c.q.InsertConversation).QueryRow(contactID, models.StatusOpen, inboxID, "", time.Now(), "", "", false, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.T("globals.messages.tooManyRequests"), nil)
+		}
+		return 0, "", err
+	}
+
+	message.ConversationID = id
+	message.ConversationUUID = uuid
+	inlineUUIDs, err := c.InsertMessageTx(tx, message)
+	if err != nil {
+		return 0, "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, "", envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if item, err := c.GetConversationListItem(uuid); err == nil {
+		c.BroadcastNewConversation(&item)
+	} else {
+		c.lo.Error("error fetching conversation list item for broadcast", "uuid", uuid, "error", err)
+	}
+	c.AfterMessageInsert(message, inlineUUIDs)
+	return id, uuid, nil
+}
+
 // GetConversation retrieves a conversation by its ID or UUID.
 func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversation, error) {
 	var conversation models.Conversation

@@ -132,7 +132,20 @@ const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
 const exchangeJWTForSession = (jwt) => http.post('/api/v1/widget/chat/auth/exchange', { jwt })
 const getAuthMe = () => http.get('/api/v1/widget/chat/auth/me')
-const initChatConversation = (data) => http.post('/api/v1/widget/chat/conversations/init', data)
+const initChatConversation = (data, files = []) => {
+  if (!files.length) return http.post('/api/v1/widget/chat/conversations/init', data)
+
+  const formData = new FormData()
+  Object.entries(data).forEach(([key, value]) => {
+    if (value === undefined || value === null) return
+    formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
+  })
+  files.forEach((file) => formData.append('files', file))
+  return http.post('/api/v1/widget/chat/conversations/init', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000
+  })
+}
 const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const downloadTranscript = (uuid) =>
@@ -147,12 +160,10 @@ const sendChatMessage = (uuid, data) =>
 const submitHandoffForm = (uuid, formData) =>
   http.post(`/api/v1/widget/chat/conversations/${uuid}/handoff-form`, { form_data: formData })
 const closeChatConversation = (uuid) => http.post(`/api/v1/widget/chat/conversations/${uuid}/close`)
-const uploadMedia = (conversationUUID, files) => {
+const uploadMedia = (conversationUUID, file) => {
   const formData = new FormData()
   formData.append('conversation_uuid', conversationUUID)
-  for (let i = 0; i < files.length; i++) {
-    formData.append('files', files[i])
-  }
+  formData.append('files', file)
   return http.post('/api/v1/widget/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 120000
