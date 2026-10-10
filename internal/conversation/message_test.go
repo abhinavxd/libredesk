@@ -742,7 +742,7 @@ func TestInlineArticleReferences(t *testing.T) {
 	for _, part := range []string{
 		"Use JWT.<sup>",
 		"Log out.<sup>",
-		"JWT again.<sup>",
+		"JWT again.</p>",
 		`title="JWT {{name}}"`,
 		">(2)</a></sup>",
 	} {
@@ -750,7 +750,7 @@ func TestInlineArticleReferences(t *testing.T) {
 			t.Errorf("inline references missing %q: %s", part, rendered)
 		}
 	}
-	if strings.Count(rendered, ">(1)</a></sup>") != 2 || strings.Contains(rendered, "ld-cite:") || strings.Contains(rendered, "<ul>") {
+	if strings.Count(rendered, ">(1)</a></sup>") != 1 || strings.Contains(rendered, "ld-cite:") || strings.Contains(rendered, "<ul>") {
 		t.Fatalf("unexpected inline references: %s", rendered)
 	}
 	if got := chatArticleReferencesHTML(content, nil /* references */); got != "<p>Use JWT. Log out. JWT again.</p>" {
@@ -758,6 +758,23 @@ func TestInlineArticleReferences(t *testing.T) {
 	}
 	if got := chatArticleReferencesHTML("<p>Answer.<!--ld-cite:999--></p>", references[:1]); strings.Contains(got, "ld-cite:") || !strings.Contains(got, "</p><p><sup>") {
 		t.Fatalf("missing placement did not produce a numbered footer: %s", got)
+	}
+	for _, tt := range []struct {
+		name    string
+		content string
+		count   int
+	}{
+		{"separate paragraphs", "<p>JWT.<!--ld-cite:12--> More JWT.<!--ld-cite:12--></p><p>JWT again.<!--ld-cite:12--></p>", 2},
+		{"separate list items", "<ul><li>JWT.<!--ld-cite:12--> More JWT.<!--ld-cite:12--></li><li>JWT again.<!--ld-cite:12--></li></ul>", 2},
+		{"inline formatting", "<p><strong>JWT.<!--ld-cite:12--></strong> More JWT.<!--ld-cite:12--></p>", 1},
+		{"line breaks", "<p>JWT.<!--ld-cite:12--><br>More JWT.<!--ld-cite:12--></p>", 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := chatArticleReferencesHTML(tt.content, references[:1])
+			if strings.Count(got, ">(1)</a></sup>") != tt.count || strings.Contains(got, "ld-cite:") {
+				t.Fatalf("unexpected paragraph citations: %s", got)
+			}
+		})
 	}
 	lo := logf.New(logf.Opts{})
 	m := Manager{

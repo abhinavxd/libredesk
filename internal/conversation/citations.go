@@ -10,6 +10,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
+	nethtml "golang.org/x/net/html"
 )
 
 var articleCitationRegexp = regexp.MustCompile(`<!--ld-cite:(\d+)-->`)
@@ -118,15 +119,38 @@ func chatArticleReferencesHTML(content string, references []hcmodels.ArticleRefe
 		byID[reference.ID] = i
 	}
 	used := map[int]bool{}
-	content = articleCitationRegexp.ReplaceAllStringFunc(content, func(marker string) string {
-		id, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "<!--ld-cite:"), "-->"))
-		i, ok := byID[id]
-		if !ok {
-			return ""
+	if articleCitationRegexp.MatchString(content) {
+		paragraph := map[int]bool{}
+		tokens := nethtml.NewTokenizer(strings.NewReader(content))
+		var rendered strings.Builder
+		for {
+			kind := tokens.Next()
+			if kind == nethtml.ErrorToken {
+				break
+			}
+			raw := string(tokens.Raw())
+			if kind == nethtml.StartTagToken || kind == nethtml.EndTagToken {
+				name, _ := tokens.TagName()
+				if string(name) == "p" || string(name) == "li" {
+					clear(paragraph)
+				}
+			}
+			if kind == nethtml.CommentToken {
+				raw = articleCitationRegexp.ReplaceAllStringFunc(raw, func(marker string) string {
+					id, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "<!--ld-cite:"), "-->"))
+					i, ok := byID[id]
+					if !ok || paragraph[id] {
+						return ""
+					}
+					used[id] = true
+					paragraph[id] = true
+					return articleReferenceLinkHTML(references[i], i+1)
+				})
+			}
+			rendered.WriteString(raw)
 		}
-		used[id] = true
-		return articleReferenceLinkHTML(references[i], i+1)
-	})
+		content = rendered.String()
+	}
 	var remaining strings.Builder
 	for i, reference := range references {
 		if !used[reference.ID] {
