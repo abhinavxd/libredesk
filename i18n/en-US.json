@@ -270,7 +270,7 @@
   "admin.helpCenter.help": "Create public help centers where customers browse and search articles. Published articles can also be used by the AI agent to answer conversations.",
   "admin.helpCenter.treeHelp": "Group articles into collections. Drag a row by its handle to change the order readers see.",
   "admin.inbox.aliases.description": "Aliases must forward to this inbox's mailbox, and your SMTP provider must allow sending as each alias.",
-  "admin.inbox.aliases.saveBeforeVerify": "This alias is not saved yet. Save the inbox, then verify sending.",
+  "admin.inbox.aliases.saveBeforeVerify": "Save the inbox first to verify this alias.",
   "admin.inbox.authProtocol": "Authentication Protocol",
   "admin.inbox.authProtocol.description": "Authentication protocol to use.",
   "admin.inbox.authProtocol.login": "Login",
