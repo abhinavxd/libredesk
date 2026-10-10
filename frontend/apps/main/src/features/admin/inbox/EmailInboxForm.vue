@@ -675,7 +675,27 @@
             <div class="grid gap-4 sm:grid-cols-2">
               <FormField v-slot="{ componentField, handleChange, meta }" name="from_name_template">
                 <FormItem>
-                  <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
+                  <div class="flex items-center gap-1">
+                    <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
+                    <Popover>
+                      <PopoverTrigger as-child>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          class="size-7 text-muted-foreground"
+                          :aria-label="$t('globals.terms.help')"
+                        >
+                          <CircleHelp aria-hidden="true" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" class="w-[28rem] max-w-[calc(100vw-2rem)]">
+                        <p class="text-xs leading-relaxed">
+                          {{ $t('admin.inbox.fromNameTemplate.variables') }}
+                        </p>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <FormControl>
                     <Input
                       type="text"
@@ -687,8 +707,6 @@
                   </FormControl>
                   <FormDescription>
                     {{ $t('admin.inbox.fromNameTemplate.description') }}
-                    <br />
-                    {{ $t('admin.inbox.fromNameTemplate.variables') }}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -910,6 +928,7 @@ import {
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
+import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -942,6 +961,7 @@ import {
   Lightbulb,
   Plus,
   Trash2,
+  CircleHelp,
   TriangleAlert
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
