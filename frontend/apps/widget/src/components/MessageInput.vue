@@ -45,7 +45,7 @@
             :fileUploadEnabled="config.features?.file_upload || false"
             :fileUploadDisabled="isAttachmentLimitReached"
             :emojiEnabled="config.features?.emoji || false"
-            :canUploadFiles="!!chatStore.currentConversation?.uuid"
+            :canUploadFiles="!!chatStore.currentConversation?.uuid || !preChatFormEnabled"
             :disabled="isSending"
             @fileUpload="handleFileUpload"
             @emojiSelect="handleEmojiSelect"
@@ -84,6 +84,7 @@ import { useI18n } from 'vue-i18n'
 import MessageInputActions from './MessageInputActions.vue'
 import MessageInputAttachmentPreview from './MessageInputAttachmentPreview.vue'
 import api, { saveSession } from '@widget/api/index.js'
+import { resolvePreChatForm } from '@widget/utils/preChatForm.js'
 
 import { useProactiveStore } from '@widget/store/proactive.js'
 const proactive = useProactiveStore()
@@ -105,6 +106,9 @@ const newMessage = computed({
 let uploadSequence = 0
 const isSending = ref(false)
 const config = computed(() => widgetStore.config)
+const preChatFormEnabled = computed(
+  () => resolvePreChatForm(config.value?.prechat_form, userStore.isVisitor).enabled
+)
 const quickReplies = computed(() => {
   if (chatStore.currentConversation?.uuid) return []
   const audience = userStore.isVisitor ? config.value.visitors : config.value.users
@@ -147,8 +151,11 @@ const { startTyping, stopTyping } = useTypingIndicator((isTyping) => {
   }
 })
 
-const initChatConversation = async (messageText) => {
-  const resp = await api.initChatConversation({ message: messageText, ...proactive.replyPayload() })
+const initChatConversation = async (messageText, files = []) => {
+  const resp = await api.initChatConversation(
+    { message: messageText, ...proactive.replyPayload() },
+    files
+  )
   const {
     conversation,
     session_token,
@@ -262,7 +269,13 @@ const sendMessage = async () => {
   try {
     isSending.value = true
     if (!conversationUUID) {
-      await initChatConversation(messageText)
+      if (attachments.length) {
+        uploadingAttachmentIds.value = new Set(attachments.map((attachment) => attachment.uuid))
+      }
+      await initChatConversation(
+        messageText,
+        attachments.map((attachment) => attachment.file)
+      )
     } else {
       const uploadedAttachments = await uploadStagedAttachments(
         conversationUUID,
@@ -315,9 +328,12 @@ const handleKeydown = (event) => {
 }
 
 const handleFileUpload = (files) => {
-  if (isSending.value || !chatStore.currentConversation?.uuid || !files?.length) return
+  if (isSending.value) return
+  if (!config.value.features?.file_upload) return
+  if (!files?.length) return
+  if (!chatStore.currentConversation?.uuid && preChatFormEnabled.value) return
 
-  const conversationUUID = chatStore.currentConversation.uuid
+  const conversationUUID = chatStore.currentConversation?.uuid || draftKey.value
   const remainingSlots = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedAttachmentCount.value)
   const acceptedFiles = Array.from(files).slice(0, remainingSlots)
   const limitExceeded = files.length > acceptedFiles.length
