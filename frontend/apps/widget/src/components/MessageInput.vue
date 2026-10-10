@@ -315,7 +315,7 @@ const handleKeydown = (event) => {
 }
 
 const handleFileUpload = (files) => {
-  if (!chatStore.currentConversation?.uuid || !files?.length) return
+  if (isSending.value || !chatStore.currentConversation?.uuid || !files?.length) return
 
   const conversationUUID = chatStore.currentConversation.uuid
   const remainingSlots = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedAttachmentCount.value)
