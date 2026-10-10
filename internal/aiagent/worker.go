@@ -35,6 +35,7 @@ const (
 	// can be split off and sent as a separate message.
 	confirmMarker     = "[[confirm]]"
 	suggestionsMarker = "[[suggestions]]"
+	sourcesMarker     = "[[sources]]"
 
 	// typingRefreshInterval must stay under the widget's 5s typing expiry (TYPING_RECEIVE_TIMEOUT).
 	typingRefreshInterval = 3 * time.Second
@@ -285,8 +286,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	m.lo.Debug("ai agent verification state", "conversation_uuid", conv.UUID, "channel", conv.InboxChannel, "contact_type", conv.Contact.Type, "has_email", conv.Contact.Email.String != "", "verified", runVerified)
 
 	outcome := &runOutcome{}
+	var hits []aimodels.SearchResult
 	tools := []ai.Tool{
-		&searchKnowledgeTool{m: m},
+		&searchKnowledgeTool{m: m, citationsEnabled: assistant.CitationsEnabled, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }},
 		&resolveTool{m: m, conv: conv, outcome: outcome},
 	}
 	if assistant.HandoffEnabled {
@@ -351,6 +353,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
+	answer, articleIDs := splitArticleSources(answer, hits, assistant.CitationsEnabled)
 	answer, confirm := splitConfirmation(strings.TrimSpace(answer))
 	answer, answerSuggestions := splitSuggestions(answer)
 	confirm, confirmSuggestions := splitSuggestions(confirm)
@@ -361,7 +364,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
-		if err := m.postReply(conv, assistant, answer, suggestedRepliesMeta(answerSuggestions)); err != nil {
+		if err := m.postReply(conv, assistant, answer, replyMeta(answerSuggestions, articleIDs)); err != nil {
 			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
 			return
 		}
@@ -435,7 +438,9 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 		meta = map[string]any{}
 	}
 	meta["ai_assistant_id"] = assistant.ID
-	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, "" /** sendFrom **/, meta); err != nil {
+	articleIDs, _ := meta["ai_article_ids"].([]int)
+	content := articleCitationHTML(text, articleIDs)
+	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, content, to, nil, nil, "" /** sendFrom **/, meta); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
 		return err
 	}
@@ -545,7 +550,7 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	}
 	history := []aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: message}}
 	var hits []aimodels.SearchResult
-	tools := []ai.Tool{&searchKnowledgeTool{m: m, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }}}
+	tools := []ai.Tool{&searchKnowledgeTool{m: m, citationsEnabled: a.CitationsEnabled, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }}}
 	runCtx, cancel := context.WithTimeout(ctx, livechatRunTimeout)
 	defer cancel()
 	// Preview is search-only: no custom tools (empty allowed set), no built-in, no side effects.
@@ -553,11 +558,32 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 	if err != nil {
 		return "", nil, err
 	}
+	answer, articleIDs := splitArticleSources(answer, hits, a.CitationsEnabled)
 	main, confirm := splitConfirmation(strings.TrimSpace(answer))
 	if confirm != "" {
 		main += "\n\n" + confirm
 	}
-	return main, m.previewSources(hits), nil
+	sources := m.previewSources(hits)
+	references, err := m.convo.GetArticleReferences(articleIDs)
+	if err != nil {
+		m.lo.Error("error loading preview article references", "error", err)
+	}
+	urlByID := make(map[int]string, len(references))
+	for _, reference := range references {
+		urlByID[reference.ID] = reference.URL
+	}
+	for i := range sources {
+		if sources[i].Type == aimodels.SourceHelpArticle {
+			sources[i].URL = urlByID[sources[i].ID]
+		}
+	}
+	var resolvedIDs []int
+	for _, id := range articleIDs {
+		if urlByID[id] != "" {
+			resolvedIDs = append(resolvedIDs, id)
+		}
+	}
+	return numberedCitationText(main, resolvedIDs), sources, nil
 }
 
 // previewSources dedupes search hits by source, keeping each one's best score. Snippets and help

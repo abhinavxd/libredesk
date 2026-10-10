@@ -167,6 +167,9 @@ func buildSystemPrompt(a models.Assistant) string {
 		b.WriteString("\n\nInstructions from the workspace admin (follow these):\n")
 		b.WriteString(instr)
 	}
+	if a.CitationsEnabled {
+		b.WriteString("\n\nCite help center articles from this turn's search results directly after the sentence they support, using [[cite:12]] where 12 is the article_id. Example: You can use JWT authentication.[[cite:12]] You can also log out.[[cite:34]] Cite each article at most once per paragraph or list item. When several sentences use the same article, put one marker after the last supported sentence. Cite only articles you actually used. Never cite snippets or articles from earlier turns, and never invent an article ID or URL. Do not put citation markers inside links, code, [[confirm]] or [[suggestions]]. Omit citations for greetings, clarifying questions, refusals and handoffs. The application replaces each marker with a numbered article link.")
+	}
 	if guard := strings.TrimSpace(a.Guardrails); guard != "" {
 		b.WriteString("\n\nGuardrails (never violate these):\n")
 		b.WriteString(guard)

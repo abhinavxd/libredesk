@@ -786,6 +786,7 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 		CreatedAt:        message.CreatedAt,
 		Content:          message.Content,
 		TextContent:      message.TextContent,
+		ContentType:      message.ContentType,
 		ConversationUUID: message.ConversationUUID,
 		Status:           message.Status,
 		Author:           author,

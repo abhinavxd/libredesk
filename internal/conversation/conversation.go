@@ -29,6 +29,7 @@ import (
 	csatModels "github.com/abhinavxd/libredesk/internal/csat/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
@@ -91,6 +92,10 @@ type notificationDispatcher interface {
 	Send(nmodels.Notification) ([]nmodels.DeliveryResult, error)
 }
 
+type articleReferenceStore interface {
+	GetArticleReferences([]int) ([]hcmodels.ArticleReference, error)
+}
+
 // Manager handles the operations related to conversations
 type Manager struct {
 	q                          queries
@@ -101,6 +106,7 @@ type Manager struct {
 	statusStore                statusStore
 	priorityStore              priorityStore
 	slaStore                   slaStore
+	articleReferenceStore      articleReferenceStore
 	settingsStore              settingsStore
 	csatStore                  csatStore
 	webhookStore               webhookStore
@@ -556,6 +562,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	c.RenderMessagesArticleReferences(messages)
 	previews := make([]models.ChatMessage, 0, len(messages))
 	for _, message := range messages {
 		c.SignAvatarURL(&message.Author.AvatarURL)
@@ -574,6 +581,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 			CreatedAt:        message.CreatedAt,
 			Content:          message.Content,
 			TextContent:      message.TextContent,
+			ContentType:      message.ContentType,
 			Author:           author,
 			Attachments:      message.Attachments,
 			Meta:             message.Meta,
@@ -2201,6 +2209,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 		m.ProcessCSATStatus(messages)
 
 		// Generate signed URLs for all attachments.
+		m.RenderMessagesArticleReferences(messages)
 		chatMessages := make([]models.ChatMessage, 0, len(messages))
 		for _, msg := range messages {
 			m.SignAvatarURL(&msg.Author.AvatarURL)
@@ -2222,6 +2231,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 				CreatedAt:        msg.CreatedAt,
 				Content:          msg.Content,
 				TextContent:      msg.TextContent,
+				ContentType:      msg.ContentType,
 				ConversationUUID: msg.ConversationUUID,
 				Meta:             msg.Meta,
 				Author:           author,

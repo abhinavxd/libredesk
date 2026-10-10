@@ -7,6 +7,9 @@ import (
 )
 
 func V2_9_0_RC9(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+	if _, err := db.Exec(`ALTER TABLE ai_assistants ADD COLUMN IF NOT EXISTS citations_enabled BOOLEAN NOT NULL DEFAULT false;`); err != nil {
+		return err
+	}
 	if _, err := db.Exec(`
 		ALTER TABLE media ADD COLUMN IF NOT EXISTS uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL;
 		CREATE INDEX IF NOT EXISTS index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
