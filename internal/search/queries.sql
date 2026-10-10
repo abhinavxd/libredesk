@@ -122,5 +122,6 @@ SELECT
 FROM users
 WHERE type = 'contact'
 AND deleted_at IS NULL
-AND (email ILIKE $1 ESCAPE '\' OR phone_number ILIKE $1 ESCAPE '\')
+AND (email ILIKE $1 ESCAPE '\' OR phone_number ILIKE $1 ESCAPE '\'
+     OR CONCAT(first_name, ' ', COALESCE(last_name, '')) ILIKE $1 ESCAPE '\')
 LIMIT $2;
