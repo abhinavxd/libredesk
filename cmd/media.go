@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -190,6 +191,79 @@ func handleMediaUploadWithMeta(r *fastglue.Request, extraMeta map[string]any) er
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(media)
+}
+
+func uploadWidgetInitMedia(r *fastglue.Request, fileHeader *multipart.FileHeader, contactID int) (mmodels.Media, error) {
+	app := r.Context.(*App)
+	file, err := fileHeader.Open()
+	if err != nil {
+		return mmodels.Media{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	defer file.Close()
+
+	filename := stringutil.SanitizeFilename(fileHeader.Filename)
+	contentType := fileHeader.Header.Get("Content-Type")
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filename)), ".")
+	if fileHeader.Size == 0 {
+		return mmodels.Media{}, envelope.NewError(envelope.InputError, app.i18n.T("media.fileEmpty"), nil)
+	}
+	consts := app.consts.Load().(*constants)
+	if bytesToMegabytes(fileHeader.Size) > float64(consts.MaxFileUploadSizeMB) {
+		return mmodels.Media{}, envelope.NewErrorWithCode(envelope.GeneralError, fasthttp.StatusRequestEntityTooLarge, app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)), nil)
+	}
+	if !slices.Contains(consts.AllowedUploadFileExtensions, ext) && !slices.Contains(consts.AllowedUploadFileExtensions, "*") {
+		return mmodels.Media{}, envelope.NewError(envelope.InputError, app.i18n.T("media.fileTypeNotAllowed"), nil)
+	}
+
+	fileUUID := uuid.New().String()
+	thumbnailName := image.ThumbPrefix + fileUUID
+	cleanUp := false
+	defer func() {
+		if cleanUp {
+			_ = app.media.Delete(fileUUID)
+			_ = app.media.Delete(thumbnailName)
+		}
+	}()
+
+	meta := []byte(`{"widget_contact_id":` + fmt.Sprint(contactID) + `}`)
+	if slices.Contains(image.Exts, ext) && image.IsImageByContent(file) {
+		prepared, prepErr := prepareImageUpload(file)
+		if prepErr == nil {
+			if prepared.thumbnailErr == nil {
+				if _, _, err := app.media.Upload(thumbnailName, contentType, prepared.thumbnail); err != nil {
+					cleanUp = true
+					return mmodels.Media{}, err
+				}
+			}
+			meta = prepared.meta
+			var values map[string]any
+			if err := json.Unmarshal(meta, &values); err != nil {
+				cleanUp = true
+				return mmodels.Media{}, err
+			}
+			values["widget_contact_id"] = contactID
+			meta, err = json.Marshal(values)
+			if err != nil {
+				cleanUp = true
+				return mmodels.Media{}, err
+			}
+		}
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return mmodels.Media{}, err
+	}
+	_, contentType, err = app.media.Upload(fileUUID, contentType, file)
+	if err != nil {
+		cleanUp = true
+		return mmodels.Media{}, err
+	}
+	media, err := app.media.Insert(null.StringFrom(attachment.DispositionAttachment), filename, contentType, "", null.StringFrom(mmodels.ModelMessages), fileUUID, null.Int{}, int(fileHeader.Size), meta, true, null.IntFrom(contactID))
+	if err != nil {
+		cleanUp = true
+		return mmodels.Media{}, err
+	}
+	cleanUp = false
+	return media, nil
 }
 
 // handleServeMedia serves uploaded media.

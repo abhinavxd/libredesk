@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"mime/multipart"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -26,6 +28,7 @@ import (
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	realip "github.com/ferluci/fast-realip"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -83,10 +86,42 @@ type customAttributeWidget struct {
 }
 
 type chatInitReq struct {
-	DeliveryID string         `json:"delivery_id"`
-	BrowserKey string         `json:"browser_key"`
-	Message    string         `json:"message"`
-	FormData   map[string]any `json:"form_data"`
+	DeliveryID  string         `json:"delivery_id"`
+	BrowserKey  string         `json:"browser_key"`
+	Message     string         `json:"message"`
+	Attachments []string       `json:"attachments"`
+	FormData    map[string]any `json:"form_data"`
+}
+
+func decodeChatInitRequest(r *fastglue.Request) (chatInitReq, []*multipart.FileHeader, error) {
+	var req chatInitReq
+	if !strings.HasPrefix(string(r.RequestCtx.Request.Header.ContentType()), "multipart/form-data") {
+		return req, nil, r.Decode(&req, "json")
+	}
+	form, err := r.RequestCtx.MultipartForm()
+	if err != nil {
+		return req, nil, err
+	}
+	if values := form.Value["message"]; len(values) > 0 {
+		req.Message = values[0]
+	}
+	if values := form.Value["delivery_id"]; len(values) > 0 {
+		req.DeliveryID = values[0]
+	}
+	if values := form.Value["browser_key"]; len(values) > 0 {
+		req.BrowserKey = values[0]
+	}
+	req.Attachments = form.Value["attachments"]
+	if values := form.Value["form_data"]; len(values) > 0 && values[0] != "" {
+		if err := json.Unmarshal([]byte(values[0]), &req.FormData); err != nil {
+			return req, nil, err
+		}
+	}
+	return req, form.File["files"], nil
+}
+
+func validChatInitMessage(message string, attachmentCount int, preChatFormEnabled bool) bool {
+	return strings.TrimSpace(message) != "" || (attachmentCount > 0 && !preChatFormEnabled)
 }
 
 type handoffFormReq struct {
@@ -194,16 +229,14 @@ func handleChatInit(r *fastglue.Request) error {
 		visitor           umodels.User
 	)
 
-	if err := r.Decode(&req, "json"); err != nil {
+	files, err := []*multipart.FileHeader(nil), error(nil)
+	req, files, err = decodeChatInitRequest(r)
+	if err != nil {
 		app.lo.Error("error unmarshalling chat init request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
-
-	if req.Message == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
-	}
-	if len(req.Message) > maxChatMessageLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
+	if len(req.Attachments)+len(files) > maxWidgetMessageAttachments {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, fmt.Sprintf("A message can contain at most %d attachments.", maxWidgetMessageAttachments), nil, envelope.InputError)
 	}
 
 	inbox, err := getWidgetInbox(r)
@@ -217,9 +250,22 @@ func handleChatInit(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	initialConfig := resolveInitialChatConfig(config, getWidgetIsVisitor(r))
+	attachmentCount := len(req.Attachments) + len(files)
+	if attachmentCount > 0 && !config.Features.FileUpload {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledFileUpload"), nil, envelope.InputError)
+	}
+	if attachmentCount > 0 && initialConfig.PreChatForm.Enabled {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if !validChatInitMessage(req.Message, attachmentCount, initialConfig.PreChatForm.Enabled) {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
+	}
+	if len(req.Message) > maxChatMessageLength {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
+	}
 
 	if req.DeliveryID != "" {
-		return handleWidgetCampaignReply(r, req, inbox, initialConfig)
+		return handleWidgetCampaignReply(r, req, files, inbox, initialConfig)
 	}
 
 	// Check if user is already authenticated (has session token).
@@ -245,6 +291,33 @@ func handleChatInit(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
+	media, err := getWidgetMessageMediaByUUIDs(app, req.Attachments, contactID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	var uploadedMedia []mmodels.Media
+	cleanupUploadedMedia := true
+	defer func() {
+		if cleanupUploadedMedia {
+			for _, item := range uploadedMedia {
+				if err := app.media.Delete(item.UUID); err != nil {
+					app.lo.Error("error cleaning up failed widget init attachment", "media_uuid", item.UUID, "error", err)
+				}
+				if err := app.media.Delete(image.ThumbPrefix + item.UUID); err != nil {
+					app.lo.Error("error cleaning up failed widget init attachment thumbnail", "media_uuid", item.UUID, "error", err)
+				}
+			}
+		}
+	}()
+	for _, file := range files {
+		item, err := uploadWidgetInitMedia(r, file, contactID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		uploadedMedia = append(uploadedMedia, item)
+	}
+	media = append(media, uploadedMedia...)
+
 	app.lo.Info("creating new live chat conversation for user", "user_id", contactID, "inbox_id", inbox.ID, "is_visitor", isVisitor)
 
 	// Create conversation and insert message.
@@ -252,44 +325,65 @@ func handleChatInit(r *fastglue.Request) error {
 		"ip":         clientIP,
 		"user_agent": userAgent,
 	}
-	_, conversationUUID, err := app.conversation.CreateConversation(
-		contactID,
-		inbox.ID,
-		"",
-		time.Now(),
-		"",
-		false,
-		meta,
-		conversationAttrs,
-		maxChatConversationsPerContact,
-		chatConversationRateLimitWindow,
-	)
-	if err != nil {
-		if envErr, ok := err.(envelope.Error); ok && envErr.ErrorType == envelope.RateLimitError {
-			return sendErrorEnvelope(r, err)
-		}
-		app.lo.Error("error creating conversation", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
-	}
-
 	message := cmodels.Message{
-		ConversationUUID: conversationUUID,
-		SenderID:         contactID,
-		Type:             cmodels.MessageIncoming,
-		SenderType:       cmodels.SenderTypeContact,
-		Status:           cmodels.MessageStatusReceived,
-		Content:          req.Message,
-		ContentType:      cmodels.ContentTypeText,
-		Private:          false,
+		SenderID:    contactID,
+		Type:        cmodels.MessageIncoming,
+		SenderType:  cmodels.SenderTypeContact,
+		Status:      cmodels.MessageStatusReceived,
+		Content:     req.Message,
+		ContentType: cmodels.ContentTypeText,
+		Private:     false,
+		Media:       media,
 	}
-	if err := app.conversation.InsertMessage(&message); err != nil {
-		// Clean up conversation if message insert fails.
-		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
-			app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
+	var conversationUUID string
+	if len(media) > 0 {
+		message.UploadUserID = contactID
+		_, conversationUUID, err = app.conversation.CreateConversationWithMessage(
+			contactID,
+			inbox.ID,
+			meta,
+			conversationAttrs,
+			maxChatConversationsPerContact,
+			chatConversationRateLimitWindow,
+			&message,
+		)
+		if err != nil {
+			if envErr, ok := err.(envelope.Error); ok && envErr.ErrorType == envelope.RateLimitError {
+				return sendErrorEnvelope(r, err)
+			}
+			app.lo.Error("error creating conversation with initial message", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
 		}
-		app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		cleanupUploadedMedia = false
+	} else {
+		_, conversationUUID, err = app.conversation.CreateConversation(
+			contactID,
+			inbox.ID,
+			"",
+			time.Now(),
+			"",
+			false,
+			meta,
+			conversationAttrs,
+			maxChatConversationsPerContact,
+			chatConversationRateLimitWindow,
+		)
+		if err != nil {
+			if envErr, ok := err.(envelope.Error); ok && envErr.ErrorType == envelope.RateLimitError {
+				return sendErrorEnvelope(r, err)
+			}
+			app.lo.Error("error creating conversation", "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		}
+		message.ConversationUUID = conversationUUID
+		if err := app.conversation.InsertMessage(&message); err != nil {
+			if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
+				app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
+				return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+			}
+			app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		}
 	}
 
 	// Process post-message hooks for the new conversation and initial message.
@@ -726,6 +820,34 @@ func getWidgetMessageMedia(app *App, ids []int, contactID int) ([]mmodels.Media,
 		if item.Model.String != mmodels.ModelMessages || item.ModelID.Int > 0 || json.Unmarshal(item.Meta, &meta) != nil || meta.ContactID != contactID {
 			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 		}
+	}
+	return media, nil
+}
+
+func getWidgetMessageMediaByUUIDs(app *App, uuids []string, contactID int) ([]mmodels.Media, error) {
+	media := make([]mmodels.Media, 0, len(uuids))
+	seen := make(map[string]struct{}, len(uuids))
+	for _, value := range uuids {
+		parsed, err := uuid.Parse(value)
+		if err != nil {
+			return nil, envelope.NewError(envelope.NotFoundError, app.i18n.T("validation.notFoundMedia"), nil)
+		}
+		mediaUUID := parsed.String()
+		if _, ok := seen[mediaUUID]; ok {
+			continue
+		}
+		seen[mediaUUID] = struct{}{}
+		item, err := app.media.Get(0, mediaUUID)
+		if err != nil {
+			return nil, err
+		}
+		var meta struct {
+			ContactID int `json:"widget_contact_id"`
+		}
+		if item.Model.String != mmodels.ModelMessages || item.ModelID.Int > 0 || !item.UploadedByUser(contactID) || json.Unmarshal(item.Meta, &meta) != nil || meta.ContactID != contactID {
+			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+		}
+		media = append(media, item)
 	}
 	return media, nil
 }

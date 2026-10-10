@@ -55,6 +55,54 @@ func TestHandleWidgetMediaUploadRejectsMissingConversation(t *testing.T) {
 	}
 }
 
+func TestValidChatInitMessage(t *testing.T) {
+	tests := []struct {
+		name               string
+		message            string
+		attachments        int
+		preChatFormEnabled bool
+		want               bool
+	}{
+		{name: "attachment-only init", attachments: 1, want: true},
+		{name: "empty init", want: false},
+		{name: "empty init with pre-chat form", attachments: 1, preChatFormEnabled: true, want: false},
+		{name: "text-only init with pre-chat form", message: "hello", preChatFormEnabled: true, want: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := validChatInitMessage(tc.message, tc.attachments, tc.preChatFormEnabled); got != tc.want {
+				t.Fatalf("validChatInitMessage() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDecodeChatInitRequestWithAttachmentOnlyMultipart(t *testing.T) {
+	var body bytes.Buffer
+	form := multipart.NewWriter(&body)
+	file, err := form.CreateFormFile("files", "attachment.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := file.Write([]byte("attachment")); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req := &fastglue.Request{RequestCtx: &fasthttp.RequestCtx{}}
+	req.RequestCtx.Request.Header.SetContentType(form.FormDataContentType())
+	req.RequestCtx.Request.SetBody(body.Bytes())
+	decoded, files, err := decodeChatInitRequest(req)
+	if err != nil {
+		t.Fatalf("decodeChatInitRequest returned error: %v", err)
+	}
+	if decoded.Message != "" || len(files) != 1 || !validChatInitMessage(decoded.Message, len(files), false) {
+		t.Fatalf("decoded attachment-only init = (%q, %d files), want empty message with one allowed file", decoded.Message, len(files))
+	}
+}
+
 func TestIsFormFieldValuePresent(t *testing.T) {
 	tests := []struct {
 		name  string
