@@ -421,6 +421,7 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
+const verifyInboxAlias = (id, data) => http.post(`/api/v1/inboxes/${id}/aliases/verify`, data)
 
 const getWhatsAppTemplates = (inboxId) =>
   http.get('/api/v1/whatsapp/templates', { params: { inbox_id: inboxId } })
@@ -750,6 +751,7 @@ export default {
   updateInbox,
   deleteInbox,
   toggleInbox,
+  verifyInboxAlias,
   getWhatsAppTemplates,
   getWhatsAppTemplate,
   updateWhatsAppTemplate,

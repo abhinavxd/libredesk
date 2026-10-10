@@ -24,6 +24,7 @@ type messageReq struct {
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
 	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
+	SendFrom    string                 `json:"send_from"`
 
 	// WhatsApp-only. Set TemplateID to send an approved template. Omit for free-form.
 	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
@@ -283,7 +284,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	if len(req.WhatsAppTemplateParams) > 0 {
 		meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 	}
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, req.SendFrom, meta)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

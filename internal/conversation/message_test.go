@@ -3,10 +3,23 @@ package conversation
 import (
 	"strings"
 	"testing"
+
+	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 )
 
 const testUUID = "d0355103-455f-4c7d-b9c7-86e9254fe119"
 const testUUID2 = "edb7be78-ef7d-4fe9-888b-22494f0ce076"
+
+type fromTestInbox struct {
+	inbox.EmailInbox
+	from    string
+	primary string
+}
+
+func (f fromTestInbox) FromAddress() string      { return f.from }
+func (f fromTestInbox) PrimaryAddress() string   { return f.primary }
+func (f fromTestInbox) FromNameTemplate() string { return "" }
 
 func TestImgSrcUploadsPattern(t *testing.T) {
 	tests := []struct {
@@ -594,4 +607,26 @@ func TestRewriteInlineImagesToCID(t *testing.T) {
 			t.Errorf("expected 0 URL-form UUIDs after rewrite, got %v", leftover)
 		}
 	})
+}
+
+func TestEmailFromAddress(t *testing.T) {
+	tests := []struct {
+		name   string
+		from   string
+		sender string
+		want   string
+	}{
+		{"primary keeps inbox from", "Acme Support <support@acme.com>", "support@acme.com", "Acme Support <support@acme.com>"},
+		{"alias takes inbox name", "Acme Support <support@acme.com>", "billing@acme.com", `"Acme Support" <billing@acme.com>`},
+		{"alias without inbox name", "support@acme.com", "billing@acme.com", "billing@acme.com"},
+	}
+	m := &Manager{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inb := fromTestInbox{from: tt.from, primary: "support@acme.com"}
+			if got := m.emailFromAddress(inb, models.Message{SenderType: models.SenderTypeContact}, tt.sender); got != tt.want {
+				t.Errorf("emailFromAddress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
 }

@@ -2,6 +2,7 @@ package models
 
 import (
 	"crypto/tls"
+	"database/sql/driver"
 	"encoding/json"
 	"net/smtp"
 	"strings"
@@ -17,6 +18,14 @@ const (
 	AuthTypeOAuth2   = "oauth2"
 )
 
+// Alias send verification states.
+const (
+	AliasVerificationNotVerified = "not_verified"
+	AliasVerificationPending     = "pending"
+	AliasVerificationVerified    = "verified"
+	AliasVerificationFailed      = "failed"
+)
+
 // Inbox represents a inbox record in DB.
 type Inbox struct {
 	ID                 int             `db:"id" json:"id"`
@@ -24,12 +33,14 @@ type Inbox struct {
 	CreatedAt          time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time       `db:"updated_at" json:"updated_at"`
 	Name               string          `db:"name" json:"name"`
+	DeletedAt          *time.Time      `db:"deleted_at" json:"-"`
 	Channel            string          `db:"channel" json:"channel"`
 	Enabled            bool            `db:"enabled" json:"enabled"`
 	CSATEnabled        bool            `db:"csat_enabled" json:"csat_enabled"`
 	PromptTagsOnReply  bool            `db:"prompt_tags_on_reply" json:"prompt_tags_on_reply"`
 	ReopenWindowHours  int             `db:"reopen_window_hours" json:"reopen_window_hours"`
 	From               string          `db:"from" json:"from"`
+	Aliases            EmailAliases    `db:"aliases" json:"aliases"`
 	FromNameTemplate   string          `db:"from_name_template" json:"from_name_template"`
 	Config             json.RawMessage `db:"config" json:"config"`
 	Secret             null.String     `db:"secret" json:"secret"`
@@ -38,6 +49,37 @@ type Inbox struct {
 	WebhookURL string `db:"-" json:"webhook_url,omitempty"`
 	// Computed, not persisted. True when Meta recently rejected this inbox's access token.
 	TokenInvalid bool `db:"-" json:"token_invalid,omitempty"`
+}
+
+// EmailAlias is an owned non-primary inbox address.
+type EmailAlias struct {
+	Email              string     `json:"email"`
+	VerificationStatus string     `json:"verification_status"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
+}
+
+type EmailAliases []EmailAlias
+
+func (a *EmailAliases) Scan(value any) error {
+	if value == nil {
+		*a = EmailAliases{}
+		return nil
+	}
+	var data []byte
+	switch v := value.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return nil
+	}
+	return json.Unmarshal(data, a)
+}
+
+func (a EmailAliases) Value() (driver.Value, error) {
+	data, err := json.Marshal(a)
+	return data, err
 }
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.

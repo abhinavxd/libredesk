@@ -384,6 +384,7 @@ type queries struct {
 	GetContactUnreadPreviewMessages    *sqlx.Stmt `query:"get-contact-unread-preview-messages"`
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
+	GetEmailSenderMessage              *sqlx.Stmt `query:"get-email-sender-message"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
@@ -1298,9 +1299,17 @@ func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUU
 	if inb.Channel() != inbox.ChannelEmail {
 		return fmt.Errorf("cannot send email through non-email inbox %d", inboxID)
 	}
+	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		return fmt.Errorf("fetching inbox sender addresses: %w", err)
+	}
+	sender, err := m.resolveSendFrom(conversationUUID, inboxRecord, "" /* requested */)
+	if err != nil {
+		return err
+	}
 	references, inReplyTo := m.BuildEmailThreadingHeaders(conversationID, "")
 	return inb.Send(models.OutboundMessage{
-		From:             inb.FromAddress(),
+		From:             m.emailFromAddress(inb, models.Message{}, sender),
 		To:               to,
 		Subject:          subject,
 		Content:          htmlContent,
@@ -1658,6 +1667,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			to,
 			nil,
 			nil,
+			"", /** sendFrom **/
 			map[string]any{"is_automated": true},
 		)
 		if err != nil {
@@ -1951,7 +1961,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		message = m.i18n.T("globals.messages.pleaseRateConversation")
 	}
 
-	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, meta); err != nil {
+	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, "" /** sendFrom **/, meta); err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

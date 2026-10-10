@@ -1,0 +1,22 @@
+export function extractEmailAddress (value) {
+  return (value?.match(/<([^>]+)>/)?.[1] || value || '').trim()
+}
+
+export function sendableAddresses (from, aliases) {
+  return [
+    extractEmailAddress(from),
+    ...(aliases || []).filter(alias =>
+      alias.verification_status === 'verified' || alias.verified_at
+    ).map(alias => alias.email)
+  ].filter(Boolean).map(address => address.toLowerCase())
+}
+
+export function resolveEmailSender (message, ownedAddresses) {
+  const owned = (ownedAddresses || [])
+  const ownedSet = new Set(owned.map(address => address.toLowerCase()))
+  const candidate = message?.type === 'incoming'
+    ? message?.meta?.inbox_address
+    : message?.meta?.send_from
+  if (candidate && ownedSet.has(candidate.toLowerCase())) return candidate.toLowerCase()
+  return owned[0] || ''
+}

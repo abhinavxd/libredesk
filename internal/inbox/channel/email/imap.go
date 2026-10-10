@@ -11,6 +11,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/emersion/go-imap/v2"
@@ -20,9 +21,13 @@ import (
 )
 
 const (
-	defaultReadInterval   = time.Duration(5 * time.Minute)
-	defaultScanInboxSince = time.Duration(48 * time.Hour)
+	defaultReadInterval      = time.Duration(5 * time.Minute)
+	defaultScanInboxSince    = time.Duration(48 * time.Hour)
+	aliasVerificationTimeout = 10 * time.Minute
 )
+
+// Direct recipient headers come first, then the headers MTAs add when forwarding.
+var recipientHeaders = []string{"To", "Cc", "Bcc", "X-Original-To", "Original-Recipient", "Envelope-To", "X-Envelope-To", "Delivered-To"}
 
 // Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
 var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
@@ -117,12 +122,13 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	}
 	e.clearAuthError()
 
-	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: true}).Wait(); err != nil {
+	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: false}).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox: %w", err)
 	}
 
 	// Scan emails since the specified duration.
-	since := time.Now().Add(-scanInboxSince)
+	scanStarted := time.Now()
+	since := scanStarted.Add(-scanInboxSince)
 
 	e.lo.Info("searching emails", "since", since, "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
 
@@ -132,14 +138,18 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("error searching messages: %w", err)
 	}
 
-	return e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
+	if err := e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier()); err != nil {
+		return err
+	}
+	return e.expireAliasVerifications(ctx, scanStarted.Add(-aliasVerificationTimeout))
 }
 
 // searchMessages searches for messages in the specified time range.
 // Uses ESEARCH if supported by the server, otherwise falls back to standard SEARCH.
 func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*imap.SearchData, error) {
 	criteria := &imap.SearchCriteria{
-		Since: since,
+		Since:   since,
+		NotFlag: []imap.Flag{imap.FlagDeleted},
 	}
 
 	// Attempt ESEARCH if server supports it
@@ -165,11 +175,8 @@ func (e *Email) searchMessages(client *imapclient.Client, since time.Time) (*ima
 // fetchAndProcessMessages fetches and processes messages based on the search results.
 func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.Client, searchResults *imap.SearchData, inboxID int) error {
 	seqSet := imap.SeqSet{}
-	if searchResults.Min > 0 && searchResults.Max > 0 {
-		e.lo.Debug("using ESEARCH range", "min", searchResults.Min, "max", searchResults.Max, "inbox_id", inboxID)
-		seqSet.AddRange(searchResults.Min, searchResults.Max)
-	} else if seqNums := searchResults.AllSeqNums(); len(seqNums) > 0 {
-		e.lo.Debug("using SEARCH fallback (no ESEARCH support)", "count", len(seqNums), "inbox_id", inboxID)
+	if seqNums := searchResults.AllSeqNums(); len(seqNums) > 0 {
+		e.lo.Debug("using SEARCH results", "count", len(seqNums), "inbox_id", inboxID)
 		seqSet.AddNum(seqNums...)
 	} else {
 		// No results found
@@ -180,6 +187,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 	// Fetch envelope and headers needed for auto-reply detection.
 	fetchOptions := &imap.FetchOptions{
 		Envelope: true,
+		UID:      true,
 		BodySection: []*imap.FetchItemBodySection{
 			{
 				Specifier: imap.PartSpecifierHeader,
@@ -187,8 +195,10 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 					headerAutoSubmitted,
 					headerAutoreply,
 					headerLibredeskLoopPrevention,
+					headerAliasVerification,
 					headerMessageID,
 				},
+				Peek: true,
 			},
 		},
 	}
@@ -199,19 +209,16 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 		seqNum             uint32
 		autoReply          bool
 		isLoop             bool
+		verificationToken  string
+		ownVerification    bool
+		uid                imap.UID
 		extractedMessageID string
 	}
 	var messages []msgData
 
 	fetchCmd := client.Fetch(seqSet, fetchOptions)
 
-	// Extract the inbox email address.
-	inboxEmail, err := stringutil.ExtractEmail(e.FromAddress())
-	if err != nil {
-		e.lo.Error("failed to extract email address from the 'From' header", "error", err)
-		return fmt.Errorf("failed to extract email address from 'From' header: %w", err)
-	}
-	if inboxEmail == "" {
+	if e.PrimaryAddress() == "" {
 		e.lo.Error("inbox email address is empty, cannot process messages", "inbox_id", e.Identifier())
 		return fmt.Errorf("inbox (%d) email address is empty, cannot process messages", e.Identifier())
 	}
@@ -234,6 +241,9 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			env                *imap.Envelope
 			autoReply          bool
 			isLoop             bool
+			verificationToken  string
+			ownVerification    bool
+			uid                imap.UID
 			extractedMessageID string
 		)
 		// Process all fetch items for the current message.
@@ -262,9 +272,11 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 				if isAutoReply(envelope) {
 					autoReply = true
 				}
-				if isLoopMessage(envelope, inboxEmail) {
+				if e.isLoopMessage(envelope) {
 					isLoop = true
 				}
+				verificationToken = strings.TrimSpace(envelope.GetHeader(headerAliasVerification))
+				ownVerification = strings.EqualFold(strings.TrimSpace(envelope.GetHeader(headerLibredeskLoopPrevention)), e.uuid)
 
 				// Extract Message-Id from raw headers as fallback for problematic Message IDs
 				extractedMessageID = extractMessageIDFromHeaders(envelope)
@@ -274,6 +286,9 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			if ed, ok := item.(imapclient.FetchItemDataEnvelope); ok {
 				env = ed.Envelope
 			}
+			if uidData, ok := item.(imapclient.FetchItemDataUID); ok {
+				uid = uidData.UID
+			}
 		}
 
 		// Skip if we couldn't get the envelope.
@@ -282,16 +297,30 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			continue
 		}
 
-		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, autoReply: autoReply, isLoop: isLoop, extractedMessageID: extractedMessageID})
+		messages = append(messages, msgData{env: env, seqNum: msg.SeqNum, uid: uid, autoReply: autoReply, isLoop: isLoop, verificationToken: verificationToken, ownVerification: ownVerification, extractedMessageID: extractedMessageID})
 	}
 
 	// Now process each collected message.
+	var verificationUIDs []imap.UID
 	for _, msgData := range messages {
 		// Check for context cancellation before processing each message.
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
+		}
+
+		// Verification mail carries its sender inbox's loop header. Other inboxes polling the same mailbox leave it for that inbox.
+		if msgData.verificationToken != "" {
+			if !msgData.ownVerification {
+				continue
+			}
+			if err := e.processAliasVerification(ctx, msgData.env, msgData.verificationToken); err != nil {
+				e.lo.Error("error processing alias verification", "error", err, "inbox_id", inboxID)
+				continue
+			}
+			verificationUIDs = append(verificationUIDs, msgData.uid)
+			continue
 		}
 
 		// Skip if this is an auto-reply message.
@@ -305,10 +334,20 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 			e.lo.Info("skipping message with loop prevention header", "subject", msgData.env.Subject, "message_id", msgData.env.MessageID)
 			continue
 		}
-
 		// Process the envelope.
 		if err := e.processEnvelope(ctx, client, msgData.env, msgData.seqNum, inboxID, msgData.extractedMessageID); err != nil && err != context.Canceled {
 			e.lo.Error("error processing envelope", "error", err)
+		}
+	}
+	if len(verificationUIDs) > 0 {
+		uidSet := imap.UIDSet{}
+		uidSet.AddNum(verificationUIDs...)
+		if err := client.Store(uidSet, &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagDeleted}}, nil).Close(); err != nil {
+			e.lo.Error("error deleting alias verification messages", "error", err, "inbox_id", inboxID)
+		} else if client.Caps().Has(imap.CapUIDPlus) {
+			if err := client.UIDExpunge(uidSet).Close(); err != nil {
+				e.lo.Error("error expunging alias verification messages", "error", err, "inbox_id", inboxID)
+			}
 		}
 	}
 
@@ -415,7 +454,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	// Fetch full message body.
 	fetchOptions := &imap.FetchOptions{
-		BodySection: []*imap.FetchItemBodySection{{}},
+		BodySection: []*imap.FetchItemBodySection{{Peek: true}},
 	}
 	seqSet := imap.SeqSet{}
 	seqSet.AddNum(seqNum)
@@ -498,6 +537,9 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 
 	incomingMsg.InReplyTo = inReplyTo
 	incomingMsg.References = references
+	if err := setInboxAddressMeta(&incomingMsg, e.resolveInboxAddress(envelope)); err != nil {
+		return err
+	}
 
 	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
 	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
@@ -592,13 +634,82 @@ func isAutoReply(envelope *enmime.Envelope) bool {
 	return false
 }
 
-// isLoopMessage returns true if the email is a loop prevention message. i.e., it has the `X-Libredesk-Loop-Prevention` header with the inbox email address.
-func isLoopMessage(envelope *enmime.Envelope, inboxEmailaddress string) bool {
-	loopHeader := envelope.GetHeader(headerLibredeskLoopPrevention)
+// isLoopMessage accepts the UUID identity and legacy owned-address identities during upgrades.
+func (e *Email) isLoopMessage(envelope *enmime.Envelope) bool {
+	loopHeader := strings.TrimSpace(envelope.GetHeader(headerLibredeskLoopPrevention))
 	if loopHeader == "" {
 		return false
 	}
-	return strings.EqualFold(loopHeader, inboxEmailaddress)
+	return strings.EqualFold(loopHeader, e.uuid) || e.ReceivesAddress(loopHeader)
+}
+
+func (e *Email) resolveInboxAddress(envelope *enmime.Envelope) string {
+	for _, header := range recipientHeaders {
+		for _, address := range parseHeaderAddresses(envelope, header) {
+			address = stringutil.RemoveConvPlusAddress(address)
+			if e.ReceivesAddress(address) {
+				normalized, _ := inbox.NormalizeEmailAddress(address)
+				return normalized
+			}
+		}
+	}
+	return e.PrimaryAddress()
+}
+
+func (e *Email) processAliasVerification(ctx context.Context, env *imap.Envelope, token string) error {
+	if e.aliasVerificationCallback == nil {
+		return nil
+	}
+	from := ""
+	if len(env.From) > 0 {
+		from = env.From[0].Addr()
+	}
+	return e.aliasVerificationCallback(ctx, token, from)
+}
+
+func (e *Email) expireAliasVerifications(ctx context.Context, startedBefore time.Time) error {
+	if e.aliasExpiryCallback == nil {
+		return nil
+	}
+	if err := e.aliasExpiryCallback(ctx, startedBefore); err != nil {
+		return fmt.Errorf("expiring alias verifications: %w", err)
+	}
+	return nil
+}
+
+func parseHeaderAddresses(envelope *enmime.Envelope, header string) []string {
+	parsed, err := envelope.AddressList(header)
+	if !enmime.AddressHeaders[strings.ToLower(header)] {
+		value := strings.TrimSpace(envelope.GetHeader(header))
+		if prefix, address, ok := strings.Cut(value, ";"); ok && strings.EqualFold(strings.TrimSpace(prefix), "rfc822") {
+			value = strings.TrimSpace(address)
+		}
+		parsed, err = enmime.ParseAddressList(value)
+	}
+	if err != nil {
+		return nil
+	}
+	addresses := make([]string, 0, len(parsed))
+	for _, address := range parsed {
+		addresses = append(addresses, address.Address)
+	}
+	return addresses
+}
+
+func setInboxAddressMeta(message *models.IncomingMessage, address string) error {
+	meta := make(map[string]any)
+	if len(message.Meta) > 0 {
+		if err := json.Unmarshal(message.Meta, &meta); err != nil {
+			return fmt.Errorf("unmarshalling incoming message meta: %w", err)
+		}
+	}
+	meta["inbox_address"] = address
+	encoded, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("marshalling incoming message meta: %w", err)
+	}
+	message.Meta = encoded
+	return nil
 }
 
 // extractAllHTMLParts extracts all HTML parts from the given enmime part by traversing the tree.

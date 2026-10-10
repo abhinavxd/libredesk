@@ -193,6 +193,7 @@ SELECT
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.config->>'reply_to', '') as inbox_reply_to,
+   COALESCE((SELECT jsonb_agg(jsonb_build_object('email', email, 'verification_status', verification_status, 'verified_at', verified_at) ORDER BY position, id) FROM inbox_email_addresses WHERE inbox_id = inb.id AND kind = 'alias'), '[]'::jsonb) AS inbox_aliases,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
    c.priority_id,
@@ -823,6 +824,14 @@ AND type in ('incoming', 'outgoing') and private = false
 and source_id > ''
 ORDER BY id DESC
 LIMIT $2;
+
+-- name: get-email-sender-message
+SELECT m.type, m.meta
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE c.uuid = $1 AND m.private = false AND m.type IN ('incoming', 'outgoing')
+ORDER BY (m.type = 'outgoing') DESC, m.id DESC
+LIMIT 1;
 
 -- name: get-outgoing-pending-messages
 SELECT
