@@ -188,6 +188,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 			return
 		}
 		outbound.From = m.emailFromAddress(inb, message, selected)
+		if len(messageArticleIDs(message.Meta)) > 0 {
+			outbound.AltContent = stringutil.HTML2TextMarkdownLinks(message.Content)
+		}
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
@@ -304,7 +307,6 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 	return data, nil
 }
 
-// RenderMessageInTemplate renders message content in the email base template for sending.
 func (m *Manager) RenderMessageInTemplate(channel string, message *models.Message) error {
 	switch channel {
 	case inbox.ChannelEmail:
@@ -313,28 +315,40 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 			return err
 		}
 
-		// Expose message meta flags to the template.
-		var (
-			isContinuity bool
-			meta         map[string]any
-		)
-		if len(message.Meta) > 0 && json.Unmarshal(message.Meta, &meta) == nil {
-			isContinuity, _ = meta["continuity_email"].(bool)
-		}
-		data["IsContinuityEmail"] = isContinuity
-
-		message.Content, err = m.template.RenderEmailWithTemplate(data, message.Content)
+		content := m.emailTemplateContent(message, data)
+		message.Content, err = m.template.RenderEmailWithTemplate(data, content)
 		if err != nil {
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
 			return fmt.Errorf("could not render email content using template: %w", err)
 		}
 	case inbox.ChannelLiveChat, inbox.ChannelWhatsApp:
+		m.RenderArticleReferences(message)
 		return nil
 	default:
 		m.lo.Warn("unknown message channel", "channel", channel)
 		return fmt.Errorf("unknown message channel: %s", channel)
 	}
 	return nil
+}
+
+func (m *Manager) emailTemplateContent(message *models.Message, data map[string]any) string {
+	var (
+		isContinuity bool
+		meta         map[string]any
+	)
+	if len(message.Meta) > 0 && json.Unmarshal(message.Meta, &meta) == nil {
+		isContinuity, _ = meta["continuity_email"].(bool)
+	}
+	data["IsContinuityEmail"] = isContinuity
+	if isContinuity {
+		data["ContinuityContent"] = message.Content
+		return "{{ .ContinuityContent }}"
+	}
+	if references := m.emailArticleReferences(message); references != "" {
+		data["ArticleReferences"] = references
+		return message.Content + "{{ .ArticleReferences }}"
+	}
+	return message.Content
 }
 
 // GetConversationMessages retrieves messages for a specific conversation.

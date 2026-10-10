@@ -67,6 +67,25 @@
                     </span>
                   </div>
                 </div>
+                <div v-if="previewReferences.length" class="space-y-2">
+                  <div class="text-sm font-medium text-foreground">
+                    {{ t('globals.terms.articleReference', 2) }}
+                  </div>
+                  <ul class="space-y-1">
+                    <li v-for="source in previewReferences" :key="source.id">
+                      <Button
+                        as="a"
+                        variant="link"
+                        :href="source.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="h-auto px-0 whitespace-normal text-left"
+                      >
+                        {{ source.title }}
+                      </Button>
+                    </li>
+                  </ul>
+                </div>
                 <div v-if="previewSources.length" class="space-y-2">
                   <div class="text-sm font-medium text-foreground">
                     {{ t('admin.ai.assistant.preview.sources') }}
@@ -189,6 +208,9 @@ const previewMessage = ref('')
 const previewReply = ref('')
 const previewSources = ref([])
 const previewLoading = ref(false)
+const previewReferences = computed(() =>
+  previewSources.value.filter((source) => source.url)
+)
 
 const fmtNumber = (value) => Number(value ?? 0).toLocaleString()
 const fmtPercent = (value) => `${Number(value ?? 0).toFixed(1)}%`

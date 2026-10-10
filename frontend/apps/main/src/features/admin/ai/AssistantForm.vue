@@ -134,6 +134,17 @@
       </FormItem>
     </FormField>
 
+    <FormField v-slot="{ componentField, handleChange, meta }" name="citations_enabled">
+      <FormItem>
+        <SwitchField
+          :title="t('admin.ai.assistant.includeArticleReferences')"
+          :description="t('admin.ai.assistant.includeArticleReferencesHint')"
+          :checked="componentField.modelValue"
+          @update:checked="(value) => handleChange(value, meta.validated)"
+        />
+      </FormItem>
+    </FormField>
+
     <FormField v-slot="{ componentField, handleChange }" name="handoff_enabled">
       <FormItem>
         <SwitchField
@@ -317,6 +328,7 @@ const form = useForm({
         .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
       fallback_team_id: z.string().optional(),
       handoff_enabled: z.boolean().optional(),
+      citations_enabled: z.boolean().optional(),
       languages: z.array(z.string()).optional(),
       instructions: z.string().optional(),
       guardrails: z.string().optional(),
@@ -332,6 +344,7 @@ const form = useForm({
     max_turns: 6,
     fallback_team_id: 'none',
     handoff_enabled: true,
+    citations_enabled: true,
     languages: [],
     instructions: '',
     guardrails: '',
@@ -360,6 +373,7 @@ watch(
         max_turns: values.max_turns ?? 6,
         fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
         handoff_enabled: values.handoff_enabled ?? true,
+        citations_enabled: values.citations_enabled ?? !props.isEditing,
         languages: [...(values.languages || [])],
         instructions: values.instructions || '',
         guardrails: values.guardrails || '',
@@ -404,6 +418,7 @@ const onSubmit = form.handleSubmit(async (values) => {
           ? Number(values.fallback_team_id)
           : null,
       handoff_enabled: !!values.handoff_enabled,
+      citations_enabled: !!values.citations_enabled,
       languages: values.languages || [],
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',

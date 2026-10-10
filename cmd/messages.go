@@ -71,6 +71,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
+	app.conversation.RenderMessagesArticleReferences(messages)
 	for i := range messages {
 		total = messages[i].Total
 		app.conversation.SignAttachmentURLs(messages[i].Attachments)
@@ -138,6 +139,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
+	app.conversation.RenderArticleReferences(&message)
 	app.conversation.SignAttachmentURLs(message.Attachments)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
