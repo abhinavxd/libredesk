@@ -20,6 +20,7 @@
         <MessageInputAttachmentPreview
           v-if="mediaFiles.length"
           :attachments="attachmentPreviews"
+          :disabled="isSending"
           @delete="handleFileDelete"
         />
         <!-- Textarea Container -->
@@ -374,6 +375,7 @@ const handleDrop = (event) => {
 }
 
 const handleFileDelete = (uuid) => {
+  if (isSending.value) return
   const attachment = mediaFiles.value.find((item) => item.uuid === uuid)
   if (attachment) revokeAttachmentPreviews([attachment])
   chatStore.attachmentDrafts = {

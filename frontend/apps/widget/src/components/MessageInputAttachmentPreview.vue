@@ -13,6 +13,7 @@
         />
         <button
           type="button"
+          :disabled="disabled"
           class="absolute -right-1 -top-1 rounded-full border bg-background p-0.5 text-muted-foreground shadow-sm transition-colors hover:text-destructive focus:outline-none"
           :aria-label="`${$t('globals.terms.remove')} ${attachment.filename}`"
           @click.prevent="$emit('delete', attachment.uuid)"
@@ -40,6 +41,7 @@
         <button
           v-if="!attachment.loading"
           type="button"
+          :disabled="disabled"
           class="rounded-md text-muted-foreground transition-colors duration-150 hover:text-destructive focus:outline-none"
           :aria-label="`${$t('globals.terms.remove')} ${attachment.filename}`"
           @click.prevent="$emit('delete', attachment.uuid)"
@@ -65,6 +67,10 @@ const props = defineProps({
   uploadingFiles: {
     type: Array,
     default: () => []
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
