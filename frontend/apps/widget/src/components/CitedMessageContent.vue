@@ -40,6 +40,7 @@ const renderNode = (node) => {
     [...node.classList].some((name) => name.endsWith('_ld-article-citation')) &&
     title
   ) {
+    const number = node.textContent.replace(/^\((\d+)\)$/, '$1')
     return h(
       HoverCardRoot,
       { openDelay: 150, closeDelay: 150 },
@@ -58,11 +59,11 @@ const renderNode = (node) => {
                     href: attributes.href,
                     target: '_blank',
                     rel: 'noopener noreferrer',
-                    'aria-label': `${node.textContent} ${title}`,
+                    'aria-label': `${number} ${title}`,
                     class:
                       'mx-0.5 h-auto rounded-full bg-foreground/10 px-1.5 py-0.5 text-sm leading-none !text-foreground hover:bg-foreground/15'
                   },
-                  { default: () => node.textContent }
+                  { default: () => number }
                 )
             }
           ),
