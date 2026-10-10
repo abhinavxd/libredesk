@@ -50,9 +50,12 @@
 {{ define "hc-helpful" }}
 <div class="hc-helpful" id="hc-helpful" role="group" aria-labelledby="hc-helpful-q" data-endpoint="/api/v1/public/help-centers/{{ .Data.HelpCenter.Slug }}/articles/{{ .Data.Article.Slug }}/feedback?locale={{ .Data.Article.Locale }}">
     <span class="hc-helpful-q" id="hc-helpful-q">{{ .L.T "helpCenter.wasHelpful" }}</span>
-    <button type="button" data-helpful="true">{{ .L.T "globals.messages.yes" }}</button>
-    <button type="button" data-helpful="false">{{ .L.T "globals.messages.no" }}</button>
-    <span class="hc-helpful-thanks" hidden>{{ .L.T "helpCenter.feedbackThanks" }}</span>
+    <div class="hc-helpful-actions">
+        <button type="button" data-helpful="true">{{ .L.T "globals.messages.yes" }}</button>
+        <button type="button" data-helpful="false">{{ .L.T "globals.messages.no" }}</button>
+    </div>
+    <span class="hc-helpful-thanks" role="status" hidden>{{ .L.T "helpCenter.feedbackThanks" }}</span>
+    <span class="hc-helpful-error" role="alert" hidden>{{ .L.T "globals.messages.somethingWentWrong" }}</span>
 </div>
 {{ end }}
 

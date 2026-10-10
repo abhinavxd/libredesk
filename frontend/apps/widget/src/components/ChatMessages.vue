@@ -77,7 +77,7 @@
                 :html="message.content"
                 :allowedSchemas="['cid', 'https', 'http', 'mailto']"
                 :allowed-css-properties="extendedCssProperties"
-                class="native-html"
+                class="native-html [&_pre]:whitespace-pre-wrap [&_code]:whitespace-pre-wrap"
               />
               <div
                 v-if="containsQuoteMarkers(message.content)"
