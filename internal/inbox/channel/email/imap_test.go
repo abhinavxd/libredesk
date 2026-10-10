@@ -1113,3 +1113,81 @@ func TestMimeParser_Charsets(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchMessagesExcludesDeletedAndOldMessages(t *testing.T) {
+	for _, extended := range []bool{false, true} {
+		name := "SEARCH"
+		if extended {
+			name = "ESEARCH"
+		}
+		t.Run(name, func(t *testing.T) {
+			user := imapmemserver.NewUser("test", "" /* password */)
+			require.NoError(t, user.Create("INBOX", nil /* options */))
+			caps := imap.CapSet{imap.CapIMAP4rev1: {}}
+			if extended {
+				caps[imap.CapESearch] = struct{}{}
+			}
+			server := imapserver.New(&imapserver.Options{
+				NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+					return imapmemserver.NewUserSession(user), &imapserver.GreetingData{PreAuth: true}, nil
+				},
+				Caps: caps,
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { server.Close() })
+			go server.Serve(listener)
+			client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+			require.NoError(t, err)
+			t.Cleanup(func() { client.Close() })
+
+			for _, message := range []struct {
+				token string
+				flags []imap.Flag
+				date  time.Time
+			}{
+				{token: "first", date: time.Now()},
+				{token: "deleted", flags: []imap.Flag{imap.FlagDeleted}, date: time.Now()},
+				{token: "seen", flags: []imap.Flag{imap.FlagSeen}, date: time.Now()},
+				{token: "old", date: time.Now().Add(-72 * time.Hour)},
+			} {
+				raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+					headerAliasVerification + ": " + message.token + "\r\n" +
+					headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+				cmd := client.Append("INBOX", int64(len(raw)), &imap.AppendOptions{Flags: message.flags, Time: message.date})
+				_, err := io.WriteString(cmd, raw)
+				require.NoError(t, err)
+				require.NoError(t, cmd.Close())
+				_, err = cmd.Wait()
+				require.NoError(t, err)
+			}
+			_, err = client.Select("INBOX", nil /* options */).Wait()
+			require.NoError(t, err)
+
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			var processed []string
+			e := &Email{
+				primary: "support@example.com",
+				uuid:    "inbox-uuid",
+				lo:      &logger,
+				aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+					processed = append(processed, token)
+					return nil
+				},
+			}
+			since := time.Now().Add(-24 * time.Hour)
+			results, err := e.searchMessages(client, since)
+			require.NoError(t, err)
+			require.Equal(t, []uint32{1, 3}, results.AllSeqNums())
+			if extended {
+				require.Equal(t, uint32(1), results.Min)
+				require.Equal(t, uint32(3), results.Max)
+			}
+			require.NoError(t, e.fetchAndProcessMessages(t.Context(), client, results, e.id))
+			require.Equal(t, []string{"first", "seen"}, processed)
+			results, err = e.searchMessages(client, since)
+			require.NoError(t, err)
+			require.Empty(t, results.AllSeqNums())
+		})
+	}
+}
