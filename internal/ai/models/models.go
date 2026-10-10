@@ -232,6 +232,9 @@ type ToolCall struct {
 	ID       string           `json:"id"`
 	Type     string           `json:"type"`
 	Function ToolCallFunction `json:"function"`
+	// ExtraContent holds provider-specific data that must be sent back unchanged when the
+	// tool call is replayed, e.g. Gemini's thought_signature.
+	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
 }
 
 type ToolCallFunction struct {
