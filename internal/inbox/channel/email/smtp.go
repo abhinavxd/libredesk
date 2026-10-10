@@ -175,6 +175,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	inboxReplyTo := e.replyTo
 	if !strings.EqualFold(emailAddress, e.PrimaryAddress()) {
 		if e.enablePlusAddressing {
+			// Alias forwarding may only match the exact address, excluding plus addressed variants.
 			inboxReplyTo = cmp.Or(inboxReplyTo, e.PrimaryAddress())
 		} else {
 			inboxReplyTo = ""
