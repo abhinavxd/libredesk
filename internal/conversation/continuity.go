@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"slices"
 	"strings"
 	"time"
 
@@ -202,7 +203,8 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	// Build References and In-Reply-To headers for email threading.
 	references, inReplyTo := m.BuildEmailThreadingHeaders(conv.ID, sourceID)
 
-	// Render message template
+	content, hasReferences := m.renderContinuityEmailContent(unreadMessages, websiteURL)
+	message.Content = content
 	if err := m.RenderMessageInTemplate(linkedEmailInbox.Channel(), &message); err != nil {
 		// Clean up the inserted message on failure
 		cleanUp = true
@@ -241,6 +243,9 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 		Meta:              message.Meta,
 		CreatedAt:         message.CreatedAt,
 	}
+	if hasReferences {
+		outbound.AltContent = stringutil.HTML2TextMarkdownLinks(message.Content)
+	}
 
 	// Send the email
 	if err := linkedEmailInbox.Send(outbound); err != nil {
@@ -270,7 +275,22 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	return nil
 }
 
-// buildContinuityEmailContent creates email content with conversation summary and unread messages
+func (m *Manager) renderContinuityEmailContent(unreadMessages []models.ContinuityUnreadMessage, websiteURL string) (string, bool) {
+	messages := slices.Clone(unreadMessages)
+	metas := make([]json.RawMessage, len(messages))
+	for i := range messages {
+		metas[i] = messages[i].Meta
+	}
+	hasReferences := false
+	for i, references := range m.lookupArticleReferences(metas...) {
+		if len(references) > 0 {
+			messages[i].Content += emailArticleReferencesHTML(references)
+			hasReferences = true
+		}
+	}
+	return m.buildContinuityEmailContent(messages, websiteURL), hasReferences
+}
+
 func (m *Manager) buildContinuityEmailContent(unreadMessages []models.ContinuityUnreadMessage, websiteURL string) string {
 	var content strings.Builder
 

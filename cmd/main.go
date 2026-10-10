@@ -289,6 +289,7 @@ func main() {
 	waClient := initWhatsAppClient()
 	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
 	conversation.SetWhatsAppTemplateStore(waTemplates)
+	conversation.SetArticleReferenceStore(helpCenter)
 
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)

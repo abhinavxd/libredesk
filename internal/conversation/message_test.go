@@ -1,11 +1,20 @@
 package conversation
 
 import (
+	"encoding/json"
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
+	"text/template"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/zerodha/logf"
 )
 
 const testUUID = "d0355103-455f-4c7d-b9c7-86e9254fe119"
@@ -20,6 +29,32 @@ type fromTestInbox struct {
 func (f fromTestInbox) FromAddress() string      { return f.from }
 func (f fromTestInbox) PrimaryAddress() string   { return f.primary }
 func (f fromTestInbox) FromNameTemplate() string { return "" }
+
+type citationArticleStore struct {
+	references []hcmodels.ArticleReference
+	err        error
+	lookups    *int
+}
+
+type citationSettingsStore struct {
+	settingsStore
+	rootURL string
+	lookups *int
+}
+
+func (s citationArticleStore) GetArticleReferences(ids []int) ([]hcmodels.ArticleReference, error) {
+	if s.lookups != nil {
+		(*s.lookups)++
+	}
+	return s.references, s.err
+}
+
+func (s citationSettingsStore) GetAppRootURL() (string, error) {
+	if s.lookups != nil {
+		(*s.lookups)++
+	}
+	return s.rootURL, nil
+}
 
 func TestImgSrcUploadsPattern(t *testing.T) {
 	tests := []struct {
@@ -626,6 +661,331 @@ func TestEmailFromAddress(t *testing.T) {
 			inb := fromTestInbox{from: tt.from, primary: "support@acme.com"}
 			if got := m.emailFromAddress(inb, models.Message{SenderType: models.SenderTypeContact}, tt.sender); got != tt.want {
 				t.Errorf("emailFromAddress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMessageArticleIDs(t *testing.T) {
+	tests := []struct {
+		meta string
+		want []int
+	}{
+		{`{"ai_assistant_id":1,"ai_article_ids":[12,12,0,-1,34]}`, []int{12, 34}},
+		{`{"ai_assistant_id":1,"ai_article_ids":[]}`, []int{}},
+		{`{"ai_article_ids":[12]}`, nil},
+		{`{"ai_assistant_id":0,"ai_article_ids":[12]}`, nil},
+		{`{"ai_assistant_id":1,"ai_article_ids":["12"]}`, nil},
+		{`not-json`, nil},
+	}
+	for _, tt := range tests {
+		if got := messageArticleIDs(json.RawMessage(tt.meta)); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("messageArticleIDs(%s) = %v, want %v", tt.meta, got, tt.want)
+		}
+	}
+}
+
+func TestRenderArticleReferences(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	m := Manager{
+		articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+			{ID: 12, Title: `Refunds <script> & "policy"`, HelpCenterSlug: "support", Locale: "en", Slug: "refunds"},
+			{ID: 34, Title: "Delivery", HelpCenterSlug: "support", Locale: "fr", Slug: "delivery", CustomDomain: "https://help.example.com"},
+		}},
+		settingsStore: citationSettingsStore{rootURL: "https://desk.example.com/"},
+		i18n:          testutil.NewI18n(t),
+		lo:            &lo,
+	}
+	meta := json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,34]}`)
+	message := models.Message{Content: "<p>Answer.</p>", Meta: meta}
+	m.RenderArticleReferences(&message)
+	for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery", "Refunds &lt;script&gt; &amp; &#34;policy&#34;"} {
+		if !strings.Contains(message.Content, part) {
+			t.Errorf("rendered references missing %q: %s", part, message.Content)
+		}
+	}
+	if strings.Contains(message.Content, "<script>") {
+		t.Fatal("article title inserted unescaped HTML")
+	}
+	plain := stringutil.HTML2TextMarkdownLinks(message.Content)
+	for _, url := range []string{"https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery"} {
+		if !strings.Contains(plain, url) {
+			t.Errorf("plain text email is missing %s", url)
+		}
+	}
+	if string(meta) != string(message.Meta) || strings.Contains(string(message.Meta), "https://") {
+		t.Fatal("message metadata changed or persisted an absolute URL")
+	}
+	m.settingsStore = citationSettingsStore{rootURL: "https://new.example.com"}
+	message.Content = "<p>Answer.</p>"
+	m.RenderArticleReferences(&message)
+	if strings.Contains(message.Content, "https://desk.example.com") || !strings.Contains(message.Content, "https://new.example.com/hc/support/en/articles/refunds") {
+		t.Fatal("references did not follow the current root URL")
+	}
+	for _, store := range []citationArticleStore{{}, {err: errors.New("lookup failed")}} {
+		m.articleReferenceStore = store
+		message.Content = "<p>Answer.</p>"
+		m.RenderArticleReferences(&message)
+		if message.Content != "<p>Answer.</p>" {
+			t.Fatal("unavailable references changed the answer")
+		}
+	}
+}
+
+func TestInlineArticleReferences(t *testing.T) {
+	references := []hcmodels.ArticleReference{
+		{ID: 12, Title: "JWT {{name}}", URL: "https://help.example.com/jwt"},
+		{ID: 34, Title: "Logout", URL: "https://help.example.com/logout"},
+	}
+	content := "<p>Use JWT.<!--ld-cite:12--> Log out.<!--ld-cite:34--> JWT again.<!--ld-cite:12--></p>"
+	rendered := chatArticleReferencesHTML(content, references)
+	for _, part := range []string{
+		"Use JWT.<sup>",
+		"Log out.<sup>",
+		"JWT again.</p>",
+		`title="JWT {{name}}"`,
+		">(2)</a></sup>",
+	} {
+		if !strings.Contains(rendered, part) {
+			t.Errorf("inline references missing %q: %s", part, rendered)
+		}
+	}
+	if strings.Count(rendered, ">(1)</a></sup>") != 1 || strings.Contains(rendered, "ld-cite:") || strings.Contains(rendered, "<ul>") {
+		t.Fatalf("unexpected inline references: %s", rendered)
+	}
+	if got := chatArticleReferencesHTML(content, nil /* references */); got != "<p>Use JWT. Log out. JWT again.</p>" {
+		t.Fatalf("unavailable references changed the answer: %s", got)
+	}
+	if got := chatArticleReferencesHTML("<p>Answer.<!--ld-cite:999--></p>", references[:1]); strings.Contains(got, "ld-cite:") || !strings.Contains(got, "</p><p><sup>") {
+		t.Fatalf("missing placement did not produce a numbered footer: %s", got)
+	}
+	for _, tt := range []struct {
+		name    string
+		content string
+		count   int
+	}{
+		{"separate paragraphs", "<p>JWT.<!--ld-cite:12--> More JWT.<!--ld-cite:12--></p><p>JWT again.<!--ld-cite:12--></p>", 2},
+		{"separate list items", "<ul><li>JWT.<!--ld-cite:12--> More JWT.<!--ld-cite:12--></li><li>JWT again.<!--ld-cite:12--></li></ul>", 2},
+		{"inline formatting", "<p><strong>JWT.<!--ld-cite:12--></strong> More JWT.<!--ld-cite:12--></p>", 1},
+		{"line breaks", "<p>JWT.<!--ld-cite:12--><br>More JWT.<!--ld-cite:12--></p>", 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := chatArticleReferencesHTML(tt.content, references[:1])
+			if strings.Count(got, ">(1)</a></sup>") != tt.count || strings.Contains(got, "ld-cite:") {
+				t.Fatalf("unexpected paragraph citations: %s", got)
+			}
+		})
+	}
+	lo := logf.New(logf.Opts{})
+	m := Manager{
+		articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+			{ID: 12, Title: "JWT", HelpCenterSlug: "support", Locale: "en", Slug: "jwt"},
+		}},
+		settingsStore: citationSettingsStore{rootURL: "https://desk.example.com"},
+		lo:            &lo,
+	}
+	message := models.Message{Content: content, Meta: json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,34]}`)}
+	data := map[string]any{}
+	mailContent := m.emailTemplateContent(&message, data)
+	if strings.Contains(mailContent, "ld-cite:") || strings.Contains(mailContent, "<sup>") {
+		t.Fatalf("email retained widget markers: %s", mailContent)
+	}
+	if !strings.Contains(data["ArticleReferences"].(string), ">(1)</a>") {
+		t.Fatal("email lost its numbered references")
+	}
+}
+
+func TestArticleReferencePublicURL(t *testing.T) {
+	reference := hcmodels.ArticleReference{HelpCenterSlug: "support", Locale: "en", Slug: "refund policy"}
+	for _, tt := range []struct{ root, custom, want string }{
+		{"https://desk.example.com/", "", "https://desk.example.com/hc/support/en/articles/refund%20policy"},
+		{"https://desk.example.com", "https://help.example.com/path", "https://help.example.com/en/articles/refund%20policy"},
+		{"", "https://help.example.com", "https://help.example.com/en/articles/refund%20policy"},
+		{"", "", ""},
+		{"javascript:alert(1)", "", ""},
+	} {
+		reference.CustomDomain = tt.custom
+		if got := reference.PublicURL(tt.root); got != tt.want {
+			t.Errorf("PublicURL(%q, %q) = %q, want %q", tt.root, tt.custom, got, tt.want)
+		}
+	}
+}
+
+func TestContinuityEmailArticleReferences(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	m := Manager{
+		articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+			{ID: 12, Title: "Refund {{name}}", HelpCenterSlug: "support", Locale: "en", Slug: "refunds"},
+		}},
+		settingsStore: citationSettingsStore{rootURL: "https://desk.example.com"},
+		i18n:          testutil.NewI18n(t),
+		lo:            &lo,
+	}
+	messages := []models.ContinuityUnreadMessage{
+		{Message: models.Message{Content: "<p>AI answer.</p>", Meta: json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,12,0,-1]}`)}},
+		{Message: models.Message{Content: "<p>Human answer. {{name}} {{ .Author.FirstName }} {{</p>"}},
+	}
+	stored := m.buildContinuityEmailContent(messages, "" /* websiteURL */)
+	rendered, _ := m.renderContinuityEmailContent(messages, "" /* websiteURL */)
+	wantURL := "https://desk.example.com/hc/support/en/articles/refunds"
+	if strings.Count(rendered, wantURL) != 1 || !strings.Contains(rendered, `target="_blank"`) {
+		t.Fatalf("offline email is missing article links: %s", rendered)
+	}
+	if !strings.Contains(rendered, ">(1)</a>") || strings.Contains(rendered, "Refund {{name}}") || strings.Contains(rendered, "Article references") {
+		t.Fatalf("offline email should contain numbered links: %s", rendered)
+	}
+	message := models.Message{Content: rendered, Meta: json.RawMessage(`{"continuity_email":true}`)}
+	data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
+	content := m.emailTemplateContent(&message, data)
+	tmpl, err := template.New("content").Parse(content)
+	if err != nil {
+		t.Fatalf("parsing offline email: %v", err)
+	}
+	var output strings.Builder
+	if err := tmpl.Execute(&output, data); err != nil {
+		t.Fatalf("rendering offline email: %v", err)
+	}
+	if output.String() != rendered || data["IsContinuityEmail"] != true {
+		t.Fatal("offline email changed literal message content or lost its template flag")
+	}
+	if strings.Index(rendered, wantURL) > strings.Index(rendered, "Human answer.") {
+		t.Fatal("article reference is attached to the wrong reply")
+	}
+	if !strings.Contains(stringutil.HTML2TextMarkdownLinks(rendered), wantURL) {
+		t.Fatal("plain text offline email is missing the article URL")
+	}
+	if stored != m.buildContinuityEmailContent(messages, "" /* websiteURL */) || strings.Contains(stored, wantURL) {
+		t.Fatal("rendering persisted an article URL in the saved email")
+	}
+	if again, _ := m.renderContinuityEmailContent(messages, "" /* websiteURL */); again != rendered {
+		t.Fatal("rendering the offline email twice duplicated article references")
+	}
+	for _, store := range []citationArticleStore{{}, {err: errors.New("lookup failed")}} {
+		m.articleReferenceStore = store
+		if got, _ := m.renderContinuityEmailContent(messages, "" /* websiteURL */); got != stored {
+			t.Fatal("unavailable references changed the offline email")
+		}
+	}
+}
+
+func TestEmailTemplateArticleReferences(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	for _, title := range []string{"Refund {{name}}", "Refund {{ .Author.FirstName }}", "Refund {{", `<script> & "refunds"`} {
+		t.Run(title, func(t *testing.T) {
+			m := Manager{
+				articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+					{ID: 12, Title: title, HelpCenterSlug: "support", Locale: "en", Slug: "refunds"},
+					{ID: 34, Title: "Delivery", HelpCenterSlug: "support", Locale: "fr", Slug: "delivery", CustomDomain: "https://help.example.com"},
+				}},
+				settingsStore: citationSettingsStore{rootURL: "https://desk.example.com"},
+				lo:            &lo,
+			}
+			message := models.Message{
+				Content: "<p>Hello {{ .Author.FirstName }}.</p>",
+				Meta:    json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,34]}`),
+			}
+			data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
+			content := m.emailTemplateContent(&message, data)
+			tmpl, err := template.New("content").Parse(content)
+			if err != nil {
+				t.Fatalf("parsing email: %v", err)
+			}
+			var output strings.Builder
+			if err := tmpl.Execute(&output, data); err != nil {
+				t.Fatalf("rendering email: %v", err)
+			}
+			want := `<p>Hello Agent.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
+			if output.String() != want || data["IsContinuityEmail"] != false {
+				t.Fatalf("unexpected email content: %s", output.String())
+			}
+			plain := stringutil.HTML2TextMarkdownLinks(output.String())
+			for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery"} {
+				if !strings.Contains(plain, part) {
+					t.Errorf("plain text email is missing %q: %s", part, plain)
+				}
+			}
+			if again := m.emailTemplateContent(&message, data); again != content {
+				t.Fatal("preparing the email twice duplicated article references")
+			}
+			for _, store := range []citationArticleStore{{}, {err: errors.New("lookup failed")}} {
+				m.articleReferenceStore = store
+				if got := m.emailTemplateContent(&message, data); got != message.Content {
+					t.Fatal("unavailable references changed the email content")
+				}
+			}
+		})
+	}
+}
+
+func TestArticleReferenceBatchLookups(t *testing.T) {
+	renderers := []struct {
+		name   string
+		render func(*Manager, []models.Message) string
+	}{
+		{"messages", func(m *Manager, messages []models.Message) string {
+			m.RenderMessagesArticleReferences(messages)
+			var output strings.Builder
+			for _, message := range messages {
+				output.WriteString(message.Content)
+			}
+			return output.String()
+		}},
+		{"transcript", func(m *Manager, messages []models.Message) string {
+			return string(m.BuildTranscript(models.Conversation{}, messages, time.Time{} /* downloadedAt */))
+		}},
+		{"offline email", func(m *Manager, messages []models.Message) string {
+			unread := make([]models.ContinuityUnreadMessage, len(messages))
+			for i, message := range messages {
+				unread[i].Message = message
+			}
+			content, _ := m.renderContinuityEmailContent(unread, "" /* websiteURL */)
+			return content
+		}},
+	}
+	for _, renderer := range renderers {
+		t.Run(renderer.name, func(t *testing.T) {
+			lo := logf.New(logf.Opts{})
+			articleLookups, settingsLookups := 0, 0
+			m := Manager{
+				articleReferenceStore: citationArticleStore{
+					references: []hcmodels.ArticleReference{
+						{ID: 12, Title: "Refund policy", HelpCenterSlug: "support", Locale: "en", Slug: "refunds"},
+						{ID: 34, Title: "Delivery", HelpCenterSlug: "support", Locale: "en", Slug: "delivery"},
+					},
+					lookups: &articleLookups,
+				},
+				settingsStore: citationSettingsStore{rootURL: "https://desk.example.com", lookups: &settingsLookups},
+				i18n:          testutil.NewI18n(t),
+				lo:            &lo,
+			}
+			messages := make([]models.Message, 151)
+			for i := range 150 {
+				messages[i] = models.Message{
+					Content: "<p>AI answer.</p>",
+					Meta:    json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[34,12,34,0,-1,999]}`),
+				}
+			}
+			messages[150].Content = "<p>Human answer.</p>"
+			output := renderer.render(&m, messages)
+			if articleLookups != 1 || settingsLookups != 1 {
+				t.Fatalf("150 replies made %d article lookups and %d settings lookups", articleLookups, settingsLookups)
+			}
+			for _, slug := range []string{"delivery", "refunds"} {
+				if count := strings.Count(output, "https://desk.example.com/hc/support/en/articles/"+slug); count != 150 {
+					t.Errorf("article %s appeared %d times, want 150", slug, count)
+				}
+			}
+			if strings.Index(output, "/articles/delivery") > strings.Index(output, "/articles/refunds") {
+				t.Fatal("batch lookup changed citation order")
+			}
+			if strings.Contains(messages[150].Content, "href=") {
+				t.Fatal("uncited reply gained article links")
+			}
+			articleLookups, settingsLookups = 0, 0
+			renderer.render(&m, []models.Message{{Content: "<p>Human answer.</p>"}})
+			renderer.render(&m, nil /* messages */)
+			if articleLookups != 0 || settingsLookups != 0 {
+				t.Fatal("uncited or empty batches performed reference lookups")
 			}
 		})
 	}

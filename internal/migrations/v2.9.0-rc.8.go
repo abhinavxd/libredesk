@@ -24,7 +24,7 @@ var notificationTypesV2_9_0 = []string{
 	"automation",
 }
 
-func V2_9_0(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func V2_9_0_RC8(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`ALTER TYPE channels ADD VALUE IF NOT EXISTS 'whatsapp';`)
 	if err != nil {
 		return err

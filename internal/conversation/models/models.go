@@ -117,6 +117,7 @@ type ChatMessage struct {
 	CreatedAt        time.Time              `json:"created_at"`
 	Content          string                 `json:"content"`
 	TextContent      string                 `json:"text_content"`
+	ContentType      string                 `json:"content_type"`
 	Author           MessageAuthor          `json:"author"`
 	Attachments      attachment.Attachments `json:"attachments"`
 	Meta             json.RawMessage        `json:"meta"`

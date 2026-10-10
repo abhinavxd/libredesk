@@ -442,6 +442,7 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 			CreatedAt:        message.CreatedAt,
 			Content:          message.Content,
 			TextContent:      message.TextContent,
+			ContentType:      message.ContentType,
 			Meta:             message.Meta,
 			Author: models.MessageAuthor{
 				ID:                 message.SenderID,

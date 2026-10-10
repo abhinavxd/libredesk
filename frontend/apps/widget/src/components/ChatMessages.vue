@@ -72,6 +72,10 @@
               <span v-if="message.content_type === 'text'" class="whitespace-pre-wrap">{{
                 message.content
               }}</span>
+              <CitedMessageContent
+                v-else-if="message.meta?.ai_article_ids?.length"
+                :html="message.content"
+              />
               <Letter
                 v-else
                 :html="message.content"
@@ -188,6 +192,7 @@ import MessageAttachment from './MessageAttachment.vue'
 import CSATMessageBubble from './CSATMessageBubble.vue'
 import PreChatForm from './PreChatForm.vue'
 import ReplyButtons from './ReplyButtons.vue'
+import CitedMessageContent from './CitedMessageContent.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
