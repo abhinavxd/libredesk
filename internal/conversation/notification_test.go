@@ -40,7 +40,7 @@ type countingPush struct {
 	count int
 }
 
-func (p *countingPush) Send(int, nmodels.PushPayload) bool {
+func (p *countingPush) Send(int, nmodels.PushPayload, nmodels.NotificationReference) bool {
 	p.count++
 	return true
 }
@@ -134,7 +134,7 @@ func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			m := &Manager{lo: &lo, userStore: replyUserStore{agent: umodels.User{ID: 42, Enabled: tt.enabled, Permissions: tt.permissions}}}
-			recipients := m.replyNotificationAssignee(models.Conversation{AssignedUserID: null.IntFrom(42)}, 7)
+			recipients := m.replyNotificationAssignee(models.Conversation{AssignedUserID: null.IntFrom(42)}, 7, nmodels.NotificationTypeNewReply)
 			if got := slices.ContainsFunc(recipients, func(recipient umodels.User) bool { return recipient.ID == 42 }); got != tt.want {
 				t.Fatalf("assignee eligible = %v, want %v", got, tt.want)
 			}
@@ -318,4 +318,84 @@ func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 			t.Fatalf("queued emails = %d, want 1", queued)
 		}
 	})
+}
+
+func TestMarkAsUnreadKeepsReplyNotificationsRead(t *testing.T) {
+	db := testutil.NewDB(t, "reply_mark_unread")
+	var userID, inboxID int
+	if err := db.Get(&userID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'unread@example.com', 'Agent', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Test', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	var conv models.Conversation
+	if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, userID, inboxID); err != nil {
+		t.Fatal(err)
+	}
+	type message struct {
+		ID   int    `db:"id"`
+		UUID string `db:"uuid"`
+	}
+	var messages []message
+	for i := range 2 {
+		var msg message
+		if err := db.Get(&msg, `INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, created_at) VALUES ($1, $2, 'contact', 'incoming', 'received', $3) RETURNING id, uuid`, conv.ID, userID, time.Now().Add(time.Duration(i-2)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		messages = append(messages, msg)
+	}
+	var q struct {
+		UpsertUserLastSeen     *sqlx.Stmt `query:"upsert-user-last-seen"`
+		MarkConversationUnread *sqlx.Stmt `query:"mark-conversation-unread"`
+	}
+	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	lo := logf.New(logf.Opts{})
+	i18n := testutil.NewI18n(t)
+	inApp, err := notifier.NewUserNotificationManager(notifier.UserNotificationOpts{DB: db, Lo: &lo, I18n: i18n})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &Manager{lo: &lo, i18n: i18n}
+	m.q.UpsertUserLastSeen = q.UpsertUserLastSeen
+	m.q.MarkConversationUnread = q.MarkConversationUnread
+	for _, msg := range messages {
+		if _, err := inApp.Create(userID, nmodels.NotificationTypeNewReply, "Reply", null.String{}, null.IntFrom(conv.ID), null.IntFrom(msg.ID), null.Int{}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unread := func(want int) {
+		t.Helper()
+		stats, err := inApp.GetStats(userID)
+		if err != nil || stats.UnreadCount != want {
+			t.Fatalf("stats=%+v err=%v want unread=%d", stats, err, want)
+		}
+	}
+
+	unread(2)
+	latest, err := m.UpdateUserLastSeen(conv.UUID, userID, messages[1].UUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unread(0)
+	older, err := m.UpdateUserLastSeen(conv.UUID, userID, messages[0].UUID)
+	if err != nil || !older.LastSeenAt.Equal(latest.LastSeenAt) || older.ReadVersion <= latest.ReadVersion {
+		t.Fatalf("older message moved last seen back: %v err=%v", older, err)
+	}
+	if _, err := m.UpdateUserLastSeen(conv.UUID, userID, "not-a-uuid"); err == nil {
+		t.Fatal("invalid message uuid accepted")
+	}
+	markedUnread, err := m.MarkAsUnread(conv.UUID, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !markedUnread.LastSeenAt.Before(latest.LastSeenAt) || markedUnread.ReadVersion <= older.ReadVersion {
+		t.Fatalf("mark unread did not return a newer state: %+v", markedUnread)
+	}
+	unread(0)
+	if now, err := m.UpdateUserLastSeen(conv.UUID, userID, "" /** messageUUID **/); err != nil || !now.LastSeenAt.After(latest.LastSeenAt) || now.ReadVersion <= markedUnread.ReadVersion {
+		t.Fatalf("empty message uuid did not mark read up to now: %v err=%v", now, err)
+	}
 }

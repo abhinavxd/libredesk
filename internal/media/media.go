@@ -119,7 +119,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		return models.Media{}, err
 	}
 
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
+	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private, null.Int{} /** uploadedBy **/)
 	if err != nil {
 		m.store.Delete(uuid.String())
 		return models.Media{}, err
@@ -148,9 +148,9 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 }
 
 // Insert inserts media details into the database and returns the inserted media record.
-func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
+func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool, uploadedBy null.Int) (models.Media, error) {
 	var id int
-	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private, uploadedBy).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -239,10 +239,10 @@ func (m *Manager) GetByContentIDs(contentIDs []string, conversationUUID string) 
 	return out, nil
 }
 
-// GetDraftInlineMedia returns media by UUID only if it's unattached or linked to a message in the given conversation.
-func (m *Manager) GetDraftInlineMedia(uuid string, conversationID int) (models.Media, error) {
+// GetDraftInlineMedia returns media by UUID only if the user uploaded it and it is unattached, or it is linked to a message in the given conversation.
+func (m *Manager) GetDraftInlineMedia(uuid string, conversationID, userID int) (models.Media, error) {
 	var media models.Media
-	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID); err != nil {
+	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID, userID); err != nil {
 		if err == sql.ErrNoRows {
 			return media, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMedia"), nil)
 		}
@@ -300,15 +300,32 @@ func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
 }
 
 // LinkMessageMediaTx links a message's attachments and inline images to it within the given transaction, stamping a content_id on the inline ones.
-func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string) error {
+func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string, uploadedBy int) error {
 	if len(media) == 0 && len(inlineUUIDs) == 0 {
 		return nil
 	}
 	ids := make([]int, 0, len(media))
+	mediaUUIDs := make(map[string]struct{}, len(media))
+	seenIDs := make(map[int]struct{}, len(media))
 	for _, med := range media {
-		ids = append(ids, med.ID)
+		if _, ok := seenIDs[med.ID]; !ok {
+			seenIDs[med.ID] = struct{}{}
+			ids = append(ids, med.ID)
+		}
+		mediaUUIDs[med.UUID] = struct{}{}
 	}
-	result, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs))
+	requestedCount := len(ids)
+	seenInlineUUIDs := make(map[string]struct{}, len(inlineUUIDs))
+	for _, uuid := range inlineUUIDs {
+		if _, ok := seenInlineUUIDs[uuid]; ok {
+			continue
+		}
+		seenInlineUUIDs[uuid] = struct{}{}
+		if _, ok := mediaUUIDs[uuid]; !ok {
+			requestedCount++
+		}
+	}
+	result, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs), uploadedBy)
 	if err != nil {
 		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
 		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
@@ -317,8 +334,8 @@ func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.
 	if err != nil {
 		return fmt.Errorf("checking linked media count for message:%d: %w", messageID, err)
 	}
-	if rowsAffected < int64(len(ids)) {
-		return fmt.Errorf("linked %d of %d requested attachments to message:%d", rowsAffected, len(ids), messageID)
+	if rowsAffected < int64(requestedCount) {
+		return fmt.Errorf("linked %d of %d requested media files to message:%d", rowsAffected, requestedCount, messageID)
 	}
 	return nil
 }

@@ -87,7 +87,7 @@
         <div
           v-for="(notification, index) in form.values.notifications"
           :key="index"
-          class="group relative p-5 box bg-background transition-all hover:border-foreground/20"
+          class="group relative p-5 box bg-background transition-colors hover:border-foreground/20"
         >
           <FormField :name="`notifications.${index}.type`" v-slot="{ componentField }">
             <Input v-bind="componentField" type="hidden" />

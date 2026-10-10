@@ -56,7 +56,7 @@
               @click="goToPage(pageNumber)"
               :aria-label="`${t('globals.terms.page')} ${pageNumber}`"
               :aria-current="pageNumber === page ? 'page' : undefined"
-              class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               :class="
                 pageNumber === page
                   ? 'bg-background text-foreground shadow-sm'

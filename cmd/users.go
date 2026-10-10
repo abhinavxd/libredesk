@@ -302,6 +302,11 @@ func handleUpdateAgent(r *fastglue.Request) error {
 
 	app.user.InvalidateAgentCache(id)
 	app.wsHub.KickUser(id)
+	if req.NewPassword != "" || !req.Enabled {
+		if err := app.auth.DestroyUserSessions(r.RequestCtx, id); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
 
 	// Create activity log if user availability status changed.
 	if oldAvailabilityStatus != req.AvailabilityStatus {
@@ -354,6 +359,9 @@ func handleDeleteAgent(r *fastglue.Request) error {
 
 	defer app.wsHub.KickUser(id)
 	defer app.user.InvalidateAgentCache(id)
+	if err := app.auth.DestroyUserSessions(r.RequestCtx, id); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 
 	// Unassign all open conversations assigned to the user.
 	if err := app.conversation.UnassignOpen(id); err != nil {
@@ -487,6 +495,9 @@ func handleSetPassword(r *fastglue.Request) error {
 	}
 	app.user.InvalidateAgentCache(id)
 	app.wsHub.KickUser(id)
+	if err := app.auth.DestroyUserSessions(r.RequestCtx, id); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
 
 	return r.SendEnvelope(true)
 }

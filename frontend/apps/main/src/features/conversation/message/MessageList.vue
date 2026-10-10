@@ -11,7 +11,7 @@
             variant="outline"
             @click="loadMore"
             :disabled="conversationStore.messages.fetching"
-            class="max-md:h-11 transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
+            class="max-md:h-11"
           >
             <Loader2
               v-if="conversationStore.messages.fetching"
@@ -25,7 +25,12 @@
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
+        <TransitionGroup
+          v-else
+          :key="conversationStore.current?.uuid"
+          :enter-active-class="loadingOlder ? '' : 'animate-slide-in'"
+          tag="div"
+        >
           <div
             v-for="row in messageRows"
             :key="row.message.render_key || row.message.uuid"
@@ -58,6 +63,7 @@
             </div>
           </div>
         </TransitionGroup>
+        <div ref="readMarkerEl" class="h-px" />
       </div>
 
       <!-- Typing indicator -->
@@ -85,6 +91,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useConversationRead } from '@main/composables/useConversationRead'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
@@ -113,12 +120,24 @@ const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const threadEl = ref(null)
 const contentEl = ref(null)
+const readMarkerEl = ref(null)
+const readReady = ref(false)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 const showAssignNudge = ref(false)
+const loadingOlder = ref(false)
 const { canAssignAgent } = useBulkActionPermissions()
 let currentConversationUUID = ''
 let openScrollDone = false
+
+useConversationRead({
+  root: threadEl,
+  marker: readMarkerEl,
+  conversationUUID: computed(() => conversationStore.current?.uuid),
+  message: computed(() => conversationStore.conversationMessages.findLast(message => message.id > 0)),
+  loading: computed(() => !readReady.value || conversationStore.conversation.loading || conversationStore.messages.loading || conversationStore.messages.fetching || conversationStore.messages.fetchingLatest || conversationStore.hasPendingMessages),
+  acknowledge: (uuid, messageUUID) => conversationStore.updateAssigneeLastSeen(uuid, messageUUID)
+})
 
 const assignToSelf = () => {
   conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
@@ -141,16 +160,18 @@ const applyOpenScroll = () => {
   if (targetEl) {
     hasUserScrolled.value = true
     // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
+    const anchorConversation = currentConversationUUID
     let lastOffset = -1
     let stableFrames = 0
     let frames = 0
     const anchorToTarget = () => {
-      if (!threadEl.value || !targetEl.isConnected) return
+      if (!threadEl.value || !targetEl.isConnected || anchorConversation !== currentConversationUUID) return
       const offset = targetEl.offsetTop
       scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
       stableFrames = offset === lastOffset ? stableFrames + 1 : 0
       lastOffset = offset
       if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES) requestAnimationFrame(anchorToTarget)
+      else readReady.value = true
     }
     anchorToTarget()
     targetEl.classList.add('highlight-mention')
@@ -158,6 +179,7 @@ const applyOpenScroll = () => {
   } else {
     hasUserScrolled.value = false
     scrollToBottom()
+    readReady.value = true
   }
 }
 
@@ -194,6 +216,7 @@ watch(
     currentConversationUUID = newUUID
     unReadMessages.value = 0
     openScrollDone = false
+    readReady.value = false
     showAssignNudge.value = false
   }
 )
@@ -256,9 +279,14 @@ const loadMore = async () => {
   if (!thread) return
   const prevHeight = thread.scrollHeight
   const prevTop = thread.scrollTop
-  await conversationStore.fetchNextMessages()
-  await nextTick()
-  thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+  loadingOlder.value = true
+  try {
+    await conversationStore.fetchNextMessages()
+    await nextTick()
+    thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+  } finally {
+    loadingOlder.value = false
+  }
 }
 
 const messageRows = computed(() => {
@@ -280,13 +308,6 @@ const messageRows = computed(() => {
 </script>
 
 <style scoped>
-/* Leaving messages must be out of flow during a conversation swap, else they shift the target's offsetTop mid-scroll. */
-.message-leaving {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Highlight via an opacity-faded overlay, not the element's own background, to avoid a text repaint flicker when it ends. */
 .highlight-mention {
   position: relative;

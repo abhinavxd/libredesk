@@ -32,6 +32,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
+	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	slaModels "github.com/abhinavxd/libredesk/internal/sla/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -41,6 +42,7 @@ import (
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	wtmodels "github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
 	"github.com/knadh/go-i18n"
@@ -194,10 +196,10 @@ type mediaStore interface {
 	GetURL(uuid, contentType, fileName string) string
 	GetSignedURL(name string) string
 	GetThumbnailURL(uuid string) string
-	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string) error
+	LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []mmodels.Media, inlineUUIDs []string, uploadedBy int) error
 	GetByModel(id int, model string) ([]mmodels.Media, error)
 	GetByContentIDs(contentIDs []string, conversationUUID string) ([]mmodels.Media, error)
-	GetDraftInlineMedia(uuid string, conversationID int) (mmodels.Media, error)
+	GetDraftInlineMedia(uuid string, conversationID, userID int) (mmodels.Media, error)
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
 	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
@@ -496,9 +498,10 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 }
 
 // GetContactPreviousConversations retrieves previous conversations for a contact with a configurable limit.
-func (c *Manager) GetContactPreviousConversations(contactID int, limit int) ([]models.PreviousConversation, error) {
+func (c *Manager) GetContactPreviousConversations(contactID int, limit int, user umodels.User) ([]models.PreviousConversation, error) {
 	var conversations = make([]models.PreviousConversation, 0)
-	if err := c.q.GetContactPreviousConversations.Select(&conversations, contactID, limit); err != nil {
+	args := append([]any{contactID, limit, user.ID}, readScopeArgs(user)...)
+	if err := c.q.GetContactPreviousConversations.Select(&conversations, args...); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
 		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -616,22 +619,35 @@ func (c *Manager) GetConversationsCreatedAfter(after time.Time, afterID, limit i
 	return refs, nil
 }
 
-// UpdateUserLastSeen updates the last seen timestamp for a specific user on a conversation.
-func (c *Manager) UpdateUserLastSeen(uuid string, userID int) error {
-	if _, err := c.q.UpsertUserLastSeen.Exec(userID, uuid); err != nil {
-		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+// UpdateUserLastSeen moves the user's last seen timestamp forward to the given message, or to now when messageUUID is empty.
+func (c *Manager) UpdateUserLastSeen(conversationUUID string, userID int, messageUUID string) (models.ConversationReadState, error) {
+	var state models.ConversationReadState
+	if messageUUID != "" {
+		if _, err := uuid.Parse(messageUUID); err != nil {
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
+		}
 	}
-	return nil
+	if err := c.q.UpsertUserLastSeen.Get(&state, userID, conversationUUID, messageUUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+		}
+		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return state, nil
 }
 
 // MarkAsUnread marks a conversation as unread for a specific user by setting last_seen to before the last message.
-func (c *Manager) MarkAsUnread(uuid string, userID int) error {
-	if _, err := c.q.MarkConversationUnread.Exec(userID, uuid); err != nil {
+func (c *Manager) MarkAsUnread(uuid string, userID int) (models.ConversationReadState, error) {
+	var state models.ConversationReadState
+	if err := c.q.MarkConversationUnread.Get(&state, userID, uuid, pq.Array(nmodels.ReplyTypes)); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+		}
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	return nil
+	return state, nil
 }
 
 // UpdateContactLastSeen updates the last seen timestamp of the contact in the conversation.
@@ -780,6 +796,10 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 	}
 
 	c.BroadcastConversationUpdate(conversationUUID, map[string]any{"status": models.StatusOpen})
+	// Reopening unassigns an agent who is away and reassigning.
+	if conv, err := c.GetConversationListItem(conversationUUID); err == nil {
+		c.retainAuthorizedSubscribers(&conv)
+	}
 
 	if err := c.RecordStatusChange(models.StatusOpen, conversationUUID, actor); err != nil {
 		return true, err
@@ -1338,7 +1358,7 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 			nType:      assigneeType,
 			tmpl:       assigneeTmpl,
 			title:      m.i18n.Ts(assigneeTitleKey, "referenceNumber", conversation.ReferenceNumber),
-			recipients: m.replyNotificationAssignee(conversation, message.SenderID),
+			recipients: m.replyNotificationAssignee(conversation, message.SenderID, assigneeType),
 		},
 		{
 			nType:      nmodels.NotificationTypeNewReplyParticipating,
@@ -1362,12 +1382,12 @@ func (m *Manager) NotifyNewReply(conversation models.Conversation, message model
 	}
 }
 
-func (m *Manager) replyNotificationAssignee(conversation models.Conversation, senderID int) []umodels.User {
+func (m *Manager) replyNotificationAssignee(conversation models.Conversation, senderID int, nType nmodels.NotificationType) []umodels.User {
 	assigneeID := conversation.AssignedUserID.Int
 	if assigneeID == 0 || assigneeID == senderID {
 		return nil
 	}
-	agent, ok := m.notifiableAgent(assigneeID, conversation)
+	agent, ok := m.notifiableAgent(assigneeID, conversation, nType, false /** participating **/)
 	if !ok {
 		return nil
 	}
@@ -1382,23 +1402,23 @@ func (m *Manager) replyNotificationParticipants(conversation models.Conversation
 	}
 	agents := make([]umodels.User, 0, len(participants))
 	for _, participant := range participants {
-		if participant.ID == senderID || participant.ID == conversation.AssignedUserID.Int {
+		if participant.ID == senderID {
 			continue
 		}
-		if agent, ok := m.notifiableAgent(participant.ID, conversation); ok {
+		if agent, ok := m.notifiableAgent(participant.ID, conversation, nmodels.NotificationTypeNewReplyParticipating, true /** participating **/); ok {
 			agents = append(agents, agent)
 		}
 	}
 	return agents
 }
 
-func (m *Manager) notifiableAgent(userID int, conversation models.Conversation) (umodels.User, bool) {
+func (m *Manager) notifiableAgent(userID int, conversation models.Conversation, nType nmodels.NotificationType, participating bool) (umodels.User, bool) {
 	agent, err := m.userStore.GetAgentCachedOrLoad(userID)
 	if err != nil {
 		m.lo.Error("error fetching agent for new reply notification", "user_id", userID, "error", err)
 		return umodels.User{}, false
 	}
-	if !agent.Enabled || !authz.CanReadAssignment(agent, conversation.AssignedUserID, conversation.AssignedTeamID) {
+	if !notifier.CanReceiveReply(agent, nType, conversation.AssignedUserID, conversation.AssignedTeamID, participating) {
 		return umodels.User{}, false
 	}
 	return agent, true
@@ -2314,17 +2334,7 @@ func (c *Manager) FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]stri
 		return nil, nil
 	}
 	var authorized []string
-	err = c.q.FilterAuthorizedListUUIDs.Select(&authorized,
-		pq.Array(uuids),
-		user.ID,
-		pq.Array(user.Teams.IDs()),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
-		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned),
-	)
+	err = c.q.FilterAuthorizedListUUIDs.Select(&authorized, append([]any{pq.Array(uuids), user.ID}, readScopeArgs(user)...)...)
 	if err != nil {
 		c.lo.Error("error filtering authorized list uuids", "agent_id", agentID, "error", err)
 		return nil, err
@@ -2499,4 +2509,17 @@ func replyNotificationText(message models.Message) string {
 		return cmp.Or(stringutil.HTML2TextNoQuotes(message.Content), full)
 	}
 	return cmp.Or(stringutil.TrimPlainTextQuotes(full), full)
+}
+
+// readScopeArgs returns the agent's team IDs and read permissions in the argument order the read-permission queries expect.
+func readScopeArgs(user umodels.User) []any {
+	return []any{
+		pq.Array(user.Teams.IDs()),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsRead),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadAssigned),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamAll),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadTeamInbox),
+		slices.Contains(user.Permissions, authzmodels.PermConversationsReadUnassigned),
+	}
 }
