@@ -308,9 +308,17 @@ func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.
 	for _, med := range media {
 		ids = append(ids, med.ID)
 	}
-	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs)); err != nil {
+	result, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs))
+	if err != nil {
 		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
 		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking linked media count for message:%d: %w", messageID, err)
+	}
+	if rowsAffected < int64(len(ids)) {
+		return fmt.Errorf("linked %d of %d requested attachments to message:%d", rowsAffected, len(ids), messageID)
 	}
 	return nil
 }
