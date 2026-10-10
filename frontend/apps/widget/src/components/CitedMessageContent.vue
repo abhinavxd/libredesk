@@ -4,12 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { sanitize, allowedCssProperties } from 'lettersanitizer'
 import { BookOpen } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from '@shared-ui/components/ui/tooltip'
+import { HoverCardRoot, HoverCardContent, HoverCardPortal, HoverCardTrigger } from 'reka-ui'
 
 const props = defineProps({
   html: { type: String, required: true }
@@ -46,12 +41,12 @@ const renderNode = (node) => {
     title
   ) {
     return h(
-      Tooltip,
-      {},
+      HoverCardRoot,
+      { openDelay: 150, closeDelay: 150 },
       {
         default: () => [
           h(
-            TooltipTrigger,
+            HoverCardTrigger,
             { asChild: true },
             {
               default: () =>
@@ -59,34 +54,60 @@ const renderNode = (node) => {
                   Button,
                   {
                     as: 'a',
-                    variant: 'ghost',
+                    variant: 'secondary',
                     href: attributes.href,
                     target: '_blank',
                     rel: 'noopener noreferrer',
                     'aria-label': `${node.textContent} ${title}`,
                     class:
-                      'h-auto px-0.5 py-0 text-[10px] leading-none !text-muted-foreground hover:!text-foreground'
+                      'mx-0.5 h-auto rounded-full bg-foreground/10 px-1.5 py-0.5 text-sm leading-none !text-foreground hover:bg-foreground/15'
                   },
                   { default: () => node.textContent }
                 )
             }
           ),
           h(
-            TooltipContent,
-            { class: 'max-w-60 whitespace-normal break-words' },
+            HoverCardPortal,
+            {},
             {
-              default: () => [
-                h('span', { class: 'mb-1 flex items-center gap-1 opacity-70' }, [
-                  h(BookOpen, { class: 'h-3 w-3', 'aria-hidden': true }),
-                  t('globals.terms.article')
-                ]),
-                h('span', { class: 'font-medium' }, title)
-              ]
+              default: () =>
+                h(
+                  HoverCardContent,
+                  { asChild: true, side: 'top', sideOffset: 6, class: 'z-50' },
+                  {
+                    default: () =>
+                      h(
+                        Button,
+                        {
+                          as: 'a',
+                          variant: 'secondary',
+                          href: attributes.href,
+                          target: '_blank',
+                          rel: 'noopener noreferrer',
+                          'aria-label': title,
+                          class:
+                            'h-auto max-w-60 flex-col items-start gap-1 whitespace-normal break-words p-3 text-left text-xs shadow-md'
+                        },
+                        {
+                          default: () => [
+                            h('span', { class: 'flex items-center gap-1 opacity-70' }, [
+                              h(BookOpen, { class: 'h-3 w-3', 'aria-hidden': true }),
+                              t('globals.terms.helpCenterArticle')
+                            ]),
+                            h('span', { class: 'font-medium' }, title)
+                          ]
+                        }
+                      )
+                  }
+                )
             }
           )
         ]
       }
     )
+  }
+  if (node.localName === 'sup' && node.querySelector('a[class$="_ld-article-citation"]')) {
+    return h('span', attributes, [...node.childNodes].map(renderNode))
   }
   if (attributes.target === '_blank') attributes.rel = 'noopener noreferrer'
   return h(node.localName, attributes, [...node.childNodes].map(renderNode))
@@ -101,7 +122,5 @@ const ContentNodes = () =>
 </script>
 
 <template>
-  <TooltipProvider :delay-duration="150">
-    <ContentNodes />
-  </TooltipProvider>
+  <ContentNodes />
 </template>
