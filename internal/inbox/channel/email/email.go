@@ -13,7 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email/oauth"
 	"github.com/abhinavxd/libredesk/internal/inbox/models"
-	"github.com/knadh/smtppool"
+	"github.com/knadh/smtppool/v2"
 	"github.com/zerodha/logf"
 	xoauth2 "golang.org/x/oauth2"
 )

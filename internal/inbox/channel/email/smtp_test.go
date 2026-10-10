@@ -1,12 +1,17 @@
 package email
 
 import (
+	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/textproto"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
@@ -344,10 +349,101 @@ func TestAliasVerificationReceivingAddress(t *testing.T) {
 	}
 }
 
+func TestSMTPTransportAndLongReferences(t *testing.T) {
+	for _, tlsMode := range []string{"none", "tls", "starttls"} {
+		for _, count := range []int{15, 20} {
+			for _, idBytes := range []int{66, 90, 130} {
+				for _, subject := range []string{"Reply", "é" + strings.Repeat("a", 50)} {
+					name := fmt.Sprintf("tls=%s/count=%d/bytes=%d/subject=%q", tlsMode, count, idBytes, subject)
+					t.Run(name, func(t *testing.T) {
+						references := make([]string, count)
+						for i := range count {
+							references[i] = fmt.Sprintf("%03d", i) + strings.Repeat("a", idBytes-15) + "@example.com"
+						}
+						message := captureSMTPMessageWithTLS(t, tlsMode, func(e *Email) error {
+							return e.Send(models.OutboundMessage{
+								From: "support@example.com", To: []string{"customer@example.net"},
+								Subject: subject, References: references, InReplyTo: references[count-1],
+								ContentType: "plain", Content: "Reply body\n",
+							})
+						})
+						require.Equal(t, "<"+strings.Join(references, "> <")+">", message.GetHeader(headerReferences))
+						require.Equal(t, "<"+references[count-1]+">", message.GetHeader(headerInReplyTo))
+						require.Equal(t, subject, message.GetHeader("Subject"))
+						require.Equal(t, "Reply body\n", message.Text)
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestNewSmtpPoolDefaultRetries(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+	go func() {
+		for attempt := range 2 {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			conn.SetDeadline(time.Now().Add(5 * time.Second))
+			protocol := textproto.NewConn(conn)
+			if attempt == 0 {
+				protocol.PrintfLine("421 temporarily unavailable")
+				conn.Close()
+				continue
+			}
+			defer conn.Close()
+			protocol.PrintfLine("220 localhost SMTP")
+			for {
+				line, err := protocol.ReadLine()
+				if err != nil {
+					return
+				}
+				if line == "DATA" {
+					protocol.PrintfLine("354 send message")
+					if _, err := protocol.ReadDotBytes(); err != nil {
+						return
+					}
+				}
+				protocol.PrintfLine("250 ok")
+			}
+		}
+	}()
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	pools, err := NewSmtpPool([]imodels.SMTPConfig{{Host: host, Port: port, TLSType: "none", MaxConns: 1}}, nil /* oauth */)
+	require.NoError(t, err)
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	e := &Email{smtpPools: pools, lo: &logger}
+	t.Cleanup(func() { e.Close() })
+	require.NoError(t, e.Send(models.OutboundMessage{
+		From: "support@example.com", To: []string{"customer@example.net"}, ContentType: "plain", Content: "Reply\n",
+	}))
+}
+
 func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope {
+	t.Helper()
+	return captureSMTPMessageWithTLS(t, "none" /* tlsMode */, send)
+}
+
+func captureSMTPMessageWithTLS(t *testing.T, tlsMode string, send func(*Email) error) *enmime.Envelope {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
+	var tlsConfig *tls.Config
+	if tlsMode != "none" {
+		certificateServer := httptest.NewTLSServer(http.NotFoundHandler())
+		tlsConfig = certificateServer.TLS.Clone()
+		certificateServer.Close()
+		if tlsMode == "tls" {
+			listener = tls.NewListener(listener, tlsConfig)
+		}
+	}
 	t.Cleanup(func() { listener.Close() })
 	messages := make(chan []byte, 1)
 	go func() {
@@ -356,6 +452,7 @@ func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope 
 			return
 		}
 		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(5 * time.Second))
 		protocol := textproto.NewConn(conn)
 		protocol.PrintfLine("220 localhost SMTP")
 		for {
@@ -365,8 +462,22 @@ func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope 
 			}
 			switch {
 			case strings.HasPrefix(line, "EHLO"), strings.HasPrefix(line, "HELO"):
-				protocol.PrintfLine("250 localhost")
+				if tlsMode == "starttls" {
+					protocol.PrintfLine("250-localhost\r\n250 STARTTLS")
+				} else {
+					protocol.PrintfLine("250 localhost")
+				}
+			case line == "STARTTLS" && tlsMode == "starttls":
+				protocol.PrintfLine("220 ready for TLS")
+				conn = tls.Server(conn, tlsConfig)
+				protocol = textproto.NewConn(conn)
 			case line == "DATA":
+				if tlsMode != "none" {
+					if _, secure := conn.(*tls.Conn); !secure {
+						protocol.PrintfLine("530 TLS required")
+						return
+					}
+				}
 				protocol.PrintfLine("354 send message")
 				body, err := protocol.ReadDotBytes()
 				if err != nil {
@@ -387,7 +498,7 @@ func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope 
 	port, err := strconv.Atoi(portText)
 	require.NoError(t, err)
 	pools, err := NewSmtpPool([]imodels.SMTPConfig{{
-		Host: host, Port: port, TLSType: "none", MaxConns: 1, MaxMessageRetries: 1,
+		Host: host, Port: port, TLSType: tlsMode, TLSSkipVerify: tlsMode != "none", MaxConns: 1, MaxMessageRetries: 1,
 	}}, nil /* oauth */)
 	require.NoError(t, err)
 	logger := logf.New(logf.Opts{Writer: io.Discard})
@@ -399,6 +510,15 @@ func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope 
 	require.NoError(t, send(e))
 	select {
 	case raw := <-messages:
+		header, _, ok := strings.Cut(string(raw), "\n\n")
+		require.True(t, ok)
+		for line := range strings.SplitSeq(header, "\n") {
+			require.LessOrEqual(t, len(line), 998)
+			require.NotEmpty(t, strings.TrimSpace(line))
+			if strings.Contains(line, "=?UTF-8?") {
+				require.LessOrEqual(t, len(line), 76)
+			}
+		}
 		message, err := enmime.ReadEnvelope(strings.NewReader(string(raw)))
 		require.NoError(t, err)
 		return message

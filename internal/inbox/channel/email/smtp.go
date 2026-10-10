@@ -13,7 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/knadh/smtppool"
+	"github.com/knadh/smtppool/v2"
 )
 
 const (
@@ -85,15 +85,27 @@ func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*s
 			poolWaitTimeout = 40 * time.Second
 		}
 
+		ssl := smtppool.SSLNone
+		if cfg.TLSConfig != nil {
+			ssl = smtppool.SSLSTARTTLS
+			if cfg.SSL {
+				ssl = smtppool.SSLTLS
+			}
+		}
+		maxMessageRetries := cfg.MaxMessageRetries
+		if maxMessageRetries == 0 {
+			maxMessageRetries = 2
+		}
+
 		pool, err := smtppool.New(smtppool.Opt{
 			Host:              cfg.Host,
 			Port:              cfg.Port,
 			HelloHostname:     cfg.HelloHostname,
 			MaxConns:          cfg.MaxConns,
-			MaxMessageRetries: cfg.MaxMessageRetries,
+			MaxMessageRetries: maxMessageRetries,
 			IdleTimeout:       idleTimeout,
 			PoolWaitTimeout:   poolWaitTimeout,
-			SSL:               cfg.SSL,
+			SSL:               ssl,
 			Auth:              cfg.Auth,
 			TLSConfig:         cfg.TLSConfig,
 		})
