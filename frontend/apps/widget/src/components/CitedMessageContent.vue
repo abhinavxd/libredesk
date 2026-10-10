@@ -1,15 +1,11 @@
 <script setup>
 import { computed, h } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { sanitize, allowedCssProperties } from 'lettersanitizer'
-import { BookOpen } from 'lucide-vue-next'
-import { Button } from '@shared-ui/components/ui/button'
-import { HoverCardRoot, HoverCardContent, HoverCardPortal, HoverCardTrigger } from 'reka-ui'
+import ArticleCitation from '@widget/components/ArticleCitation.vue'
 
 const props = defineProps({
   html: { type: String, required: true }
 })
-const { t } = useI18n()
 
 const content = computed(() => {
   const parser = new DOMParser()
@@ -40,72 +36,11 @@ const renderNode = (node) => {
     [...node.classList].some((name) => name.endsWith('_ld-article-citation')) &&
     title
   ) {
-    const number = node.textContent.replace(/^\((\d+)\)$/, '$1')
-    return h(
-      HoverCardRoot,
-      { openDelay: 150, closeDelay: 150 },
-      {
-        default: () => [
-          h(
-            HoverCardTrigger,
-            { asChild: true },
-            {
-              default: () =>
-                h(
-                  Button,
-                  {
-                    as: 'button',
-                    type: 'button',
-                    variant: 'secondary',
-                    'aria-label': `${number} ${title}`,
-                    class:
-                      'mx-0.5 h-auto rounded-full bg-foreground/10 px-1.5 py-0.5 text-sm leading-none !text-foreground hover:bg-foreground/15'
-                  },
-                  { default: () => number }
-                )
-            }
-          ),
-          h(
-            HoverCardPortal,
-            {},
-            {
-              default: () =>
-                h(
-                  HoverCardContent,
-                  {
-                    side: 'top',
-                    sideOffset: 6,
-                    class:
-                      'z-50 flex max-w-60 flex-col items-start gap-1 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md'
-                  },
-                  {
-                    default: () => [
-                      h('span', { class: 'flex items-center gap-1 text-muted-foreground' }, [
-                        h(BookOpen, { class: 'h-3 w-3', 'aria-hidden': true }),
-                        t('globals.terms.helpCenterArticle')
-                      ]),
-                      h(
-                        Button,
-                        {
-                          as: 'a',
-                          variant: 'link',
-                          href: attributes.href,
-                          target: '_blank',
-                          rel: 'noopener noreferrer',
-                          'aria-label': title,
-                          class:
-                            'h-auto justify-start whitespace-normal break-words p-0 text-left text-xs text-popover-foreground no-underline hover:text-popover-foreground hover:underline'
-                        },
-                        { default: () => title }
-                      )
-                    ]
-                  }
-                )
-            }
-          )
-        ]
-      }
-    )
+    return h(ArticleCitation, {
+      number: node.textContent.replace(/^\((\d+)\)$/, '$1'),
+      title,
+      href: attributes.href
+    })
   }
   if (node.localName === 'sup' && node.querySelector('a[class$="_ld-article-citation"]')) {
     return h('span', attributes, [...node.childNodes].map(renderNode))
