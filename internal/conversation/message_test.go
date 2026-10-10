@@ -699,7 +699,7 @@ func TestRenderArticleReferences(t *testing.T) {
 	meta := json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,34]}`)
 	message := models.Message{Content: "<p>Answer.</p>", Meta: meta}
 	m.RenderArticleReferences(&message)
-	for _, part := range []string{"Article references", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery", "Refunds &lt;script&gt; &amp; &#34;policy&#34;"} {
+	for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery", "Refunds &lt;script&gt; &amp; &#34;policy&#34;"} {
 		if !strings.Contains(message.Content, part) {
 			t.Errorf("rendered references missing %q: %s", part, message.Content)
 		}
@@ -729,6 +729,52 @@ func TestRenderArticleReferences(t *testing.T) {
 		if message.Content != "<p>Answer.</p>" {
 			t.Fatal("unavailable references changed the answer")
 		}
+	}
+}
+
+func TestInlineArticleReferences(t *testing.T) {
+	references := []hcmodels.ArticleReference{
+		{ID: 12, Title: "JWT {{name}}", URL: "https://help.example.com/jwt"},
+		{ID: 34, Title: "Logout", URL: "https://help.example.com/logout"},
+	}
+	content := "<p>Use JWT.<!--ld-cite:12--> Log out.<!--ld-cite:34--> JWT again.<!--ld-cite:12--></p>"
+	rendered := chatArticleReferencesHTML(content, references)
+	for _, part := range []string{
+		"Use JWT.<sup>",
+		"Log out.<sup>",
+		"JWT again.<sup>",
+		`title="JWT {{name}}"`,
+		">(2)</a></sup>",
+	} {
+		if !strings.Contains(rendered, part) {
+			t.Errorf("inline references missing %q: %s", part, rendered)
+		}
+	}
+	if strings.Count(rendered, ">(1)</a></sup>") != 2 || strings.Contains(rendered, "ld-cite:") || strings.Contains(rendered, "<ul>") {
+		t.Fatalf("unexpected inline references: %s", rendered)
+	}
+	if got := chatArticleReferencesHTML(content, nil /* references */); got != "<p>Use JWT. Log out. JWT again.</p>" {
+		t.Fatalf("unavailable references changed the answer: %s", got)
+	}
+	if got := chatArticleReferencesHTML("<p>Answer.<!--ld-cite:999--></p>", references[:1]); strings.Contains(got, "ld-cite:") || !strings.Contains(got, "</p><p><sup>") {
+		t.Fatalf("missing placement did not produce a numbered footer: %s", got)
+	}
+	lo := logf.New(logf.Opts{})
+	m := Manager{
+		articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+			{ID: 12, Title: "JWT", HelpCenterSlug: "support", Locale: "en", Slug: "jwt"},
+		}},
+		settingsStore: citationSettingsStore{rootURL: "https://desk.example.com"},
+		lo:            &lo,
+	}
+	message := models.Message{Content: content, Meta: json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12,34]}`)}
+	data := map[string]any{}
+	mailContent := m.emailTemplateContent(&message, data)
+	if strings.Contains(mailContent, "ld-cite:") || strings.Contains(mailContent, "<sup>") {
+		t.Fatalf("email retained widget markers: %s", mailContent)
+	}
+	if !strings.Contains(data["ArticleReferences"].(string), ">(1)</a>") {
+		t.Fatal("email lost its numbered references")
 	}
 }
 

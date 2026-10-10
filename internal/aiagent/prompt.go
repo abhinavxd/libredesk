@@ -168,7 +168,7 @@ func buildSystemPrompt(a models.Assistant) string {
 		b.WriteString(instr)
 	}
 	if a.CitationsEnabled {
-		b.WriteString("\n\nWhen your answer uses help center articles from this turn's search results, add a separate line in this exact form: [[sources]] [12,34]. Include only the article_id values of articles you actually used, once each. Never cite snippets or articles from earlier turns, and never invent an article ID or URL. Put this line before [[confirm]] or [[suggestions]] when present. Omit it when no help center article supports the answer, including greetings, clarifying questions, refusals and handoffs. The customer never sees this line. Article links are added by the application.")
+		b.WriteString("\n\nCite help center articles from this turn's search results directly after the sentence they support, using [[cite:12]] where 12 is the article_id. Example: You can use JWT authentication.[[cite:12]] You can also log out.[[cite:34]] Repeat a marker when the same article supports another sentence. Cite only articles you actually used. Never cite snippets or articles from earlier turns, and never invent an article ID or URL. Do not put citation markers inside links, code, [[confirm]] or [[suggestions]]. Omit citations for greetings, clarifying questions, refusals and handoffs. The application replaces each marker with a numbered article link.")
 	}
 	if guard := strings.TrimSpace(a.Guardrails); guard != "" {
 		b.WriteString("\n\nGuardrails (never violate these):\n")

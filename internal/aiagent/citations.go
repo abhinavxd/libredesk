@@ -2,10 +2,16 @@ package aiagent
 
 import (
 	"encoding/json"
+	"regexp"
+	"strconv"
 	"strings"
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"golang.org/x/net/html"
 )
+
+var inlineCitationRegexp = regexp.MustCompile(`\[\[cite:([^\]]*)\]\]`)
 
 func splitArticleSources(answer string, hits []aimodels.SearchResult, enabled bool) (string, []int) {
 	allowed := map[int]bool{}
@@ -17,6 +23,18 @@ func splitArticleSources(answer string, hits []aimodels.SearchResult, enabled bo
 		}
 	}
 	var articleIDs []int
+	cited := map[int]bool{}
+	answer = inlineCitationRegexp.ReplaceAllStringFunc(answer, func(marker string) string {
+		id, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "[[cite:"), "]]"))
+		if err != nil || !allowed[id] {
+			return ""
+		}
+		if !cited[id] {
+			articleIDs = append(articleIDs, id)
+			cited[id] = true
+		}
+		return marker
+	})
 	var body strings.Builder
 	for {
 		before, payload, found := strings.Cut(answer, sourcesMarker)
@@ -47,9 +65,9 @@ func splitArticleSources(answer string, hits []aimodels.SearchResult, enabled bo
 		}
 		if err == nil {
 			for _, id := range ids {
-				if allowed[id] {
+				if allowed[id] && !cited[id] {
 					articleIDs = append(articleIDs, id)
-					delete(allowed, id)
+					cited[id] = true
 				}
 			}
 		}
@@ -61,10 +79,49 @@ func splitArticleSources(answer string, hits []aimodels.SearchResult, enabled bo
 	return strings.TrimSpace(body.String()), articleIDs
 }
 
+func articleCitationHTML(text string, articleIDs []int) string {
+	allowed := make(map[int]bool, len(articleIDs))
+	for _, id := range articleIDs {
+		allowed[id] = true
+	}
+	tokens := html.NewTokenizer(strings.NewReader(stringutil.Markdown2HTML(text)))
+	var content strings.Builder
+	for {
+		kind := tokens.Next()
+		if kind == html.ErrorToken {
+			break
+		}
+		raw := string(tokens.Raw())
+		raw = inlineCitationRegexp.ReplaceAllStringFunc(raw, func(marker string) string {
+			id, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "[[cite:"), "]]"))
+			if kind != html.TextToken || !allowed[id] {
+				return ""
+			}
+			return "<!--ld-cite:" + strconv.Itoa(id) + "-->"
+		})
+		content.WriteString(raw)
+	}
+	return content.String()
+}
+
 func replyMeta(suggestions []string, articleIDs []int) map[string]any {
 	meta := suggestedRepliesMeta(suggestions)
 	if len(articleIDs) > 0 {
 		meta["ai_article_ids"] = articleIDs
 	}
 	return meta
+}
+
+func numberedCitationText(text string, articleIDs []int) string {
+	numbers := make(map[int]int, len(articleIDs))
+	for i, id := range articleIDs {
+		numbers[id] = i + 1
+	}
+	return inlineCitationRegexp.ReplaceAllStringFunc(text, func(marker string) string {
+		id, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "[[cite:"), "]]"))
+		if number := numbers[id]; number > 0 {
+			return "(" + strconv.Itoa(number) + ")"
+		}
+		return ""
+	})
 }

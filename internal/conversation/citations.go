@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 )
+
+var articleCitationRegexp = regexp.MustCompile(`<!--ld-cite:(\d+)-->`)
 
 func (m *Manager) SetArticleReferenceStore(store articleReferenceStore) {
 	m.articleReferenceStore = store
@@ -37,17 +41,13 @@ func (m *Manager) GetArticleReferences(ids []int) ([]hcmodels.ArticleReference, 
 }
 
 func (m *Manager) RenderArticleReferences(message *models.Message) {
-	message.Content += m.chatArticleReferencesHTML(m.lookupArticleReferences(message.Meta)[0])
+	message.Content = chatArticleReferencesHTML(message.Content, m.lookupArticleReferences(message.Meta)[0])
 }
 
 func (m *Manager) RenderMessagesArticleReferences(messages []models.Message) {
 	for i, references := range m.lookupArticleReferences(messageMetas(messages)...) {
-		messages[i].Content += m.chatArticleReferencesHTML(references)
+		messages[i].Content = chatArticleReferencesHTML(messages[i].Content, references)
 	}
-}
-
-func (m *Manager) chatArticleReferencesHTML(references []hcmodels.ArticleReference) string {
-	return articleReferencesHTML(references, m.i18n.Tc("globals.terms.articleReference", 2 /* n */))
 }
 
 func (m *Manager) emailArticleReferences(message *models.Message) string {
@@ -110,6 +110,40 @@ func messageArticleIDs(meta json.RawMessage) []int {
 		}
 	}
 	return ids
+}
+
+func chatArticleReferencesHTML(content string, references []hcmodels.ArticleReference) string {
+	byID := make(map[int]int, len(references))
+	for i, reference := range references {
+		byID[reference.ID] = i
+	}
+	used := map[int]bool{}
+	content = articleCitationRegexp.ReplaceAllStringFunc(content, func(marker string) string {
+		id, _ := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(marker, "<!--ld-cite:"), "-->"))
+		i, ok := byID[id]
+		if !ok {
+			return ""
+		}
+		used[id] = true
+		return articleReferenceLinkHTML(references[i], i+1)
+	})
+	var remaining strings.Builder
+	for i, reference := range references {
+		if !used[reference.ID] {
+			if remaining.Len() > 0 {
+				remaining.WriteByte(' ')
+			}
+			remaining.WriteString(articleReferenceLinkHTML(reference, i+1))
+		}
+	}
+	if remaining.Len() > 0 {
+		content += "<p>" + remaining.String() + "</p>"
+	}
+	return content
+}
+
+func articleReferenceLinkHTML(reference hcmodels.ArticleReference, number int) string {
+	return fmt.Sprintf(`<sup><a class="ld-article-citation" href="%s" title="%s" aria-label="%s" target="_blank" rel="noopener noreferrer">(%d)</a></sup>`, html.EscapeString(reference.URL), html.EscapeString(reference.Title), html.EscapeString(reference.Title), number)
 }
 
 func articleReferencesHTML(references []hcmodels.ArticleReference, label string) string {

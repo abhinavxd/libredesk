@@ -7,6 +7,7 @@ import (
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 )
 
 func TestSplitSuggestions(t *testing.T) {
@@ -41,6 +42,11 @@ func TestSplitArticleSources(t *testing.T) {
 		body    string
 		ids     []int
 	}{
+		{"inline claims", "Use JWT.[[cite:12]] Log out.[[cite:34]]", true, "Use JWT.[[cite:12]] Log out.[[cite:34]]", []int{12, 34}},
+		{"repeated inline article", "Use JWT.[[cite:34]] More JWT.[[cite:34]]", true, "Use JWT.[[cite:34]] More JWT.[[cite:34]]", []int{34}},
+		{"invalid inline articles", "Answer.[[cite:999]][[cite:56]][[cite:0]][[cite:-1]][[cite:no]]", true, "Answer.", nil},
+		{"inline disabled", "Answer.[[cite:12]]", false, "Answer.", nil},
+		{"mixed citation styles", "Answer.[[cite:34]]\n[[sources]] [12,34]", true, "Answer.[[cite:34]]", []int{34, 12}},
 		{"used articles", "Answer.\n[[sources]] [34,12]", true, "Answer.", []int{34, 12}},
 		{"duplicates and unknown IDs", "Answer.\n[[sources]] [12,12,0,-1,999,56,34]", true, "Answer.", []int{12, 34}},
 		{"multiple searches and lines", "Answer.\n[[sources]] [12]\n[[sources]] [12,34]", true, "Answer.", []int{12, 34}},
@@ -73,10 +79,33 @@ func TestSplitArticleSources(t *testing.T) {
 }
 
 func TestArticleCitationPrompt(t *testing.T) {
-	if strings.Contains(buildSystemPrompt(models.Assistant{}), "[[sources]]") {
+	if strings.Contains(buildSystemPrompt(models.Assistant{}), "[[cite:") {
 		t.Fatal("disabled assistant requests article references")
 	}
-	if !strings.Contains(buildSystemPrompt(models.Assistant{CitationsEnabled: true}), "[[sources]]") {
+	if !strings.Contains(buildSystemPrompt(models.Assistant{CitationsEnabled: true}), "[[cite:") {
 		t.Fatal("enabled assistant does not request article references")
+	}
+}
+
+func TestArticleCitationHTML(t *testing.T) {
+	text := "Use **JWT**.[[cite:12]]\nDéconnectez-vous.[[cite:34]][[cite:999]]"
+	content := articleCitationHTML(text, []int{12, 34})
+	want := "<p>Use <strong>JWT</strong>.<!--ld-cite:12--><br>\nDéconnectez-vous.<!--ld-cite:34--></p>\n"
+	if content != want {
+		t.Fatalf("got %q, want %q", content, want)
+	}
+	plain := stringutil.HTML2Text(content)
+	if strings.Contains(plain, "cite") || !strings.Contains(plain, "Déconnectez-vous.") {
+		t.Fatalf("citation markers changed stored plain text: %q", plain)
+	}
+	if got := articleCitationHTML("Answer.[[cite:12]]", nil /* articleIDs */); got != "<p>Answer.</p>\n" {
+		t.Fatalf("uncited reply retained a marker: %q", got)
+	}
+	link := articleCitationHTML(`[Article](https://example.com "[[cite:12]]")`, []int{12})
+	if strings.Contains(link, "ld-cite") || strings.Contains(link, "[[cite:") {
+		t.Fatalf("citation inserted inside an HTML attribute: %q", link)
+	}
+	if got := numberedCitationText("JWT.[[cite:12]] Logout.[[cite:34]][[cite:999]]", []int{12, 34}); got != "JWT.(1) Logout.(2)" {
+		t.Fatalf("unexpected preview: %q", got)
 	}
 }

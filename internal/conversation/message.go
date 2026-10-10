@@ -332,6 +332,7 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 }
 
 func (m *Manager) emailTemplateContent(message *models.Message, data map[string]any) string {
+	content := articleCitationRegexp.ReplaceAllString(message.Content, "")
 	var (
 		isContinuity bool
 		meta         map[string]any
@@ -341,14 +342,14 @@ func (m *Manager) emailTemplateContent(message *models.Message, data map[string]
 	}
 	data["IsContinuityEmail"] = isContinuity
 	if isContinuity {
-		data["ContinuityContent"] = message.Content
+		data["ContinuityContent"] = content
 		return "{{ .ContinuityContent }}"
 	}
 	if references := m.emailArticleReferences(message); references != "" {
 		data["ArticleReferences"] = references
-		return message.Content + "{{ .ArticleReferences }}"
+		return content + "{{ .ArticleReferences }}"
 	}
-	return message.Content
+	return content
 }
 
 // GetConversationMessages retrieves messages for a specific conversation.
@@ -1694,6 +1695,7 @@ func (m *Manager) broadcastMessageToWidgetClients(message *models.Message) {
 		CreatedAt:        message.CreatedAt,
 		Content:          message.Content,
 		TextContent:      message.TextContent,
+		ContentType:      message.ContentType,
 		Author:           message.Author,
 		Attachments:      message.Attachments,
 		Meta:             message.Meta,

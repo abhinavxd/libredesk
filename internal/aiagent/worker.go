@@ -438,7 +438,9 @@ func (m *Manager) postReply(conv cmodels.Conversation, assistant models.Assistan
 		meta = map[string]any{}
 	}
 	meta["ai_assistant_id"] = assistant.ID
-	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, stringutil.Markdown2HTML(text), to, nil, nil, "" /** sendFrom **/, meta); err != nil {
+	articleIDs, _ := meta["ai_article_ids"].([]int)
+	content := articleCitationHTML(text, articleIDs)
+	if _, err := m.convo.QueueReply(nil, conv.InboxID, assistant.UserID, conv.ContactID, conv.UUID, content, to, nil, nil, "" /** sendFrom **/, meta); err != nil {
 		m.lo.Error("error sending assistant reply", "conversation_uuid", conv.UUID, "error", err)
 		return err
 	}
@@ -575,7 +577,13 @@ func (m *Manager) PreviewReply(ctx context.Context, assistantID int, message str
 			sources[i].URL = urlByID[sources[i].ID]
 		}
 	}
-	return main, sources, nil
+	var resolvedIDs []int
+	for _, id := range articleIDs {
+		if urlByID[id] != "" {
+			resolvedIDs = append(resolvedIDs, id)
+		}
+	}
+	return numberedCitationText(main, resolvedIDs), sources, nil
 }
 
 // previewSources dedupes search hits by source, keeping each one's best score. Snippets and help
