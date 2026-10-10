@@ -54,11 +54,9 @@ const renderNode = (node) => {
                 h(
                   Button,
                   {
-                    as: 'a',
+                    as: 'button',
+                    type: 'button',
                     variant: 'secondary',
-                    href: attributes.href,
-                    target: '_blank',
-                    rel: 'noopener noreferrer',
                     'aria-label': `${number} ${title}`,
                     class:
                       'mx-0.5 h-auto rounded-full bg-foreground/10 px-1.5 py-0.5 text-sm leading-none !text-foreground hover:bg-foreground/15'
@@ -87,7 +85,7 @@ const renderNode = (node) => {
                           rel: 'noopener noreferrer',
                           'aria-label': title,
                           class:
-                            'h-auto max-w-60 flex-col items-start gap-1 whitespace-normal break-words p-3 text-left text-xs shadow-md'
+                            'h-auto max-w-60 flex-col items-start gap-1 whitespace-normal break-words p-3 text-left text-xs shadow-md hover:bg-accent'
                         },
                         {
                           default: () => [
