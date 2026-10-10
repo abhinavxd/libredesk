@@ -33,6 +33,7 @@ import (
 
 const (
 	maxChatConversationsPerContact  = 50
+	maxWidgetMessageAttachments     = 5
 	chatConversationRateLimitWindow = 24 * time.Hour
 	widgetSessionPrefix             = "widget_session:"
 	defaultSessionTTL               = 180 * 24 * time.Hour
@@ -551,6 +552,14 @@ func handleChatSendMessage(r *fastglue.Request) error {
 		app.lo.Error("error unmarshalling chat message request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
+	if len(req.Attachments) > maxWidgetMessageAttachments {
+		return r.SendErrorEnvelope(
+			fasthttp.StatusBadRequest,
+			fmt.Sprintf("A message can contain at most %d attachments.", maxWidgetMessageAttachments),
+			nil,
+			envelope.InputError,
+		)
+	}
 
 	if strings.TrimSpace(req.Message) == "" && len(req.Attachments) == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
@@ -676,8 +685,8 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	}
 
 	conversationValues, convOk := form.Value["conversation_uuid"]
-	if !convOk || len(conversationValues) == 0 || conversationValues[0] == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.conversation}"), nil, envelope.InputError)
+	if !convOk || len(conversationValues) == 0 || strings.TrimSpace(conversationValues[0]) == "" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "An active conversation is required to upload attachments.", nil, envelope.InputError)
 	}
 	conversationUUID := conversationValues[0]
 
