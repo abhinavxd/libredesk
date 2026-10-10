@@ -8,7 +8,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
-	"github.com/knadh/smtppool"
+	"github.com/knadh/smtppool/v2"
 	"github.com/zerodha/logf"
 )
 

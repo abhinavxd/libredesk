@@ -28,7 +28,7 @@ require (
 	github.com/knadh/koanf/providers/posflag v0.1.0
 	github.com/knadh/koanf/providers/rawbytes v0.1.0
 	github.com/knadh/koanf/v2 v2.1.1
-	github.com/knadh/smtppool v1.1.0
+	github.com/knadh/smtppool/v2 v2.3.0
 	github.com/knadh/stuffbin v1.3.0
 	github.com/lib/pq v1.10.9
 	github.com/mackee/go-readability v0.3.1
@@ -100,3 +100,5 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/knadh/smtppool/v2 => github.com/abhinavxd/smtppool/v2 v2.0.0-20261010161941-542584b9d295

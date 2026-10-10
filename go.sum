@@ -10,6 +10,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/SherClockHolmes/webpush-go v1.4.0 h1:ocnzNKWN23T9nvHi6IfyrQjkIc0oJWv1B1pULsf9i3s=
 github.com/SherClockHolmes/webpush-go v1.4.0/go.mod h1:XSq8pKX11vNV8MJEMwjrlTkxhAj1zKfxmyhdV7Pd6UA=
+github.com/abhinavxd/smtppool/v2 v2.0.0-20261010161941-542584b9d295 h1:9dJ3bgZi2eVflESfw92Rvw1XPD60PQVcB2hzbrYYrMw=
+github.com/abhinavxd/smtppool/v2 v2.0.0-20261010161941-542584b9d295/go.mod h1:D7HcfSS8Xd3jpZ9LRwQ3aGdqp9FzFE66uW6w/BTpy4E=
 github.com/abhinavxd/ssrfguard v0.1.0 h1:Ns/llAQ63uGFehxSvhCd+WGDKmBEEmIH+E1AW1CGgWM=
 github.com/abhinavxd/ssrfguard v0.1.0/go.mod h1:eNVubb+m/r3KrKWYdG6hxzeAfj+t2ZmZss4V/x7D6Ws=
 github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 h1:uvdUDbHQHO85qeSydJtItA4T55Pw6BtAejd0APRJOCE=
@@ -154,8 +156,6 @@ github.com/knadh/koanf/providers/rawbytes v0.1.0 h1:dpzgu2KO6uf6oCb4aP05KDmKmAmI
 github.com/knadh/koanf/providers/rawbytes v0.1.0/go.mod h1:mMTB1/IcJ/yE++A2iEZbY1MLygX7vttU+C+S/YmPu9c=
 github.com/knadh/koanf/v2 v2.1.1 h1:/R8eXqasSTsmDCsAyYj+81Wteg8AqrV9CP6gvsTsOmM=
 github.com/knadh/koanf/v2 v2.1.1/go.mod h1:4mnTRbZCK+ALuBXHZMjDfG9y714L7TykVnZkXbMU3Es=
-github.com/knadh/smtppool v1.1.0 h1:J7RB3PpNQW/STnJ6JXlNZLfuNsgJu2VILV+CHWnc/j8=
-github.com/knadh/smtppool v1.1.0/go.mod h1:3DJHouXAgPDBz0kC50HukOsdapYSwIEfJGwuip46oCA=
 github.com/knadh/stuffbin v1.3.0 h1:HaVSuYV+KnrlCHl7DrLNyOCgpTU2K8x5Hb+J4Ck3gww=
 github.com/knadh/stuffbin v1.3.0/go.mod h1:yVCFaWaKPubSNibBsTAJ939q2ABHudJQxRWZWV5yh+4=
 github.com/kr/pretty v0.2.1 h1:Fmg33tUaq4/8ym9TJN1x7sLJnHVwhP33CNkpYV/7rwI=
