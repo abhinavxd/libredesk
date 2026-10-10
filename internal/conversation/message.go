@@ -1790,7 +1790,7 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 	if requested != "" {
 		normalized, err := inbox.NormalizeEmailAddress(requested)
 		if err != nil || !slices.Contains(sendable, normalized) {
-			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.senderAddressNotAllowed"), nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidEmail"), nil)
 		}
 		return normalized, nil
 	}

@@ -1770,7 +1770,6 @@
   "validation.selectAtLeastOneEvent": "Please select at least one event",
   "validation.selectAtLeastOneRecipient": "Please select at least one recipient",
   "validation.selectAtLeastOneRole": "Please select at least one role",
-  "validation.senderAddressNotAllowed": "The selected From address is not a verified address of this inbox. Pick another From address and send again.",
   "validation.subjectCannotBeEmpty": "Subject cannot be empty",
   "validation.tooLongStatus": "Status is too long, should be at most {max} characters",
   "view.form.description": "Create and save custom filter views for quick access to your conversations.",
