@@ -1,5 +1,10 @@
 <template>
-  <div class="focus:ring-0 focus:outline-none">
+  <div
+    class="focus:ring-0 focus:outline-none"
+    @paste="handlePaste"
+    @dragover.prevent
+    @drop.prevent="handleDrop"
+  >
     <ReplyButtons
       v-if="quickReplies.length"
       :replies="quickReplies"
@@ -310,7 +315,7 @@ const handleKeydown = (event) => {
 }
 
 const handleFileUpload = (files) => {
-  if (!chatStore.currentConversation.uuid || files.length === 0) return
+  if (!chatStore.currentConversation?.uuid || !files?.length) return
 
   const conversationUUID = chatStore.currentConversation.uuid
   const remainingSlots = Math.max(0, MAX_STAGED_ATTACHMENTS - stagedAttachmentCount.value)
@@ -337,6 +342,19 @@ const handleFileUpload = (files) => {
     [conversationUUID]: [...(chatStore.attachmentDrafts[conversationUUID] || []), ...selectedFiles]
   }
   if (!limitExceeded) emit('error', '')
+}
+
+const handlePaste = (event) => {
+  const files = event.clipboardData?.files
+  if (!files?.length) return
+  event.preventDefault()
+  handleFileUpload(files)
+}
+
+const handleDrop = (event) => {
+  const files = event.dataTransfer?.files
+  if (!files?.length) return
+  handleFileUpload(files)
 }
 
 const handleFileDelete = (uuid) => {
