@@ -27,13 +27,14 @@ import { useHelpStore } from '@widget/store/help.js'
 import { useI18n } from 'vue-i18n'
 import { useProactiveStore } from '@widget/store/proactive.js'
 import { useReplyPreviews } from '@widget/composables/useReplyPreviews.js'
+import { matchLanguage } from '@widget/utils/language.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const help = useHelpStore()
 const proactive = useProactiveStore()
-const { locale } = useI18n()
+const { locale, setLocaleMessage } = useI18n()
 useReplyPreviews()
 
 // Register stores for the global 401 response interceptor.
@@ -96,6 +97,27 @@ const fetchInitialConversations = async () => {
   }
 }
 
+let languageRequest = 0
+const setLanguage = async (requested) => {
+  if (widgetStore.config.language !== 'auto') return
+  const request = ++languageRequest
+  try {
+    const available = await api.getAvailableLanguages()
+    const code = matchLanguage(requested, available.data.data.map((l) => l.code))
+    if (request !== languageRequest || !code || code === locale.value) return
+    const messages = await api.getLanguage(code)
+    if (request !== languageRequest) return
+    setLocaleMessage(code, messages.data)
+    locale.value = code
+    if (widgetStore.config.help?.help_center_id) {
+      help.reset()
+      await help.load(code)
+    }
+  } catch (error) {
+    console.error('Error switching widget language:', error)
+  }
+}
+
 // Listen for messages from parent window (widget.js)
 const setupParentMessageListeners = () => {
   window.addEventListener('message', async (event) => {
@@ -138,6 +160,8 @@ const setupParentMessageListeners = () => {
       } finally {
         signalWidgetLoaded()
       }
+    } else if (event.data.type === 'SET_LANGUAGE') {
+      await setLanguage(event.data.language)
     } else if (event.data.type === 'SET_JWT_TOKEN') {
       if (event.data.visitorToken) {
         initVisitorToken(event.data.visitorToken)
