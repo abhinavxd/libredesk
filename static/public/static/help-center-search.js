@@ -40,6 +40,7 @@
     }
 
     function close() {
+        clearTimeout(timer);
         seq++;
         panel.hidden = true;
         active = -1;
@@ -57,6 +58,7 @@
     }
 
     function render(list, q) {
+        input.removeAttribute('aria-activedescendant');
         panel.replaceChildren();
         items = [];
         if (!list.length) {
@@ -112,8 +114,7 @@
 
     input.addEventListener('input', function () {
         var q = input.value.trim();
-        clearTimeout(timer);
-        seq++;
+        close();
         // A term the reader abandoned mid-session still belongs in the log.
         if (pending && q.indexOf(pending) !== 0) flush();
         if (q.length < MIN_CHARS) {

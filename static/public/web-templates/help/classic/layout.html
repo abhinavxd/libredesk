@@ -65,14 +65,34 @@
         var navToggle = document.querySelector('[data-hc-nav-toggle]');
         var nav = document.querySelector('.hc-nav');
         if (navToggle && nav) {
-            navToggle.addEventListener('click', function () {
+            var links = nav.querySelector('.hc-nav-links');
+            var animation;
+            navToggle.addEventListener('click', function (e) {
+                if (animation) animation.cancel();
                 var open = nav.hasAttribute('data-nav-open');
                 if (open) { nav.removeAttribute('data-nav-open'); } else { nav.setAttribute('data-nav-open', ''); }
                 navToggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+                if (!open && e.detail > 0) {
+                    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    animation = links.animate(reduced ? [{ opacity: 0 }, { opacity: 1 }] : [
+                        { opacity: 0, transform: 'translateY(-4px)' },
+                        { opacity: 1, transform: 'translateY(0)' }
+                    ], { duration: reduced ? 100 : 150, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+                }
             });
-            var closeNav = function () { nav.removeAttribute('data-nav-open'); navToggle.setAttribute('aria-expanded', 'false'); };
+            var closeNav = function () {
+                if (animation) animation.cancel();
+                nav.removeAttribute('data-nav-open');
+                navToggle.setAttribute('aria-expanded', 'false');
+            };
             document.addEventListener('click', function (e) { if (!nav.contains(e.target)) closeNav(); });
-            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeNav(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && nav.hasAttribute('data-nav-open')) {
+                    if (links.contains(document.activeElement)) navToggle.focus();
+                    closeNav();
+                }
+            });
+            links.addEventListener('focusout', function (e) { if (!nav.contains(e.relatedTarget)) closeNav(); });
         }
     })();
     </script>
