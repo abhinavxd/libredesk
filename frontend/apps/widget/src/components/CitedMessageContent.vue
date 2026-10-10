@@ -72,31 +72,33 @@ const renderNode = (node) => {
               default: () =>
                 h(
                   HoverCardContent,
-                  { asChild: true, side: 'top', sideOffset: 6, class: 'z-50' },
                   {
-                    default: () =>
+                    side: 'top',
+                    sideOffset: 6,
+                    class:
+                      'z-50 flex max-w-60 flex-col items-start gap-1 rounded-md border bg-popover p-3 text-xs text-popover-foreground shadow-md'
+                  },
+                  {
+                    default: () => [
+                      h('span', { class: 'flex items-center gap-1 text-muted-foreground' }, [
+                        h(BookOpen, { class: 'h-3 w-3', 'aria-hidden': true }),
+                        t('globals.terms.helpCenterArticle')
+                      ]),
                       h(
                         Button,
                         {
                           as: 'a',
-                          variant: 'secondary',
+                          variant: 'link',
                           href: attributes.href,
                           target: '_blank',
                           rel: 'noopener noreferrer',
                           'aria-label': title,
                           class:
-                            'h-auto max-w-60 flex-col items-start gap-1 whitespace-normal break-words p-3 text-left text-xs shadow-md hover:bg-accent'
+                            'h-auto justify-start whitespace-normal break-words p-0 text-left text-xs text-popover-foreground no-underline hover:text-popover-foreground hover:underline'
                         },
-                        {
-                          default: () => [
-                            h('span', { class: 'flex items-center gap-1 opacity-70' }, [
-                              h(BookOpen, { class: 'h-3 w-3', 'aria-hidden': true }),
-                              t('globals.terms.helpCenterArticle')
-                            ]),
-                            h('span', { class: 'font-medium' }, title)
-                          ]
-                        }
+                        { default: () => title }
                       )
+                    ]
                   }
                 )
             }

@@ -1,7 +1,7 @@
 <template>
   <div
     class="inline-flex w-fit items-center px-3 py-2 text-sm text-muted-foreground"
-    :class="bubble ? 'rounded-2xl bg-muted' : ''"
+    :class="bubble ? 'min-h-9 rounded-2xl bg-muted' : ''"
   >
     <div class="flex space-x-1">
       <div
