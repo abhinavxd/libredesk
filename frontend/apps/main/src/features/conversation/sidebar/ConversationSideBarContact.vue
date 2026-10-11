@@ -63,7 +63,7 @@
         {{ t('conversation.sidebar.notAvailable') }}
       </span>
     </div>
-    <div class="flex gap-2 items-center">
+    <div v-if="conversation?.contact?.phone_number" class="flex gap-2 items-center">
       <Phone size="16" class="text-muted-foreground flex-shrink-0" />
       <span class="sidebar-value">
         {{ phoneNumber }}
@@ -90,21 +90,26 @@
       </span>
     </div>
 
-    <!-- Livechat visitor info -->
-    <template v-if="isLivechat">
-      <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
-        <Globe size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value">{{ countryName }}</span>
-      </div>
-      <div v-if="conversation?.meta?.ip" class="flex gap-2 items-center">
-        <Monitor size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value break-all">{{ conversation.meta.ip }}</span>
-      </div>
-      <div v-if="conversation?.meta?.user_agent" class="flex gap-2 items-center">
-        <Smartphone size="16" class="text-muted-foreground flex-shrink-0" />
-        <span class="sidebar-value break-all">{{ parsedUA }}</span>
-      </div>
-    </template>
+    <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
+      <Globe size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value">{{ countryName }}</span>
+    </div>
+
+    <!-- Recorded per conversation by the livechat widget -->
+    <div v-if="conversation?.meta?.ip" class="flex gap-2 items-center">
+      <Monitor size="16" class="text-muted-foreground flex-shrink-0" />
+      <span class="sidebar-value break-all">{{ conversation.meta.ip }}</span>
+    </div>
+    <div v-if="userAgent" class="flex gap-2 items-center">
+      <component
+        :is="userAgent.isMobile ? Smartphone : Laptop"
+        size="16"
+        class="text-muted-foreground flex-shrink-0"
+      />
+      <span class="sidebar-value min-w-0 truncate" :title="conversation.meta.user_agent">
+        {{ userAgent.label }}
+      </span>
+    </div>
 
     <!-- Context Links -->
     <template v-if="contextLinks.length > 0">
@@ -139,6 +144,7 @@ import {
   ExternalLink,
   IdCard,
   Globe,
+  Laptop,
   Monitor,
   Smartphone,
   ShieldCheck,
@@ -147,6 +153,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import countries from '@shared-ui/constants/countries.js'
+import { formatUserAgent } from './userAgent.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
@@ -161,7 +168,7 @@ const userStore = useUserStore()
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
-  const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
+  const number = conversation.value?.contact?.phone_number
   if (!countryCodeValue) return number
 
   const country = countries.find((c) => c.iso_2 === countryCodeValue)
@@ -182,16 +189,7 @@ const isVerified = computed(
   () => isLivechat.value && conversation.value?.contact?.type !== 'visitor'
 )
 
-const parsedUA = computed(() => {
-  const ua = conversation.value?.meta?.user_agent
-  if (!ua) return ''
-  const browser = ua.match(/(Chrome|Firefox|Safari|Edge|Opera|MSIE|Trident)[/\s](\d+)/i)
-  const os = ua.match(/(Windows|Mac OS X|Linux|Android|iOS|iPhone|iPad)[\s/]?([0-9._]*)/i)
-  const parts = []
-  if (browser) parts.push(browser[1] + ' ' + browser[2])
-  if (os) parts.push(os[1].replace('_', ' '))
-  return parts.length > 0 ? parts.join(' / ') : ua.substring(0, 60)
-})
+const userAgent = computed(() => formatUserAgent(conversation.value?.meta?.user_agent))
 
 const contextLinks = ref([])
 const loadingAppId = ref(null)
