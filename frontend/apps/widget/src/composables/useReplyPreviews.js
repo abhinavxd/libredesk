@@ -11,9 +11,9 @@ export function useReplyPreviews() {
   const widget = useWidgetStore()
   const chat = useChatStore()
   const user = useUserStore()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   watch(
-    () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen],
+    () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen, locale.value],
     async () => {
       await nextTick()
       const element = document.querySelector('.libredesk-widget-app')
