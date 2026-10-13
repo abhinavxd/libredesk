@@ -267,6 +267,36 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 	}
 }
 
+func TestContactSearchMatchesName(t *testing.T) {
+	db := testutil.NewDB(t, "search_contacts_name")
+	lo := logf.New(logf.Opts{})
+	manager, err := New(Opts{
+		DB:             db,
+		Lo:             &lo,
+		I18n:           testutil.NewI18n(t),
+		FilterLocation: func() string { return "UTC" },
+	})
+	if err != nil {
+		t.Fatalf("creating search manager: %v", err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO users (type, email, first_name, last_name)
+		VALUES ('contact', 'jane@example.com', 'Jane', 'Doe'), ('contact', 'other@example.com', 'Other', '')
+	`); err != nil {
+		t.Fatalf("inserting contacts: %v", err)
+	}
+
+	for term, want := range map[string]string{"jane": "jane@example.com", "Jane Doe": "jane@example.com", "doe": "jane@example.com", "other": "other@example.com"} {
+		results, err := manager.Contacts(term, 10)
+		if err != nil {
+			t.Fatalf("searching contacts for %q: %v", term, err)
+		}
+		if len(results) != 1 || results[0].Email.String != want {
+			t.Fatalf("contact search for %q returned %+v, want only %s", term, results, want)
+		}
+	}
+}
+
 func insertSearchConversation(t *testing.T, db *sqlx.DB, reference, email, firstName, lastName, subject string, lastMessageAt time.Time) (int, int) {
 	t.Helper()
 
