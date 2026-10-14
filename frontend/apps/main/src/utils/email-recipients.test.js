@@ -47,6 +47,16 @@ describe('computeRecipientsFromMessage', () => {
     const inboxEmail = 'support@domain.com'
     const contactEmail = 'customer@example.com'
 
+    test('replies to Reply-To instead of the no-reply sender', () => {
+        const message = {
+            type: 'incoming',
+            meta: { from: ['noreply@form.example'], reply_to: ['customer@example.com'], to: ['support@domain.com'] }
+        }
+        const result = computeRecipientsFromMessage(message, contactEmail, [inboxEmail])
+        expect(result.to).toEqual(['customer@example.com'])
+        expect(result.cc).toEqual([])
+    })
+
     describe('filters inbox email variants', () => {
         test('removes primary and aliases from recipients', () => {
             const message = {

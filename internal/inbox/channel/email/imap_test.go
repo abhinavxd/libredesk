@@ -1191,3 +1191,14 @@ func TestSearchMessagesExcludesDeletedAndOldMessages(t *testing.T) {
 		})
 	}
 }
+
+func TestContactAddressPrefersReplyTo(t *testing.T) {
+	e := &Email{receiveAddresses: map[string]struct{}{"support@example.com": {}}}
+	from := []imap.Address{{Name: "Form", Mailbox: "noreply", Host: "form.example"}}
+	customer := imap.Address{Name: "Taro Yamada", Mailbox: "taro", Host: "example.com"}
+
+	require.Equal(t, customer, e.contactAddress(&imap.Envelope{From: from, ReplyTo: []imap.Address{customer}}))
+	require.Equal(t, from[0], e.contactAddress(&imap.Envelope{From: from}))
+	// Reply-To pointing back at the inbox itself is ignored.
+	require.Equal(t, from[0], e.contactAddress(&imap.Envelope{From: from, ReplyTo: []imap.Address{{Mailbox: "support", Host: "example.com"}}}))
+}
