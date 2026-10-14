@@ -46,6 +46,13 @@ func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig
 		scanInboxSince = defaultScanInboxSince
 	}
 
+	// Scan once right away so a freshly configured inbox picks up mail (or surfaces connection errors)
+	// without waiting a full read interval.
+	if ctx.Err() != nil {
+		return nil
+	}
+	e.readMailbox(ctx, scanInboxSince, cfg)
+
 	readTicker := time.NewTicker(readInterval)
 	defer readTicker.Stop()
 
@@ -59,13 +66,17 @@ func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig
 			if ctx.Err() != nil {
 				return nil
 			}
-
-			if err := e.processMailbox(ctx, scanInboxSince, cfg); err != nil && err != context.Canceled {
-				e.lo.Error("error searching emails", "error", err)
-			}
-			e.lo.Info("email search complete", "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
+			e.readMailbox(ctx, scanInboxSince, cfg)
 		}
 	}
+}
+
+// readMailbox runs a single scan of the mailbox and logs the outcome.
+func (e *Email) readMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) {
+	if err := e.processMailbox(ctx, scanInboxSince, cfg); err != nil && err != context.Canceled {
+		e.lo.Error("error searching emails", "error", err)
+	}
+	e.lo.Info("email search complete", "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
 }
 
 // processMailbox processes emails in the specified mailbox.
