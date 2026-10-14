@@ -782,8 +782,9 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 		message.TextContent = stringutil.HTML2Text(message.Content)
 	}
 
+	createdAt := sql.NullTime{Time: message.CreatedAt, Valid: !message.CreatedAt.IsZero()}
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
-		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
+		message.Private, message.ContentType, message.SourceID, message.Meta, createdAt); err != nil {
 		m.lo.Error("error inserting message in db", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -1432,7 +1433,10 @@ func (m *Manager) findOrCreateConversation(in models.IncomingMessage) (int, stri
 	if conversationID == 0 {
 		m.lo.Debug("no conversation found with in-reply-to and references, creating new conversation", "in_reply_to", in.InReplyTo, "references", in.References)
 		lastMessage := stringutil.HTML2Text(in.Content)
-		lastMessageAt := time.Now()
+		lastMessageAt := in.ReceivedAt
+		if lastMessageAt.IsZero() {
+			lastMessageAt = time.Now()
+		}
 		conversationID, conversationUUID, err = m.CreateConversation(in.Contact.ID,
 			in.InboxID,
 			lastMessage,
