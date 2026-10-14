@@ -51,6 +51,9 @@ const (
 // Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
 var wantsMaxCompletionTokens sync.Map
 
+// Endpoints (baseURL+model) that reject function tools unless reasoning_effort is "none".
+var wantsNoReasoningWithTools sync.Map
+
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
 type OpenAIClient struct {
 	cfg    models.ProviderConfig
@@ -149,6 +152,9 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 	if len(payload.Tools) > 0 {
 		body["tools"] = payload.Tools
 		body["tool_choice"] = "auto"
+		if _, ok := wantsNoReasoningWithTools.Load(o.cfg.BaseURL + "|" + model); ok {
+			body["reasoning_effort"] = "none"
+		}
 	}
 
 	respBytes, err := o.post(ctx, "/chat/completions", body)
@@ -306,9 +312,12 @@ func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]an
 			if adaptations < maxParamAdaptations {
 				if param, ok := adaptUnsupportedParam(body, respBytes); ok {
 					adaptations++
-					if param == "max_tokens" {
-						if m, ok := body["model"].(string); ok {
+					if m, ok := body["model"].(string); ok {
+						switch {
+						case param == "max_tokens":
 							wantsMaxCompletionTokens.Store(o.cfg.BaseURL+"|"+m, true)
+						case param == "reasoning_effort" && body["reasoning_effort"] == "none":
+							wantsNoReasoningWithTools.Store(o.cfg.BaseURL+"|"+m, true)
 						}
 					}
 					bodyBytes, err = json.Marshal(body)
@@ -391,6 +400,14 @@ func adaptUnsupportedParam(body map[string]any, resp []byte) (string, bool) {
 	var parsed apiErrorResponse
 	if err := json.Unmarshal(resp, &parsed); err != nil {
 		return "", false
+	}
+	// Reasoning models reject function tools on /chat/completions with a null code unless reasoning_effort is "none".
+	if parsed.Error.Code == "" && parsed.Error.Param == "reasoning_effort" {
+		if _, hasTools := body["tools"]; !hasTools || body["reasoning_effort"] == "none" {
+			return "", false
+		}
+		body["reasoning_effort"] = "none"
+		return "reasoning_effort", true
 	}
 	if parsed.Error.Code != "unsupported_parameter" && parsed.Error.Code != "unsupported_value" {
 		return "", false
