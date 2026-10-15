@@ -305,12 +305,37 @@ func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.
 		return nil
 	}
 	ids := make([]int, 0, len(media))
+	mediaUUIDs := make(map[string]struct{}, len(media))
+	seenIDs := make(map[int]struct{}, len(media))
 	for _, med := range media {
-		ids = append(ids, med.ID)
+		if _, ok := seenIDs[med.ID]; !ok {
+			seenIDs[med.ID] = struct{}{}
+			ids = append(ids, med.ID)
+		}
+		mediaUUIDs[med.UUID] = struct{}{}
 	}
-	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs), uploadedBy); err != nil {
+	requestedCount := len(ids)
+	seenInlineUUIDs := make(map[string]struct{}, len(inlineUUIDs))
+	for _, uuid := range inlineUUIDs {
+		if _, ok := seenInlineUUIDs[uuid]; ok {
+			continue
+		}
+		seenInlineUUIDs[uuid] = struct{}{}
+		if _, ok := mediaUUIDs[uuid]; !ok {
+			requestedCount++
+		}
+	}
+	result, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs), uploadedBy)
+	if err != nil {
 		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
 		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking linked media count for message:%d: %w", messageID, err)
+	}
+	if rowsAffected < int64(requestedCount) {
+		return fmt.Errorf("linked %d of %d requested media files to message:%d", rowsAffected, requestedCount, messageID)
 	}
 	return nil
 }

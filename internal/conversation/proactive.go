@@ -8,9 +8,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
+	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 )
 
-func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, contactID int, reply string, attrs, meta map[string]any, maxConversations int, window time.Duration) (models.Message, error) {
+func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, contactID int, reply string, media []mmodels.Media, attrs, meta map[string]any, maxConversations int, window time.Duration) (models.Message, error) {
 	var snapshot proactive.Snapshot
 	if err := json.Unmarshal(delivery.Snapshot, &snapshot); err != nil {
 		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -51,9 +52,13 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 		return models.Message{}, m.proactiveError(err)
 	}
 	invitationMeta, _ := json.Marshal(map[string]any{"proactive_sender": snapshot.Sender, "campaign_id": delivery.CampaignID})
+	incomingMessage := models.Message{Type: models.MessageIncoming, Status: models.MessageStatusReceived, SenderID: contactID, SenderType: models.SenderTypeContact, Content: reply, Media: media}
+	if len(media) > 0 {
+		incomingMessage.UploadUserID = contactID
+	}
 	messages := []models.Message{
 		{Type: models.MessageOutgoing, Status: models.MessageStatusSent, SenderID: snapshot.SenderID, SenderType: models.SenderTypeAgent, Content: snapshot.Message, Meta: invitationMeta},
-		{Type: models.MessageIncoming, Status: models.MessageStatusReceived, SenderID: contactID, SenderType: models.SenderTypeContact, Content: reply},
+		incomingMessage,
 	}
 	inlineUUIDs := make([][]string, len(messages))
 	for i := range messages {

@@ -10,6 +10,8 @@ export const useChatStore = defineStore('chat', () => {
   const userStore = useUserStore()
   const previewUnreadUUID = ref(null)
   const drafts = ref({})
+  const attachmentDrafts = ref({})
+  const uploadingFiles = ref([])
   const preChatDraft = ref({})
   const handoffDraft = ref({})
   let typingTimeout = null
@@ -81,7 +83,7 @@ export const useChatStore = defineStore('chat', () => {
     updateConversationListLastMessage(conversationUUID, message, shouldIncrementUnread)
   }
 
-  const addPendingMessage = (conversationUUID, messageText, authorType, authorId, files = []) => {
+  const addPendingMessage = (conversationUUID, messageText, authorType, authorId, attachments = []) => {
     const pendingMessage = {
       content: messageText,
       content_type: 'text',
@@ -94,9 +96,16 @@ export const useChatStore = defineStore('chat', () => {
         availability_status: '',
         active_at: null
       },
-      attachments: [],
+      attachments: attachments.map((attachment) => ({
+        uuid: attachment.uuid,
+        name: attachment.filename || attachment.name,
+        size: attachment.size,
+        content_type: attachment.content_type,
+        url: attachment.url,
+        disposition: attachment.disposition
+      })),
       uuid: `pending-${Date.now()}`,
-      status: files.length > 0 ? 'uploading' : 'sending',
+      status: 'sending',
       created_at: new Date().toISOString()
     }
     messageCache.addMessage(conversationUUID, pendingMessage)
@@ -266,6 +275,8 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     drafts,
+    attachmentDrafts,
+    uploadingFiles,
     preChatDraft,
     handoffDraft,
     previewUnreadUUID,
