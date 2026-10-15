@@ -100,3 +100,44 @@ func TestEmbeddingTokenLimit(t *testing.T) {
 		t.Fatalf("explicit value should be honored, got %d", got)
 	}
 }
+
+// Gemini 3 returns a thought signature in extra_content on each tool call and rejects the
+// next turn unless the assistant message replays it unchanged.
+func TestToolCallExtraContentRoundTrip(t *testing.T) {
+	const extra = `{"google":{"thought_signature":"c2ln"}}`
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding request body: %v", err)
+		}
+		bodies = append(bodies, body)
+		w.Write([]byte(`{"choices":[{"message":{"content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"search_articles","arguments":"{}"},"extra_content":` + extra + `}]}}]}`))
+	}))
+	defer srv.Close()
+
+	lo := logf.New(logf.Opts{})
+	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "extra-content-test-model"}, &lo, srv.Client())
+	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
+
+	res, err := client.SendChatCompletion(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+	payload.Messages = append(payload.Messages,
+		models.ChatMessage{Role: models.RoleAssistant, ToolCalls: res.ToolCalls},
+		models.ChatMessage{Role: models.RoleTool, ToolCallID: "call_1", Content: "[]"},
+	)
+	if _, err := client.SendChatCompletion(context.Background(), payload); err != nil {
+		t.Fatalf("second request: %v", err)
+	}
+
+	toolCall := bodies[1]["messages"].([]any)[1].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)
+	got, err := json.Marshal(toolCall["extra_content"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != extra {
+		t.Fatalf("replayed tool call extra_content = %s, want %s", got, extra)
+	}
+}

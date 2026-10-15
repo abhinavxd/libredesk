@@ -84,6 +84,20 @@ describe('Email Inbox Form Schema', () => {
         expect(() => schema.parse({ ...validForm, from: '' })).toThrow()
     })
 
+    test('rejects duplicate aliases and the primary address', () => {
+        expect(() => schema.parse({
+            ...validForm,
+            aliases: [
+                { email: 'billing@example.com' },
+                { email: 'BILLING@example.com' }
+            ]
+        })).toThrow()
+        expect(() => schema.parse({
+            ...validForm,
+            aliases: [{ email: 'desk@example.com' }]
+        })).toThrow()
+    })
+
     test('from_name_template defaults to empty string', () => {
         expect(schema.parse(validForm).from_name_template).toBe('')
     })

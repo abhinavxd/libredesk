@@ -47,7 +47,17 @@ Cypress.Commands.add('login', () => {
   )
 })
 
-// Pick an option from a shadcn/radix Select by the label currently on its trigger.
+Cypress.Commands.add('setEmailInboxSection', (section, open) => {
+  cy.get(`[data-section="${section}"] > h3 > button`).then(($trigger) => {
+    if ($trigger.attr('aria-expanded') !== String(open)) cy.wrap($trigger).click()
+  })
+})
+
+Cypress.Commands.add('toggleEmailInboxAdvanced', (connection) => {
+  cy.setEmailInboxSection(connection, true)
+  cy.get(`[data-connection="${connection}"]`).contains('button', 'Advanced').click()
+})
+
 Cypress.Commands.add('selectOption', (triggerLabel, optionText) => {
   cy.contains('button[role="combobox"]', triggerLabel).click()
   cy.get('[role="option"]').contains(optionText).click()

@@ -127,6 +127,22 @@ CREATE TABLE inboxes (
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
 
+DROP TABLE IF EXISTS inbox_email_addresses CASCADE;
+CREATE TABLE inbox_email_addresses (
+	id SERIAL PRIMARY KEY,
+	inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+	email TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	verification_status TEXT NOT NULL DEFAULT 'not_verified',
+	verification_token TEXT NULL,
+	verification_started_at TIMESTAMPTZ NULL,
+	verified_at TIMESTAMPTZ NULL,
+	CONSTRAINT constraint_inbox_email_addresses_on_kind CHECK (kind IN ('primary', 'alias'))
+);
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_inbox_email ON inbox_email_addresses (inbox_id, LOWER(email));
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_primary ON inbox_email_addresses (inbox_id) WHERE kind = 'primary';
+
 DROP TABLE IF EXISTS teams CASCADE;
 CREATE TABLE teams (
 	id SERIAL PRIMARY KEY,
@@ -377,7 +393,7 @@ CREATE TABLE macros (
    team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE,
    usage_count INT DEFAULT 0 NOT NULL,
    CONSTRAINT name_length CHECK (length(name) <= 140),
-   CONSTRAINT message_content_length CHECK (length(message_content) <= 5000)
+   CONSTRAINT message_content_length CHECK (length(message_content) <= 100000)
 );
 
 DROP TABLE IF EXISTS conversation_participants CASCADE;
@@ -835,6 +851,7 @@ CREATE TABLE ai_assistants (
 	max_turns INTEGER NOT NULL DEFAULT 6,
 	fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	handoff_enabled BOOLEAN NOT NULL DEFAULT true,
+	citations_enabled BOOLEAN NOT NULL DEFAULT false,
 	languages TEXT[] NOT NULL DEFAULT '{}',
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_ai_assistants_on_tone CHECK (tone IN ('friendly', 'professional', 'neutral', 'casual')),

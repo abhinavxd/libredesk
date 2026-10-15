@@ -29,6 +29,7 @@ import (
 	csatModels "github.com/abhinavxd/libredesk/internal/csat/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
@@ -91,6 +92,10 @@ type notificationDispatcher interface {
 	Send(nmodels.Notification) ([]nmodels.DeliveryResult, error)
 }
 
+type articleReferenceStore interface {
+	GetArticleReferences([]int) ([]hcmodels.ArticleReference, error)
+}
+
 // Manager handles the operations related to conversations
 type Manager struct {
 	q                          queries
@@ -101,6 +106,7 @@ type Manager struct {
 	statusStore                statusStore
 	priorityStore              priorityStore
 	slaStore                   slaStore
+	articleReferenceStore      articleReferenceStore
 	settingsStore              settingsStore
 	csatStore                  csatStore
 	webhookStore               webhookStore
@@ -384,6 +390,7 @@ type queries struct {
 	GetContactUnreadPreviewMessages    *sqlx.Stmt `query:"get-contact-unread-preview-messages"`
 	GetOutgoingPendingMessages         *sqlx.Stmt `query:"get-outgoing-pending-messages"`
 	GetMessageSourceIDs                *sqlx.Stmt `query:"get-message-source-ids"`
+	GetEmailSenderMessage              *sqlx.Stmt `query:"get-email-sender-message"`
 	GetConversationUUIDFromMessageUUID *sqlx.Stmt `query:"get-conversation-uuid-from-message-uuid"`
 	MessageExistsBySourceID            *sqlx.Stmt `query:"message-exists-by-source-id"`
 	GetConversationByMessageID         *sqlx.Stmt `query:"get-conversation-by-message-id"`
@@ -610,6 +617,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	c.RenderMessagesArticleReferences(messages)
 	previews := make([]models.ChatMessage, 0, len(messages))
 	for _, message := range messages {
 		c.SignAvatarURL(&message.Author.AvatarURL)
@@ -628,6 +636,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 			CreatedAt:        message.CreatedAt,
 			Content:          message.Content,
 			TextContent:      message.TextContent,
+			ContentType:      message.ContentType,
 			Author:           author,
 			Attachments:      message.Attachments,
 			Meta:             message.Meta,
@@ -1353,9 +1362,17 @@ func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUU
 	if inb.Channel() != inbox.ChannelEmail {
 		return fmt.Errorf("cannot send email through non-email inbox %d", inboxID)
 	}
+	inboxRecord, err := m.inboxStore.GetDBRecord(inboxID)
+	if err != nil {
+		return fmt.Errorf("fetching inbox sender addresses: %w", err)
+	}
+	sender, err := m.resolveSendFrom(conversationUUID, inboxRecord, "" /* requested */)
+	if err != nil {
+		return err
+	}
 	references, inReplyTo := m.BuildEmailThreadingHeaders(conversationID, "")
 	return inb.Send(models.OutboundMessage{
-		From:             inb.FromAddress(),
+		From:             m.emailFromAddress(inb, models.Message{}, sender),
 		To:               to,
 		Subject:          subject,
 		Content:          htmlContent,
@@ -1713,6 +1730,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			to,
 			nil,
 			nil,
+			"", /** sendFrom **/
 			map[string]any{"is_automated": true},
 		)
 		if err != nil {
@@ -2006,7 +2024,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		message = m.i18n.T("globals.messages.pleaseRateConversation")
 	}
 
-	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, meta); err != nil {
+	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, "" /** sendFrom **/, meta); err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -2246,6 +2264,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 		m.ProcessCSATStatus(messages)
 
 		// Generate signed URLs for all attachments.
+		m.RenderMessagesArticleReferences(messages)
 		chatMessages := make([]models.ChatMessage, 0, len(messages))
 		for _, msg := range messages {
 			m.SignAvatarURL(&msg.Author.AvatarURL)
@@ -2267,6 +2286,7 @@ func (m *Manager) BuildWidgetConversationResponse(conversation models.Conversati
 				CreatedAt:        msg.CreatedAt,
 				Content:          msg.Content,
 				TextContent:      msg.TextContent,
+				ContentType:      msg.ContentType,
 				ConversationUUID: msg.ConversationUUID,
 				Meta:             msg.Meta,
 				Author:           author,

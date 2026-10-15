@@ -22,6 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -204,6 +205,7 @@ type queries struct {
 
 	GetHelpCenterTreeData            *sqlx.Stmt `query:"get-help-center-tree-data"`
 	GetPublicTreeData                *sqlx.Stmt `query:"get-public-tree-data"`
+	GetArticleReferences             *sqlx.Stmt `query:"get-article-references"`
 	GetPublishedArticleBySlug        *sqlx.Stmt `query:"get-published-article-by-slug"`
 	GetPublishedArticleTranslations  *sqlx.Stmt `query:"get-published-article-translations"`
 	GetPublishedCollectionLocales    *sqlx.Stmt `query:"get-published-collection-locales"`
@@ -1002,6 +1004,18 @@ func (m *Manager) GetPublicTree(helpCenter models.HelpCenter, locale string) (mo
 		return models.TreeResponse{}, err
 	}
 	return models.TreeResponse{HelpCenter: helpCenter, Tree: tree}, nil
+}
+
+func (m *Manager) GetArticleReferences(ids []int) ([]models.ArticleReference, error) {
+	references := []models.ArticleReference{}
+	if len(ids) == 0 {
+		return references, nil
+	}
+	if err := m.q.GetArticleReferences.Select(&references, pq.Array(ids)); err != nil {
+		m.lo.Error("error fetching article references", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return references, nil
 }
 
 // GetPublishedArticle retrieves a published article by help center slug and article slug, restricted to locale (empty = any).

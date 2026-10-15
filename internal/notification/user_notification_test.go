@@ -2,8 +2,10 @@ package notifier
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
@@ -97,6 +99,17 @@ func TestReplyReadFollowsLastSeen(t *testing.T) {
 		if n.IsRead != want {
 			t.Fatalf("notification=%+v want read=%v", n, want)
 		}
+	}
+}
+
+func TestCreateTrimsLongBody(t *testing.T) {
+	f := newReplyFixture(t, "create_trims_long_body")
+	n, err := f.manager.Create(f.userID, models.NotificationTypeNewReply, "Reply", null.StringFrom(strings.Repeat("é", 3000)), null.IntFrom(f.convID), null.IntFrom(f.messageIDs[0]), null.Int{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := utf8.RuneCountInString(n.Body.String); got != notificationBodyRunes+1 {
+		t.Fatalf("body runes=%d want %d", got, notificationBodyRunes+1)
 	}
 }
 

@@ -51,6 +51,17 @@
         :class="['space-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
         v-if="messageType === 'reply'"
       >
+        <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center gap-2">
+          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.from') }}</label>
+          <Select v-model="sendFrom">
+            <SelectTrigger :class="RECIPIENT_INPUT_CLASS"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="address in conversationStore.currentFromOptions" :key="address" :value="address">
+                {{ address }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div class="flex items-center gap-2">
           <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.to') }}</label>
           <Input
@@ -212,6 +223,7 @@ import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@shared-ui/components/ui/select'
 import { useEmitter } from '@main/composables/useEmitter'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
@@ -232,6 +244,7 @@ const messageType = defineModel('messageType', { default: 'reply' })
 const to = defineModel('to', { default: '' })
 const cc = defineModel('cc', { default: '' })
 const bcc = defineModel('bcc', { default: '' })
+const sendFrom = defineModel('sendFrom', { default: '' })
 const showCc = defineModel('showCc', { default: false })
 const showBcc = defineModel('showBcc', { default: false })
 const emailErrors = defineModel('emailErrors', { default: () => [] })

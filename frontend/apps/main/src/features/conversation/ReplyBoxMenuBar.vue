@@ -1,6 +1,6 @@
 <template>
   <div
-    class="relative flex h-14 justify-between"
+    class="relative flex min-h-14 flex-wrap justify-between gap-y-2"
     :class="{ 'items-end': isFullscreen, 'items-center': !isFullscreen }"
   >
     <EmojiPicker
@@ -56,6 +56,20 @@
         </TooltipTrigger>
         <TooltipContent>{{ $t('globals.messages.addEmoji') }}</TooltipContent>
       </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Toggle
+            :class="[ICON_BUTTON_CLASS, 'md:hidden']"
+            variant="outline"
+            :aria-label="$t('actions.applyMacro')"
+            @click="openMacroPicker"
+            :pressed="false"
+          >
+            <Zap class="h-4 w-4" />
+          </Toggle>
+        </TooltipTrigger>
+        <TooltipContent>{{ $t('actions.applyMacro') }}</TooltipContent>
+      </Tooltip>
       <Tooltip v-if="showWhatsAppTemplate">
         <TooltipTrigger as-child>
           <Toggle
@@ -87,7 +101,7 @@
         <TooltipContent>{{ $t('replyBox.generateReply') }}</TooltipContent>
       </Tooltip>
     </div>
-    <div class="flex items-center rounded-md shadow-sm">
+    <div class="ml-auto flex items-center rounded-md shadow-sm">
       <Button
         class="h-8 max-md:h-11 px-4 rounded-r-none"
         @click="handleSend"
@@ -130,7 +144,7 @@ import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button'
 import { Toggle } from '@shared-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { Paperclip, Smile, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
+import { Paperclip, Smile, Zap, ChevronDownIcon, Sparkles, Loader2 } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -143,6 +157,7 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { WHATSAPP_MEDIA_ACCEPT } from '@main/features/conversation/whatsappMedia'
+import { MACROS_COMMAND, useCommandPalette } from '@main/features/command/useCommandPalette'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([import('vue3-emoji-picker'), import('vue3-emoji-picker/css')])
@@ -195,8 +210,13 @@ const toggleEmojiPicker = () => {
 
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
+const palette = useCommandPalette()
 
 const attachmentAccept = computed(() => (props.isWhatsApp ? WHATSAPP_MEDIA_ACCEPT : undefined))
+
+const openMacroPicker = () => {
+  palette.openPalette({ parent: MACROS_COMMAND })
+}
 
 const openTemplatePicker = () => {
   emitter.emit(EMITTER_EVENTS.WHATSAPP_TEMPLATE_PICKER_OPEN)

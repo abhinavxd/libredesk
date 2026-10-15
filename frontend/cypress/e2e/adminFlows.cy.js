@@ -16,7 +16,7 @@ describe('Admin setup and outgoing conversation', () => {
   const subject = `Cypress subject ${stamp}`
   const replyBody = `Automated reply from Cypress ${stamp}`
 
-  // SMTP points at the MailHog sink running as a CI service; IMAP is dummy.
+  // MailHog captures outgoing mail. IMAP is dummy.
   const smtpHost = Cypress.env('SMTP_HOST') || '127.0.0.1'
   const smtpPort = Cypress.env('SMTP_PORT') || '1025'
   const mailhogUrl = Cypress.env('MAILHOG_URL')
@@ -41,14 +41,16 @@ describe('Admin setup and outgoing conversation', () => {
     cy.get('input[name="imap.username"]').type('cypress')
     cy.get('input[name="imap.password"]').type('cypress')
 
-    // smtp.host/port also exist in the hidden OAuth section, so target the visible ones.
-    cy.get('input[name="smtp.host"]:visible').clear().type(smtpHost)
-    cy.get('input[name="smtp.port"]:visible').clear().type(smtpPort)
+    cy.get('input[name="smtp.host"]').clear().type(smtpHost)
+    cy.get('input[name="smtp.port"]').clear().type(smtpPort)
     cy.get('input[name="smtp.username"]').type('cypress')
     cy.get('input[name="smtp.password"]').type('cypress')
+    cy.toggleEmailInboxAdvanced('smtp')
     cy.selectOption('Login', 'None') // SMTP auth protocol -> None (MailHog needs none)
 
-    cy.contains('button', 'Create').click()
+    cy.setEmailInboxSection('imap', false)
+    cy.setEmailInboxSection('smtp', false)
+    cy.get('button[type="submit"]').click()
     cy.wait('@createInbox').its('response.statusCode').should('eq', 200)
     cy.location('pathname').should('eq', '/admin/inboxes')
   })

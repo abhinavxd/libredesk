@@ -18,6 +18,8 @@ import (
 	"github.com/zerodha/logf"
 )
 
+const notificationBodyRunes = 400
+
 //go:embed queries.sql
 var queriesFS embed.FS
 
@@ -88,6 +90,7 @@ func (m *UserNotificationManager) Create(userID int, notificationType models.Not
 	if meta == nil {
 		meta = json.RawMessage("{}")
 	}
+	body.String = pushPreview(body.String, notificationBodyRunes)
 	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta, pq.Array(models.ReplyTypes)); err != nil {
 		m.lo.Error("error creating notification", "user_id", userID, "error", err)
 		return notification, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

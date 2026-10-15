@@ -6,10 +6,12 @@ import (
 	"mime/multipart"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
+	"github.com/zerodha/logf"
 )
 
 func TestHandleChatSendMessageRejectsMoreThanFiveAttachments(t *testing.T) {
@@ -100,6 +102,22 @@ func TestDecodeChatInitRequestWithAttachmentOnlyMultipart(t *testing.T) {
 	}
 	if decoded.Message != "" || len(files) != 1 || !validChatInitMessage(decoded.Message, len(files), false) {
 		t.Fatalf("decoded attachment-only init = (%q, %d files), want empty message with one allowed file", decoded.Message, len(files))
+	}
+}
+
+func TestValidateAttributeValuePreservesUTF8(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	app := &App{lo: &lo}
+	for _, char := range []string{"a", "é", "界", "😀"} {
+		for padding := range len(char) {
+			prefix := strings.Repeat("a", padding)
+			value := prefix + strings.Repeat(char, 1001)
+			want := prefix + strings.Repeat(char, (1000-padding)/len(char))
+			got := validateAttributeValue("description", value, app).(string)
+			if !utf8.ValidString(got) || got != want {
+				t.Fatalf("padding %d: got %q, want %q", padding, got, want)
+			}
+		}
 	}
 }
 

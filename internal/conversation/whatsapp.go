@@ -161,7 +161,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 		if err == nil {
 			meta["whatsapp_template_id"] = t.ID
 			meta["whatsapp_template_params"] = map[string]string{"button_url_0": csatUUID}
-			if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, "", nil, nil, nil, meta); err != nil {
+			if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, "", nil, nil, nil, "" /** sendFrom **/, meta); err != nil {
 				m.lo.Error("error sending whatsapp CSAT template", "conversation_uuid", conversation.UUID, "error", err)
 				return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 			}
@@ -176,7 +176,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 				content = tmpl.BodyContent + "\n" + csatURL
 			}
 		}
-		if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, content, nil, nil, nil, meta); err != nil {
+		if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, content, nil, nil, nil, "" /** sendFrom **/, meta); err != nil {
 			m.lo.Error("error sending whatsapp CSAT link", "conversation_uuid", conversation.UUID, "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}

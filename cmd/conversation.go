@@ -65,6 +65,7 @@ type createConversationRequest struct {
 	ReuseContact           bool              `json:"reuse_contact"`
 	Subject                string            `json:"subject"`
 	Content                string            `json:"content"`
+	SendFrom               string            `json:"send_from"`
 	Attachments            []int             `json:"attachments"`
 	Initiator              string            `json:"initiator"` // "contact" | "agent"
 	SourceID               string            `json:"source_id"` // RFC 5322 Message-ID of the inbound message. Stored on the created contact message so replies thread on it. Contact-initiated only.
@@ -1001,9 +1002,9 @@ func handleCreateConversation(r *fastglue.Request) error {
 		if len(req.WhatsAppTemplateParams) > 0 {
 			meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 		}
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "" /** content **/, nil /** to **/, nil /** cc **/, nil /** bcc **/, meta)
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "" /** content **/, nil /** to **/, nil /** cc **/, nil /** bcc **/, "" /** sendFrom **/, meta)
 	case req.Initiator == umodels.UserTypeAgent:
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, map[string]any{})
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, req.SendFrom, map[string]any{} /** meta **/)
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
 		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID, auser.ID)

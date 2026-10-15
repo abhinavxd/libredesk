@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -202,13 +203,9 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 		if len(meta) >= maxCsatMetaKeys {
 			return
 		}
-		if len(k) > maxCsatMetaKeyLength {
-			k = k[:maxCsatMetaKeyLength]
-		}
+		k = stringutil.TruncateUTF8(k, maxCsatMetaKeyLength)
 		v := string(value)
-		if len(v) > maxCsatMetaValLength {
-			v = v[:maxCsatMetaValLength]
-		}
+		v = stringutil.TruncateUTF8(v, maxCsatMetaValLength)
 		meta[k] = v
 	})
 

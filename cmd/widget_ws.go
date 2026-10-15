@@ -12,6 +12,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/fasthttp/websocket"
 	"github.com/google/uuid"
 	"github.com/zerodha/fastglue"
@@ -331,12 +332,8 @@ func handleWidgetPageVisit(app *App, data json.RawMessage, contactID int) {
 		return
 	}
 
-	if len(visit.URL) > 2048 {
-		visit.URL = visit.URL[:2048]
-	}
-	if len(visit.Title) > 256 {
-		visit.Title = visit.Title[:256]
-	}
+	visit.URL = stringutil.TruncateUTF8(visit.URL, 2048 /* maxBytes */)
+	visit.Title = stringutil.TruncateUTF8(visit.Title, 256 /* maxBytes */)
 
 	parsedURL, err := url.Parse(visit.URL)
 	if err != nil || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {

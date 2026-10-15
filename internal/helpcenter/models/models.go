@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/volatiletech/null/v9"
@@ -18,6 +20,16 @@ const (
 	ColorSchemeLight  = "light"
 	ColorSchemeDark   = "dark"
 )
+
+type ArticleReference struct {
+	ID             int    `db:"id" json:"id"`
+	Title          string `db:"title" json:"title"`
+	Slug           string `db:"slug" json:"-"`
+	Locale         string `db:"locale" json:"-"`
+	HelpCenterSlug string `db:"help_center_slug" json:"-"`
+	CustomDomain   string `db:"custom_domain" json:"-"`
+	URL            string `db:"-" json:"url"`
+}
 
 type HelpCenter struct {
 	ID              int             `db:"id" json:"id"`
@@ -218,6 +230,20 @@ type Locale struct {
 type Insights struct {
 	TopSearches    []SearchTermStat `json:"top_searches"`
 	NoResultSearch []SearchTermStat `json:"no_result_searches"`
+}
+
+func (r ArticleReference) PublicURL(rootURL string) string {
+	origin := strings.TrimRight(rootURL, "/")
+	prefix := "/hc/" + url.PathEscape(r.HelpCenterSlug)
+	if u, err := url.Parse(r.CustomDomain); err == nil && u.Host != "" && (u.Scheme == "https" || u.Scheme == "http") {
+		origin = u.Scheme + "://" + u.Host
+		prefix = ""
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return ""
+	}
+	return origin + prefix + "/" + url.PathEscape(r.Locale) + "/articles/" + url.PathEscape(r.Slug)
 }
 
 // DefaultTheme enables the show-flags for elements that must keep rendering when a stored theme predates the flag.

@@ -18,7 +18,7 @@ func TestV2_9_0TemplateComponentsMigration(t *testing.T) {
 	}
 	db.MustExec(`ALTER TABLE whatsapp_templates DROP COLUMN component_types`)
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -51,7 +51,7 @@ func TestV2_9_0PrivateNotePermissionMigration(t *testing.T) {
 
 	// Running the migration twice verifies that it does not append duplicates.
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatalf("running migration: %v", err)
 		}
 	}
@@ -95,7 +95,7 @@ func TestV2_9_0NotificationMigration(t *testing.T) {
 	`)
 
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatalf("running migration: %v", err)
 		}
 	}
@@ -160,7 +160,7 @@ func TestV2_9_0PreservesExistingQueuedEmails(t *testing.T) {
 	db.MustExec(`INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'queued@example.com', 'Agent', '')`)
 	db.MustExec(`INSERT INTO notification_email_queue (user_id, notification_type, recipient_email, subject, content, send_at) VALUES ((SELECT id FROM users LIMIT 1), 'new_reply', 'queued@example.com', 'Reply', 'Pending reply', now())`)
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -184,7 +184,7 @@ func TestWidgetCampaignMigration(t *testing.T) {
 	db := testutil.NewDB(t, "widget_migration")
 	db.MustExec(`DROP TABLE widget_campaign_deliveries`)
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -211,7 +211,7 @@ func TestHelpArticleTranslationGroupMigration(t *testing.T) {
 	`)
 
 	for range 2 {
-		if err := V2_9_0(db, nil, nil); err != nil {
+		if err := V2_9_0_RC8(db, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
