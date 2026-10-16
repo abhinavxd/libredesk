@@ -36,6 +36,9 @@
         <span v-if="isCurrentUser(item)" class="text-muted-foreground text-xs"
           >({{ t('globals.terms.you') }})</span
         >
+        <span v-if="item.disabled" class="text-muted-foreground text-xs"
+          >({{ t('globals.terms.awayReassigning') }})</span
+        >
       </div>
     </template>
 

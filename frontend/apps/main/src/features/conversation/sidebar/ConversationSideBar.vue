@@ -20,6 +20,7 @@
                 v-model="conversationStore.current.assigned_user_id"
                 include-none
                 current-user-first
+                block-away-reassigning
                 @select="selectAgent"
               />
             </div>

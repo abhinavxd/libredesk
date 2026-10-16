@@ -211,6 +211,7 @@
               <SelectAgentCombobox
                 v-bind="componentField"
                 include-none
+                block-away-reassigning
                 :button-class="isUnset(componentField.modelValue) ? ROW_COMBOBOX_EMPTY_CLASS : ROW_COMBOBOX_CLASS"
               />
             </FormControl>

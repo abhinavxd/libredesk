@@ -29,6 +29,7 @@
               v-for="item in visibleItems"
               :key="item.value"
               :value="JSON.stringify({ label: item.label, value: item.value })"
+              :disabled="item.disabled"
               @select="handleSelect"
             >
               <slot name="item" :item="item">{{ item.label }}</slot>
