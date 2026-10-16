@@ -90,7 +90,6 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 	return rendered.String(), nil
 }
 
-// RenderStoredEmailTemplate fetches and renders an email template from the database, including subject and body and returns the rendered content.
 func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, string, error) {
 	tmpl, err := m.getByName(name)
 	if err != nil {
@@ -112,33 +111,9 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 		return sb.String(), nil
 	}
 
-	defaultTmpl, err := m.getDefaultOutgoingEmailTemplate()
+	content, err := m.renderNotificationEmail(tmpl.Body, data)
 	if err != nil {
-		m.lo.Error("error fetching default outgoing email template", "error", err)
-	}
-
-	if defaultTmpl.Body == "" {
-		defaultTmpl.Body = `{{ template "content" . }}`
-	}
-
-	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("parsing base template: %w", err)
-	}
-
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Parse(tmpl.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("parsing content template: %w", err)
-	}
-
-	baseTemplate, err = baseTemplate.AddParseTree(TmplContent, contentTemplate.Tree)
-	if err != nil {
-		return "", "", fmt.Errorf("adding content template: %w", err)
-	}
-
-	var rendered strings.Builder
-	if err := baseTemplate.ExecuteTemplate(&rendered, TmplBase, data); err != nil {
-		return "", "", fmt.Errorf("executing base template: %w", err)
+		return "", "", err
 	}
 
 	subject, err := executeSubjectTemplate(tmpl.Subject.String)
@@ -146,7 +121,7 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 		return "", "", err
 	}
 
-	return rendered.String(), subject, nil
+	return content, subject, nil
 }
 
 // RenderInMemoryTemplate executes an in-memory template with data and returns the rendered content.
@@ -172,4 +147,29 @@ func (m *Manager) RenderWebPage(ctx *fasthttp.RequestCtx, tmplFile string, data 
 	ctx.Response.Header.Set("Pragma", "no-cache")
 	ctx.Response.Header.Set("Expires", "0")
 	return m.webTpls.ExecuteTemplate(ctx, tmplFile, data)
+}
+
+func (m *Manager) renderNotificationEmail(content string, data any) (string, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	if m.notificationTpls == nil {
+		return "", fmt.Errorf("notification templates are not loaded")
+	}
+	tmpl, err := m.notificationTpls.Clone()
+	if err != nil {
+		return "", fmt.Errorf("cloning notification templates: %w", err)
+	}
+	tmpl.Funcs(m.funcMap)
+	if _, err := tmpl.New(TmplContent).Parse(content); err != nil {
+		return "", fmt.Errorf("parsing notification content: %w", err)
+	}
+	if _, err := tmpl.New(TmplBase).Parse(`{{ template "header" . }}{{ template "content" . }}{{ template "footer" . }}`); err != nil {
+		return "", fmt.Errorf("parsing notification layout: %w", err)
+	}
+	var rendered strings.Builder
+	if err := tmpl.ExecuteTemplate(&rendered, TmplBase, data); err != nil {
+		return "", fmt.Errorf("rendering notification email: %w", err)
+	}
+	return rendered.String(), nil
 }

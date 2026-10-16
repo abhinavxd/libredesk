@@ -136,6 +136,12 @@ func TestReplyDeliveryRechecksEligibility(t *testing.T) {
 	check(false)
 	f.db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, f.convID, f.userID)
 	ref.Type = models.NotificationTypeNewReplyParticipating
+	check(false)
+	f.db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private, meta) VALUES ($1, $2, 'agent', 'activity', 'sent', true, '{"activity_type":"tag_added"}')`, f.convID, f.userID)
+	check(false)
+	f.db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private) VALUES ($1, $2, 'agent', 'outgoing', 'sent', true)`, f.convID, f.userID)
+	check(false)
+	f.db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private) VALUES ($1, $2, 'agent', 'outgoing', 'sent', false)`, f.convID, f.userID)
 	check(true)
 	f.checker.prefs = fakePreferences{}
 	check(false)

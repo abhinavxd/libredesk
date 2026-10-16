@@ -509,7 +509,8 @@ func TestSendNotificationKeepsPendingWhenDispatchFails(t *testing.T) {
 	if len(pending) != 1 {
 		t.Fatalf("pending notifications = %d, want 1", len(pending))
 	}
-	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+	renderer, err := template.New(m.lo, db, nil, layout, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +538,8 @@ func TestSendNotificationRetriesOnlyUndeliveredRecipients(t *testing.T) {
 	if err := m.q.GetScheduledSLANotifications.Select(&pending); err != nil {
 		t.Fatal(err)
 	}
-	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+	renderer, err := template.New(m.lo, db, nil, layout, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
 	if err != nil {
 		t.Fatal(err)
 	}
