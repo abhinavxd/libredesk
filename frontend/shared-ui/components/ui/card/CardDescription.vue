@@ -1,5 +1,5 @@
 <script setup>
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 
 const props = defineProps({
   class: { type: null, required: false }
@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <p :class="cn('text-sm text-muted-foreground', props.class)">
+  <p :class="cn('ui-description', props.class)">
     <slot />
   </p>
 </template>

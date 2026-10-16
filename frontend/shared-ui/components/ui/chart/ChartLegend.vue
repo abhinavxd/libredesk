@@ -1,40 +1,23 @@
 <script setup>
-import { VisBulletLegend } from '@unovis/vue'
-import { BulletLegend } from '@unovis/ts'
-import { nextTick, onMounted, ref } from 'vue'
-import { buttonVariants } from '../button'
+import { Button } from '@shared-ui/components/ui/button'
 
 const props = defineProps({
-  items: { type: Array, required: true, default: () => [] }
+  items: { type: Array, required: true, default: () => [] },
+  showLineStyles: { type: Boolean, default: false }
 })
 
 const emits = defineEmits(['legendItemClick', 'update:items'])
-
-const elRef = ref()
-
-onMounted(() => {
-  const selector = `.${BulletLegend.selectors.item}`
-  nextTick(() => {
-    const elements = elRef.value?.querySelectorAll(selector)
-    const classes = buttonVariants({ variant: 'ghost', size: 'xs' }).split(' ')
-
-    // buttonVariants' [&_svg]:size-4 oversizes the 9px bullet svg, pushing the dot below the label.
-    elements?.forEach((el) => el.classList.add(...classes, '!inline-flex', '!mr-2', '[&_svg]:!size-full'))
-  })
-})
 
 function onLegendItemClick(d, i) {
   emits('legendItemClick', d, i)
   const isBulletActive = !props.items[i].inactive
   const isFilterApplied = props.items.some((i) => i.inactive)
   if (isFilterApplied && isBulletActive) {
-    // reset filter
     emits(
       'update:items',
       props.items.map((item) => ({ ...item, inactive: false }))
     )
   } else {
-    // apply selection, set other item as inactive
     emits(
       'update:items',
       props.items.map((item) =>
@@ -46,7 +29,33 @@ function onLegendItemClick(d, i) {
 </script>
 
 <template>
-  <div ref="elRef" class="w-max">
-    <VisBulletLegend :items="items" :on-legend-item-click="onLegendItemClick" />
+  <div class="flex max-w-full flex-wrap justify-end gap-1">
+    <Button
+      v-for="(item, index) in items"
+      :key="item.name"
+      type="button"
+      variant="ghost"
+      size="xs"
+      class="h-auto min-h-7 whitespace-normal text-left"
+      :class="{ 'text-muted-foreground': item.inactive }"
+      :aria-pressed="!item.inactive"
+      @click="onLegendItemClick(item, index)"
+    >
+      <span
+        v-if="showLineStyles"
+        class="w-4 shrink-0 border-t-2"
+        :class="{ 'opacity-30': item.inactive }"
+        :style="{ borderTopColor: item.color, borderTopStyle: index % 2 ? 'dashed' : 'solid' }"
+        aria-hidden="true"
+      />
+      <span
+        v-else
+        class="size-2.5 shrink-0 rounded-full"
+        :class="{ 'opacity-30': item.inactive }"
+        :style="{ backgroundColor: item.color }"
+        aria-hidden="true"
+      />
+      {{ item.name }}
+    </Button>
   </div>
 </template>

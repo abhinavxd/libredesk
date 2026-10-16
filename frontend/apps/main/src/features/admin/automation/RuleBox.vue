@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="box p-5">
     <div class="mb-5">
       <RadioGroup
         class="flex"
@@ -29,7 +29,7 @@
       </RadioGroup>
     </div>
 
-    <div class="space-y-6" :class="{ 'box p-5': ruleGroup.rules?.length > 0 }">
+    <div class="space-y-6">
       <div class="space-y-6">
         <div v-for="(rule, index) in ruleGroup.rules" :key="rule" class="space-y-6">
           <div v-if="index > 0">

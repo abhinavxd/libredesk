@@ -3,8 +3,12 @@
     <Tooltip>
       <TooltipTrigger as-child>
         <SidebarMenuButton asChild :isActive="item.isActive">
-          <router-link :to="item.to">
-            <component :is="item.icon" />
+          <router-link
+            :to="item.to"
+            :aria-label="item.label"
+            :aria-current="item.isActive ? 'page' : undefined"
+          >
+            <component :is="item.icon" aria-hidden="true" />
             <span v-if="variant === 'drawer'">{{ item.label }}</span>
           </router-link>
         </SidebarMenuButton>

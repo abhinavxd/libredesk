@@ -1,40 +1,54 @@
 <template>
   <AdminSplitLayout>
     <template #content>
-      <div class="mb-5">
-        <CustomBreadcrumb :links="breadcrumbLinks" />
-      </div>
-
       <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div class="flex items-center gap-3">
-            <label class="text-sm text-muted-foreground">{{ $t('globals.terms.inbox') }}</label>
-            <Select v-model="selectedInboxID" @update:model-value="onInboxChange">
-              <SelectTrigger class="w-72">
-                <SelectValue :placeholder="$t('placeholders.selectInbox')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
-                  {{ inb.name }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div class="flex items-center gap-2">
-            <Button variant="outline" :disabled="!selectedInboxID || isSyncing" @click="onSync">
+        <AdminToolbar
+          v-model:search="searchTerm"
+          :searchable="whatsappInboxes.length > 0"
+          class="mb-5"
+        >
+          <template #left>
+            <div class="flex items-center gap-3">
+              <label class="text-sm text-muted-foreground">{{ $t('globals.terms.inbox') }}</label>
+              <Select v-model="selectedInboxID" @update:model-value="onInboxChange">
+                <SelectTrigger class="w-48 sm:w-60">
+                  <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
+                    {{ inb.name }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </template>
+          <template #actions>
+            <Button
+              type="button"
+              variant="outline"
+              :disabled="!selectedInboxID || isSyncing"
+              @click="onSync"
+            >
               <RefreshCw class="size-4" :class="{ 'animate-spin': isSyncing }" />
               {{ $t('admin.whatsappTemplates.syncFromMeta') }}
             </Button>
-            <Button :disabled="!selectedInboxID" @click="onNew">
+            <Button type="button" :disabled="!selectedInboxID" @click="onNew">
               {{ $t('globals.messages.newTemplate') }}
             </Button>
-          </div>
-        </div>
+          </template>
+        </AdminToolbar>
 
         <div v-if="!whatsappInboxes.length" class="box p-6 text-sm text-muted-foreground">
           {{ $t('admin.whatsappTemplates.noInboxes') }}
         </div>
-        <DataTable v-else :columns="columns" :data="templates" :loading="isLoading" />
+        <DataTable
+          v-else
+          v-model:search="searchTerm"
+          :searchable="false"
+          :columns="columns"
+          :data="templates"
+          :loading="isLoading"
+        />
       </LoadingOverlay>
 
       <AlertDialog :open="deleteAlertOpen" @update:open="deleteAlertOpen = $event">
@@ -61,7 +75,7 @@
           <p class="text-sm font-medium text-foreground">
             {{ $t('admin.whatsappTemplates.title') }}
           </p>
-          <p class="text-sm text-muted-foreground">
+          <p class="ui-description">
             {{ $t('admin.whatsappTemplates.help.overview') }}
           </p>
           <a
@@ -104,10 +118,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useInboxStore } from '@main/stores/inbox'
@@ -124,14 +138,10 @@ const inboxStore = useInboxStore()
 const isLoading = ref(false)
 const isSyncing = ref(false)
 const templates = ref([])
+const searchTerm = ref('')
 const selectedInboxID = ref(null)
 const deleteAlertOpen = ref(false)
 const deleteID = ref(null)
-
-const breadcrumbLinks = [
-  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('admin.whatsappTemplates.title') }
-]
 
 const whatsappInboxes = computed(() =>
   inboxStore.inboxes.filter((inb) => inb.channel === 'whatsapp')
@@ -140,7 +150,7 @@ const whatsappInboxes = computed(() =>
 const RESERVED_NAME_PREFIX = 'libredesk_csat_'
 
 const STATUS_BADGE_VARIANT = {
-  APPROVED: 'default',
+  APPROVED: 'success',
   PENDING: 'secondary',
   REJECTED: 'destructive',
   DISABLED: 'secondary',
@@ -268,6 +278,7 @@ const fetchTemplates = async () => {
 }
 
 const onInboxChange = (id) => {
+  searchTerm.value = ''
   selectedInboxID.value = id
   router.replace({ query: { ...route.query, inbox_id: id } })
   fetchTemplates()

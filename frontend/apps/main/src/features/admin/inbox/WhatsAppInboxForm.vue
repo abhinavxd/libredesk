@@ -54,7 +54,7 @@
       </p>
     </FormField>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="max-w-xl">
       <FormField v-slot="{ componentField }" name="reopen_window_hours">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.whatsapp.reopenWindow') }}</FormLabel>
@@ -71,8 +71,8 @@
 
     <div v-show="csatEnabled" class="box p-4 space-y-4">
       <div>
-        <h3 class="font-semibold">{{ $t('globals.terms.csatSurveyTemplate') }}</h3>
-        <p class="!mt-1 text-sm text-muted-foreground flex items-start gap-1.5">
+        <h3 class="ui-heading">{{ $t('globals.terms.csatSurveyTemplate') }}</h3>
+        <p class="!mt-1 ui-description flex items-start gap-1.5">
           <Lightbulb class="size-4 mt-0.5 shrink-0" />
           <span>{{ $t('admin.inbox.whatsapp.csatTemplate.description') }}</span>
         </p>
@@ -91,7 +91,7 @@
         </FormItem>
       </FormField>
 
-      <div class="grid grid-cols-2 gap-4">
+      <FormGrid>
         <FormField v-slot="{ componentField }" name="config.csat_template_button_text">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.buttonText') }}</FormLabel>
@@ -115,12 +115,12 @@
             <FormMessage />
           </FormItem>
         </FormField>
-      </div>
+      </FormGrid>
     </div>
 
     <div class="box p-4 space-y-4">
-      <h3 class="font-semibold">{{ $t('admin.inbox.whatsapp.metaCredentials') }}</h3>
-      <div class="grid grid-cols-2 gap-4">
+      <h3 class="ui-heading">{{ $t('admin.inbox.whatsapp.metaCredentials') }}</h3>
+      <FormGrid>
         <FormField v-slot="{ componentField }" name="config.phone_number_id">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.phoneNumberID') }}</FormLabel>
@@ -143,9 +143,9 @@
             <FormMessage />
           </FormItem>
         </FormField>
-      </div>
+      </FormGrid>
 
-      <div class="grid grid-cols-2 gap-4">
+      <FormGrid>
         <FormField v-slot="{ componentField }" name="config.access_token">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.accessToken') }}</FormLabel>
@@ -171,9 +171,9 @@
             <FormMessage />
           </FormItem>
         </FormField>
-      </div>
+      </FormGrid>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="max-w-xl">
         <FormField v-slot="{ componentField }" name="config.api_version">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.apiVersion') }}</FormLabel>
@@ -187,13 +187,13 @@
     </div>
 
     <div class="box p-4 space-y-4">
-      <h3 class="font-semibold">{{ $t('globals.terms.webhook', 1) }}</h3>
-      <p class="text-sm text-muted-foreground flex items-start gap-1.5">
+      <h3 class="ui-heading">{{ $t('globals.terms.webhook', 1) }}</h3>
+      <p v-if="webhookURL" class="ui-description flex items-start gap-1.5">
         <Lightbulb class="size-4 mt-0.5 shrink-0" />
         <span>{{ $t('admin.inbox.whatsapp.webhook.description') }}</span>
       </p>
 
-      <div class="grid grid-cols-2 gap-4">
+      <div class="max-w-xl">
         <FormField v-slot="{ componentField }" name="config.webhook_verify_token">
           <FormItem>
             <FormLabel>{{ $t('globals.terms.webhookVerifyToken') }}</FormLabel>
@@ -207,15 +207,12 @@
           </FormItem>
         </FormField>
 
-        <div class="space-y-2">
+        <div v-if="webhookURL" class="space-y-2">
           <Label class="text-muted-foreground">{{ $t('globals.terms.callbackURL') }}</Label>
-          <div v-if="webhookURL" class="flex items-center gap-2">
+          <div class="flex items-center gap-2">
             <Input :model-value="webhookURL" readonly class="font-mono text-xs" />
             <CopyButton :text="webhookURL" />
           </div>
-          <p v-else class="text-sm text-muted-foreground">
-            {{ $t('admin.inbox.whatsapp.webhookURL.afterSave') }}
-          </p>
         </div>
       </div>
     </div>
@@ -227,6 +224,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, computed } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'

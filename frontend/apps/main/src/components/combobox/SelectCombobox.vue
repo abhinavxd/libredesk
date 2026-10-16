@@ -26,11 +26,12 @@
             v-if="item.availability_status"
             :status="item.availability_status"
             size="sm"
-            class="absolute bottom-0 right-0 border border-background"
+            class="absolute -bottom-[3px] -right-[3px]"
           />
         </div>
 
         <!-- Others -->
+        <PriorityMarker v-else-if="type === 'priority'" :priority="item.label" :tooltip="false" />
         <span v-else-if="item.emoji">{{ item.emoji }}</span>
         <span>{{ item.label }}</span>
         <span v-if="isCurrentUser(item)" class="text-muted-foreground text-xs"
@@ -53,11 +54,12 @@
               v-if="selected.availability_status"
               :status="selected.availability_status"
               size="sm"
-              class="absolute bottom-0 right-0 border border-background"
+              class="absolute -bottom-[3px] -right-[3px]"
             />
           </div>
 
           <!-- Others -->
+          <PriorityMarker v-else-if="type === 'priority'" :priority="selected.label" :tooltip="false" />
           <span v-else-if="selected.emoji" class="shrink-0">{{ selected.emoji }}</span>
           <span class="truncate">{{ selected.label }}</span>
           <span
@@ -77,6 +79,7 @@ import { computed } from 'vue'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
+import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()

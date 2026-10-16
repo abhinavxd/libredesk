@@ -4,7 +4,7 @@
     <template v-else>
       <div v-if="showGettingStarted" class="getting-started-wrapper">
         <div class="text-center">
-          <h2 class="text-2xl font-semibold text-foreground mb-6">
+          <h2 class="ui-display-heading mb-6">
             {{ $t('setup.completeYourSetup') }}
           </h2>
 
@@ -45,8 +45,9 @@
           </div>
         </div>
       </div>
-      <div v-else>
-        <p class="placeholder-text">{{ $t('conversation.placeholder') }}</p>
+      <div v-else class="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
+        <MessageSquareText class="size-8 text-muted-foreground" aria-hidden="true" />
+        <p class="text-sm text-muted-foreground">{{ $t('conversation.placeholder') }}</p>
       </div>
     </template>
   </div>
@@ -55,7 +56,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle, Circle } from 'lucide-vue-next'
+import { CheckCircle, Circle, MessageSquareText } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useInboxStore } from '@/stores/inbox'
@@ -81,7 +82,7 @@ const showGettingStarted = computed(() => !hasInboxes.value || !hasAgents.value)
 
 <style scoped>
 .placeholder-container {
-  @apply h-screen w-full flex items-center justify-center min-w-[400px] relative;
+  @apply relative flex h-full min-h-0 w-full min-w-0 items-center justify-center rounded-xl border border-border bg-card;
 }
 
 .getting-started-wrapper {

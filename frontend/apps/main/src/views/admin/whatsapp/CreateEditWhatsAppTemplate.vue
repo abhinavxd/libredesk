@@ -7,14 +7,14 @@
 
       <p
         v-if="isEditing && template && !canEditWhatsAppTemplate(template)"
-        class="mb-5 text-sm text-muted-foreground"
+        class="mb-5 ui-description"
         role="status"
       >
         {{ $t('admin.whatsappTemplates.error.editUnavailable') }}
       </p>
       <form @submit="onSubmit" class="w-full">
         <fieldset :disabled="isFetching || isLoading || editUnavailable" class="space-y-6">
-          <div :class="FIELD_GRID_CLASS">
+          <FormGrid>
             <FormField v-slot="{ componentField, handleChange, meta }" name="inbox_id">
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
@@ -63,9 +63,7 @@
                 <FormMessage />
               </FormItem>
             </FormField>
-          </div>
 
-          <div :class="FIELD_GRID_CLASS">
             <FormField v-slot="{ componentField, handleChange, meta }" name="name">
               <FormItem>
                 <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
@@ -103,12 +101,12 @@
                 <FormMessage />
               </FormItem>
             </FormField>
-          </div>
+          </FormGrid>
 
           <div :class="SECTION_CLASS">
-            <h3 class="font-semibold">{{ $t('globals.terms.header') }}</h3>
+            <h3 class="ui-heading">{{ $t('globals.terms.header') }}</h3>
 
-            <div :class="FIELD_GRID_CLASS">
+            <div class="max-w-xl">
               <FormField v-slot="{ componentField, handleChange, meta }" name="header_type">
                 <FormItem>
                   <FormLabel>{{ $t('globals.terms.headerType') }}</FormLabel>
@@ -155,7 +153,7 @@
           </div>
 
           <div :class="SECTION_CLASS">
-            <h3 class="font-semibold">{{ $t('globals.terms.body') }}</h3>
+            <h3 class="ui-heading">{{ $t('globals.terms.body') }}</h3>
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="body_content">
               <FormItem>
@@ -194,7 +192,7 @@
           </div>
 
           <div v-if="placeholders.length" :class="SECTION_CLASS">
-            <h3 class="font-semibold">{{ $t('globals.terms.sampleValue', 2) }}</h3>
+            <h3 class="ui-heading">{{ $t('globals.terms.sampleValue', 2) }}</h3>
             <p class="text-xs text-muted-foreground">
               {{ $t('admin.whatsappTemplates.sampleValues.description') }}
             </p>
@@ -217,7 +215,7 @@
 
           <div :class="SECTION_CLASS">
             <div class="flex items-center justify-between">
-              <h3 class="font-semibold">{{ $t('globals.terms.button', 2) }}</h3>
+              <h3 class="ui-heading">{{ $t('globals.terms.button', 2) }}</h3>
               <Button
                 type="button"
                 variant="outline"
@@ -316,8 +314,8 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 const SECTION_CLASS = 'box p-4 space-y-4'
-const FIELD_GRID_CLASS = 'grid grid-cols-2 gap-4'
 
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'

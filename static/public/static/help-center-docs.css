@@ -563,7 +563,15 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 .hcd-footer-social { display: flex; flex-wrap: wrap; gap: 1rem; }
 .hcd-footer-social a { display: inline-flex; }
 .hcd-footer-social svg { width: 1.15rem; height: 1.15rem; }
-.hcd-footer-powered { margin: .25rem 0 0; opacity: .7; }
+.hcd-footer-powered { margin: .25rem 0 0; color: var(--hc-footer-text, var(--hc-muted)); font-size: .75rem; font-weight: 400; line-height: 1rem; }
+.hcd-footer-powered a { color: inherit; opacity: 1; transition: color .15s; }
+.hcd-footer-powered a:focus-visible { color: var(--hc-footer-text, var(--hc-ink)); }
+@media (hover: hover) and (pointer: fine) {
+    .hcd-footer-powered a:hover { color: var(--hc-footer-text, var(--hc-ink)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .hcd-footer-powered a { transition: none; }
+}
 
 /* ---- Responsive ---- */
 @media (max-width: 1023px) {

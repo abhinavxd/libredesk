@@ -3,7 +3,7 @@
     <Card class="bg-card box" id="reset-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
-          <CardTitle class="text-2xl font-bold text-foreground">{{
+          <CardTitle class="ui-display-heading">{{
             t('auth.resetPassword')
           }}</CardTitle>
           <p class="text-sm text-muted-foreground">{{ t('auth.enterEmailForReset') }}</p>
@@ -61,15 +61,15 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../api'
+import api from '@main/api'
 import { validateEmail } from '@shared-ui/utils/string'
 import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'

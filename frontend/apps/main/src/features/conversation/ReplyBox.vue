@@ -63,7 +63,7 @@
     </AlertDialogContent>
   </AlertDialog>
 
-  <div class="text-foreground bg-background">
+  <div class="rounded-t-xl bg-background text-foreground">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
@@ -791,59 +791,3 @@ watch(
   }
 )
 </script>
-
-<style scoped>
-/* While the AI drafts a reply, a point of light orbits the reply box: a bright
-   comet head that fades to a transparent tail, with its glow travelling along. */
-@property --ai-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-.ai-generating {
-  box-shadow: 0 6px 22px -10px hsl(var(--primary) / 0.28);
-}
-
-.ai-generating::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--ai-angle),
-    hsl(var(--primary)) 0deg,
-    hsl(var(--primary) / 0) 90deg,
-    hsl(var(--primary) / 0) 180deg,
-    hsl(var(--primary)) 180deg,
-    hsl(var(--primary) / 0) 270deg,
-    hsl(var(--primary) / 0) 360deg
-  );
-  filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5));
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: ai-border-spin 2.4s linear infinite;
-  pointer-events: none;
-  z-index: 20;
-}
-
-@keyframes ai-border-spin {
-  to {
-    --ai-angle: 360deg;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* Steady even glow so the active state stays legible without motion. */
-  .ai-generating {
-    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.4);
-  }
-  .ai-generating::after {
-    display: none;
-  }
-}
-</style>

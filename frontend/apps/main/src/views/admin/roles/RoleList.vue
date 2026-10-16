@@ -1,33 +1,42 @@
 <template>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-end mb-5">
-      <router-link :to="{ name: 'new-role' }">
-        <Button>
-          {{
-            $t('role.new')
-          }}
-        </Button>
-      </router-link>
-    </div>
+    <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+      <template #actions>
+        <router-link :to="{ name: 'new-role' }">
+          <Button>
+            {{ $t('role.new') }}
+          </Button>
+        </router-link>
+      </template>
+    </AdminToolbar>
     <div>
-      <DataTable :columns="createColumns(t)" :data="roles" :loading="isLoading" />
+      <DataTable
+        v-model:search="searchTerm"
+        :searchable="false"
+        :columns="createColumns(t)"
+        :data="roles"
+        :loading="isLoading"
+      />
     </div>
   </LoadingOverlay>
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { onMounted, onUnmounted, ref } from 'vue'
-import { createColumns } from '../../../features/admin/roles/dataTableColumns.js'
+import { createColumns } from '@/features/admin/roles/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS} from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api'
+import api from '@/api'
 
 const emitter = useEmitter()
+const searchTerm = ref('')
 const { t } = useI18n()
 const roles = ref([])
 const isLoading = ref(false)

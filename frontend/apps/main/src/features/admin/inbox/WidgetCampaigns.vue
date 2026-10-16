@@ -1,4 +1,5 @@
 <script setup>
+import { usePreferredReducedMotion } from '@vueuse/core'
 const HINT_CLASS = 'text-xs text-muted-foreground'
 
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
@@ -80,6 +81,8 @@ const SELECT_FIELDS = [
   }
 ]
 const DEVICES = ['desktop', 'mobile']
+
+const reducedMotion = usePreferredReducedMotion()
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -299,7 +302,7 @@ onMounted(async () => {
 
     <!-- Campaign list -->
     <template v-if="!campaign">
-      <p class="text-sm text-muted-foreground">{{ t('widget.campaignsHint') }}</p>
+      <p class="ui-description">{{ t('widget.campaignsHint') }}</p>
 
       <div class="space-y-2 max-w-md">
         <Label for="campaign-cooldown">{{ t('widget.campaignCooldown') }}</Label>
@@ -321,7 +324,7 @@ onMounted(async () => {
       </div>
 
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">
+        <h4 class="ui-heading">
           {{ t('globals.terms.proactiveMessage', 2) }}
         </h4>
         <p v-if="modelValue.length > 1" class="text-sm text-muted-foreground">
@@ -332,7 +335,7 @@ onMounted(async () => {
           v-if="modelValue.length"
           v-model="orderedCampaigns"
           item-key="id"
-          :animation="200"
+          :animation="reducedMotion === 'reduce' ? 0 : 200"
           handle=".drag-handle"
           :force-fallback="true"
           fallback-on-body
@@ -493,7 +496,7 @@ onMounted(async () => {
 
       <!-- Message -->
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('globals.terms.message', 1) }}</h4>
+        <h4 class="ui-heading">{{ t('globals.terms.message', 1) }}</h4>
 
         <div class="space-y-2">
           <Label for="campaign-name">{{ t('globals.terms.name') }}</Label>
@@ -564,7 +567,7 @@ onMounted(async () => {
 
       <!-- Who sees it -->
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">
+        <h4 class="ui-heading">
           {{ t('widget.campaign.section.audience') }}
         </h4>
 
@@ -600,7 +603,7 @@ onMounted(async () => {
 
       <!-- Where and when -->
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">
+        <h4 class="ui-heading">
           {{ t('widget.campaign.section.placement') }}
         </h4>
 
@@ -712,7 +715,7 @@ onMounted(async () => {
 
       <!-- Repeat -->
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">
+        <h4 class="ui-heading">
           {{ t('globals.terms.repeat') }}
         </h4>
 

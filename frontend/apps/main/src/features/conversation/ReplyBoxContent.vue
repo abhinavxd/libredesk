@@ -48,91 +48,102 @@
     <!-- To, CC, and BCC fields -->
     <div v-if="conversationStore.current.inbox_channel === 'email'">
       <div
-        :class="['space-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
+        :class="['grid grid-cols-[max-content_minmax(0,1fr)] gap-x-2 gap-y-3', isFullscreen ? 'border-b border-border p-4' : 'mb-3']"
         v-if="messageType === 'reply'"
       >
-        <div v-if="conversationStore.currentFromOptions.length > 1" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.from') }}</label>
-          <Select v-model="sendFrom">
-            <SelectTrigger :class="RECIPIENT_INPUT_CLASS"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="address in conversationStore.currentFromOptions" :key="address" :value="address">
-                {{ address }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div v-if="conversationStore.currentFromOptions.length > 1" :class="RECIPIENT_ROW_CLASS">
+          <label :for="`${recipientId}-from`" :class="RECIPIENT_LABEL_CLASS">{{ $t('globals.terms.from') }}</label>
+          <div class="flex min-w-0 items-center gap-2">
+            <Select v-model="sendFrom">
+              <SelectTrigger :id="`${recipientId}-from`" :class="RECIPIENT_INPUT_CLASS"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="address in conversationStore.currentFromOptions" :key="address" :value="address">
+                  {{ address }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('globals.terms.to') }}</label>
-          <Input
-            type="text"
-            :placeholder="t('replyBox.emailAddresess')"
-            v-model="to"
-            :class="RECIPIENT_INPUT_CLASS"
-            @blur="validateEmails"
-          />
-          <Button
-            v-if="!showCc"
-            type="button"
-            size="sm"
-            variant="ghost"
-            :class="RECIPIENT_TOGGLE_CLASS"
-            @click="showRecipientField('cc')"
-          >
-            {{ $t('replyBox.cc') }}
-          </Button>
-          <Button
-            v-if="!showBcc"
-            type="button"
-            size="sm"
-            variant="ghost"
-            :class="RECIPIENT_TOGGLE_CLASS"
-            @click="showRecipientField('bcc')"
-          >
-            {{ $t('replyBox.bcc') }}
-          </Button>
+        <div :class="RECIPIENT_ROW_CLASS">
+          <label :for="`${recipientId}-to`" :class="RECIPIENT_LABEL_CLASS">{{ $t('globals.terms.to') }}</label>
+          <div class="flex min-w-0 items-center gap-2">
+            <Input
+              :id="`${recipientId}-to`"
+              type="text"
+              :placeholder="t('replyBox.emailAddresess')"
+              v-model="to"
+              :class="RECIPIENT_INPUT_CLASS"
+              @blur="validateEmails"
+            />
+            <Button
+              v-if="!showCc"
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              @click="showRecipientField('cc')"
+            >
+              {{ $t('replyBox.cc') }}
+            </Button>
+            <Button
+              v-if="!showBcc"
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              @click="showRecipientField('bcc')"
+            >
+              {{ $t('replyBox.bcc') }}
+            </Button>
+          </div>
         </div>
-        <div v-if="showCc" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.cc') }}</label>
-          <Input
-            ref="ccInputRef"
-            type="text"
-            :placeholder="t('replyBox.emailAddresess')"
-            v-model="cc"
-            :class="RECIPIENT_INPUT_CLASS"
-            @blur="validateEmails"
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            :class="RECIPIENT_TOGGLE_CLASS"
-            :aria-label="t('replyBox.removeCC')"
-            @click="hideRecipientField('cc')"
-          >
-            <X class="w-4 h-4" />
-          </Button>
+        <div v-if="showCc" :class="RECIPIENT_ROW_CLASS">
+          <label :for="`${recipientId}-cc`" :class="RECIPIENT_LABEL_CLASS">{{ $t('replyBox.cc') }}</label>
+          <div class="flex min-w-0 items-center gap-2">
+            <Input
+              ref="ccInputRef"
+              :id="`${recipientId}-cc`"
+              type="text"
+              :placeholder="t('replyBox.emailAddresess')"
+              v-model="cc"
+              :class="RECIPIENT_INPUT_CLASS"
+              @blur="validateEmails"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              :aria-label="t('replyBox.removeCC')"
+              @click="hideRecipientField('cc')"
+            >
+              <X class="w-4 h-4" />
+            </Button>
+          </div>
         </div>
-        <div v-if="showBcc" class="flex items-center gap-2">
-          <label class="w-12 shrink-0 text-sm text-muted-foreground">{{ $t('replyBox.bcc') }}</label>
-          <Input
-            ref="bccInputRef"
-            type="text"
-            :placeholder="t('replyBox.emailAddresess')"
-            v-model="bcc"
-            :class="RECIPIENT_INPUT_CLASS"
-            @blur="validateEmails"
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            :class="RECIPIENT_TOGGLE_CLASS"
-            :aria-label="t('replyBox.removeBCC')"
-            @click="hideRecipientField('bcc')"
-          >
-            <X class="w-4 h-4" />
-          </Button>
+        <div v-if="showBcc" :class="RECIPIENT_ROW_CLASS">
+          <label :for="`${recipientId}-bcc`" :class="RECIPIENT_LABEL_CLASS">{{ $t('replyBox.bcc') }}</label>
+          <div class="flex min-w-0 items-center gap-2">
+            <Input
+              ref="bccInputRef"
+              :id="`${recipientId}-bcc`"
+              type="text"
+              :placeholder="t('replyBox.emailAddresess')"
+              v-model="bcc"
+              :class="RECIPIENT_INPUT_CLASS"
+              @blur="validateEmails"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              :class="RECIPIENT_TOGGLE_CLASS"
+              :aria-label="t('replyBox.removeBCC')"
+              @click="hideRecipientField('bcc')"
+            >
+              <X class="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -206,11 +217,13 @@
 </template>
 
 <script setup>
+const RECIPIENT_ROW_CLASS = 'col-span-2 grid grid-cols-subgrid items-center gap-x-2'
+const RECIPIENT_LABEL_CLASS = 'whitespace-nowrap text-right text-sm text-muted-foreground'
 const RECIPIENT_INPUT_CLASS =
-  'flex-grow border-input bg-card px-3 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
+  'min-w-0 flex-1 border-input bg-card px-2 py-2 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-ring'
 const RECIPIENT_TOGGLE_CLASS = 'shrink-0 px-2 text-muted-foreground'
 
-import { ref, computed, nextTick, watch } from 'vue'
+import { ref, computed, nextTick, watch, useId } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { MACRO_CONTEXT } from '@main/constants/conversation'
@@ -367,6 +380,7 @@ const isWhatsAppReply = computed(
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
 const { t } = useI18n()
+const recipientId = useId()
 const insertContent = ref(null)
 const editorRef = ref(null)
 const ccInputRef = ref(null)

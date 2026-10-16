@@ -24,7 +24,14 @@
   }
 
   .animate-shake,
-  .animate-slide-in {
+  .animate-slide-in,
+  .animate-slide-out,
+  .animate-fade-in-down,
+  .animate-pop,
+  .animate-accordion-down,
+  .animate-accordion-up,
+  .animate-collapsible-down,
+  .animate-collapsible-up {
     animation: none !important;
   }
 }
@@ -35,6 +42,8 @@
     @apply font-sans;
     --vis-font-family: theme('fontFamily.sans');
     min-height: 100%;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
     overflow: hidden;
     margin: 0;
     -webkit-font-smoothing: antialiased;
@@ -268,7 +277,7 @@
     overflow-wrap: break-word;
   }
 
-  * {
+  .native-html * {
     max-width: 100%;
   }
 
@@ -295,6 +304,28 @@
 
 .overlay {
   background: hsl(var(--foreground) / 0.5);
+}
+
+@layer components {
+  .ui-heading {
+    @apply text-base font-semibold leading-6 text-foreground;
+  }
+
+  .ui-subheading {
+    @apply text-sm font-semibold leading-5 text-foreground;
+  }
+
+  .ui-description {
+    @apply text-sm font-normal leading-5 text-muted-foreground;
+  }
+
+  .ui-dialog-heading {
+    @apply text-lg font-semibold leading-7 text-foreground;
+  }
+
+  .ui-display-heading {
+    @apply text-2xl font-semibold leading-8 text-foreground;
+  }
 }
 
 .text-sm-muted {
@@ -445,11 +476,53 @@
   }
 }
 
-/* Fix collapsed sidebar visibility in padding gap.
- * The sidebar is position:fixed and slides to left:-14rem when collapsed,
- * but ml-[3.2rem] offset causes part to remain visible in the app's padding gap.
- * Push it further left to fully hide it.
- */
-[data-state="collapsed"][data-collapsible="offcanvas"] .sidebar-secondary {
-  left: calc((var(--sidebar-width) + 3.5rem) * -1.4) !important;
+@property --ai-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.ai-generating {
+  box-shadow: 0 6px 22px -10px hsl(var(--primary) / 0.28);
+}
+
+.ai-generating::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--ai-angle),
+    hsl(var(--primary)) 0deg,
+    hsl(var(--primary) / 0) 90deg,
+    hsl(var(--primary) / 0) 180deg,
+    hsl(var(--primary)) 180deg,
+    hsl(var(--primary) / 0) 270deg,
+    hsl(var(--primary) / 0) 360deg
+  );
+  filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ai-border-spin 2.4s linear infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+@keyframes ai-border-spin {
+  to {
+    --ai-angle: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-generating {
+    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.4);
+  }
+  .ai-generating::after {
+    display: none;
+  }
 }

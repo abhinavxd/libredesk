@@ -62,7 +62,7 @@
       </FormItem>
     </FormField>
 
-    <div class="grid gap-6 md:grid-cols-3">
+    <FormGrid compact>
       <FormField v-slot="{ componentField }" name="tone">
         <FormItem>
           <FormLabel>{{ t('admin.ai.assistant.tone') }}</FormLabel>
@@ -115,7 +115,7 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="languages">
       <FormItem>
@@ -211,7 +211,7 @@
 
     <div class="space-y-2">
       <div class="text-sm font-medium leading-none">{{ t('admin.ai.assistant.tools') }}</div>
-      <p class="text-sm text-muted-foreground">{{ t('admin.ai.assistant.toolsHint') }}</p>
+      <p class="ui-description">{{ t('admin.ai.assistant.toolsHint') }}</p>
       <div class="space-y-3 mt-3">
         <div v-for="tool in tools" :key="tool.id" class="flex items-center space-x-2">
           <Checkbox
@@ -223,7 +223,7 @@
             {{ tool.name }}
           </label>
         </div>
-        <p v-if="!tools.length" class="text-sm text-muted-foreground">
+        <p v-if="!tools.length" class="ui-description">
           {{ t('admin.ai.assistant.toolsEmpty') }}
         </p>
       </div>
@@ -238,6 +238,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -296,7 +297,9 @@ const avatarFile = ref(null)
 const avatarPreview = ref('')
 const removeAvatar = ref(false)
 
-const avatarInitials = computed(() => (form.values.name || '').trim().charAt(0).toUpperCase() || 'A')
+const avatarInitials = computed(
+  () => (form.values.name || '').trim().charAt(0).toUpperCase() || 'A'
+)
 
 const onAvatarUpload = (file) => {
   if (!file) return

@@ -6,7 +6,7 @@
       </DialogHeader>
       <div class="mt-2 space-y-6">
         <div v-for="group in groups" :key="group.title" class="space-y-3">
-          <h4 class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <h4 class="sidebar-section-label">
             {{ group.title }}
           </h4>
           <div class="space-y-2">

@@ -2,19 +2,25 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading"/>
-  <AgentForm :initialValues="user" :submitForm="submitForm" :isLoading="formLoading" v-else />
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <AgentForm
+      :initialValues="user"
+      :submitForm="submitForm"
+      :isLoading="formLoading"
+      v-if="!isLoading"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import api from '../../../api'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import api from '@/api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import AgentForm from '@/features/admin/agents/AgentForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useI18n } from 'vue-i18n'
 
 const user = ref({})

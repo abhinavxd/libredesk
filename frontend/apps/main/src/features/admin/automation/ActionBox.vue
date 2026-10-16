@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6" :class="{ 'box p-5': actions.length > 0 }">
+  <div class="box p-5 space-y-6">
     <div class="space-y-6">
       <div v-for="(action, index) in actions" :key="index" class="space-y-6">
         <div v-if="index > 0">

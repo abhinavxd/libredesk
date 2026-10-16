@@ -1,34 +1,18 @@
 <template>
-  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.nameHint') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField }" name="description">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
-        <FormControl>
-          <Textarea
-            rows="3"
-            :placeholder="t('admin.ai.tool.descriptionPlaceholder')"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.descriptionHint') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <div class="grid gap-6 md:grid-cols-3">
+  <form @submit="onSubmit" novalidate class="tool-form space-y-6 w-full">
+    <FormGrid class="tool-connection-grid">
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ t('admin.ai.tool.nameHint') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
       <FormField v-slot="{ componentField }" name="url">
-        <FormItem class="md:col-span-2">
+        <FormItem>
           <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
           <FormControl>
             <Input
@@ -59,7 +43,22 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
+
+    <FormField v-slot="{ componentField }" name="description">
+      <FormItem>
+        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+        <FormControl>
+          <Textarea
+            rows="3"
+            :placeholder="t('admin.ai.tool.descriptionPlaceholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>{{ t('admin.ai.tool.descriptionHint') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <FormField v-slot="{ componentField, handleChange, meta }" name="headers">
       <FormItem>
@@ -123,45 +122,46 @@
       </FormItem>
     </FormField>
 
-    <div class="space-y-5 rounded-lg border border-border p-4">
-      <div>
-        <h3 class="font-medium text-sm text-muted-foreground">{{ t('globals.terms.agentAccess') }}</h3>
+    <fieldset class="min-w-0">
+      <legend class="ui-heading mb-4">
+        {{ t('globals.terms.agentAccess') }}
+      </legend>
+      <div class="space-y-5">
+        <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.availableInCopilot')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.availableInGenerateReply')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.requireAgentApproval')"
+              :description="t('admin.ai.tool.requireAgentApprovalHint')"
+              :checked="componentField.modelValue"
+              :disabled="!hasAgentSurface"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
       </div>
+    </fieldset>
 
-      <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.availableInCopilot')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.availableInGenerateReply')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.requireAgentApproval')"
-            :description="t('admin.ai.tool.requireAgentApprovalHint')"
-            :checked="componentField.modelValue"
-            :disabled="!hasAgentSurface"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-    </div>
-
-    <div class="flex justify-end mt-10">
+    <div class="flex justify-end">
       <Button type="submit" :isLoading="formLoading">
         {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
       </Button>
@@ -198,6 +198,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { computed, ref, watch } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -384,3 +385,19 @@ const onSubmit = form.handleSubmit(async (values) => {
   }
 })
 </script>
+
+<style scoped>
+.tool-form {
+  container-type: inline-size;
+}
+
+.tool-connection-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 40rem) {
+  .tool-connection-grid.form-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.75fr) minmax(0, 1fr);
+  }
+}
+</style>

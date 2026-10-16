@@ -3,7 +3,7 @@ const typography = require("@tailwindcss/typography")
 const plugin = require("tailwindcss/plugin")
 const defaultTheme = require("tailwindcss/defaultTheme")
 
-const canHover = plugin(({ addVariant }) => addVariant("can-hover", "@media (hover: hover)"))
+const canHover = plugin(({ addVariant }) => addVariant("can-hover", "@media (hover: hover) and (pointer: fine)"))
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {

@@ -1,22 +1,29 @@
 <template>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-between mb-5">
-      <div></div>
-      <router-link :to="{ name: 'new-inbox' }">
-        <Button>
-          {{
-            $t('inbox.newInbox')
-          }}
-        </Button>
-      </router-link>
-    </div>
+    <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+      <template #actions>
+        <router-link :to="{ name: 'new-inbox' }">
+          <Button>
+            {{ $t('inbox.newInbox') }}
+          </Button>
+        </router-link>
+      </template>
+    </AdminToolbar>
     <div>
-      <DataTable :columns="columns" :data="data" :loading="isLoading" />
+      <DataTable
+        v-model:search="searchTerm"
+        :searchable="false"
+        :columns="columns"
+        :data="data"
+        :loading="isLoading"
+      />
     </div>
   </LoadingOverlay>
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { onMounted, ref } from 'vue'
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -36,6 +43,7 @@ import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useInboxStore } from '@main/stores/inbox'
 import api from '@main/api'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
@@ -70,9 +78,7 @@ onMounted(async () => {
     }, 500)
   } else if (successCode) {
     const msg =
-      successCode === 'oauth_reconnected'
-        ? t('toast.inboxReconnected')
-        : t('toast.inboxConnected')
+      successCode === 'oauth_reconnected' ? t('toast.inboxReconnected') : t('toast.inboxConnected')
     setTimeout(() => {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: msg })
     }, 500)
@@ -111,7 +117,8 @@ const columns = [
     },
     cell: function ({ row }) {
       const children = [
-        h(RouterLink,
+        h(
+          RouterLink,
           {
             to: { name: 'edit-inbox', params: { id: row.original.id } },
             class: 'text-foreground font-medium hover:underline'
@@ -141,7 +148,11 @@ const columns = [
     },
     cell: function ({ row }) {
       const channel = row.getValue('channel')
-      return h('div', { class: 'text-center' }, CHANNEL_LABEL_KEYS[channel] ? t(CHANNEL_LABEL_KEYS[channel], 1) : channel)
+      return h(
+        'div',
+        { class: 'text-center' },
+        CHANNEL_LABEL_KEYS[channel] ? t(CHANNEL_LABEL_KEYS[channel], 1) : channel
+      )
     }
   },
   {

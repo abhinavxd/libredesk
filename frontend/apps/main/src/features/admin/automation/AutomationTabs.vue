@@ -1,16 +1,23 @@
 <template>
   <Tabs default-value="new_conversation" v-model="selectedTab">
-    <TabsList class="flex w-full justify-start overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden mb-5 sm:grid sm:grid-cols-3">
-      <TabsTrigger value="new_conversation" :class="AUTOMATION_TAB_CLASS">
-        {{ $t('conversation.newConversation') }}
-      </TabsTrigger>
-      <TabsTrigger value="conversation_update" :class="AUTOMATION_TAB_CLASS">
-        {{ $t('admin.automation.conversationUpdate') }}
-      </TabsTrigger>
-      <TabsTrigger value="time_trigger" :class="AUTOMATION_TAB_CLASS">
-        {{ $t('admin.automation.timeTriggers') }}
-      </TabsTrigger>
-    </TabsList>
+    <AdminToolbar class="mb-5">
+      <template #left>
+        <TabsList class="w-max justify-start">
+          <TabsTrigger value="new_conversation">
+            {{ $t('conversation.newConversation') }}
+          </TabsTrigger>
+          <TabsTrigger value="conversation_update">
+            {{ $t('admin.automation.conversationUpdate') }}
+          </TabsTrigger>
+          <TabsTrigger value="time_trigger">
+            {{ $t('admin.automation.timeTriggers') }}
+          </TabsTrigger>
+        </TabsList>
+      </template>
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
+    </AdminToolbar>
     <TabsContent value="new_conversation">
       <RuleTab
         type="new_conversation"
@@ -30,8 +37,7 @@
 </template>
 
 <script setup>
-const AUTOMATION_TAB_CLASS = 'shrink-0 sm:min-w-0'
-
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useI18n } from 'vue-i18n'
 import RuleTab from './RuleTab.vue'

@@ -1,19 +1,27 @@
 <template>
   <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="flex flex-wrap gap-1 h-auto p-1 w-fit">
-        <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
-        <TabsTrigger value="appearance">{{ $t('globals.terms.appearance') }}</TabsTrigger>
-        <TabsTrigger value="content">{{ $t('globals.terms.content', 1) }}</TabsTrigger>
-        <TabsTrigger value="conversations">{{ $t('globals.terms.conversation', 2) }}</TabsTrigger>
-        <TabsTrigger value="setup">{{ $t('globals.terms.setup') }}</TabsTrigger>
-      </TabsList>
+      <AdminToolbar>
+        <template #left>
+          <TabsList class="w-max justify-start">
+            <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
+            <TabsTrigger value="appearance">{{ $t('globals.terms.appearance') }}</TabsTrigger>
+            <TabsTrigger value="content">{{ $t('globals.terms.content', 1) }}</TabsTrigger>
+            <TabsTrigger value="conversations">{{
+              $t('globals.terms.conversation', 2)
+            }}</TabsTrigger>
+            <TabsTrigger value="setup">{{ $t('globals.terms.setup') }}</TabsTrigger>
+          </TabsList>
+        </template>
+      </AdminToolbar>
 
       <div class="mt-8">
         <div v-show="activeTab === 'general'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="basics" data-section="basics">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.general') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.general')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField, handleChange }" name="enabled">
                   <FormItem>
@@ -34,7 +42,7 @@
                       @update:checked="handleChange"
                     />
                   </FormItem>
-                  <p class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5">
+                  <p :class="HINT_CLASS">
                     <Lightbulb class="size-4" />
                     <span>{{ $t('admin.inbox.csatSurveys.description_3') }}</span>
                   </p>
@@ -51,40 +59,46 @@
                   </FormItem>
                 </FormField>
 
-                <FormField v-slot="{ componentField }" name="name">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="" v-bind="componentField" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
+                <FormGrid>
+                  <FormField v-slot="{ componentField }" name="name">
+                    <FormItem>
+                      <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="" v-bind="componentField" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
 
-                <FormField v-slot="{ componentField }" name="config.brand_name">
-                  <FormItem>
-                    <FormLabel>{{ $t('globals.terms.brandName') }}</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder="" v-bind="componentField" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
+                  <FormField v-slot="{ componentField }" name="config.brand_name">
+                    <FormItem>
+                      <FormLabel>{{ $t('globals.terms.brandName') }}</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="" v-bind="componentField" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
 
-                <FormField v-slot="{ componentField }" name="config.website_url">
-                  <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.websiteUrl') }}</FormLabel>
-                    <FormControl>
-                      <Input type="url" placeholder="https://example.com" v-bind="componentField" />
-                    </FormControl>
-                    <FormDescription>{{
-                      $t('admin.inbox.livechat.websiteUrl.description')
-                    }}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                </FormField>
+                  <FormField v-slot="{ componentField }" name="config.website_url">
+                    <FormItem>
+                      <FormLabel>{{ $t('admin.inbox.livechat.websiteUrl') }}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="url"
+                          placeholder="https://example.com"
+                          v-bind="componentField"
+                        />
+                      </FormControl>
+                      <FormDescription>{{
+                        $t('admin.inbox.livechat.websiteUrl.description')
+                      }}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
+                </FormGrid>
 
-                <div class="grid grid-cols-2 gap-4">
+                <FormGrid compact>
                   <FormField v-slot="{ componentField }" name="config.language">
                     <FormItem>
                       <FormLabel>{{ $t('globals.terms.language') }}</FormLabel>
@@ -138,15 +152,17 @@
                       }}</FormDescription>
                     </FormItem>
                   </FormField>
-                </div>
+                </FormGrid>
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="continuity" data-section="continuity">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.conversationContinuity') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.conversationContinuity')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
-                <div class="grid grid-cols-2 gap-4">
+                <FormGrid compact>
                   <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
-                    <FormItem>
+                    <FormItem class="col-span-full">
                       <FormLabel>{{ $t('admin.inbox.livechat.conversationContinuity') }}</FormLabel>
                       <FormControl>
                         <Select v-bind="componentField">
@@ -155,7 +171,11 @@
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
-                            <SelectItem v-for="inbox in emailInboxes" :key="inbox.id" :value="inbox.id">
+                            <SelectItem
+                              v-for="inbox in emailInboxes"
+                              :key="inbox.id"
+                              :value="inbox.id"
+                            >
                               {{ inbox.name }}
                             </SelectItem>
                           </SelectContent>
@@ -168,7 +188,10 @@
                   </FormField>
 
                   <template v-if="form.values.linked_email_inbox_id">
-                    <FormField v-slot="{ componentField }" name="config.continuity.offline_threshold">
+                    <FormField
+                      v-slot="{ componentField }"
+                      name="config.continuity.offline_threshold"
+                    >
                       <FormItem>
                         <FormLabel>{{
                           $t('admin.inbox.livechat.continuity.offlineThreshold')
@@ -207,7 +230,10 @@
                       </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField }" name="config.continuity.min_email_interval">
+                    <FormField
+                      v-slot="{ componentField }"
+                      name="config.continuity.min_email_interval"
+                    >
                       <FormItem>
                         <FormLabel>{{
                           $t('admin.inbox.livechat.continuity.minEmailInterval')
@@ -222,7 +248,7 @@
                       </FormItem>
                     </FormField>
                   </template>
-                </div>
+                </FormGrid>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -231,9 +257,7 @@
         <div v-show="activeTab === 'appearance'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="appearance" data-section="appearance">
-              <AccordionTrigger class="text-base">{{
-                $t('globals.terms.theme')
-              }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{ $t('globals.terms.theme') }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField }" name="config.theme">
                   <FormItem>
@@ -272,23 +296,33 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="branding" data-section="branding">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.branding') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.branding')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <Tabs :model-value="editingTheme" @update:model-value="editingTheme = $event">
-                    <TabsList class="w-full h-10">
-                      <TabsTrigger value="light" class="flex-1 gap-2 h-8">
-                        <Sun class="size-4" />
-                        {{ $t('globals.terms.light') }}
-                      </TabsTrigger>
-                      <TabsTrigger value="dark" class="flex-1 gap-2 h-8">
-                        <Moon class="size-4" />
-                        {{ $t('globals.terms.dark') }}
-                      </TabsTrigger>
-                    </TabsList>
+                    <AdminToolbar>
+                      <template #left>
+                        <TabsList class="w-max justify-start">
+                          <TabsTrigger value="light" class="gap-2 h-8">
+                            <Sun class="size-4" />
+                            {{ $t('globals.terms.light') }}
+                          </TabsTrigger>
+                          <TabsTrigger value="dark" class="gap-2 h-8">
+                            <Moon class="size-4" />
+                            {{ $t('globals.terms.dark') }}
+                          </TabsTrigger>
+                        </TabsList>
+                      </template>
+                    </AdminToolbar>
                   </Tabs>
 
-                  <FormField v-slot="{ componentField }" :name="`${brandingPath}.logo_url`" keep-value>
+                  <FormField
+                    v-slot="{ componentField }"
+                    :name="`${brandingPath}.logo_url`"
+                    keep-value
+                  >
                     <FormItem>
                       <FormLabel>{{ $t('globals.terms.logoUrl') }}</FormLabel>
                       <FormControl>
@@ -319,13 +353,15 @@
                           class="text-sm text-destructive flex items-start gap-1.5"
                         >
                           <TriangleAlert class="size-4 shrink-0 mt-0.5" />
-                          <span>{{ $t('admin.inbox.livechat.colors.primary.contrastWarning') }}</span>
+                          <span>{{
+                            $t('admin.inbox.livechat.colors.primary.contrastWarning')
+                          }}</span>
                         </p>
                       </FormItem>
                     </FormField>
                   </div>
 
-                  <h5 class="text-sm font-semibold text-foreground pt-2">
+                  <h5 class="ui-subheading pt-2">
                     {{ $t('globals.terms.homeScreen') }}
                   </h5>
 
@@ -465,7 +501,9 @@
                     <FormItem>
                       <SwitchField
                         :title="$t('admin.inbox.livechat.homeScreen.fadeBackground')"
-                        :description="$t('admin.inbox.livechat.homeScreen.fadeBackground.description')"
+                        :description="
+                          $t('admin.inbox.livechat.homeScreen.fadeBackground.description')
+                        "
                         :checked="componentField.modelValue"
                         @update:checked="handleChange"
                       />
@@ -475,20 +513,26 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="launcher" data-section="launcher">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.launcher') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.launcher')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <Tabs :model-value="editingTheme" @update:model-value="editingTheme = $event">
-                    <TabsList class="w-full h-10">
-                      <TabsTrigger value="light" class="flex-1 gap-2 h-8">
-                        <Sun class="size-4" />
-                        {{ $t('globals.terms.light') }}
-                      </TabsTrigger>
-                      <TabsTrigger value="dark" class="flex-1 gap-2 h-8">
-                        <Moon class="size-4" />
-                        {{ $t('globals.terms.dark') }}
-                      </TabsTrigger>
-                    </TabsList>
+                    <AdminToolbar>
+                      <template #left>
+                        <TabsList class="w-max justify-start">
+                          <TabsTrigger value="light" class="gap-2 h-8">
+                            <Sun class="size-4" />
+                            {{ $t('globals.terms.light') }}
+                          </TabsTrigger>
+                          <TabsTrigger value="dark" class="gap-2 h-8">
+                            <Moon class="size-4" />
+                            {{ $t('globals.terms.dark') }}
+                          </TabsTrigger>
+                        </TabsList>
+                      </template>
+                    </AdminToolbar>
                   </Tabs>
 
                   <div class="grid grid-cols-2 gap-4">
@@ -547,7 +591,7 @@
                     </FormItem>
                   </FormField>
 
-                  <div class="grid grid-cols-3 gap-4">
+                  <FormGrid compact>
                     <FormField v-slot="{ componentField }" name="config.launcher.icon_scale">
                       <FormItem>
                         <FormLabel>{{ $t('globals.terms.iconSize') }}</FormLabel>
@@ -569,7 +613,9 @@
 
                     <FormField v-slot="{ componentField }" name="config.launcher.spacing.side">
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.side') }}</FormLabel>
+                        <FormLabel>{{
+                          $t('admin.inbox.livechat.launcher.spacing.side')
+                        }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -588,7 +634,9 @@
 
                     <FormField v-slot="{ componentField }" name="config.launcher.spacing.bottom">
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.spacing.bottom') }}</FormLabel>
+                        <FormLabel>{{
+                          $t('admin.inbox.livechat.launcher.spacing.bottom')
+                        }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -604,7 +652,7 @@
                         <FormMessage />
                       </FormItem>
                     </FormField>
-                  </div>
+                  </FormGrid>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -614,7 +662,9 @@
         <div v-show="activeTab === 'content'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="messages" data-section="messages">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.tabs.messages') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.tabs.messages')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField }" name="config.greeting_message">
                   <FormItem>
@@ -666,7 +716,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="noticeBanner" data-section="noticeBanner">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.noticeBanner') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.noticeBanner')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <FormField
@@ -703,7 +755,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="homeApps" data-section="homeApps">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.homeScreenApp', 2) }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.homeScreenApp', 2)
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <FormField name="config.home_apps">
@@ -712,7 +766,7 @@
                         <Draggable
                           v-model="homeApps"
                           item-key="index"
-                          :animation="200"
+                          :animation="reducedMotion === 'reduce' ? 0 : 200"
                           handle=".drag-handle"
                           :force-fallback="true"
                           fallback-on-body
@@ -722,18 +776,26 @@
                           @change="updateHomeApps"
                         >
                           <template #item="{ element: item, index }">
-                            <div class="flex items-start gap-2 p-3 border rounded-md">
-                              <div class="drag-handle cursor-move text-muted-foreground pt-2">
+                            <div class="flex min-w-0 items-start gap-2 p-3 border rounded-md">
+                              <div
+                                class="drag-handle shrink-0 cursor-move text-muted-foreground pt-2"
+                              >
                                 <GripVertical class="w-4 h-4" />
                               </div>
-                              <div class="flex-1">
+                              <div class="min-w-0 flex-1">
                                 <div class="text-xs text-muted-foreground mb-2">
                                   {{ homeAppLabel(item.type) }}
                                 </div>
-                                <p v-if="item.type === 'help'" class="text-sm text-muted-foreground">
+                                <p
+                                  v-if="item.type === 'help'"
+                                  class="ui-description"
+                                >
                                   {{ $t('widget.helpHomeAppHint') }}
                                 </p>
-                                <div v-else-if="item.type === 'announcement'" class="flex flex-col gap-2">
+                                <div
+                                  v-else-if="item.type === 'announcement'"
+                                  class="flex flex-col gap-2"
+                                >
                                   <Input
                                     v-model="item.title"
                                     :placeholder="$t('globals.terms.title')"
@@ -745,7 +807,7 @@
                                     rows="6"
                                     @change="updateHomeApps"
                                   />
-                                  <div class="grid grid-cols-2 gap-2">
+                                  <FormGrid compact class="gap-2">
                                     <Input
                                       v-model="item.image_url"
                                       type="url"
@@ -758,11 +820,12 @@
                                       :placeholder="$t('globals.messages.linkUrl')"
                                       @change="updateHomeApps"
                                     />
-                                  </div>
+                                  </FormGrid>
                                 </div>
-                                <div
+                                <FormGrid
                                   v-else-if="item.type === 'external_link'"
-                                  class="grid grid-cols-2 gap-2"
+                                  compact
+                                  class="gap-2"
                                 >
                                   <Input
                                     v-model="item.text"
@@ -774,12 +837,13 @@
                                     placeholder="https://example.com"
                                     @change="updateHomeApps"
                                   />
-                                </div>
+                                </FormGrid>
                               </div>
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="sm"
+                                size="icon"
+                                class="shrink-0"
                                 :aria-label="$t('globals.terms.remove')"
                                 @click="removeHomeApp(index)"
                               >
@@ -789,7 +853,7 @@
                           </template>
                         </Draggable>
 
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                           <Button
                             type="button"
                             variant="outline"
@@ -840,7 +904,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="help" data-section="help">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.helpCenter', 1) }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.helpCenter', 1)
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <WidgetHelpConfig
                   :model-value="form.values.config.help"
@@ -882,7 +948,9 @@
         <div v-show="activeTab === 'conversations'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="features" data-section="features">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.features') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.features')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <div class="space-y-3">
@@ -900,7 +968,10 @@
                       </FormItem>
                     </FormField>
 
-                    <FormField v-slot="{ componentField, handleChange }" name="config.features.emoji">
+                    <FormField
+                      v-slot="{ componentField, handleChange }"
+                      name="config.features.emoji"
+                    >
                       <FormItem>
                         <SwitchField
                           :title="$t('admin.inbox.livechat.features.emoji')"
@@ -928,7 +999,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="officeHours" data-section="officeHours">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.officeHours') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.officeHours')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <FormField
@@ -968,7 +1041,9 @@
                     name="config.chat_reply_expectation_message"
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.chatReplyExpectationMessage') }}</FormLabel>
+                      <FormLabel>{{
+                        $t('admin.inbox.livechat.chatReplyExpectationMessage')
+                      }}</FormLabel>
                       <FormControl>
                         <Input type="text" v-bind="componentField" />
                       </FormControl>
@@ -982,7 +1057,9 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="prechat" data-section="prechat">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.tabs.prechat') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.tabs.prechat')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <PreChatFormConfig v-model="prechatConfig" />
               </AccordionContent>
@@ -991,17 +1068,25 @@
               <AccordionTrigger class="text-base">{{ $t('globals.terms.users') }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <Tabs :model-value="selectedUserTab" @update:model-value="selectedUserTab = $event">
-                  <TabsList class="grid w-full grid-cols-2">
-                    <TabsTrigger value="visitors">
-                      {{ $t('admin.inbox.livechat.userSettings.visitors') }}
-                    </TabsTrigger>
-                    <TabsTrigger value="users">
-                      {{ $t('globals.terms.users') }}
-                    </TabsTrigger>
-                  </TabsList>
+                  <AdminToolbar>
+                    <template #left>
+                      <TabsList class="w-max justify-start">
+                        <TabsTrigger value="visitors">
+                          {{ $t('admin.inbox.livechat.userSettings.visitors') }}
+                        </TabsTrigger>
+                        <TabsTrigger value="users">
+                          {{ $t('globals.terms.users') }}
+                        </TabsTrigger>
+                      </TabsList>
+                    </template>
+                  </AdminToolbar>
 
                   <div class="space-y-4 mt-4">
-                    <div v-show="selectedUserTab === 'visitors'" data-audience="visitors" class="space-y-4">
+                    <div
+                      v-show="selectedUserTab === 'visitors'"
+                      data-audience="visitors"
+                      class="space-y-4"
+                    >
                       <FormField
                         v-slot="{ componentField }"
                         name="config.visitors.start_conversation_button_text"
@@ -1044,7 +1129,9 @@
                         <FormItem>
                           <SwitchField
                             :title="$t('admin.inbox.livechat.directToConversation')"
-                            :description="$t('admin.inbox.livechat.directToConversation.description')"
+                            :description="
+                              $t('admin.inbox.livechat.directToConversation.description')
+                            "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
                           />
@@ -1075,7 +1162,9 @@
                           <SwitchField
                             :title="$t('admin.inbox.livechat.preventMultipleConversations')"
                             :description="
-                              $t('admin.inbox.livechat.preventMultipleConversations.visitors.description')
+                              $t(
+                                'admin.inbox.livechat.preventMultipleConversations.visitors.description'
+                              )
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1091,7 +1180,9 @@
                           <SwitchField
                             :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
                             :description="
-                              $t('admin.inbox.livechat.preventReplyToClosedConversation.description')
+                              $t(
+                                'admin.inbox.livechat.preventReplyToClosedConversation.description'
+                              )
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1100,7 +1191,11 @@
                       </FormField>
                     </div>
 
-                    <div v-show="selectedUserTab === 'users'" data-audience="users" class="space-y-4">
+                    <div
+                      v-show="selectedUserTab === 'users'"
+                      data-audience="users"
+                      class="space-y-4"
+                    >
                       <FormField
                         v-slot="{ componentField }"
                         name="config.users.start_conversation_button_text"
@@ -1143,7 +1238,9 @@
                         <FormItem>
                           <SwitchField
                             :title="$t('admin.inbox.livechat.directToConversation')"
-                            :description="$t('admin.inbox.livechat.directToConversation.description')"
+                            :description="
+                              $t('admin.inbox.livechat.directToConversation.description')
+                            "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
                           />
@@ -1174,7 +1271,9 @@
                           <SwitchField
                             :title="$t('admin.inbox.livechat.preventMultipleConversations')"
                             :description="
-                              $t('admin.inbox.livechat.preventMultipleConversations.users.description')
+                              $t(
+                                'admin.inbox.livechat.preventMultipleConversations.users.description'
+                              )
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1190,7 +1289,9 @@
                           <SwitchField
                             :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
                             :description="
-                              $t('admin.inbox.livechat.preventReplyToClosedConversation.description')
+                              $t(
+                                'admin.inbox.livechat.preventReplyToClosedConversation.description'
+                              )
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1208,7 +1309,9 @@
         <div v-show="activeTab === 'setup'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="installation" data-section="installation">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.tabs.installation') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.tabs.installation')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <ol class="text-sm space-y-2 list-decimal list-inside text-muted-foreground">
@@ -1224,24 +1327,30 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="identity" data-section="identity">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.installation.identity.title') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.installation.identity.title')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <div class="space-y-1">
-                    <p class="text-sm text-muted-foreground">
+                    <p class="ui-description">
                       {{ $t('admin.inbox.livechat.installation.identity.description') }}
                     </p>
-                    <p class="text-sm text-muted-foreground">
+                    <p class="ui-description">
                       {{ $t('admin.inbox.livechat.installation.identity.howItWorks') }}
                     </p>
                   </div>
 
                   <div class="relative">
-                    <CodeEditor :modelValue="jwtPayloadExample" language="javascript" :readOnly="true" />
+                    <CodeEditor
+                      :modelValue="jwtPayloadExample"
+                      language="javascript"
+                      :readOnly="true"
+                    />
                     <CopyButton :text="jwtPayloadExample" class="absolute top-3 right-3" />
                   </div>
 
-                  <p class="text-sm text-muted-foreground">
+                  <p class="ui-description">
                     {{ $t('admin.inbox.livechat.installation.identity.addJwt') }}
                   </p>
 
@@ -1251,7 +1360,10 @@
                       language="html"
                       :readOnly="true"
                     />
-                    <CopyButton :text="authenticatedIntegrationSnippet" class="absolute top-3 right-3" />
+                    <CopyButton
+                      :text="authenticatedIntegrationSnippet"
+                      class="absolute top-3 right-3"
+                    />
                   </div>
 
                   <p class="text-sm text-destructive flex items-center gap-1.5">
@@ -1262,10 +1374,12 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="jsApi" data-section="jsApi">
-              <AccordionTrigger class="text-base">{{ $t('admin.inbox.livechat.installation.jsApi.title') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('admin.inbox.livechat.installation.jsApi.title')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
-                  <p class="text-sm text-muted-foreground">
+                  <p class="ui-description">
                     {{ $t('admin.inbox.livechat.installation.jsApi.description') }}
                   </p>
 
@@ -1277,9 +1391,11 @@
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="security" data-section="security">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.security') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{
+                $t('globals.terms.security')
+              }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
-                <div class="grid grid-cols-2 gap-6">
+                <FormGrid>
                   <FormField v-slot="{ componentField }" name="secret">
                     <FormItem>
                       <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
@@ -1292,7 +1408,7 @@
                       <FormMessage />
                       <p
                         v-if="weakSecret"
-                        class="!mt-2 text-muted-foreground text-xs flex items-start gap-1.5"
+                        :class="HINT_CLASS"
                       >
                         <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                         <span>{{ $t('admin.inbox.livechat.secretKey.weak') }}</span>
@@ -1312,9 +1428,9 @@
                       <FormMessage />
                     </FormItem>
                   </FormField>
-                </div>
+                </FormGrid>
 
-                <div class="grid grid-cols-2 gap-6">
+                <FormGrid>
                   <FormField v-slot="{ componentField }" name="config.trusted_domains">
                     <FormItem>
                       <FormLabel>{{ $t('admin.inbox.livechat.trustedDomains.list') }}</FormLabel>
@@ -1348,7 +1464,7 @@
                       <FormMessage />
                     </FormItem>
                   </FormField>
-                </div>
+                </FormGrid>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -1363,6 +1479,11 @@
 </template>
 
 <script setup>
+const HINT_CLASS = '!mt-2 text-muted-foreground text-xs flex items-start gap-1.5'
+
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+import FormGrid from '@shared-ui/components/FormGrid.vue'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { watch, computed, ref, inject, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -1490,6 +1611,8 @@ const FIELD_SECTION = [
   ['config.language', 'basics'],
   ['name', 'basics']
 ]
+
+const reducedMotion = usePreferredReducedMotion()
 
 const props = defineProps({
   initialValues: {

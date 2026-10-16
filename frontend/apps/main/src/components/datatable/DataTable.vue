@@ -12,6 +12,7 @@
       ref="scrollContainer"
       class="relative overflow-auto rounded-lg border border-border bg-card shadow-sm"
       :style="{ maxHeight }"
+      :aria-busy="loading"
     >
       <table class="w-full caption-bottom text-sm sm:w-max sm:min-w-full">
         <TableHeader class="sticky top-0 z-10 bg-card">
@@ -23,31 +24,56 @@
             <TableHead
               v-for="(header, headerIndex) in headerGroup.headers"
               :key="header.id"
+              scope="col"
+              :aria-sort="
+                header.column.getCanSort()
+                  ? header.column.getIsSorted() === 'asc'
+                    ? 'ascending'
+                    : header.column.getIsSorted() === 'desc'
+                      ? 'descending'
+                      : 'none'
+                  : undefined
+              "
               class="h-11 px-4 text-center text-sm font-medium text-muted-foreground sm:whitespace-nowrap"
               :class="{
-                'group cursor-pointer select-none transition-colors hover:text-foreground':
-                  header.column.getCanSort(),
                 'max-sm:hidden': isHiddenOnPhone(header.column.id, headerIndex)
               }"
-              @click="header.column.getToggleSortingHandler()?.($event)"
             >
-              <div class="flex items-center justify-center gap-2">
+              <Button
+                v-if="header.column.getCanSort()"
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="group h-auto w-full gap-2 py-2 text-muted-foreground hover:text-foreground"
+                @click="header.column.getToggleSortingHandler()?.($event)"
+              >
                 <FlexRender
                   v-if="!header.isPlaceholder"
                   :render="header.column.columnDef.header"
                   :props="header.getContext()"
                 />
-                <template v-if="header.column.getCanSort()">
-                  <ChevronUp v-if="header.column.getIsSorted() === 'asc'" class="h-3.5 w-3.5" />
-                  <ChevronDown
-                    v-else-if="header.column.getIsSorted() === 'desc'"
-                    class="h-3.5 w-3.5"
-                  />
-                  <ArrowUpDown
-                    v-else
-                    class="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-50"
-                  />
-                </template>
+                <ChevronUp
+                  v-if="header.column.getIsSorted() === 'asc'"
+                  class="h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                <ChevronDown
+                  v-else-if="header.column.getIsSorted() === 'desc'"
+                  class="h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
+                <ArrowUpDown
+                  v-else
+                  class="h-3.5 w-3.5 opacity-50 can-hover:opacity-0 can-hover:group-hover:opacity-50 group-focus-visible:opacity-50"
+                  aria-hidden="true"
+                />
+              </Button>
+              <div v-else class="flex items-center justify-center gap-2">
+                <FlexRender
+                  v-if="!header.isPlaceholder"
+                  :render="header.column.columnDef.header"
+                  :props="header.getContext()"
+                />
               </div>
             </TableHead>
           </TableRow>
@@ -82,7 +108,11 @@
             <TableRow class="hover:bg-transparent">
               <TableCell :colspan="columns.length" class="h-32">
                 <div class="flex items-center justify-center">
-                  <p class="text-sm text-muted-foreground">{{ t('globals.terms.loading') }}</p>
+                  <Spinner
+                    v-if="!overlayLoading"
+                    :absolute="false"
+                    :text="t('globals.terms.loading')"
+                  />
                 </div>
               </TableCell>
             </TableRow>
@@ -92,7 +122,7 @@
             <TableRow class="hover:bg-transparent">
               <TableCell :colspan="columns.length" class="h-32">
                 <div class="flex flex-col items-center justify-center gap-2 text-center">
-                  <Ghost class="h-8 w-8 text-muted-foreground/50" />
+                  <Ghost class="h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                   <p class="text-sm font-medium text-muted-foreground">{{ emptyText }}</p>
                 </div>
               </TableCell>
@@ -114,9 +144,12 @@ import {
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useI18n } from 'vue-i18n'
-import { computed, ref } from 'vue'
+import { computed, inject, ref } from 'vue'
+import { LOADING_OVERLAY_INJECTION_KEY } from '@main/components/layout/loadingOverlay'
 import { ArrowUpDown, ChevronDown, ChevronUp, Ghost } from 'lucide-vue-next'
 import SearchInput from '@shared-ui/components/SearchInput.vue'
+import { Button } from '@shared-ui/components/ui/button'
+import { Spinner } from '@shared-ui/components/ui/spinner'
 import {
   TableBody,
   TableCell,
@@ -126,6 +159,7 @@ import {
 } from '@shared-ui/components/ui/table'
 
 const { t } = useI18n()
+const overlayLoading = inject(LOADING_OVERLAY_INJECTION_KEY, ref(false))
 
 // Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
 const actionCellClass =
@@ -164,7 +198,7 @@ const props = defineProps({
 })
 
 const sorting = ref([])
-const globalFilter = ref('')
+const globalFilter = defineModel('search', { type: String, default: '' })
 
 const emptyText = computed(() => props.emptyText || t('globals.messages.noResultsFound'))
 

@@ -170,10 +170,10 @@
 
       <div v-else class="mt-6 space-y-8">
         <div>
-          <h3 class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <h3 class="ui-heading mb-3">
             {{ t('helpCenter.topSearches') }}
           </h3>
-          <p v-if="!insights.top_searches?.length" class="text-sm text-muted-foreground">
+          <p v-if="!insights.top_searches?.length" class="ui-description">
             {{ t('helpCenter.noSearchData') }}
           </p>
           <table v-else class="w-full text-sm">
@@ -193,10 +193,10 @@
         </div>
 
         <div>
-          <h3 class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <h3 class="ui-heading mb-3">
             {{ t('helpCenter.noResultSearches') }}
           </h3>
-          <p v-if="!insights.no_result_searches?.length" class="text-sm text-muted-foreground">
+          <p v-if="!insights.no_result_searches?.length" class="ui-description">
             {{ t('helpCenter.noSearchData') }}
           </p>
           <table v-else class="w-full text-sm">

@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex h-full min-h-0 flex-col">
     <!-- Header -->
-    <div class="h-12 flex-shrink-0 px-2 border-b flex items-center justify-between gap-2">
+    <div class="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
       <div class="flex items-center gap-1 min-w-0">
         <Button
           v-if="isMobile"
@@ -12,17 +12,21 @@
         >
           <ChevronLeft class="w-4 h-4" />
         </Button>
-        <span class="truncate">{{ conversationStore.currentContactName }}</span>
+        <span class="truncate text-sm font-semibold" :title="conversationStore.currentContactName">
+          {{ conversationStore.currentContactName }}
+        </span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <Button
-          v-if="isMobile"
+          type="button"
           variant="ghost"
           :class="MOBILE_ICON_BUTTON_CLASS"
-          :aria-label="t('globals.terms.contact')"
+          :aria-label="t('copilot.details')"
+          :aria-expanded="detailsOpen"
           @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
         >
-          <PanelRight class="w-4 h-4" />
+          <PanelRightClose v-if="detailsOpen" class="w-4 h-4" aria-hidden="true" />
+          <PanelRight v-else class="w-4 h-4" aria-hidden="true" />
         </Button>
         <Tooltip v-if="isSnoozed && snoozedUntilLabel">
           <TooltipTrigger as-child>
@@ -85,8 +89,8 @@
     </div>
 
     <!-- Messages & reply box -->
-    <div class="flex flex-col flex-grow overflow-hidden">
-      <MessageList class="flex-1 overflow-y-auto" />
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <MessageList class="min-h-0 flex-1 overflow-y-auto" />
       <WhatsAppComposer v-if="isWhatsAppChannel && canCompose" />
       <ReplyBox v-else-if="canCompose" />
     </div>
@@ -99,7 +103,7 @@ const MOBILE_ICON_BUTTON_CLASS = 'w-11 h-11 lg:w-8 lg:h-8 p-0'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Clock, MoreHorizontal, ChevronLeft, PanelRight } from 'lucide-vue-next'
+import { Clock, MoreHorizontal, ChevronLeft, PanelRight, PanelRightClose } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import { useIsMobile } from '@shared-ui/composables'
 import {
@@ -125,6 +129,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import api from '@main/api'
 import { permissions as perms } from '@main/constants/permissions.js'
+defineProps({ detailsOpen: { type: Boolean, default: false } })
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()

@@ -5,7 +5,7 @@
       <CardDescription>{{ description }}</CardDescription>
     </CardHeader>
     <CardContent>
-      <form @submit="onSubmit" novalidate class="space-y-6 w-full">
+      <form @submit="onSubmit" novalidate class="provider-form space-y-6 w-full">
         <div class="space-y-2">
           <p class="text-sm font-medium leading-none">{{ t('admin.ai.preset') }}</p>
           <Select v-model="selectedPreset" @update:modelValue="applyPreset">
@@ -18,11 +18,11 @@
               </SelectItem>
             </SelectContent>
           </Select>
-          <p class="text-sm text-muted-foreground">{{ t('admin.ai.presetHint') }}</p>
+          <p class="ui-description">{{ t('admin.ai.presetHint') }}</p>
         </div>
 
-        <div class="grid gap-6 md:grid-cols-2">
-          <FormField v-slot="{ componentField }" name="model">
+        <FormGrid class="provider-grid"
+          ><FormField v-slot="{ componentField }" name="model">
             <FormItem>
               <FormLabel>{{ t('globals.terms.model') }}</FormLabel>
               <FormControl>
@@ -35,18 +35,21 @@
               <FormMessage />
             </FormItem>
           </FormField>
-
           <FormField v-slot="{ componentField }" name="base_url">
             <FormItem>
               <FormLabel>{{ t('admin.ai.baseUrl') }}</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="https://api.openai.com/v1" v-bind="componentField" />
+                <Input
+                  type="text"
+                  placeholder="https://api.openai.com/v1"
+                  v-bind="componentField"
+                />
               </FormControl>
               <FormDescription>{{ t('admin.ai.baseUrlHint') }}</FormDescription>
               <FormMessage />
-            </FormItem>
-          </FormField>
-
+            </FormItem> </FormField
+        ></FormGrid>
+        <FormGrid class="provider-grid">
           <FormField v-slot="{ componentField }" name="api_key">
             <FormItem>
               <FormLabel>{{ t('globals.terms.apiKey') }}</FormLabel>
@@ -61,9 +64,34 @@
               <FormMessage />
             </FormItem>
           </FormField>
-
-          <template v-if="showCompletionFields">
-            <FormField v-slot="{ componentField }" name="temperature">
+          <FormField
+            v-if="showCompletionFields"
+            v-slot="{ componentField }"
+            name="reasoning_effort"
+          >
+            <FormItem>
+              <FormLabel>{{ t('admin.ai.reasoningEffort') }}</FormLabel>
+              <FormControl>
+                <Input type="text" placeholder="none" v-bind="componentField" />
+              </FormControl>
+              <FormDescription>{{ t('admin.ai.reasoningEffortHint') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+          <FormField v-if="showEmbeddingFields" v-slot="{ componentField }" name="dimensions">
+            <FormItem>
+              <FormLabel>{{ t('admin.ai.dimensions') }}</FormLabel>
+              <FormControl>
+                <Input type="number" min="1" step="1" placeholder="1536" v-bind="componentField" />
+              </FormControl>
+              <FormDescription>{{ t('admin.ai.dimensionsHint') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </FormGrid>
+        <template v-if="showCompletionFields"
+          ><FormGrid class="provider-grid"
+            ><FormField v-slot="{ componentField }" name="temperature">
               <FormItem>
                 <FormLabel>{{ t('admin.ai.temperature') }}</FormLabel>
                 <FormControl>
@@ -72,7 +100,6 @@
                 <FormMessage />
               </FormItem>
             </FormField>
-
             <FormField v-slot="{ componentField }" name="max_tokens">
               <FormItem>
                 <FormLabel>{{ t('admin.ai.maxTokens') }}</FormLabel>
@@ -82,54 +109,27 @@
                 <FormMessage />
               </FormItem>
             </FormField>
-
-            <FormField v-slot="{ componentField }" name="reasoning_effort">
-              <FormItem>
-                <FormLabel>{{ t('admin.ai.reasoningEffort') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="none" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ t('admin.ai.reasoningEffortHint') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ componentField }" name="instructions">
-              <FormItem class="md:col-span-2">
-                <FormLabel>{{ t('admin.ai.instructions') }}</FormLabel>
-                <FormControl>
-                  <Textarea rows="4" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ t('admin.ai.instructionsHint') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-
-            <FormField v-slot="{ componentField, handleChange }" name="vision">
-              <FormItem class="md:col-span-2">
-                <SwitchField
-                  :title="t('admin.ai.vision')"
-                  :description="t('admin.ai.visionHint')"
-                  :checked="componentField.modelValue"
-                  @update:checked="handleChange"
-                />
-              </FormItem>
-            </FormField>
-          </template>
-
-          <template v-if="showEmbeddingFields">
-            <FormField v-slot="{ componentField }" name="dimensions">
-              <FormItem>
-                <FormLabel>{{ t('admin.ai.dimensions') }}</FormLabel>
-                <FormControl>
-                  <Input type="number" min="1" step="1" placeholder="1536" v-bind="componentField" />
-                </FormControl>
-                <FormDescription>{{ t('admin.ai.dimensionsHint') }}</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-          </template>
-        </div>
+          </FormGrid>
+          <FormField v-slot="{ componentField }" name="instructions">
+            <FormItem class="col-span-full">
+              <FormLabel>{{ t('admin.ai.instructions') }}</FormLabel>
+              <FormControl>
+                <Textarea rows="4" v-bind="componentField" />
+              </FormControl>
+              <FormDescription>{{ t('admin.ai.instructionsHint') }}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+          <FormField v-slot="{ componentField, handleChange }" name="vision">
+            <FormItem class="col-span-full">
+              <SwitchField
+                :title="t('admin.ai.vision')"
+                :description="t('admin.ai.visionHint')"
+                :checked="componentField.modelValue"
+                @update:checked="handleChange"
+              />
+            </FormItem> </FormField
+        ></template>
 
         <div class="flex gap-2">
           <Button type="submit" :isLoading="formLoading">{{ t('globals.messages.save') }}</Button>
@@ -143,6 +143,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -204,7 +205,12 @@ const fieldDefaults = {
 
 // OpenAI-compatible provider presets: pre-fill base URL + model (+ dims for embedding).
 const completionPresets = [
-  { value: 'openai', label: 'OpenAI', base_url: 'https://api.openai.com/v1', model: 'gpt-5.4-mini' },
+  {
+    value: 'openai',
+    label: 'OpenAI',
+    base_url: 'https://api.openai.com/v1',
+    model: 'gpt-5.4-mini'
+  },
   {
     value: 'anthropic',
     label: 'Anthropic (Claude)',
@@ -410,3 +416,19 @@ const onSubmit = form.handleSubmit(async (values) => {
   }
 })
 </script>
+
+<style scoped>
+.provider-form {
+  container-type: inline-size;
+}
+
+.provider-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 32rem) {
+  .provider-grid.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

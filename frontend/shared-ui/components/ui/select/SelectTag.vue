@@ -1,13 +1,16 @@
 <template>
   <!-- idk why I named this select tag, should be named multi-select -->
-  <TagsInput ref="rootRef" v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
+  <TagsInput
+    ref="rootRef"
+    v-model="tags"
+    class="min-h-9 gap-1 px-2 py-0.5"
+    :displayValue="getLabel"
+  >
     <!-- Tags visible to the user -->
-    <div class="flex gap-2 flex-wrap items-center px-3">
-      <TagsInputItem v-for="tagValue in tags" :key="tagValue" :value="tagValue">
-        <TagsInputItemText />
-        <TagsInputItemDelete />
-      </TagsInputItem>
-    </div>
+    <TagsInputItem v-for="tagValue in tags" :key="tagValue" :value="tagValue" class="min-w-0">
+      <TagsInputItemText class="min-w-0" />
+      <TagsInputItemDelete class="shrink-0" />
+    </TagsInputItem>
 
     <!-- Combobox for selecting new tags -->
     <ComboboxRoot
@@ -15,14 +18,13 @@
       v-model:open="open"
       v-model:search-term="searchTerm"
       :filterFunction="filterFunc"
-      class="w-full"
+      class="min-w-24 flex-1"
     >
       <ComboboxAnchor as-child>
         <div class="flex w-full items-center">
-          <ComboboxInput :placeholder="placeholder" as-child>
+          <ComboboxInput :placeholder="tags.length ? '' : placeholder" :aria-label="placeholder" as-child>
             <TagsInputInput
-              class="w-full px-3"
-              :class="tags.length > 0 ? 'mt-2' : ''"
+              class="w-0 min-w-0 flex-1 px-1"
               @keydown.enter.prevent
               @blur="handleBlur"
               @click="open = true"
@@ -34,8 +36,11 @@
             size="xs"
             variant="muted"
             :absolute="false"
-            class="mr-3 h-4 w-4 shrink-0"
+            class="mr-1 h-4 w-4 shrink-0"
           />
+          <div v-if="$slots.action" class="shrink-0">
+            <slot name="action" />
+          </div>
         </div>
       </ComboboxAnchor>
       <ComboboxPortal>
@@ -44,7 +49,9 @@
             position="popper"
             class="w-[--radix-popper-anchor-width] rounded-md mt-2 border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
           >
-            <CommandEmpty v-if="!searching">{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
+            <CommandEmpty v-if="!searching">{{
+              $t('globals.messages.noResultsFound')
+            }}</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 v-for="item in visibleOptions"
@@ -63,7 +70,12 @@
 </template>
 
 <script setup>
-import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '@shared-ui/components/ui/command'
+import {
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList
+} from '@shared-ui/components/ui/command'
 import {
   TagsInput,
   TagsInputInput,
@@ -194,7 +206,9 @@ const handleSelect = (event) => {
 }
 
 const filterFunc = (remainingItemValues, term) => {
-  const remainingItems = displayedItems.value.filter((item) => remainingItemValues.includes(item.value))
+  const remainingItems = displayedItems.value.filter((item) =>
+    remainingItemValues.includes(item.value)
+  )
   if (props.search) return remainingItems.map((item) => item.value)
   return remainingItems
     .filter((item) => item.label.toLowerCase().includes(term.toLowerCase()))

@@ -1,28 +1,26 @@
 <template>
   <form @submit.prevent="onSubmit" class="space-y-6">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input
-            type="text"
-            v-bind="componentField"
-            :disabled="!isOutgoingTemplate"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem v-auto-animate>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" :disabled="!isOutgoingTemplate" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="subject" v-if="!hideSubject">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="subject" v-if="!hideSubject">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="body">
       <FormItem>
@@ -70,6 +68,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'

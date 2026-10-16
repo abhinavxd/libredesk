@@ -1,20 +1,22 @@
 <template>
-  <Card
-    class="flex flex-col p-4 max-w-xs cursor-pointer transition-shadow hover:shadow-md"
+  <Button
+    type="button"
+    variant="outline"
+    class="h-full w-full min-w-0 flex-col items-stretch whitespace-normal bg-card p-4 text-left font-normal text-card-foreground"
     @click="handleClick">
-    <div class="flex items-center mb-2">
-      <img v-if="typeof icon === 'string'" :src="icon" class="w-6 h-6 mr-2" />
-      <component v-else :is="icon" size="24" class="mr-2 text-primary" />
-      <h3 class="text-lg font-medium">{{ title }}</h3>
+    <span class="mb-2 flex items-center">
+      <img v-if="typeof icon === 'string'" :src="icon" alt="" class="w-6 h-6 mr-2" />
+      <component v-else :is="icon" size="24" class="mr-2 text-primary" aria-hidden="true" />
+      <span class="ui-heading">{{ title }}</span>
       <BetaBadge v-if="badge" class="ml-2">{{ badge }}</BetaBadge>
-    </div>
-    <p class="text-sm text-muted-foreground">{{ subTitle }}</p>
-  </Card>
+    </span>
+    <span class="ui-description">{{ subTitle }}</span>
+  </Button>
 </template>
 
 <script setup>
 import BetaBadge from '@main/components/BetaBadge.vue'
-import { Card } from '@shared-ui/components/ui/card'
+import { Button } from '@shared-ui/components/ui/button'
 
 const props = defineProps({
   title: String,

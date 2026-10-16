@@ -1,136 +1,116 @@
 <template>
   <div class="space-y-3">
-    <div class="relative group/item" v-for="attribute in attributes" :key="attribute.id">
-      <!-- Label -->
-      <div class="sidebar-label flex items-center" v-if="attribute.data_type !== 'checkbox'">
-        <div class="flex items-center gap-1">
-          <p>
-            {{ attribute.name }}
-          </p>
-          <Tooltip>
-            <TooltipTrigger>
-              <Info class="text-muted-foreground" size="14" />
-            </TooltipTrigger>
-            <TooltipContent>
-              {{ attribute.description }}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-
-      <!-- Checkbox -->
-      <div class="sidebar-label flex items-center gap-2" v-else>
-        <Checkbox
-          v-if="attribute.data_type === 'checkbox'"
-          :disabled="loading"
-          @update:checked="
-            (value) => {
-              editingValue = value
-              saveAttribute(attribute.key)
-            }
-          "
-          :checked="customAttributes?.[attribute.key]"
-        />
-        <p>
-          {{ attribute.name }}
-        </p>
-        <Tooltip>
-          <TooltipTrigger>
-            <Info class="text-muted-foreground" size="14" />
+    <div
+      v-for="attribute in attributes"
+      :key="attribute.id"
+      class="grid min-w-0 grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-x-4"
+    >
+      <div class="sidebar-label min-w-0 py-0.5 [overflow-wrap:anywhere]">
+        <Tooltip :disabled="!attribute.description">
+          <TooltipTrigger as-child>
+            <span>{{ attribute.name }}</span>
           </TooltipTrigger>
-          <TooltipContent>
-            {{ attribute.description }}
-          </TooltipContent>
+          <TooltipContent v-if="attribute.description">{{ attribute.description }}</TooltipContent>
         </Tooltip>
       </div>
 
-      <!-- Value -->
-      <template v-if="attribute.data_type !== 'checkbox'">
-        <div
-          v-if="!editingAttributeKey || editingAttributeKey !== attribute.key"
-          class="flex items-center justify-between gap-1"
-        >
-          <span class="sidebar-value break-all" v-if="attribute.data_type !== 'checkbox'">
-            {{ customAttributes?.[attribute.key] ?? '-' }}
-          </span>
-          <div class="flex items-center gap-0.5 transition-opacity duration-200 flex-shrink-0 can-hover:opacity-0 can-hover:group-hover/item:opacity-100">
-            <button
-              class="p-1 rounded-md hover:bg-muted cursor-pointer transition-colors"
-              @click="startEditing(attribute)"
-            >
-              <Pencil size="12" class="text-muted-foreground" />
-            </button>
-            <button
-              v-if="customAttributes?.[attribute.key]"
-              class="p-1 rounded-md hover:bg-destructive/10 cursor-pointer transition-colors"
-              @click="deleteAttribute(attribute)"
-            >
-              <Trash2 size="12" class="text-muted-foreground hover:text-destructive" />
-            </button>
-          </div>
-        </div>
-        <div v-else>
-          <div class="flex items-center gap-1.5">
-            <template v-if="attribute.data_type === 'text'">
-              <Input
-                v-model="editingValue"
-                type="text"
-                class="h-7 text-xs px-2"
-                @keydown.enter="saveAttribute(attribute.key)"
-              />
-            </template>
-            <template v-else-if="attribute.data_type === 'number'">
-              <Input
-                v-model="editingValue"
-                type="number"
-                class="h-7 text-xs px-2 hide-number-spinners"
-                @keydown.enter="saveAttribute(attribute.key)"
-              />
-            </template>
-            <template v-else-if="attribute.data_type === 'checkbox'">
-              <Checkbox v-model:checked="editingValue" />
-            </template>
-            <template v-else-if="attribute.data_type === 'date'">
-              <Input v-model="editingValue" type="date" class="h-7 text-xs px-2" />
-            </template>
-            <template v-else-if="attribute.data_type === 'link'">
-              <Input
-                v-model="editingValue"
-                type="url"
-                class="h-7 text-xs px-2"
-                @keydown.enter="saveAttribute(attribute.key)"
-              />
-            </template>
-            <template v-else-if="attribute.data_type === 'list'">
-              <Select v-model="editingValue">
-                <SelectTrigger class="h-7 text-xs px-2">
-                  <SelectValue :placeholder="t('placeholders.selectValue')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem v-for="option in attribute.values" :key="option" :value="option">
-                    {{ option }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </template>
-            <Check
-              size="14"
-              class="text-muted-foreground cursor-pointer flex-shrink-0"
-              @click="saveAttribute(attribute.key)"
+      <Checkbox
+        v-if="attribute.data_type === 'checkbox'"
+        type="button"
+        class="mt-1 justify-self-end"
+        :disabled="loading"
+        :aria-label="attribute.name"
+        :checked="!!customAttributes?.[attribute.key]"
+        @update:checked="(value) => saveAttribute(attribute.key, value)"
+      />
+
+      <Popover
+        v-else
+        :open="editingAttributeKey === attribute.key"
+        @update:open="(open) => (open ? startEditing(attribute) : cancelEditing())"
+      >
+        <PopoverTrigger as-child>
+          <Button
+            type="button"
+            variant="link"
+            :disabled="loading"
+            class="sidebar-value h-auto min-h-6 min-w-6 max-w-full justify-end justify-self-end rounded-sm whitespace-normal px-0 py-0.5 text-right font-normal decoration-muted-foreground/40 decoration-dotted underline-offset-4 can-hover:hover:decoration-foreground"
+            :class="{ 'text-muted-foreground': customAttributes?.[attribute.key] == null }"
+            :aria-label="`${t('globals.messages.edit')}: ${attribute.name}`"
+          >
+            <span class="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{{
+              customAttributes?.[attribute.key] ?? t('globals.messages.set')
+            }}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" class="w-72" :aria-label="attribute.name">
+          <form class="space-y-3" novalidate @submit.stop.prevent="saveAttribute(attribute.key)">
+            <div class="space-y-1.5">
+              <Label :for="`${editorId}-${attribute.key}`">{{ attribute.name }}</Label>
+              <p v-if="attribute.description" class="text-xs text-muted-foreground">
+                {{ attribute.description }}
+              </p>
+            </div>
+
+            <Select v-if="attribute.data_type === 'list'" v-model="editingValue">
+              <SelectTrigger
+                :id="`${editorId}-${attribute.key}`"
+                :aria-invalid="!!errorMessage"
+                :aria-describedby="errorMessage ? `${editorId}-${attribute.key}-error` : undefined"
+              >
+                <SelectValue :placeholder="t('placeholders.selectValue')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="option in attribute.values" :key="option" :value="option">
+                  {{ option }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              v-else
+              :id="`${editorId}-${attribute.key}`"
+              v-model="editingValue"
+              :type="INPUT_TYPES[attribute.data_type] || 'text'"
+              :class="{ 'hide-number-spinners': attribute.data_type === 'number' }"
+              :aria-invalid="!!errorMessage"
+              :aria-describedby="errorMessage ? `${editorId}-${attribute.key}-error` : undefined"
             />
-            <X size="14" class="text-muted-foreground cursor-pointer flex-shrink-0" @click="cancelEditing" />
-          </div>
-          <p v-if="errorMessage" class="text-destructive text-xs mt-1">
-            {{ errorMessage }}
-          </p>
-        </div>
-      </template>
+
+            <p
+              v-if="errorMessage"
+              :id="`${editorId}-${attribute.key}-error`"
+              class="text-destructive text-xs"
+              role="alert"
+            >
+              {{ errorMessage }}
+            </p>
+            <div class="flex items-center justify-between gap-2">
+              <Button
+                v-if="customAttributes?.[attribute.key] != null"
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground"
+                @click="deleteAttribute(attribute)"
+              >
+                {{ t('globals.terms.remove') }}
+              </Button>
+              <div class="ml-auto flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" @click="cancelEditing">
+                  {{ t('globals.messages.cancel') }}
+                </Button>
+                <Button type="submit" size="sm">{{ t('globals.messages.save') }}</Button>
+              </div>
+            </div>
+          </form>
+        </PopoverContent>
+      </Popover>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, useId } from 'vue'
 import * as z from 'zod'
 import { Input } from '@shared-ui/components/ui/input'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
@@ -141,7 +121,9 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { Pencil, Trash2, Check, X, Info } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
+import { Label } from '@shared-ui/components/ui/label'
+import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { useI18n } from 'vue-i18n'
 
@@ -161,6 +143,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:setattributes'])
 const { t } = useI18n()
+const editorId = useId()
+const INPUT_TYPES = { text: 'text', number: 'number', date: 'date', link: 'url' }
 const errorMessage = ref('')
 const editingAttributeKey = ref(null)
 const editingValue = ref(null)
@@ -175,6 +159,7 @@ const startEditing = (attribute) => {
 const cancelEditing = () => {
   editingAttributeKey.value = null
   editingValue.value = null
+  errorMessage.value = ''
 }
 
 const getValidationSchema = (attribute) => {
@@ -208,18 +193,10 @@ const getValidationSchema = (attribute) => {
     case 'date':
       return z
         .string()
-        .refine(
-          (val) => !isNaN(Date.parse(val)),
-          t('validation.invalidValue')
-        )
+        .refine((val) => !isNaN(Date.parse(val)), t('validation.invalidValue'))
         .nullable()
     case 'link':
-      return z
-        .string()
-        .url(
-          t('validation.invalidUrl')
-        )
-        .nullable()
+      return z.string().url(t('validation.invalidUrl')).nullable()
     case 'list':
       return z
         .string()
@@ -232,13 +209,13 @@ const getValidationSchema = (attribute) => {
   }
 }
 
-const saveAttribute = (key) => {
+const saveAttribute = (key, value = editingValue.value) => {
   const attribute = props.attributes.find((attr) => attr.key === key)
   if (!attribute) return
 
   try {
     const schema = getValidationSchema(attribute)
-    schema.parse(editingValue.value)
+    schema.parse(value)
   } catch (validationError) {
     if (validationError instanceof z.ZodError) {
       errorMessage.value = validationError.errors[0].message
@@ -249,7 +226,7 @@ const saveAttribute = (key) => {
   }
 
   const updatedAttributes = { ...(props.customAttributes || {}) }
-  updatedAttributes[attribute.key] = editingValue.value
+  updatedAttributes[attribute.key] = value
   emit('update:setattributes', updatedAttributes)
   cancelEditing()
 }

@@ -1,85 +1,81 @@
 <template>
-  <div class="relative h-full">
+  <div ref="detailContainerRef" class="relative h-full min-h-0">
     <div
       v-if="isLoading"
       class="conv-progress absolute inset-x-0 top-0 h-0.5 z-50 pointer-events-none"
     />
     <ResizablePanelGroup
-      v-if="showContent && !isMobile"
+      v-if="showContent && panelGroupWidth > 0"
       direction="horizontal"
-      class="h-full transition-opacity duration-200"
+      class="h-full min-h-0 transition-opacity duration-200"
       :class="{ 'opacity-60': isDimmed }"
       :inert="isDimmed"
       @layout="onLayoutChange"
     >
       <!-- Conversation Content Panel -->
-      <ResizablePanel :default-size="sidebarOpen ? panelSizes[0] : 100" :min-size="30">
-        <Conversation />
+      <ResizablePanel
+        :order="1"
+        :min-size="55"
+        class="min-w-0 overflow-hidden rounded-xl border border-border bg-card"
+      >
+        <Conversation :details-open="useDetailsDrawer ? sheetSidebarOpen : sidebarOpen" />
       </ResizablePanel>
 
       <!-- Resizable Handle -->
-      <ResizableHandle />
+      <ResizableHandle
+        v-if="!useDetailsDrawer"
+        v-show="sidebarOpen"
+        class="w-1 bg-transparent after:w-1 can-hover:hover:after:bg-border"
+        :aria-label="$t('copilot.details')"
+        @dragging="resizingSidebar = $event"
+        @keydown.capture="onSidebarResizeKey"
+        @keyup="resizingSidebar = false"
+        @blur="resizingSidebar = false"
+      />
 
       <!-- Sidebar Panel (collapsible) -->
       <ResizablePanel
+        v-if="!useDetailsDrawer"
+        :order="2"
         ref="sidebarPanelRef"
-        :default-size="sidebarOpen ? panelSizes[1] : 0"
-        :min-size="15"
-        :max-size="60"
+        size-unit="px"
+        :default-size="sidebarOpen ? sidebarWidth : 0"
+        :min-size="240"
         :collapsible="true"
         :collapsed-size="0"
+        class="min-w-0 overflow-hidden rounded-xl border border-border bg-background data-[state=collapsed]:border-0"
         @collapse="onSidebarCollapse"
         @expand="onSidebarExpand"
       >
-        <div class="h-full overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable]">
-          <ConversationSideBar />
-        </div>
+        <ConversationSideBar />
       </ResizablePanel>
     </ResizablePanelGroup>
 
-    <template v-else-if="showContent">
-      <div
-        class="h-full transition-opacity duration-200"
-        :class="{ 'opacity-60': isDimmed }"
-        :inert="isDimmed"
-      >
-        <Conversation />
-      </div>
-
-      <Sheet :open="sheetSidebarOpen" @update:open="sheetSidebarOpen = $event">
-        <SheetContent
-          side="right"
-          class="w-[85vw] max-w-sm p-0 overflow-y-auto [&>button]:hidden"
-          :aria-describedby="undefined"
-        >
-          <SheetTitle class="sr-only">{{ $t('globals.terms.contact') }}</SheetTitle>
-          <ConversationSideBar />
-        </SheetContent>
-      </Sheet>
-    </template>
-
-    <button
-      v-if="showContent && !isMobile && !sidebarOpen"
-      @click="toggleSidebar"
-      class="absolute right-0 top-16 p-2 rounded-l-full bg-sidebar text-sidebar-foreground hover:bg-opacity-90 transition-colors duration-200 border shadow-md z-50"
+    <Sheet
+      v-if="showContent && useDetailsDrawer"
+      :open="sheetSidebarOpen"
+      @update:open="sheetSidebarOpen = $event"
     >
-      <ChevronLeft size="16" />
-    </button>
+      <SheetContent
+        side="right"
+        class="w-[90vw] max-w-sm overflow-hidden p-0 [&>button]:hidden"
+        :aria-describedby="undefined"
+      >
+        <SheetTitle class="sr-only">{{ $t('globals.terms.contact') }}</SheetTitle>
+        <ConversationSideBar />
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
 
 <script setup>
-const DEFAULT_PANEL_SIZES = [70, 30]
-
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useStorage } from '@vueuse/core'
-import { ChevronLeft } from 'lucide-vue-next'
+import { useElementSize, useMediaQuery, useStorage } from '@vueuse/core'
 import { useConversationStore } from '@main/stores/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import Conversation from '@main/features/conversation/Conversation.vue'
 import ConversationSideBar from '@main/features/conversation/sidebar/ConversationSideBar.vue'
-import { useIsMobile } from '@shared-ui/composables'
 import { Sheet, SheetContent, SheetTitle } from '@shared-ui/components/ui/sheet'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@shared-ui/components/ui/resizable'
 
@@ -89,13 +85,21 @@ const props = defineProps({
 
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
-const isMobile = useIsMobile()
+const compactViewport = useMediaQuery('(max-width: 1279px)')
+const detailContainerRef = ref(null)
+const { width: panelGroupWidth } = useElementSize(detailContainerRef)
+const useDetailsDrawer = computed(
+  () => compactViewport.value || (panelGroupWidth.value > 0 && panelGroupWidth.value < 640)
+)
 const sidebarPanelRef = ref(null)
 const sidebarOpen = useStorage('conversationSidebarOpen', true)
-const panelSizes = useStorage('conversationDetailPanelSizes', DEFAULT_PANEL_SIZES)
-// Older builds saved the collapsed [100, 0], which would reopen the panel at zero width.
-if (!(panelSizes.value[1] > 0)) panelSizes.value = DEFAULT_PANEL_SIZES
+const sidebarWidth = useStorage('conversationSidebarWidth', 320)
+const resizingSidebar = ref(false)
 const sheetSidebarOpen = ref(false)
+
+watch(useDetailsDrawer, () => {
+  sheetSidebarOpen.value = false
+})
 
 const showContent = computed(
   () => conversationStore.current || conversationStore.conversation.loading
@@ -108,14 +112,14 @@ const isLoading = computed(
 const isDimmed = computed(() => conversationStore.conversation.loading)
 
 const toggleSidebar = () => {
-  if (isMobile.value) {
+  if (useDetailsDrawer.value) {
     sheetSidebarOpen.value = !sheetSidebarOpen.value
     return
   }
   if (sidebarOpen.value) {
     sidebarPanelRef.value?.collapse()
   } else {
-    sidebarPanelRef.value?.resize(panelSizes.value[1])
+    sidebarPanelRef.value?.resize(sidebarWidth.value)
   }
 }
 
@@ -128,10 +132,18 @@ const onSidebarExpand = () => {
 }
 
 const onLayoutChange = (sizes) => {
-  // Layout fires before the collapse event, and saving the collapsed [100, 0] reopens the panel at its minimum width.
   if (sizes.length === 2 && sizes[1] > 0) {
-    panelSizes.value = sizes
+    if (resizingSidebar.value) {
+      sidebarWidth.value = sizes[1]
+    } else if (sidebarOpen.value) {
+      sidebarPanelRef.value?.resize(sidebarWidth.value)
+    }
   }
+}
+
+const onSidebarResizeKey = (event) => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  resizingSidebar.value = true
 }
 
 // Listen to emitter events for toggle (from sidebar contact)

@@ -1,67 +1,76 @@
 <template>
-  <div class="min-h-screen flex flex-col">
-    <div class="flex flex-wrap gap-4 pb-4">
-      <div class="flex items-center gap-2 mb-4">
-        <!-- Filter Popover -->
-        <Popover :open="filtersOpen" @update:open="filtersOpen = $event">
-          <PopoverTrigger @click="filtersOpen = !filtersOpen">
-            <Button variant="outline" size="sm" class="flex items-center gap-2 h-8">
-              <ListFilter size="14" />
-              <span>{{ t('globals.terms.filter', 1) }}</span>
-              <span
-                v-if="filters.length > 0"
-                class="flex items-center justify-center bg-primary text-primary-foreground rounded-full size-4 text-xs"
-              >
-                {{ filters.length }}
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent class="w-full p-4 flex flex-col gap-4">
-            <div class="w-[32rem]">
-              <FilterBuilder
-                :fields="filterFields"
-                :showButtons="true"
-                v-model="filters"
-                @apply="fetchActivityLogs"
-                @clear="fetchActivityLogs"
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
+  <div class="min-h-0 flex-1 flex flex-col">
+    <div class="pb-4">
+      <AdminToolbar class="mb-5">
+        <template #left>
+          <div class="flex items-center gap-2">
+            <!-- Filter Popover -->
+            <Popover :open="filtersOpen" @update:open="filtersOpen = $event">
+              <PopoverTrigger as-child>
+                <Button type="button" variant="outline" class="gap-2">
+                  <ListFilter size="14" />
+                  <span>{{ t('globals.terms.filter', 1) }}</span>
+                  <span
+                    v-if="filters.length > 0"
+                    class="flex items-center justify-center bg-primary text-primary-foreground rounded-full size-4 text-xs"
+                  >
+                    {{ filters.length }}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-full p-4 flex flex-col gap-4">
+                <div class="w-[32rem] max-w-full">
+                  <FilterBuilder
+                    :fields="filterFields"
+                    :showButtons="true"
+                    v-model="filters"
+                    @apply="fetchActivityLogs"
+                    @clear="fetchActivityLogs"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
 
-        <!-- Order By Popover -->
-        <Popover>
-          <PopoverTrigger>
-            <Button variant="outline" size="sm" class="flex items-center h-8">
-              <ArrowDownWideNarrow size="18" class="text-muted-foreground cursor-pointer" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent class="w-[200px] p-4 flex flex-col gap-4">
-            <!-- order by field -->
-            <Select v-model="orderByField" @update:model-value="fetchActivityLogs">
-              <SelectTrigger class="h-8 w-full">
-                <SelectValue :placeholder="orderByField" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem :value="'activity_logs.created_at'">
-                  {{ t('globals.terms.createdAt') }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <!-- Order By Popover -->
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  :aria-label="t('globals.messages.sortBy')"
+                >
+                  <ArrowDownWideNarrow size="18" class="text-muted-foreground cursor-pointer" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent class="w-[200px] p-4 flex flex-col gap-4">
+                <!-- order by field -->
+                <Select v-model="orderByField" @update:model-value="fetchActivityLogs">
+                  <SelectTrigger class="h-8 w-full">
+                    <SelectValue :placeholder="orderByField" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="'activity_logs.created_at'">
+                      {{ t('globals.terms.createdAt') }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
 
-            <!-- order by direction -->
-            <Select v-model="orderByDirection" @update:model-value="fetchActivityLogs">
-              <SelectTrigger class="h-8 w-full">
-                <SelectValue :placeholder="orderByDirection" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem :value="'asc'">{{ t('globals.terms.ascending') }}</SelectItem>
-                <SelectItem :value="'desc'">{{ t('globals.terms.descending') }}</SelectItem>
-              </SelectContent>
-            </Select>
-          </PopoverContent>
-        </Popover>
-      </div>
+                <!-- order by direction -->
+                <Select v-model="orderByDirection" @update:model-value="fetchActivityLogs">
+                  <SelectTrigger class="h-8 w-full">
+                    <SelectValue :placeholder="orderByDirection" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem :value="'asc'">{{ t('globals.terms.ascending') }}</SelectItem>
+                    <SelectItem :value="'desc'">{{ t('globals.terms.descending') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </template>
+      </AdminToolbar>
 
       <div class="w-full overflow-x-auto">
         <SimpleTable
@@ -90,6 +99,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { useStorage } from '@vueuse/core'
 import SimpleTable from '@main/components/table/SimpleTable.vue'
 import {
@@ -103,11 +113,11 @@ import FilterBuilder from '@main/components/filter/FilterBuilder.vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { ListFilter, ArrowDownWideNarrow } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
-import { useActivityLogFilters } from '../../../composables/useActivityLogFilters'
+import { useActivityLogFilters } from '@main/composables/useActivityLogFilters'
 import { useI18n } from 'vue-i18n'
 import { format } from 'date-fns'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
-import api from '../../../api'
+import api from '@main/api'
 
 const activityLogs = ref([])
 const { t } = useI18n()

@@ -1,162 +1,102 @@
 <template>
-  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
-    <div class="grid gap-6 md:grid-cols-2">
-    <FormField v-slot="{ field }" name="site_name">
-      <FormItem>
-        <FormLabel>{{ t('admin.general.siteName') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+  <form @submit="onSubmit" novalidate class="space-y-8 w-full">
+    <fieldset class="workspace-fields min-w-0">
+      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.workspace') }}</legend>
+      <FormGrid class="workspace-grid">
+        <FormField v-slot="{ field }" name="site_name">
+          <FormItem>
+            <FormLabel>{{ t('admin.general.siteName') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-    <FormField v-slot="{ componentField }" name="lang">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.language') }}</FormLabel>
-        <FormControl>
-          <Select v-bind="componentField" :modelValue="componentField.modelValue">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('admin.general.language.placeholder')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem v-for="lang in availableLanguages" :key="lang.code" :value="lang.code">
-                  {{ lang.name }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+        <FormField v-slot="{ field }" name="root_url">
+          <FormItem>
+            <FormLabel>
+              {{ t('globals.terms.rootURL') }}
+            </FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+        <FormField v-slot="{ componentField }" name="lang">
+          <FormItem>
+            <FormLabel>{{ t('globals.terms.language') }}</FormLabel>
+            <FormControl>
+              <Select v-bind="componentField" :modelValue="componentField.modelValue">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('admin.general.language.placeholder')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem
+                      v-for="lang in availableLanguages"
+                      :key="lang.code"
+                      :value="lang.code"
+                    >
+                      {{ lang.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-    <FormField v-slot="{ componentField }" name="timezone">
-      <FormItem>
-        <FormLabel>
-          {{ t('globals.terms.timezone') }}
-        </FormLabel>
-        <FormControl>
-          <Select v-bind="componentField">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('admin.general.timezone.placeholder')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
-                  {{ label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+        <FormField v-slot="{ componentField }" name="timezone">
+          <FormItem>
+            <FormLabel>
+              {{ t('globals.terms.timezone') }}
+            </FormLabel>
+            <FormControl>
+              <Select v-bind="componentField">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('admin.general.timezone.placeholder')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
+                      {{ label }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-    <FormField v-slot="{ componentField }" name="business_hours_id">
-      <FormItem>
-        <FormLabel>
-          {{ t('globals.terms.businessHour', 2) }}
-        </FormLabel>
-        <FormControl>
-          <Select v-bind="componentField">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('admin.general.businessHours.placeholder')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem v-for="bh in businessHours" :key="bh.id" :value="bh.id">
-                  {{ bh.name }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="root_url">
-      <FormItem>
-        <FormLabel>
-          {{ t('globals.terms.rootURL') }}
-        </FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormDescription>
-          {{ t('admin.general.rootURL.description') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="favicon_url" :value="props.initialValues.favicon_url">
-      <FormItem>
-        <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ field }" name="logo_url" :value="props.initialValues.logo_url">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="field" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField
-      v-slot="{ field }"
-      name="max_file_upload_size"
-      :value="props.initialValues.max_file_upload_size"
-    >
-      <FormItem>
-        <FormLabel>
-          {{ t('admin.general.maxAllowedFileUploadSize') }}
-        </FormLabel>
-        <FormControl>
-          <Input type="number" placeholder="10" v-bind="field" />
-        </FormControl>
-        <FormDescription>
-          {{ t('admin.general.maxAllowedFileUploadSize.description') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField name="allowed_file_upload_extensions" v-slot="{ componentField, handleChange }">
-      <FormItem>
-        <FormLabel>
-          {{ t('admin.general.allowedFileUploadExtensions') }}
-        </FormLabel>
-        <FormControl>
-          <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
-            <TagsInputItem v-for="item in componentField.modelValue" :key="item" :value="item">
-              <TagsInputItemText />
-              <TagsInputItemDelete />
-            </TagsInputItem>
-            <TagsInputInput placeholder="jpg" />
-          </TagsInput>
-        </FormControl>
-        <FormDescription>
-          {{ t('admin.general.allowedFileUploadExtensions.description') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
+        <FormField v-slot="{ componentField }" name="business_hours_id">
+          <FormItem>
+            <FormLabel>
+              {{ t('globals.terms.businessHour', 2) }}
+            </FormLabel>
+            <FormControl>
+              <Select v-bind="componentField">
+                <SelectTrigger>
+                  <SelectValue :placeholder="t('admin.general.businessHours.placeholder')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="bh in businessHours" :key="bh.id" :value="bh.id">
+                      {{ bh.name }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </FormGrid>
       <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
-        <FormItem>
+        <FormItem class="mt-5">
           <SwitchField
             :title="t('admin.general.showConversationSubject')"
             :description="t('admin.general.showConversationSubject.description')"
@@ -165,13 +105,83 @@
           />
         </FormItem>
       </FormField>
+    </fieldset>
+    <fieldset class="min-w-0">
+      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.branding') }}</legend>
+      <FormGrid>
+        <FormField v-slot="{ field }" name="logo_url" :value="props.initialValues.logo_url">
+          <FormItem>
+            <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+        <FormField v-slot="{ field }" name="favicon_url" :value="props.initialValues.favicon_url">
+          <FormItem>
+            <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
+            <FormControl>
+              <Input type="text" v-bind="field" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </FormGrid>
+    </fieldset>
+    <fieldset class="min-w-0">
+      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.file', 2) }}</legend>
+      <FormGrid>
+        <FormField
+          v-slot="{ field }"
+          name="max_file_upload_size"
+          :value="props.initialValues.max_file_upload_size"
+        >
+          <FormItem>
+            <FormLabel>
+              {{ t('admin.general.maxAllowedFileUploadSize') }}
+            </FormLabel>
+            <FormControl>
+              <Input type="number" placeholder="10" v-bind="field" />
+            </FormControl>
+            <FormDescription>
+              {{ t('admin.general.maxAllowedFileUploadSize.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+        <FormField name="allowed_file_upload_extensions" v-slot="{ componentField, handleChange }">
+          <FormItem>
+            <FormLabel>
+              {{ t('admin.general.allowedFileUploadExtensions') }}
+            </FormLabel>
+            <FormControl>
+              <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
+                <TagsInputItem v-for="item in componentField.modelValue" :key="item" :value="item">
+                  <TagsInputItemText />
+                  <TagsInputItemDelete />
+                </TagsInputItem>
+                <TagsInputInput placeholder="jpg" />
+              </TagsInput>
+            </FormControl>
+            <FormDescription>
+              {{ t('admin.general.allowedFileUploadExtensions.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </FormGrid>
+    </fieldset>
+    <div class="sticky bottom-0 z-10 flex border-t border-border bg-card py-3">
+      <Button type="submit" :isLoading="formLoading">{{ submitLabel }}</Button>
     </div>
-
-    <Button type="submit" :isLoading="formLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
 
 <script setup>
+const SECTION_HEADING_CLASS = 'mb-4 ui-heading'
+
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, ref, onMounted } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -201,13 +211,13 @@ import {
   TagsInputItemText
 } from '@shared-ui/components/ui/tags-input/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { timeZones } from '../../../constants/timezones.js'
+import { timeZones } from '@main/constants/timezones.js'
 import { useI18n } from 'vue-i18n'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
-import api from '../../../api/index.js'
+import api from '@main/api/index.js'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -294,3 +304,19 @@ watch(
   { deep: true }
 )
 </script>
+
+<style scoped>
+.workspace-fields {
+  container-type: inline-size;
+}
+
+.workspace-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 32rem) {
+  .workspace-grid.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

@@ -2,25 +2,9 @@
   <div class="flex flex-col relative h-full">
     <div ref="threadEl" class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]" @scroll="handleScroll">
       <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
-        <div
-          v-if="showLoadMore"
-          class="text-center mt-3"
-        >
-          <Button
-            size="sm"
-            variant="outline"
-            @click="loadMore"
-            :disabled="conversationStore.messages.fetching"
-            class="max-md:h-11"
-          >
-            <Loader2
-              v-if="conversationStore.messages.fetching"
-              size="16"
-              class="mr-2 animate-spin"
-            />
-            <RefreshCw v-else size="16" class="mr-2" />
-            {{ $t('globals.terms.loadMore') }}
-          </Button>
+        <div v-if="loadingOlder && conversationStore.messages.fetching" class="flex justify-center py-3" role="status">
+          <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+          <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
         </div>
 
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
@@ -91,13 +75,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useElementSize } from '@vueuse/core'
 import { useConversationRead } from '@main/composables/useConversationRead'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, Loader2 } from 'lucide-vue-next'
+import { Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import DaySeparator from '@shared-ui/components/DaySeparator'
 import { isSameDay } from 'date-fns'
@@ -113,12 +97,14 @@ const MENTION_TOP_OFFSET_RATIO = 0.25
 const MENTION_SETTLE_FRAMES = 3
 const MENTION_MAX_ANCHOR_FRAMES = 90
 const HIGHLIGHT_MS = 2500
+const OLDER_MESSAGES_SCROLL_DISTANCE = 48
 
 const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const threadEl = ref(null)
+const { height: threadHeight } = useElementSize(threadEl)
 const contentEl = ref(null)
 const readMarkerEl = ref(null)
 const readReady = ref(false)
@@ -143,9 +129,22 @@ const assignToSelf = () => {
   conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
 }
 
-const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
-  onArriveBottom: () => { unReadMessages.value = 0 }
-})
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll: handleStickyScroll } =
+  useStickyScroll(threadEl, contentEl, {
+    skipAutoScroll: () => loadingOlder.value,
+    onArriveBottom: () => { unReadMessages.value = 0 }
+  })
+
+const handleScroll = () => {
+  handleStickyScroll()
+  if (
+    openScrollDone &&
+    readReady.value &&
+    threadEl.value?.scrollTop <= OLDER_MESSAGES_SCROLL_DISTANCE
+  ) {
+    loadMore()
+  }
+}
 
 const handleScrollToBottom = () => {
   hasUserScrolled.value = false
@@ -270,24 +269,55 @@ const getSpacingClass = (index, groupWithPrev) => {
   return groupWithPrev ? 'mt-1' : 'mt-4'
 }
 
-const showLoadMore = computed(
-  () => conversationStore.currentConversationHasMoreMessages && !conversationStore.messages.loading
-)
-
 const loadMore = async () => {
+  if (
+    loadingOlder.value ||
+    conversationStore.messages.loading ||
+    conversationStore.messages.fetching ||
+    !conversationStore.currentConversationHasMoreMessages
+  ) return
   const thread = threadEl.value
   if (!thread) return
+  const conversationUUID = conversationStore.current?.uuid
+  const previousPage = conversationStore.messages.data.getLastFetchedPage(conversationUUID)
+  const threadTop = thread.getBoundingClientRect().top
+  const anchor = [...thread.querySelectorAll('[data-message-uuid]')].find(
+    element => element.getBoundingClientRect().bottom > threadTop
+  )
+  const anchorTop = anchor?.getBoundingClientRect().top
   const prevHeight = thread.scrollHeight
   const prevTop = thread.scrollTop
+  hasUserScrolled.value = true
   loadingOlder.value = true
   try {
     await conversationStore.fetchNextMessages()
     await nextTick()
-    thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+    if (conversationUUID !== conversationStore.current?.uuid || thread !== threadEl.value) return
+    if (anchor?.isConnected) {
+      scrollToOffset(thread.scrollTop + anchor.getBoundingClientRect().top - anchorTop)
+    } else {
+      scrollToOffset(thread.scrollHeight - prevHeight + prevTop)
+    }
+    if (thread.scrollHeight <= thread.clientHeight) hasUserScrolled.value = false
   } finally {
     loadingOlder.value = false
+    if (
+      conversationUUID !== conversationStore.current?.uuid ||
+      conversationStore.messages.data.getLastFetchedPage(conversationUUID) > previousPage
+    ) fillShortThread()
   }
 }
+
+const fillShortThread = () => {
+  const thread = threadEl.value
+  if (
+    readReady.value &&
+    thread?.clientHeight > 0 &&
+    thread.scrollHeight <= thread.clientHeight
+  ) loadMore()
+}
+
+watch([threadHeight, readReady], fillShortThread, { flush: 'post' })
 
 const messageRows = computed(() => {
   const messages = conversationStore.conversationMessages

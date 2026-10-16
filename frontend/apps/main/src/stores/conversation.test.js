@@ -117,6 +117,39 @@ describe('conversation read state', () => {
     expect(store.conversations.data[0].unread_message_count).toBe(1)
   })
 
+  it.each([7, '7'])('keeps the sender unread count stable for replies and private notes (sender: %s)', senderID => {
+    const store = setup()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    for (const privateNote of [false, true]) {
+      client.handleMessage({ target: client.socket, data: JSON.stringify({
+        type: 'new_message', data: {
+          ...reply, type: 'outgoing', sender_type: 'agent', sender_id: senderID,
+          private: privateNote, conversation_uuid: 'conversation-a'
+        }
+      }) })
+      expect(store.conversations.data[0].unread_message_count).toBe(2)
+    }
+    expect(store.updateConversationMessage).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    { sender_type: 'agent', sender_id: 8 },
+    { sender_type: 'contact', sender_id: 7 },
+    { sender_type: 'agent', sender_id: 0 },
+    { sender_type: 'agent' }
+  ])('keeps unread updates for messages that cannot be identified as the sender own message (%j)', sender => {
+    const store = setup()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    client.handleMessage({ target: client.socket, data: JSON.stringify({
+      type: 'new_message', data: { ...reply, ...sender, conversation_uuid: 'conversation-a' }
+    }) })
+    expect(store.conversations.data[0].unread_message_count).toBe(3)
+  })
+
   it('preserves a read event received before the conversation enters the list', () => {
     const store = setup()
     const [row] = store.conversations.data

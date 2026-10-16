@@ -1,173 +1,218 @@
 <template>
   <form @submit="onSubmit" class="space-y-8">
-    <div class="grid gap-6 md:grid-cols-2">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="description">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="description">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
+    <fieldset class="sla-durations min-w-0 space-y-3" :aria-describedby="durationHintId">
+      <FormGrid class="sla-duration-grid">
+        <FormField v-slot="{ componentField }" name="first_response_time">
+          <FormItem>
+            <FormLabel>{{ t('admin.sla.firstResponseTime') }}</FormLabel>
+            <FormControl>
+              <Input type="text" placeholder="6h" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-    <FormField v-slot="{ componentField }" name="first_response_time">
-      <FormItem>
-        <FormLabel>{{ t('admin.sla.firstResponseTime') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="6h" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>
-          {{ t('globals.messages.golangDurationHoursMinutes') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+        <FormField v-slot="{ componentField }" name="resolution_time">
+          <FormItem>
+            <FormLabel>{{ t('admin.sla.resolutionTime') }}</FormLabel>
+            <FormControl>
+              <Input type="text" placeholder="24h" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-    <FormField v-slot="{ componentField }" name="resolution_time">
-      <FormItem>
-        <FormLabel>{{ t('admin.sla.resolutionTime') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="24h" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>{{ t('globals.messages.golangDurationHoursMinutes') }} </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <FormField v-slot="{ componentField }" name="next_response_time">
-      <FormItem>
-        <FormLabel>{{ t('admin.sla.nextResponseTime') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="30m" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>
-          {{ t('globals.messages.golangDurationHoursMinutes') }}
-        </FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-    </div>
+        <FormField v-slot="{ componentField }" name="next_response_time">
+          <FormItem>
+            <FormLabel>{{ t('admin.sla.nextResponseTime') }}</FormLabel>
+            <FormControl>
+              <Input type="text" placeholder="30m" v-bind="componentField" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </FormGrid>
+      <p :id="durationHintId" class="ui-description">
+        {{ t('globals.messages.golangDurationHoursMinutes') }}
+      </p>
+    </fieldset>
 
     <!-- Notifications Section -->
     <div class="space-y-6">
-      <div class="flex items-center justify-between pb-3 border-b">
+      <div class="flex flex-wrap items-start justify-between gap-3 pb-3 border-b">
         <div class="space-y-1">
-          <h3 class="text-lg font-semibold text-foreground">
+          <h3 class="ui-heading">
             {{ t('admin.sla.alertConfiguration') }}
           </h3>
-          <p class="text-sm text-muted-foreground">
+          <p class="ui-description">
             {{ t('admin.sla.alertConfiguration.description') }}
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" @click="addNotification('breach')">
-            <Plus class="w-4 h-4"/>
+            <Plus class="w-4 h-4" />
             {{ t('admin.sla.addBreachAlert') }}
           </Button>
           <Button type="button" variant="outline" size="sm" @click="addNotification('warning')">
-            <Plus class="w-4 h-4"/>
+            <Plus class="w-4 h-4" />
             {{ t('admin.sla.addWarningAlert') }}
           </Button>
         </div>
       </div>
 
-      <!-- Notifications List -->
       <div v-if="form.values.notifications?.length > 0" class="space-y-3">
-        <div
+        <Card
           v-for="(notification, index) in form.values.notifications"
           :key="index"
-          class="group relative p-5 box bg-background transition-colors hover:border-foreground/20"
+          class="sla-alert-card min-w-0 shadow-none"
         >
           <FormField :name="`notifications.${index}.type`" v-slot="{ componentField }">
             <Input v-bind="componentField" type="hidden" />
           </FormField>
-
-          <!-- Card Header -->
-          <div class="flex items-center justify-between mb-5">
-            <div class="flex items-center gap-3">
+          <CardHeader class="flex-row items-center justify-between gap-3 space-y-0 p-4 pb-4 sm:p-5 sm:pb-4">
+            <div class="flex min-w-0 items-center gap-3">
               <span
-                class="flex items-center justify-center w-8 h-8 rounded-md"
-                :class="{
-                  'bg-destructive/10 text-destructive': notification.type === 'breach',
-                  'bg-warning/10 text-warning-600': notification.type === 'warning'
-                }"
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+                :class="
+                  notification.type === 'warning'
+                    ? 'bg-warning/10 text-warning-600'
+                    : 'bg-destructive/10 text-destructive'
+                "
               >
-                <CircleAlert size="18" v-if="notification.type === 'warning'" />
-                <Timer size="18" v-else />
+                <CircleAlert
+                  v-if="notification.type === 'warning'"
+                  class="h-4 w-4"
+                  aria-hidden="true"
+                />
+                <Timer v-else class="h-4 w-4" aria-hidden="true" />
               </span>
-              <div>
-                <div class="font-medium text-foreground">
+              <div class="min-w-0 space-y-1">
+                <h4 class="ui-subheading">
                   {{
                     notification.type === 'warning' ? t('admin.sla.warning') : t('admin.sla.breach')
                   }}
-                  {{ t('globals.terms.alert') }}
-                </div>
-                <p class="text-xs text-muted-foreground">
-                  {{ notification.type === 'warning' ? t('admin.sla.preBreachAlert') : t('admin.sla.postBreachAlert') }}
-                </p>
+                </h4>
               </div>
             </div>
             <Button
               type="button"
               variant="ghost"
-              size="xs"
+              size="icon"
+              :aria-label="t('globals.terms.remove')"
               @click.prevent="removeNotification(index)"
-              class="opacity-70 hover:opacity-100 text-muted-foreground hover:text-foreground"
+              class="h-8 w-8 shrink-0 text-muted-foreground"
             >
-              <X class="w-4 h-4" />
+              <X class="h-4 w-4" aria-hidden="true" />
             </Button>
-          </div>
-
-          <!-- Configuration Fields -->
-          <div class="grid gap-5 md:grid-cols-2">
-            <!-- Timing Section -->
-            <div class="space-y-3">
-              <div class="space-y-6">
-                <FormField
-                  :name="`notifications.${index}.time_delay_type`"
-                  v-slot="{ componentField }"
-                  v-if="notification.type === 'breach'"
-                >
+          </CardHeader>
+          <CardContent class="p-4 pt-0 sm:p-5 sm:pt-0">
+            <FormGrid class="sla-alert-grid items-start">
+              <div class="min-w-0 space-y-5">
+                <FormField :name="`notifications.${index}.metric`" v-slot="{ componentField }">
                   <FormItem>
-                    <FormLabel class="flex items-center gap-1.5 text-sm font-medium">
-                      <Clock class="w-4 h-4 text-muted-foreground" />
-                      {{ t('admin.sla.triggerTiming') }}
-                    </FormLabel>
+                    <FormLabel>{{ t('globals.terms.slaMetric') }}</FormLabel>
                     <FormControl>
                       <Select v-bind="componentField">
-                        <SelectTrigger class="w-full">
-                          <SelectValue />
+                        <SelectTrigger>
+                          <SelectValue :placeholder="t('sla.selectMetric')" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem value="immediately">
-                              {{ t('admin.sla.immediatelyOnBreach') }}
-                            </SelectItem>
-                            <SelectItem value="after">
-                              {{ t('admin.sla.afterSpecificDuration') }}
-                            </SelectItem>
+                            <SelectItem value="all">{{ t('globals.messages.all') }}</SelectItem>
+                            <SelectItem value="first_response">{{
+                              t('admin.sla.firstResponseTime')
+                            }}</SelectItem>
+                            <SelectItem value="next_response">{{
+                              t('admin.sla.nextResponseTime')
+                            }}</SelectItem>
+                            <SelectItem value="resolution">{{
+                              t('admin.sla.resolutionTime')
+                            }}</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 </FormField>
-
-                <FormField :name="`notifications.${index}.time_delay`" v-slot="{ componentField }">
-                  <FormItem v-if="shouldShowTimeDelay(index)">
-                    <FormLabel class="flex items-center gap-1.5 text-sm font-medium">
-                      <Hourglass class="w-4 h-4 text-muted-foreground" />
+                <FormField
+                  :name="`notifications.${index}.recipients`"
+                  v-slot="{ componentField, handleChange, meta }"
+                >
+                  <FormItem>
+                    <FormLabel>{{ t('admin.sla.alertRecipients') }}</FormLabel>
+                    <FormControl>
+                      <SelectAgentCombobox
+                        multiple
+                        exclude-ai-assistants
+                        :prepend-items="[
+                          { label: t('admin.sla.assignedUser'), value: 'assigned_user' }
+                        ]"
+                        :placeholder="t('globals.messages.startTypingToSearch')"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(value) => handleChange(value, meta.validated)"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+              </div>
+              <div class="min-w-0 space-y-5">
+                <FormField
+                  v-if="notification.type === 'breach'"
+                  :name="`notifications.${index}.time_delay_type`"
+                  v-slot="{ componentField }"
+                >
+                  <FormItem>
+                    <FormLabel>{{ t('admin.sla.triggerTiming') }}</FormLabel>
+                    <FormControl>
+                      <Select v-bind="componentField">
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="immediately">{{
+                              t('admin.sla.immediatelyOnBreach')
+                            }}</SelectItem>
+                            <SelectItem value="after">{{
+                              t('admin.sla.afterSpecificDuration')
+                            }}</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+                <FormField
+                  v-if="shouldShowTimeDelay(index)"
+                  :name="`notifications.${index}.time_delay`"
+                  v-slot="{ componentField, handleChange, meta }"
+                >
+                  <FormItem>
+                    <FormLabel>
                       {{
                         notification.type === 'warning'
                           ? t('admin.sla.advanceWarning')
@@ -177,85 +222,19 @@
                     <FormControl>
                       <Input
                         type="text"
-                        :placeholder="
-                          t('sla.enterDuration')
-                        "
-                        v-bind="componentField"
-                        @keydown.enter.prevent
+                        placeholder="10m"
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(value) => handleChange(value, meta.validated)"
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 </FormField>
               </div>
-            </div>
-
-            <!-- Recipients Section -->
-            <div class="space-y-3">
-              <FormField
-                :name="`notifications.${index}.recipients`"
-                v-slot="{ componentField, handleChange }"
-              >
-                <FormItem>
-                  <FormLabel class="flex items-center gap-1.5 text-sm font-medium">
-                    <Users class="w-4 h-4 text-muted-foreground" />
-                    {{ t('admin.sla.alertRecipients') }}
-                  </FormLabel>
-                  <FormControl>
-                    <SelectAgentCombobox
-                      multiple
-                      exclude-ai-assistants
-                      :prepend-items="[
-                        { label: t('admin.sla.assignedUser'), value: 'assigned_user' }
-                      ]"
-                      :placeholder="t('globals.messages.startTypingToSearch')"
-                      v-model="componentField.modelValue"
-                      @update:modelValue="handleChange"
-                      class="w-full hover:border-foreground/30"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-            </div>
-
-            <FormField :name="`notifications.${index}.metric`" v-slot="{ componentField }">
-              <FormItem>
-                <FormLabel class="flex items-center gap-1.5 text-sm font-medium">
-                  <SlidersHorizontal class="w-4 h-4 text-muted-foreground" />
-                  {{ t('globals.terms.slaMetric') }}
-                </FormLabel>
-                <FormControl>
-                  <Select v-bind="componentField">
-                    <SelectTrigger class="w-full">                        <SelectValue
-                        :placeholder="
-                          t('sla.selectMetric')
-                        "
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="all">
-                          {{ t('globals.messages.all') }}
-                        </SelectItem>
-                        <SelectItem value="first_response">
-                          {{ t('admin.sla.firstResponseTime') }}
-                        </SelectItem>
-                        <SelectItem value="next_response">
-                          {{ t('admin.sla.nextResponseTime') }}
-                        </SelectItem>
-                        <SelectItem value="resolution">
-                          {{ t('admin.sla.resolutionTime') }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
-          </div>
-        </div>
+            </FormGrid>
+          </CardContent>
+        </Card>
       </div>
 
       <!-- Empty State -->
@@ -264,7 +243,7 @@
         class="flex flex-col items-center justify-center p-8 space-y-3 rounded-md bg-muted/30 border border-dashed"
       >
         <Bell class="w-8 h-8 text-muted-foreground" />
-        <p class="text-sm text-muted-foreground">{{ t('admin.sla.noAlertsConfigured') }}</p>
+        <p class="ui-description">{{ t('admin.sla.noAlertsConfigured') }}</p>
       </div>
     </div>
 
@@ -275,29 +254,20 @@
 </template>
 
 <script setup>
-import { watch, computed } from 'vue'
+import FormGrid from '@shared-ui/components/FormGrid.vue'
+import { Card, CardHeader, CardContent } from '@shared-ui/components/ui/card'
+import { watch, computed, useId } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema'
 import { Button } from '@shared-ui/components/ui/button'
-import {
-  X,
-  Plus,
-  Timer,
-  CircleAlert,
-  Users,
-  Clock,
-  Hourglass,
-  Bell,
-  SlidersHorizontal
-} from 'lucide-vue-next'
+import { X, Plus, Timer, CircleAlert, Bell } from 'lucide-vue-next'
 import {
   FormControl,
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
-  FormDescription
+  FormMessage
 } from '@shared-ui/components/ui/form'
 import {
   Select,
@@ -310,6 +280,8 @@ import {
 import { useI18n } from 'vue-i18n'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import { Input } from '@shared-ui/components/ui/input'
+
+const durationHintId = useId()
 
 const props = defineProps({
   initialValues: {
@@ -393,11 +365,13 @@ watch(
             : 'immediately'
     }))
 
-    form.setValues({
-      ...newValues,
-      notifications: transformedNotifications
-    }, false)
-
+    form.setValues(
+      {
+        ...newValues,
+        notifications: transformedNotifications
+      },
+      false
+    )
   },
   { immediate: true, deep: true }
 )
@@ -423,3 +397,22 @@ const onSubmit = form.handleSubmit((values) => {
 //   { deep: true }
 // )
 </script>
+
+<style scoped>
+.sla-durations,
+.sla-alert-card {
+  container-type: inline-size;
+}
+
+.sla-duration-grid.form-grid,
+.sla-alert-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 32rem) {
+  .sla-duration-grid.form-grid,
+  .sla-alert-grid.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>
