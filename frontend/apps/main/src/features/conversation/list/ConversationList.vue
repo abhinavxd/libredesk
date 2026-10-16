@@ -162,7 +162,6 @@ import {
 } from '@shared-ui/components/ui/dropdown-menu'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
 import { useConversationStore } from '@/stores/conversation'
-import { useUsersStore } from '@/stores/users'
 import { useTeamStore } from '@/stores/team'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
 import EmptyList from '@/features/conversation/list/ConversationEmptyList.vue'
@@ -171,17 +170,10 @@ import ConversationListItem from '@/features/conversation/list/ConversationListI
 import ConversationListItemSkeleton from '@/features/conversation/list/ConversationListItemSkeleton.vue'
 
 const conversationStore = useConversationStore()
-const usersStore = useUsersStore()
 const teamStore = useTeamStore()
 const { canBulkAct } = useBulkActionPermissions()
 const route = useRoute()
 const { t } = useI18n()
-
-watch(
-  () => conversationStore.conversationsList.map((conversation) => conversation.assigned_user_id),
-  usersStore.ensureUserIDs,
-  { immediate: true }
-)
 
 watch(
   () => conversationStore.conversationsList

@@ -1,5 +1,3 @@
-// The first page is stubbed empty, so these pass or fail on the ids call alone whatever the DB holds.
-
 const stamp = Date.now()
 const agentFirst = `Zzlate${stamp}`
 const agentName = `${agentFirst} Agent`
@@ -337,14 +335,20 @@ describe('Saved lookup values outside the first page', () => {
       cy.contains('button[role="combobox"]', teamName).should('exist')
     })
 
-    it('labels the assigned agent by asking for it by id', () => {
+    it('labels the assigned agent from the conversation without an id lookup', () => {
       blankFirstPage('agents/compact')
       cy.intercept('GET', '**/api/v1/agents/compact?*ids=*').as('agentById')
+      cy.intercept('GET', `**/api/v1/conversations/${ids.conversation}`).as('loadConversation')
 
       openConversation()
 
-      cy.wait('@agentById').its('response.statusCode').should('eq', 200)
+      cy.wait('@loadConversation').its('response.body.data.assignee').should('include', {
+        id: ids.agent,
+        first_name: agentFirst,
+        last_name: 'Agent'
+      })
       cy.contains('button[role="combobox"]', agentName).should('exist')
+      cy.get('@agentById.all').should('have.length', 0)
     })
 
     it('shows the assigned tag while the tag list page is empty', () => {

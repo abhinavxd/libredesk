@@ -54,7 +54,7 @@ export function useGlobalShortcuts() {
 
   const setStatus = (status) => () => {
     if (!conversationOpen() || !userStore.can(perms.CONVERSATIONS_UPDATE_STATUS)) return false
-    if (conversationStore.current.status !== status) conversationStore.updateStatus(status)
+    if (conversationStore.current.status !== status) conversationStore.updateStatus(conversationStore.current.uuid, status)
     return true
   }
 

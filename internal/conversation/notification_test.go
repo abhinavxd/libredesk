@@ -81,6 +81,7 @@ func TestNotifyNewReplyChecksParticipantAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conv.ID, agentID)
+	db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status) VALUES ($1, $2, 'agent', 'outgoing', 'sent')`, conv.ID, agentID)
 	var q struct {
 		Participants *sqlx.Stmt `query:"get-conversation-participant-agents"`
 	}
@@ -142,6 +143,80 @@ func TestNotifyNewReplyChecksAssigneeAccess(t *testing.T) {
 	}
 }
 
+func TestReplyParticipantsRequireAgentMessage(t *testing.T) {
+	db := testutil.NewDB(t, "reply_participant_messages")
+	var agentID, inboxID int
+	if err := db.Get(&agentID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', 'participant@example.com', 'Agent', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Test', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	var q struct {
+		Participants    *sqlx.Stmt `query:"get-conversation-participant-agents"`
+		AllParticipants *sqlx.Stmt `query:"get-conversation-participants"`
+	}
+	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name               string
+		message            string
+		senderType         string
+		private            bool
+		other              bool
+		missingParticipant bool
+		count              int
+		want               int
+	}{
+		{name: "no messages"},
+		{name: "tag activity", message: models.MessageActivity, senderType: models.SenderTypeAgent, private: true, count: 2},
+		{name: "contact reply", message: models.MessageIncoming, senderType: models.SenderTypeContact, count: 1},
+		{name: "reply elsewhere", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, other: true, count: 1},
+		{name: "agent reply", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, count: 1, want: 1},
+		{name: "reply without participant", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, missingParticipant: true, count: 1},
+		{name: "internal note", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, private: true, count: 1},
+		{name: "repeated replies", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, count: 3, want: 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var conv models.Conversation
+			if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, agentID, inboxID); err != nil {
+				t.Fatal(err)
+			}
+			if !tt.missingParticipant {
+				db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conv.ID, agentID)
+			}
+			messageConversationID := conv.ID
+			if tt.other {
+				if err := db.Get(&messageConversationID, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, agentID, inboxID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for range tt.count {
+				db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private) VALUES ($1, $2, $3, $4, 'sent', $5)`, messageConversationID, agentID, tt.senderType, tt.message, tt.private)
+			}
+			var participants []umodels.User
+			if err := q.Participants.Select(&participants, conv.UUID); err != nil {
+				t.Fatal(err)
+			}
+			if len(participants) != tt.want {
+				t.Fatalf("participants = %d, want %d", len(participants), tt.want)
+			}
+			var allParticipants []models.ConversationParticipant
+			if err := q.AllParticipants.Select(&allParticipants, conv.UUID); err != nil {
+				t.Fatal(err)
+			}
+			wantVisible := 1
+			if tt.missingParticipant {
+				wantVisible = 0
+			}
+			if len(allParticipants) != wantVisible {
+				t.Fatalf("visible participants = %d, want %d", len(allParticipants), wantVisible)
+			}
+		})
+	}
+}
+
 func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 	db := testutil.NewDB(t, "reply_notification_history")
 	var userID, inboxID int
@@ -176,7 +251,8 @@ func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	templates, err := template.New(&lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, i18n)
+	layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+	templates, err := template.New(&lo, db, nil, layout, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, i18n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,6 +334,36 @@ func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 		db.Get(&body, `SELECT body FROM user_notifications LIMIT 1`)
 		if body != assigned.LastMessage.String {
 			t.Fatalf("notification body = %q, want %q", body, assigned.LastMessage.String)
+		}
+	})
+
+	t.Run("assignment survives a broken email template", func(t *testing.T) {
+		var originalBody string
+		if err := db.Get(&originalBody, `SELECT body FROM templates WHERE name = $1`, template.TmplConversationAssigned); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			db.MustExec(`UPDATE templates SET body = $1 WHERE name = $2`, originalBody, template.TmplConversationAssigned)
+		})
+		db.MustExec(`UPDATE templates SET body = $1 WHERE name = $2`, "{{", template.TmplConversationAssigned)
+		m := newManager(nmodels.NotificationChannelInApp, nmodels.NotificationChannelEmail, nmodels.NotificationChannelPush)
+		push := &countingPush{}
+		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
+			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil /** wsHub **/, &lo), nchannels.NewEmail(emailQueue), nchannels.NewPush(push)),
+			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp, nmodels.NotificationChannelEmail, nmodels.NotificationChannelPush}},
+		})
+		if err := m.NotifyAssignment([]int{userID}, conv); err != nil {
+			t.Fatal(err)
+		}
+		if notifications() != 1 || push.count != 1 {
+			t.Fatalf("assignment alerts: in-app=%d push=%d, want 1 each", notifications(), push.count)
+		}
+		var queued int
+		if err := db.Get(&queued, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
+			t.Fatal(err)
+		}
+		if queued != 0 {
+			t.Fatalf("queued broken emails = %d, want 0", queued)
 		}
 	})
 

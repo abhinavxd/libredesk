@@ -13,10 +13,10 @@
       v-for="conversation in conversationStore.current?.previous_conversations || []"
       :key="conversation.uuid"
       :to="{
-        name: 'inbox-conversation',
+        name: $route.name,
         params: {
-          uuid: conversation.uuid,
-          type: 'assigned'
+          ...$route.params,
+          uuid: conversation.uuid
         }
       }"
       class="block p-2 rounded-md hover:bg-muted"

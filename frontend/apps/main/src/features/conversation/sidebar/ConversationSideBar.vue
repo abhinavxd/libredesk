@@ -418,10 +418,11 @@ const selectPriority = (priority) => {
 }
 
 const updateContactCustomAttributes = async (attributes) => {
-  let previousAttributes = conversationStore.current.contact.custom_attributes
+  const conv = conversationStore.current
+  let previousAttributes = conv.contact.custom_attributes
   try {
-    conversationStore.current.contact.custom_attributes = attributes
-    await api.updateContactCustomAttribute(conversationStore.current.uuid, attributes)
+    conv.contact.custom_attributes = attributes
+    await api.updateContactCustomAttribute(conv.uuid, attributes)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
@@ -430,7 +431,7 @@ const updateContactCustomAttributes = async (attributes) => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
-    conversationStore.current.contact.custom_attributes = previousAttributes
+    conv.contact.custom_attributes = previousAttributes
   }
 }
 </script>

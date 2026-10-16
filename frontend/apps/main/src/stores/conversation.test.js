@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { useConversationStore } from './conversation'
+import { useUsersStore } from '@main/stores/users'
 import { WebSocketClient } from '@main/websocket'
 
-const { api } = vi.hoisted(() => ({ api: { getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn(), markConversationAsUnread: vi.fn() } }))
+const { api } = vi.hoisted(() => ({ api: {
+  getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn(),
+  markConversationAsUnread: vi.fn(), getConversation: vi.fn(), getAllConversations: vi.fn(), getUsersCompact: vi.fn()
+} }))
 vi.mock('@main/api', () => ({ default: api }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ currentRoute: ref({ params: { uuid: 'conversation-a' } }) }) }))
 vi.mock('@main/stores/user', () => ({ useUserStore: () => ({ userID: 7, user: {}, can: () => true }) }))
@@ -35,6 +39,68 @@ const setup = () => {
   store.conversations.data = [{ uuid: 'conversation-a', unread_message_count: 2, last_message_at: reply.created_at }]
   return store
 }
+
+describe('conversation assignees', () => {
+  const agent = { id: 2194, first_name: 'Agent', last_name: 'One', avatar_url: '/avatar.png', type: 'agent', availability_status: 'online' }
+
+  it('loads list assignees and preserves selected agent labels without an id lookup', async () => {
+    const store = useConversationStore()
+    const users = useUsersStore()
+    api.getAllConversations.mockResolvedValueOnce({ data: { data: {
+      results: [{ uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent }],
+      page: 1, total_pages: 1, total: 1
+    } } })
+
+    await store.fetchConversationsList(false, 'all')
+    await users.ensureUserIDs([agent.id])
+
+    expect(store.conversations.data).toHaveLength(1)
+    expect(users.options).toContainEqual(expect.objectContaining({ value: '2194', label: 'Agent One', avatar_url: '/avatar.png' }))
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it('loads the assignee when opening a conversation directly', async () => {
+    const store = useConversationStore()
+    const users = useUsersStore()
+    api.getConversation.mockResolvedValueOnce({ data: { data: { uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent } } })
+
+    await store.fetchConversation('conversation-a')
+    await users.ensureUserIDs([agent.id])
+
+    expect(users.users).toEqual([agent])
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it.each(['new_conversation', 'new_message'])('uses assignee details from %s events without an id lookup', async type => {
+    const store = setup()
+    const users = useUsersStore()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'refreshSidebarCounts').mockImplementation(() => {})
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    const payload = { uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent }
+
+    client.handleMessage({ target: client.socket, data: JSON.stringify({
+      type, data: type === 'new_message' ? { ...reply, conversation: payload } : payload
+    }) })
+    await users.ensureUserIDs([agent.id])
+
+    expect(users.users).toEqual([agent])
+    expect(store.conversations.data[0].assigned_user_id).toBe(agent.id)
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it('handles unassignment without adding an empty agent or changing another agent', () => {
+    const store = setup()
+    const users = useUsersStore()
+    store.handleConvPush({ uuid: 'conversation-a', assigned_user_id: agent.id, assignee: { ...agent } })
+    store.handleConvPush({ uuid: 'conversation-a', assigned_user_id: null, assignee: null })
+
+    expect(store.conversations.data[0].assigned_user_id).toBeNull()
+    expect(users.users).toEqual([agent])
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+})
 
 describe('conversation read state', () => {
   it('blocks acknowledgements while an earlier reply body is still loading', async () => {
