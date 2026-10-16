@@ -4,7 +4,10 @@ import { createRemoteLookup } from './remote-lookup'
 const rows = (values) => ({ data: { data: values } })
 
 describe('createRemoteLookup', () => {
-  afterEach(() => vi.restoreAllMocks())
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
 
   it('seeds the list from the first page and only fetches it once', async () => {
     const fetchRows = vi.fn().mockResolvedValue(rows([{ id: 1, name: 'a' }]))
@@ -212,7 +215,7 @@ describe('createRemoteLookup', () => {
     now.mockReturnValue(301000)
     const refresh = lookup.ensureIDs([1])
     const repeated = lookup.ensureIDs([1, '1'])
-    expect(fetchRows).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(fetchRows).toHaveBeenCalledTimes(2))
     expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '1' })
     expect(lookup.rows.value).toEqual([{ id: 1, name: 'Old name' }])
 
@@ -293,5 +296,78 @@ describe('createRemoteLookup', () => {
 
     expect(fetchRows).toHaveBeenCalledTimes(2)
     expect(lookup.rows.value).toEqual([])
+  })
+
+  it.each([[300, 2], [500, 3]])('batches %i assignment updates into %i id requests', async (count, requests) => {
+    vi.useFakeTimers()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    const updates = Array.from({ length: count }, (_, index) => lookup.ensureIDs([index + 1, 1, 2, 0, -1]))
+    await vi.advanceTimersByTimeAsync(49)
+    expect(fetchRows).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await Promise.all(updates)
+
+    const batches = fetchRows.mock.calls.slice(1).map(([params]) => params.ids.split(',').map(Number))
+    expect(batches).toHaveLength(requests)
+    expect(batches.every((batch) => batch.length <= 200)).toBe(true)
+    expect(batches.flat()).toEqual(Array.from({ length: count }, (_, index) => index + 1))
+    expect(lookup.rows.value).toHaveLength(count)
+  })
+
+  it('keeps the first batch deadline while new updates keep arriving', async () => {
+    vi.useFakeTimers()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    const first = lookup.ensureIDs([302, 111])
+    await vi.advanceTimersByTimeAsync(40)
+    const second = lookup.ensureIDs([999, 302, 111])
+    await vi.advanceTimersByTimeAsync(10)
+    await Promise.all([first, second])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '302,111,999' })
+
+    const next = lookup.ensureIDs([555, 302])
+    await vi.advanceTimersByTimeAsync(50)
+    await next
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '555' })
+  })
+
+  it('retries only the failed chunk of a large batch', async () => {
+    vi.useFakeTimers()
+    const onError = vi.fn()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementationOnce(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError })
+    await lookup.fetchFirstPage()
+    const ids = Array.from({ length: 300 }, (_, index) => index + 1)
+
+    const first = lookup.ensureIDs(ids)
+    await vi.advanceTimersByTimeAsync(50)
+    await first
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(lookup.rows.value).toHaveLength(200)
+
+    const retry = lookup.ensureIDs(ids)
+    await vi.advanceTimersByTimeAsync(50)
+    await retry
+
+    expect(fetchRows).toHaveBeenCalledTimes(4)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: ids.slice(200).join(',') })
+    expect(lookup.rows.value).toHaveLength(300)
   })
 })
