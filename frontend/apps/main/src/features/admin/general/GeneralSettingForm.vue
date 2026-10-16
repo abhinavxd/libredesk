@@ -165,6 +165,16 @@
           />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="block_assign_away_reassigning">
+        <FormItem>
+          <SwitchField
+            :title="t('admin.general.blockAssignAwayReassigning')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
     </div>
 
     <Button type="submit" :isLoading="formLoading"> {{ submitLabel }} </Button>

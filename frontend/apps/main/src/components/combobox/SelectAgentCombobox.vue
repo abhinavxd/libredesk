@@ -5,7 +5,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="usersStore.searchUsers"
+    :search="searchUsers"
   />
   <SelectComboBox
     v-else
@@ -13,7 +13,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="usersStore.searchUsers"
+    :search="searchUsers"
     type="user"
   >
     <template v-if="$slots.trigger" #trigger="slotProps">
@@ -27,6 +27,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUsersStore } from '@/stores/users'
 import { useUserStore } from '@/stores/user'
+import { useAppSettingsStore } from '@/stores/appSettings'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
 
@@ -60,19 +61,39 @@ const props = defineProps({
   currentUserFirst: {
     type: Boolean,
     default: false
+  },
+  blockAwayReassigning: {
+    type: Boolean,
+    default: false
   }
 })
 
 const { t } = useI18n()
 const usersStore = useUsersStore()
 const userStore = useUserStore()
+const appSettingsStore = useAppSettingsStore()
 
 const placeholderText = computed(() => props.placeholder || t('placeholders.selectAgent'))
+
+const isBlocking = computed(
+  () =>
+    props.blockAwayReassigning && appSettingsStore.settings['app.block_assign_away_reassigning'] === true
+)
+
+const markBlocked = (options) =>
+  isBlocking.value
+    ? options.map((option) =>
+        option.availability_status === 'away_and_reassigning' ? { ...option, disabled: true } : option
+      )
+    : options
+
+const searchUsers = async (query) => markBlocked(await usersStore.searchUsers(query))
 
 const items = computed(() => {
   let options = props.excludeAiAssistants
     ? usersStore.options.filter((option) => option.type !== 'ai_assistant')
     : usersStore.options
+  options = markBlocked(options)
   if (props.currentUserFirst) {
     const isMe = (option) => String(option.value) === String(userStore.userID)
     const me = options.find(isMe)

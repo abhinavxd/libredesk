@@ -124,6 +124,7 @@
           <SelectAgentCombobox
             v-model="agentId"
             include-none
+            block-away-reassigning
             :button-class="isUnset(agentId) ? ROW_COMBOBOX_EMPTY_CLASS : ROW_COMBOBOX_CLASS"
           />
         </div>

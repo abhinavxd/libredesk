@@ -89,6 +89,7 @@ type constants struct {
 	UploadProvider              string
 	AllowedUploadFileExtensions []string
 	MaxFileUploadSizeMB         int
+	BlockAssignAwayReassigning  bool
 }
 
 // Config loads config from files and environment variables into koanf.
@@ -168,6 +169,7 @@ func initConstants() *constants {
 		UploadProvider:              ko.MustString("upload.provider"),
 		AllowedUploadFileExtensions: ko.Strings("app.allowed_file_upload_extensions"),
 		MaxFileUploadSizeMB:         ko.Int("app.max_file_upload_size"),
+		BlockAssignAwayReassigning:  ko.Bool("app.block_assign_away_reassigning"),
 	}
 }
 

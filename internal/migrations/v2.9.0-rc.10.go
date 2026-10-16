@@ -10,6 +10,7 @@ func V2_9_0_RC10(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`
 		ALTER TABLE macros DROP CONSTRAINT IF EXISTS message_content_length;
 		ALTER TABLE macros ADD CONSTRAINT message_content_length CHECK (length(message_content) <= 100000);
+		INSERT INTO settings (key, value) VALUES ('app.block_assign_away_reassigning', 'false'::jsonb) ON CONFLICT (key) DO NOTHING;
 	`)
 	return err
 }
