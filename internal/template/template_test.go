@@ -17,7 +17,7 @@ func TestRenderNotificationEmailUsesSystemLayout(t *testing.T) {
 		"SiteName": func() string { return "Support" },
 		"LogoURL":  func() string { return "" },
 	}
-	layout := template.Must(template.New("emails").Funcs(funcs).Parse(string(body)))
+	layout := template.Must(template.New("base").Funcs(funcs).Parse(string(body)))
 	m := &Manager{}
 	if err := m.Reload(nil /** webTpls **/, layout, funcs); err != nil {
 		t.Fatal(err)

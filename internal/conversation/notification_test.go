@@ -329,6 +329,36 @@ func TestReplyNotificationsAlertForEveryMessage(t *testing.T) {
 		}
 	})
 
+	t.Run("assignment survives a broken email template", func(t *testing.T) {
+		var originalBody string
+		if err := db.Get(&originalBody, `SELECT body FROM templates WHERE name = $1`, template.TmplConversationAssigned); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			db.MustExec(`UPDATE templates SET body = $1 WHERE name = $2`, originalBody, template.TmplConversationAssigned)
+		})
+		db.MustExec(`UPDATE templates SET body = $1 WHERE name = $2`, "{{", template.TmplConversationAssigned)
+		m := newManager(nmodels.NotificationChannelInApp, nmodels.NotificationChannelEmail, nmodels.NotificationChannelPush)
+		push := &countingPush{}
+		m.dispatcher = notifier.NewDispatcher(notifier.DispatcherOpts{
+			Pipeline: nchannels.NewPipeline(nchannels.NewInApp(inApp, nil /** wsHub **/, &lo), nchannels.NewEmail(emailQueue), nchannels.NewPush(push)),
+			Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelInApp, nmodels.NotificationChannelEmail, nmodels.NotificationChannelPush}},
+		})
+		if err := m.NotifyAssignment([]int{userID}, conv); err != nil {
+			t.Fatal(err)
+		}
+		if notifications() != 1 || push.count != 1 {
+			t.Fatalf("assignment alerts: in-app=%d push=%d, want 1 each", notifications(), push.count)
+		}
+		var queued int
+		if err := db.Get(&queued, `SELECT COUNT(*) FROM notification_email_queue`); err != nil {
+			t.Fatal(err)
+		}
+		if queued != 0 {
+			t.Fatalf("queued broken emails = %d, want 0", queued)
+		}
+	})
+
 	t.Run("replies arriving together alert individually", func(t *testing.T) {
 		m := newManager(nmodels.NotificationChannelInApp)
 		var wg sync.WaitGroup

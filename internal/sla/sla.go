@@ -727,7 +727,7 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			metricLabel = label
 		}
 
-		// Render the email template.
+		recipient := nmodels.Recipient{UserID: recipientID}
 		content, subject, err := m.template.RenderStoredEmailTemplate(tmpl,
 			map[string]any{
 				"SLA": map[string]any{
@@ -757,8 +757,13 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			})
 
 		if err != nil {
-			m.lo.Error("error rendering email template", "template", template.TmplConversationAssigned, "scheduled_notification_id", scheduledNotification.ID, "error", err)
-			continue
+			m.lo.Error("error rendering email template", "template", tmpl, "scheduled_notification_id", scheduledNotification.ID, "error", err)
+		} else {
+			recipient.Email = &nmodels.EmailNotification{
+				Recipient: agent.Email.String,
+				Subject:   subject,
+				Content:   content,
+			}
 		}
 
 		notifType := metricNotificationTypes[scheduledNotification.Metric].warning
@@ -779,15 +784,8 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 		}
 
 		if _, err := m.dispatcher.Send(nmodels.Notification{
-			Type: notifType,
-			Recipients: []nmodels.Recipient{{
-				UserID: recipientID,
-				Email: &nmodels.EmailNotification{
-					Recipient: agent.Email.String,
-					Subject:   subject,
-					Content:   content,
-				},
-			}},
+			Type:             notifType,
+			Recipients:       []nmodels.Recipient{recipient},
 			Title:            notificationTitle,
 			Body:             null.StringFrom(notificationBody),
 			ConversationID:   null.IntFrom(appliedSLA.ConversationID),

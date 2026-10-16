@@ -1329,30 +1329,15 @@ func (m *Manager) SendTransientEmail(inboxID, conversationID int, conversationUU
 
 // NotifyAssignment sends notifications (in-app, WebSocket, email) for an assigned conversation.
 func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversation) error {
-	agent, err := m.userStore.GetAgentCachedOrLoad(userIDs[0])
-	if err != nil {
-		m.lo.Error("error fetching agent", "user_id", userIDs[0], "error", err)
-		return fmt.Errorf("fetching agent: %w", err)
-	}
-
-	// Automated messages do not have an author.
-	content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplConversationAssigned,
-		notificationTemplateData(conversation, agent, umodels.User{}))
-	if err != nil {
-		m.lo.Error("error rendering template", "template", template.TmplConversationAssigned, "conversation_uuid", conversation.UUID, "error", err)
-		return fmt.Errorf("rendering template: %w", err)
-	}
+	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
+		content, subject, err := m.template.RenderStoredEmailTemplate(template.TmplConversationAssigned,
+			notificationTemplateData(conversation, recipient, umodels.User{}))
+		return subject, content, err
+	})
 
 	if _, err := m.dispatcher.Send(nmodels.Notification{
-		Type: nmodels.NotificationTypeAssignment,
-		Recipients: []nmodels.Recipient{{
-			UserID: agent.ID,
-			Email: &nmodels.EmailNotification{
-				Recipient: agent.Email.String,
-				Subject:   subject,
-				Content:   content,
-			},
-		}},
+		Type:             nmodels.NotificationTypeAssignment,
+		Recipients:       recipients,
 		Title:            m.i18n.Ts("notification.conversationAssigned", "referenceNumber", conversation.ReferenceNumber),
 		Body:             null.StringFrom(cmp.Or(conversation.Subject.String, conversation.LastMessage.String)),
 		ConversationID:   null.IntFrom(conversation.ID),

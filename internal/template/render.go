@@ -164,7 +164,8 @@ func (m *Manager) renderNotificationEmail(content string, data any) (string, err
 	if _, err := tmpl.New(TmplContent).Parse(content); err != nil {
 		return "", fmt.Errorf("parsing notification content: %w", err)
 	}
-	if _, err := tmpl.New(TmplBase).Parse(`{{ template "header" . }}{{ template "content" . }}{{ template "footer" . }}`); err != nil {
+	tmpl, err = tmpl.New(TmplBase).Parse(`{{ template "header" . }}{{ template "content" . }}{{ template "footer" . }}`)
+	if err != nil {
 		return "", fmt.Errorf("parsing notification layout: %w", err)
 	}
 	var rendered strings.Builder
