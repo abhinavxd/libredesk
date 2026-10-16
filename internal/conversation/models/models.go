@@ -151,6 +151,7 @@ type ConversationListItem struct {
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
 	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee              json.RawMessage         `db:"assignee" json:"assignee"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -199,6 +200,7 @@ type Conversation struct {
 	LastReplyAt               null.Time              `db:"last_reply_at" json:"last_reply_at"`
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee                  json.RawMessage        `db:"assignee" json:"assignee"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
 	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`

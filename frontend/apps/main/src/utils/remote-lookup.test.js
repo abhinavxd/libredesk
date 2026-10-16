@@ -19,6 +19,36 @@ describe('createRemoteLookup', () => {
     expect(lookup.rows.value).toEqual([{ id: 1, name: 'a' }])
   })
 
+  it('uses supplied rows for selected ids without a request and preserves other fields', async () => {
+    const fetchRows = vi.fn()
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    lookup.upsert([{ id: 2194, first_name: 'Agent', last_name: 'One', email: 'agent@example.com' }])
+    lookup.upsert([{ id: 2194, first_name: 'Updated', avatar_url: '/avatar.png' }])
+
+    await lookup.ensureIDs([2194, '2194'])
+
+    expect(fetchRows).not.toHaveBeenCalled()
+    expect(lookup.rows.value).toEqual([
+      { id: 2194, first_name: 'Updated', last_name: 'One', email: 'agent@example.com', avatar_url: '/avatar.png' }
+    ])
+  })
+
+  it('keeps supplied rows when the first page and search results arrive', async () => {
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'First page' }]))
+      .mockResolvedValueOnce(rows([{ id: 2, name: 'Search result' }]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    lookup.upsert([{ id: 2194, name: 'Assigned agent' }])
+
+    await lookup.fetchFirstPage()
+    expect(await lookup.search('search')).toEqual([{ id: 2, name: 'Search result' }])
+    await lookup.ensureIDs([2194])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, q: 'search', page: 1 })
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'First page' }, { id: 2194, name: 'Assigned agent' }])
+  })
+
   it('returns server search results without replacing the shared list', async () => {
     const fetchRows = vi.fn()
       .mockResolvedValueOnce(rows([{ id: 1, name: 'a' }]))

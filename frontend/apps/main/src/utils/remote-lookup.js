@@ -119,10 +119,15 @@ export function createRemoteLookup ({ fetchRows, onError }) {
     await Promise.all(wanted.map((id) => pendingIDs.get(id)).filter(Boolean))
   }
 
+  const upsert = (fetched) => {
+    merge(fetched.map((row) => ({ ...byID.value[row.id], ...row })))
+    pinnedIDs.value = [...new Set([...pinnedIDs.value, ...fetched.map((row) => Number(row.id))])]
+  }
+
   const patch = (id, changes) => {
     const row = byID.value[id]
     if (row) byID.value[id] = { ...row, ...changes }
   }
 
-  return { rows, fetchFirstPage, search, ensureIDs, patch }
+  return { rows, fetchFirstPage, search, ensureIDs, upsert, patch }
 }
