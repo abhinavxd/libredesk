@@ -624,15 +624,7 @@ INNER JOIN users ON users.id = conversation_participants.user_id
 WHERE conversation_id =
 (
     SELECT id FROM conversations WHERE uuid = $1
-)
-  AND (users.type != 'agent' OR EXISTS (
-      SELECT 1 FROM conversation_messages m
-      WHERE m.conversation_id = conversation_participants.conversation_id
-        AND m.sender_id = users.id
-        AND m.sender_type = 'agent'
-        AND m.type = 'outgoing'
-        AND NOT m.private
-  ));
+);
 
 -- name: get-conversation-participant-agents
 SELECT users.id, users.first_name, users.last_name, users.email

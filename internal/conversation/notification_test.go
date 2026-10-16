@@ -160,19 +160,21 @@ func TestReplyParticipantsRequireAgentMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tt := range []struct {
-		name       string
-		message    string
-		senderType string
-		private    bool
-		other      bool
-		count      int
-		want       int
+		name               string
+		message            string
+		senderType         string
+		private            bool
+		other              bool
+		missingParticipant bool
+		count              int
+		want               int
 	}{
 		{name: "no messages"},
 		{name: "tag activity", message: models.MessageActivity, senderType: models.SenderTypeAgent, private: true, count: 2},
 		{name: "contact reply", message: models.MessageIncoming, senderType: models.SenderTypeContact, count: 1},
 		{name: "reply elsewhere", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, other: true, count: 1},
 		{name: "agent reply", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, count: 1, want: 1},
+		{name: "reply without participant", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, missingParticipant: true, count: 1},
 		{name: "internal note", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, private: true, count: 1},
 		{name: "repeated replies", message: models.MessageOutgoing, senderType: models.SenderTypeAgent, count: 3, want: 1},
 	} {
@@ -181,7 +183,9 @@ func TestReplyParticipantsRequireAgentMessage(t *testing.T) {
 			if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, agentID, inboxID); err != nil {
 				t.Fatal(err)
 			}
-			db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conv.ID, agentID)
+			if !tt.missingParticipant {
+				db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conv.ID, agentID)
+			}
 			messageConversationID := conv.ID
 			if tt.other {
 				if err := db.Get(&messageConversationID, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, agentID, inboxID); err != nil {
@@ -202,8 +206,12 @@ func TestReplyParticipantsRequireAgentMessage(t *testing.T) {
 			if err := q.AllParticipants.Select(&allParticipants, conv.UUID); err != nil {
 				t.Fatal(err)
 			}
-			if len(allParticipants) != tt.want {
-				t.Fatalf("visible participants = %d, want %d", len(allParticipants), tt.want)
+			wantVisible := 1
+			if tt.missingParticipant {
+				wantVisible = 0
+			}
+			if len(allParticipants) != wantVisible {
+				t.Fatalf("visible participants = %d, want %d", len(allParticipants), wantVisible)
 			}
 		})
 	}

@@ -113,6 +113,23 @@ func TestCreateTrimsLongBody(t *testing.T) {
 	}
 }
 
+func TestReplyDeliveryRequiresParticipantRow(t *testing.T) {
+	f := newReplyFixture(t, "reply_delivery_participant")
+	f.db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private) VALUES ($1, $2, 'agent', 'outgoing', 'sent', false)`, f.convID, f.userID)
+	ref := models.NotificationReference{Type: models.NotificationTypeNewReplyParticipating, ConversationID: null.IntFrom(f.convID), MessageID: null.IntFrom(f.messageIDs[1])}
+	for _, participating := range []bool{false, true} {
+		if participating {
+			f.db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, f.convID, f.userID)
+		}
+		for _, channel := range []models.NotificationChannel{models.NotificationChannelEmail, models.NotificationChannelPush} {
+			got, err := f.checker.ShouldDeliver(f.userID, ref, channel)
+			if err != nil || got != participating {
+				t.Fatalf("participant=%v channel=%s deliver=%v err=%v", participating, channel, got, err)
+			}
+		}
+	}
+}
+
 func TestReplyDeliveryRechecksEligibility(t *testing.T) {
 	f := newReplyFixture(t, "reply_delivery_eligibility")
 	ref := models.NotificationReference{Type: models.NotificationTypeNewReply, ConversationID: null.IntFrom(f.convID), MessageID: null.IntFrom(f.messageIDs[1])}

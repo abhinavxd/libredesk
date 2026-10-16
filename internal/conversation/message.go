@@ -796,9 +796,7 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 
 // AfterMessageInsert runs the post-commit side effects of a message insert: participant, last message and broadcast.
 func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []string) {
-	if !message.Private && (message.Type == models.MessageOutgoing || (message.Type == models.MessageIncoming && message.SenderType == models.SenderTypeContact)) {
-		m.addConversationParticipant(message.SenderID, message.ConversationUUID)
-	}
+	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Skip updating last_message and broadcasting for continuity emails.
 	if !message.IsContinuityMessage() {

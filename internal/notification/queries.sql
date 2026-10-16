@@ -99,6 +99,9 @@ DELETE FROM notification_push_subscriptions WHERE id = $1;
 -- name: reply-delivery-state
 SELECT c.assigned_user_id, c.assigned_team_id,
     EXISTS (
+        SELECT 1 FROM conversation_participants
+        WHERE conversation_id = c.id AND user_id = $1
+    ) AND EXISTS (
         SELECT 1 FROM conversation_messages participant_message
         WHERE participant_message.conversation_id = c.id
           AND participant_message.sender_id = $1
