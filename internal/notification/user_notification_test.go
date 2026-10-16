@@ -115,6 +115,7 @@ func TestCreateTrimsLongBody(t *testing.T) {
 
 func TestReplyDeliveryRequiresParticipantRow(t *testing.T) {
 	f := newReplyFixture(t, "reply_delivery_participant")
+	f.db.MustExec(`UPDATE conversations SET assigned_user_id = NULL WHERE id = $1`, f.convID)
 	f.db.MustExec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private) VALUES ($1, $2, 'agent', 'outgoing', 'sent', false)`, f.convID, f.userID)
 	ref := models.NotificationReference{Type: models.NotificationTypeNewReplyParticipating, ConversationID: null.IntFrom(f.convID), MessageID: null.IntFrom(f.messageIDs[1])}
 	for _, participating := range []bool{false, true} {
