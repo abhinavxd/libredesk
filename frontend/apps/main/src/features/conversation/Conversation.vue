@@ -208,7 +208,7 @@ const handleUpdateStatus = (status) => {
     palette.openPalette({ parent: SNOOZE_COMMAND })
     return
   }
-  conversationStore.updateStatus(status)
+  conversationStore.updateStatus(conversationStore.current.uuid, status)
 }
 
 const paletteActions = {

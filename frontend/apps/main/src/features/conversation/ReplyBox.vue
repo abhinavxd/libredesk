@@ -510,6 +510,10 @@ const processSend = async (
   if (hasPendingInlineUpload(html)) return
   const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
+  // The agent can open another conversation while the send is in flight, and the editor then holds that conversation's draft.
+  const isConversationStillOpen = () => conversationStore.current?.uuid === convUUID
+  const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
+  const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
   const isPrivate = messageType.value === 'private_note'
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
@@ -650,8 +654,10 @@ const processSend = async (
         tempUUIDs.slice(i).forEach((uuid) => conversationStore.removePendingMessage(convUUID, uuid))
         // Already-accepted attachments must not be resent on retry.
         const sentIDs = new Set(parts.slice(0, i).flatMap((p) => p.attachments.map((f) => f.id)))
-        if (sentIDs.size) setMediaFiles(mediaFiles.value.filter((f) => !sentIDs.has(f.id)))
-        if (i === 0) htmlContent.value = savedContent
+        if (isConversationStillOpen()) {
+          if (sentIDs.size) setMediaFiles(mediaFiles.value.filter((f) => !sentIDs.has(f.id)))
+          if (i === 0) htmlContent.value = savedContent
+        }
         emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
           variant: 'destructive',
           description: handleHTTPError(error).message
@@ -667,8 +673,6 @@ const processSend = async (
 
   // Apply macro actions if any.
   if (!hasMessageSendingErrored) {
-    const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
-    const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
     if (macroID > 0) {
       try {
         await api.applyMacro(convUUID, macroID, macroActions)
@@ -684,11 +688,13 @@ const processSend = async (
   // Clear state on success.
   if (!hasMessageSendingErrored) {
     clearDraft(convUUID, isPrivate ? 'private_note' : 'reply')
-    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    clearMediaFiles()
-    emailErrors.value = []
-    mentions.value = []
-    if (statusToSet) conversationStore.updateStatus(statusToSet)
+    if (isConversationStillOpen()) {
+      conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+      clearMediaFiles()
+      emailErrors.value = []
+      mentions.value = []
+    }
+    if (statusToSet) conversationStore.updateStatus(convUUID, statusToSet)
   }
   isSending.value = false
 }

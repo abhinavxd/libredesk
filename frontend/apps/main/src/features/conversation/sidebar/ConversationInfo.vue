@@ -160,10 +160,11 @@ const feedbackExpanded = ref(false)
 const isFeedbackLong = computed(() => (conversation.value?.csat_feedback?.length || 0) > 160)
 
 const updateCustomAttributes = async (attributes) => {
-  let previousAttributes = conversationStore.current.custom_attributes
+  const conv = conversationStore.current
+  let previousAttributes = conv.custom_attributes
   try {
-    conversationStore.current.custom_attributes = attributes
-    await api.updateConversationCustomAttribute(conversation.value.uuid, attributes)
+    conv.custom_attributes = attributes
+    await api.updateConversationCustomAttribute(conv.uuid, attributes)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })
@@ -172,7 +173,7 @@ const updateCustomAttributes = async (attributes) => {
       variant: 'destructive',
       description: handleHTTPError(error).message
     })
-    conversationStore.current.custom_attributes = previousAttributes
+    conv.custom_attributes = previousAttributes
   }
 }
 </script>
