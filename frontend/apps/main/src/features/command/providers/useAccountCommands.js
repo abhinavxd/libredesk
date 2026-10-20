@@ -7,6 +7,7 @@ import {
   Keyboard,
   LogOut,
   Moon,
+  Monitor,
   Sun,
   UserRoundCog
 } from 'lucide-vue-next'
@@ -39,6 +40,16 @@ export function useAccountCommands() {
         icon: isDark ? Sun : Moon,
         run: () => {
           mode.value = isDark ? 'light' : 'dark'
+        }
+      },
+      {
+        id: 'account.themeSystem',
+        label: t('command.useSystemTheme'),
+        keywords: [t('navigation.darkMode'), 'theme', 'system', 'auto'],
+        section: SECTIONS.ACCOUNT,
+        icon: Monitor,
+        run: () => {
+          mode.value = 'auto'
         }
       },
       {
