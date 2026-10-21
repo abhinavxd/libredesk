@@ -55,9 +55,9 @@
                 variant="ghost"
                 size="icon"
                 class="h-7 w-7"
-                :class="mode === option.value && 'bg-accent text-accent-foreground'"
+                :class="themeChoice === option.value && 'bg-accent text-accent-foreground'"
                 :title="t(option.label)"
-                :aria-pressed="mode === option.value"
+                :aria-pressed="themeChoice === option.value"
                 @click="mode = option.value"
               >
                 <component :is="option.icon" />
@@ -153,6 +153,8 @@ import { useColorMode } from '@vueuse/core'
 const isMobile = useIsMobile()
 // useColorMode's 'auto' follows the OS preference, so it needs no own listener.
 const mode = useColorMode()
+// mode reads as the resolved light/dark; the stored choice is what can be 'auto'.
+const themeChoice = mode.store
 const themeOptions = [
   { value: 'auto', label: 'navigation.themeSystem', icon: Monitor },
   { value: 'light', label: 'navigation.themeLight', icon: Sun },
