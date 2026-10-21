@@ -87,6 +87,7 @@ type Manager struct {
 	// lastSeen holds the newest message ID a run's history included, per in-flight conversation.
 	lastSeen map[int]int
 	mu       sync.Mutex
+	delayed  map[int]*time.Timer
 
 	miningQueue    chan int
 	miningInflight map[int]bool
@@ -134,6 +135,7 @@ func New(opts Opts, aiManager *ai.Manager, convo *conversation.Manager, inboxMan
 		inflight:           map[int]bool{},
 		pending:            map[int]bool{},
 		lastSeen:           map[int]int{},
+		delayed:            map[int]*time.Timer{},
 		miningQueue:        make(chan int, opts.QueueSize),
 		miningInflight:     map[int]bool{},
 		assistantUserIDs:   map[int]bool{},
@@ -280,7 +282,7 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled, a.ResponseInterval).Scan(&id); err != nil {
 		m.lo.Error("error creating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -317,7 +319,7 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled, a.ResponseInterval); err != nil {
 		m.lo.Error("error updating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -420,6 +422,9 @@ func (m *Manager) validate(a *models.Assistant) error {
 	}
 	if a.MaxTurns <= 0 || a.MaxTurns > 20 {
 		a.MaxTurns = 6
+	}
+	if a.ResponseInterval < 0 || a.ResponseInterval > 300 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	a.Languages = normalizeLanguages(a.Languages)
 	return nil

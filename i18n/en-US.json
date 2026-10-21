@@ -80,6 +80,8 @@
   "admin.ai.assistant.languagesPlaceholder": "Type a language and press Enter",
   "admin.ai.assistant.maxTurns": "Max turns",
   "admin.ai.assistant.maxTurnsHint": "Number of back-and-forth replies before the assistant hands off. Between 1 and 20.",
+  "admin.ai.assistant.responseInterval": "Response interval (seconds)",
+  "admin.ai.assistant.responseIntervalHint": "The assistant waits this long after the latest customer message before starting its turn. Each new message restarts the wait. Enter 0 to reply immediately, or up to 300 seconds.",
   "admin.ai.assistant.nameHint": "The display name customers see when they chat with this assistant.",
   "admin.ai.assistant.new": "New assistant",
   "admin.ai.assistant.offerHandoff": "Offer handoff to a human",

@@ -1,14 +1,177 @@
 package aiagent
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/abhinavxd/libredesk/internal/testutil"
 )
+
+func TestScheduleResponse(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.scheduleResponse(1, 5*time.Second)
+		time.Sleep(4 * time.Second)
+		manager.scheduleResponse(1, 5*time.Second)
+		time.Sleep(4 * time.Second)
+		synctest.Wait()
+		select {
+		case <-manager.queue:
+			t.Fatal("response queued before the quiet period ended")
+		default:
+		}
+		time.Sleep(time.Second)
+		synctest.Wait()
+		if got := <-manager.queue; got != 1 {
+			t.Fatalf("got conversation %d, want 1", got)
+		}
+		manager.markDone(1)
+		time.Sleep(5 * time.Second)
+		synctest.Wait()
+		if len(manager.queue) != 0 {
+			t.Fatal("burst queued more than one response")
+		}
+	})
+}
+
+func TestScheduleResponseDuringRun(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.inflight[1] = true
+		manager.lastSeen[1] = 42
+		manager.scheduleResponse(1, 5*time.Second)
+		manager.markDone(1)
+		if manager.lastSeen[1] != 42 {
+			t.Fatal("delayed follow-up lost the running turn's message history")
+		}
+		if len(manager.queue) != 0 {
+			t.Fatal("follow-up queued before its interval")
+		}
+		time.Sleep(5 * time.Second)
+		synctest.Wait()
+		if got := <-manager.queue; got != 1 {
+			t.Fatalf("got conversation %d, want 1", got)
+		}
+		manager.markDone(1)
+		if _, exists := manager.lastSeen[1]; exists {
+			t.Fatal("completed conversation retained message history")
+		}
+	})
+}
+
+func TestResponseIntervalValidation(t *testing.T) {
+	manager := &Manager{i18n: testutil.NewI18n(t)}
+	for _, interval := range []int{-1, 0, 5, 300, 301} {
+		assistant := models.Assistant{Name: "Support", ResponseInterval: interval}
+		err := manager.validate(&assistant)
+		wantError := interval < 0 || interval > 300
+		if (err != nil) != wantError {
+			t.Fatalf("interval %d: got error %v, want error %v", interval, err, wantError)
+		}
+		if assistant.ResponseInterval != interval {
+			t.Fatalf("interval %d changed to %d", interval, assistant.ResponseInterval)
+		}
+	}
+}
+
+func TestScheduleResponseIndependentConversations(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.scheduleResponse(1, 5*time.Second)
+		manager.scheduleResponse(2, 0)
+		if got := <-manager.queue; got != 2 {
+			t.Fatalf("immediate conversation blocked by delayed conversation: %d", got)
+		}
+		manager.markDone(2)
+		time.Sleep(5 * time.Second)
+		synctest.Wait()
+		if got := <-manager.queue; got != 1 {
+			t.Fatalf("got conversation %d, want 1", got)
+		}
+	})
+}
+
+func TestScheduleResponseExpiresDuringRun(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.inflight[1] = true
+		manager.lastSeen[1] = 42
+		manager.scheduleResponse(1, 5*time.Second)
+		time.Sleep(5 * time.Second)
+		synctest.Wait()
+		if len(manager.queue) != 0 || !manager.pending[1] {
+			t.Fatal("expired interval did not wait for the running turn")
+		}
+		manager.markDone(1)
+		if got := <-manager.queue; got != 1 || manager.lastSeen[1] != 42 {
+			t.Fatal("follow-up was not queued with the previous message history")
+		}
+		manager.markDone(1)
+	})
+}
+
+func TestScheduleResponseSwitchToImmediate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.scheduleResponse(1, 5*time.Second)
+		manager.scheduleResponse(1, 0)
+		if got := <-manager.queue; got != 1 {
+			t.Fatalf("got conversation %d, want 1", got)
+		}
+		manager.markDone(1)
+		time.Sleep(5 * time.Second)
+		synctest.Wait()
+		if len(manager.queue) != 0 || len(manager.delayed) != 0 {
+			t.Fatal("replaced timer queued another response")
+		}
+	})
+}
+
+func TestScheduleResponseAfterClose(t *testing.T) {
+	manager := newResponseTestManager()
+	manager.Close()
+	manager.scheduleResponse(1, time.Second)
+	manager.scheduleResponse(2, 0)
+	if len(manager.delayed) != 0 {
+		t.Fatal("closed manager accepted a delayed response")
+	}
+	if _, ok := <-manager.queue; ok {
+		t.Fatal("closed manager accepted an immediate response")
+	}
+}
+
+func TestScheduleResponseDefersQueuedRun(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		manager := newResponseTestManager()
+		manager.scheduleResponse(1, 0)
+		manager.scheduleResponse(1, 5*time.Second)
+		defer manager.delayed[1].Stop()
+		manager.lastSeen[1] = 42
+		close(manager.queue)
+		manager.worker(context.Background())
+		if manager.inflight[1] || manager.lastSeen[1] != 42 {
+			t.Fatal("queued run did not defer to the new interval with its history intact")
+		}
+	})
+}
+
+func newResponseTestManager() *Manager {
+	return &Manager{
+		queue:       make(chan int, 4),
+		miningQueue: make(chan int, 4),
+		inflight:    map[int]bool{},
+		pending:     map[int]bool{},
+		lastSeen:    map[int]int{},
+		delayed:     map[int]*time.Timer{},
+	}
+}
 
 func TestSplitSuggestions(t *testing.T) {
 	body, suggestions := splitSuggestions("Which plan?\n[[suggestions]] [\"Basic\",\"Pro\",\"Enterprise\",\"Extra\"]")

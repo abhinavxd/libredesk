@@ -35,6 +35,7 @@ type Assistant struct {
 	Tone             string         `db:"tone" json:"tone"`
 	ResponseLength   string         `db:"response_length" json:"response_length"`
 	MaxTurns         int            `db:"max_turns" json:"max_turns"`
+	ResponseInterval int            `db:"response_interval" json:"response_interval"`
 	FallbackTeamID   null.Int       `db:"fallback_team_id" json:"fallback_team_id"`
 	CitationsEnabled bool           `db:"citations_enabled" json:"citations_enabled"`
 	HandoffEnabled   bool           `db:"handoff_enabled" json:"handoff_enabled"`

@@ -849,6 +849,7 @@ CREATE TABLE ai_assistants (
 	tone TEXT NOT NULL DEFAULT 'professional',
 	response_length TEXT NOT NULL DEFAULT 'balanced',
 	max_turns INTEGER NOT NULL DEFAULT 6,
+	response_interval INTEGER NOT NULL DEFAULT 0 CONSTRAINT constraint_ai_assistants_on_response_interval CHECK (response_interval >= 0 AND response_interval <= 300),
 	fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	handoff_enabled BOOLEAN NOT NULL DEFAULT true,
 	citations_enabled BOOLEAN NOT NULL DEFAULT false,
