@@ -109,3 +109,54 @@ func TestArticleCitationHTML(t *testing.T) {
 		t.Fatalf("unexpected preview: %q", got)
 	}
 }
+
+func TestNormalizeHistory(t *testing.T) {
+	user := func(c string) aimodels.ChatMessage { return aimodels.ChatMessage{Role: aimodels.RoleUser, Content: c} }
+	asst := func(c string) aimodels.ChatMessage {
+		return aimodels.ChatMessage{Role: aimodels.RoleAssistant, Content: c}
+	}
+	tests := []struct {
+		name    string
+		history []aimodels.ChatMessage
+		want    []aimodels.ChatMessage
+	}{
+		{
+			name:    "trailing reply and confirmation",
+			history: []aimodels.ChatMessage{user("first"), user("image"), asst("reply"), asst("anything else?")},
+			want:    []aimodels.ChatMessage{user("first"), asst("reply\n\nanything else?"), user("image")},
+		},
+		{
+			name:    "single trailing assistant message",
+			history: []aimodels.ChatMessage{user("first"), user("second"), asst("reply")},
+			want:    []aimodels.ChatMessage{user("first"), asst("reply"), user("second")},
+		},
+		{
+			name:    "trailing reply merges with earlier reply",
+			history: []aimodels.ChatMessage{user("hi"), asst("hello"), user("second"), asst("reply")},
+			want:    []aimodels.ChatMessage{user("hi"), asst("hello\n\nreply"), user("second")},
+		},
+		{
+			name:    "already ordered",
+			history: []aimodels.ChatMessage{user("hi"), asst("hello"), asst("anything else?"), user("yes")},
+			want:    []aimodels.ChatMessage{user("hi"), asst("hello\n\nanything else?"), user("yes")},
+		},
+		{
+			name:    "no user message",
+			history: []aimodels.ChatMessage{asst("hello")},
+			want:    []aimodels.ChatMessage{asst("hello")},
+		},
+		{
+			name:    "empty",
+			history: []aimodels.ChatMessage{},
+			want:    []aimodels.ChatMessage{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeHistory(tt.history)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("got %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}

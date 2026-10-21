@@ -726,7 +726,37 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		}
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}
-	return history
+	return normalizeHistory(history)
+}
+
+// normalizeHistory makes the history end with the customer message being answered. A requeued run
+// sees the previous run's reply (often split in two by [[confirm]]) after the customer's follow-up,
+// as the follow-up was created first. Trailing assistant turns are moved before the latest user turn,
+// matching the order the assistant saw them, and consecutive assistant turns are merged; some
+// providers reject trailing assistant messages or treat them as a prefill to continue.
+func normalizeHistory(history []aimodels.ChatMessage) []aimodels.ChatMessage {
+	last := -1
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role == aimodels.RoleUser {
+			last = i
+			break
+		}
+	}
+	if last >= 0 && last < len(history)-1 {
+		reordered := make([]aimodels.ChatMessage, 0, len(history))
+		reordered = append(reordered, history[:last]...)
+		reordered = append(reordered, history[last+1:]...)
+		history = append(reordered, history[last])
+	}
+	merged := make([]aimodels.ChatMessage, 0, len(history))
+	for _, msg := range history {
+		if n := len(merged); n > 0 && msg.Role == aimodels.RoleAssistant && merged[n-1].Role == aimodels.RoleAssistant {
+			merged[n-1].Content += "\n\n" + msg.Content
+			continue
+		}
+		merged = append(merged, msg)
+	}
+	return merged
 }
 
 // recentContactConversations lists the contact's other recent conversations, only once verified so
