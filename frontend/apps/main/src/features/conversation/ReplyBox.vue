@@ -146,6 +146,27 @@
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
       v-if="!isCollapsed && !isEditorFullscreen"
     >
+      <!-- Send delay bar -->
+      <div
+        v-if="pendingSendTimer"
+        class="absolute -top-16 left-1/2 -translate-x-1/2 z-10 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border bg-card text-card-foreground shadow-lg w-80"
+      >
+        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ t('replyBox.sendingIn', { seconds: sendCountdown }) }}</span>
+          <div class="h-1 w-full overflow-hidden rounded-full bg-border">
+            <div
+              class="h-full rounded-full bg-primary transition-none"
+              :style="sendProgressStyle"
+            />
+          </div>
+        </div>
+        <button
+          class="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          @click="cancelPendingSend"
+        >
+          {{ t('replyBox.undo') }}
+        </button>
+      </div>
       <ReplyBoxContent
         ref="replyBoxContentRef"
         :isFullscreen="false"
@@ -192,11 +213,13 @@ import { MACRO_CONTEXT } from '@main/constants/conversation'
 import { WHATSAPP_CHANNEL, isWhatsAppWindowOpen } from '@main/features/conversation/whatsappTemplate'
 import { useUserStore } from '@main/stores/user'
 import { useDraftManager } from '@main/composables/useDraftManager'
+import { useSendDelay } from '@main/composables/useSendDelay'
 import api from '@main/api'
 import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useNotificationStore } from '@main/stores/notification'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -224,6 +247,7 @@ const { t } = useI18n()
 const conversationStore = useConversationStore()
 const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
+const appSettingsStore = useAppSettingsStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
 const isCramped = useIsComposerCramped()
@@ -359,6 +383,9 @@ const pendingToolApproval = ref(null)
 const pendingToolConversationUUID = ref('')
 const deferredStatus = ref(null)
 const mentions = ref([])
+const { pendingSendTimer, sendCountdown, sendProgressStyle, cancelPendingSend, executeSendWithDelay } = useSendDelay(
+  computed(() => (appSettingsStore.settings['app.send_delay_seconds'] ?? 5) * 1000)
+)
 
 watch(currentConversationUUID, (uuid) => {
   if (pendingToolApproval.value && pendingToolConversationUUID.value !== uuid) {
@@ -570,6 +597,12 @@ const processSend = async (
     }
   }
   let tempUUIDs = []
+
+  // Show inline send delay bar with Undo option before actually sending.
+  if (appSettingsStore.settings['app.send_delay_seconds'] > 0) {
+    const cancelled = await executeSendWithDelay()
+    if (cancelled) return
+  }
 
   // Add pending message to cache for instant display.
   if (hasContent) {
