@@ -1,6 +1,6 @@
 <template>
   <!-- Set fixed width only when not in fullscreen. -->
-  <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
+  <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen, 'pointer-events-none': disabled }">
     <!-- Message type toggle -->
     <div
       class="flex items-center justify-between"
@@ -12,7 +12,6 @@
             v-if="canSendReply"
             value="reply"
             class="max-md:py-2.5"
-            :disabled="disabled"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
@@ -20,7 +19,6 @@
             v-if="canSendPrivateNote"
             value="private_note"
             class="max-md:py-2.5"
-            :disabled="disabled"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
@@ -427,8 +425,7 @@ const enableSend = computed(() => {
       props.uploadedFiles.length > 0) &&
     emailErrors.value.length === 0 &&
     !props.uploadingFiles.length &&
-    !props.isDraftLoading &&
-    !props.disabled
+    !props.isDraftLoading
   )
 })
 
