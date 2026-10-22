@@ -219,7 +219,6 @@ import { useI18n } from 'vue-i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useNotificationStore } from '@main/stores/notification'
-import { useAppSettingsStore } from '@main/stores/appSettings'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -247,7 +246,6 @@ const { t } = useI18n()
 const conversationStore = useConversationStore()
 const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
-const appSettingsStore = useAppSettingsStore()
 const emitter = useEmitter()
 const userStore = useUserStore()
 const isCramped = useIsComposerCramped()
@@ -383,8 +381,9 @@ const pendingToolApproval = ref(null)
 const pendingToolConversationUUID = ref('')
 const deferredStatus = ref(null)
 const mentions = ref([])
+const sendDelaySeconds = computed(() => userStore.preferences.send_delay_seconds ?? 0)
 const { pendingSendTimer, sendCountdown, sendProgressStyle, cancelPendingSend, executeSendWithDelay } = useSendDelay(
-  computed(() => (appSettingsStore.settings['app.send_delay_seconds'] ?? 5) * 1000)
+  computed(() => sendDelaySeconds.value * 1000)
 )
 
 watch(currentConversationUUID, (uuid) => {
@@ -599,7 +598,7 @@ const processSend = async (
   let tempUUIDs = []
 
   // Show inline send delay bar with Undo option before actually sending.
-  if (appSettingsStore.settings['app.send_delay_seconds'] > 0) {
+  if (sendDelaySeconds.value > 0) {
     const cancelled = await executeSendWithDelay()
     if (cancelled) return
   }

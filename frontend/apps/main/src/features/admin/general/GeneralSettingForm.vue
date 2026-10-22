@@ -105,32 +105,6 @@
           />
         </FormItem>
       </FormField>
-      <FormField v-slot="{ componentField, handleChange }" name="send_delay_seconds">
-        <FormItem class="mt-5">
-          <div class="space-y-2">
-            <p class="text-sm font-medium text-foreground">{{ t('admin.general.sendDelaySeconds') }}</p>
-            <div class="flex items-center gap-3">
-              <Select
-                :modelValue="String(componentField.modelValue)"
-                @update:modelValue="(val) => handleChange(Number(val))"
-              >
-                <SelectTrigger class="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="0">{{ t('globals.terms.off') }}</SelectItem>
-                    <SelectItem value="5">5s</SelectItem>
-                    <SelectItem value="10">10s</SelectItem>
-                    <SelectItem value="15">15s</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <p class="text-sm text-muted-foreground">{{ t('admin.general.sendDelaySeconds.description') }}</p>
-            </div>
-          </div>
-        </FormItem>
-      </FormField>
     </fieldset>
     <fieldset class="min-w-0">
       <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.branding') }}</legend>
