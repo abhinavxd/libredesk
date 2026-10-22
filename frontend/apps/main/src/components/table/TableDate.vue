@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { format, isValid } from 'date-fns'
+import { timePattern } from '@shared-ui/utils/datetime.js'
 
 const props = defineProps({
   value: { type: [String, Number, Date], default: null }
@@ -11,7 +12,7 @@ const date = computed(() => {
   const parsed = new Date(props.value)
   return isValid(parsed) ? parsed : null
 })
-const fullTimestamp = computed(() => date.value ? format(date.value, 'd MMM yyyy, h:mm:ss a OOOO') : '')
+const fullTimestamp = computed(() => date.value ? format(date.value, `d MMM yyyy, ${timePattern(true)} OOOO`) : '')
 </script>
 
 <template>
@@ -21,5 +22,5 @@ const fullTimestamp = computed(() => date.value ? format(date.value, 'd MMM yyyy
     :title="fullTimestamp"
     :aria-label="fullTimestamp"
     class="whitespace-nowrap"
-  >{{ format(date, 'd MMM yyyy, h:mm a') }}</time>
+  >{{ format(date, `d MMM yyyy, ${timePattern()}`) }}</time>
 </template>
