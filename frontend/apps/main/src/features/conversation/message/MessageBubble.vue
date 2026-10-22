@@ -117,9 +117,7 @@
                 v-else-if="message.content_type !== 'text' && sanitizedContent"
                 ref="messageContentEl"
                 @click="onMessageContentClick"
-                :class="{
-                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
-                }"
+                :class="{ 'email-light-canvas': useLightCanvas }"
               >
                 <Letter
                   :html="sanitizedContent"
@@ -311,6 +309,7 @@ import CSATResponseDisplay from './CSATResponseDisplay.vue'
 import api from '@main/api'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
+import { needsLightCanvas } from '@main/utils/email-colors'
 import { delayedLoading } from '@main/utils/delayed-loading'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
@@ -431,6 +430,14 @@ const sanitizedContent = computed(() => {
     .replace(STRIKE_OPEN_TAG, '<span style="text-decoration: line-through">')
     .replace(STRIKE_CLOSE_TAG, '</span>')
 })
+
+// Dark mode only puts incoming emails on a light canvas when they bring their own colors.
+const useLightCanvas = computed(
+  () =>
+    !isOutgoing.value &&
+    convStore.current?.inbox_channel === 'email' &&
+    needsLightCanvas(sanitizedContent.value)
+)
 
 const nonInlineAttachments = computed(() =>
   props.message.attachments.filter((attachment) => attachment.disposition !== 'inline')
