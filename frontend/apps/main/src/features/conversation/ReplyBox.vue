@@ -63,7 +63,24 @@
     </AlertDialogContent>
   </AlertDialog>
 
-  <div class="rounded-t-xl bg-background text-foreground">
+  <div class="rounded-t-xl text-foreground" :class="pendingSendTimer ? 'bg-transparent' : 'bg-background'">
+    <!-- Send delay bar — outside the collapsed guard so Undo is reachable even when minimized -->
+    <div v-if="pendingSendTimer" class="flex justify-center pb-2 px-2">
+      <div class="flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border bg-card text-card-foreground shadow-lg w-80">
+        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ t('replyBox.sendingIn', { seconds: sendCountdown }) }}</span>
+          <div class="h-1 w-full overflow-hidden rounded-full bg-border">
+            <div class="h-full rounded-full bg-primary transition-none" :style="sendProgressStyle" />
+          </div>
+        </div>
+        <button
+          class="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          @click="cancelPendingSend"
+        >
+          {{ t('replyBox.undo') }}
+        </button>
+      </div>
+    </div>
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
@@ -146,27 +163,6 @@
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
       v-if="!isCollapsed && !isEditorFullscreen"
     >
-      <!-- Send delay bar -->
-      <div
-        v-if="pendingSendTimer"
-        class="absolute -top-16 left-1/2 -translate-x-1/2 z-10 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border border-border bg-card text-card-foreground shadow-lg w-80"
-      >
-        <div class="flex flex-col gap-1.5 flex-1 min-w-0">
-          <span class="text-sm font-medium">{{ t('replyBox.sendingIn', { seconds: sendCountdown }) }}</span>
-          <div class="h-1 w-full overflow-hidden rounded-full bg-border">
-            <div
-              class="h-full rounded-full bg-primary transition-none"
-              :style="sendProgressStyle"
-            />
-          </div>
-        </div>
-        <button
-          class="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-          @click="cancelPendingSend"
-        >
-          {{ t('replyBox.undo') }}
-        </button>
-      </div>
       <ReplyBoxContent
         ref="replyBoxContentRef"
         :isFullscreen="false"
@@ -387,6 +383,8 @@ const { pendingSendTimer, sendCountdown, sendProgressStyle, cancelPendingSend, e
 )
 
 watch(currentConversationUUID, (uuid) => {
+  // Cancel any pending send when the agent switches conversations.
+  cancelPendingSend()
   if (pendingToolApproval.value && pendingToolConversationUUID.value !== uuid) {
     pendingToolApproval.value = null
     pendingToolConversationUUID.value = ''
@@ -500,6 +498,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  cancelPendingSend()
   emitter.off(EMITTER_EVENTS.COPILOT_INSERT_REPLY, handleCopilotInsertReply)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_SET_TYPE, setMessageTypeFromPalette)
   emitter.off(EMITTER_EVENTS.REPLY_BOX_FOCUS, focusFromPalette)
@@ -530,6 +529,9 @@ const processSend = async (
   skipMissingTagsCheck = false,
   statusToSet = null
 ) => {
+  // Block a second send while a delay countdown is already running.
+  if (pendingSendTimer.value) return
+
   let hasMessageSendingErrored = false
   isEditorFullscreen.value = false
 
