@@ -12,6 +12,7 @@
             v-if="canSendReply"
             value="reply"
             class="max-md:py-2.5"
+            :disabled="disabled"
           >
             {{ $t('globals.terms.reply') }}
           </TabsTrigger>
@@ -19,6 +20,7 @@
             v-if="canSendPrivateNote"
             value="private_note"
             class="max-md:py-2.5"
+            :disabled="disabled"
           >
             {{ $t('globals.terms.privateNote') }}
           </TabsTrigger>
@@ -166,7 +168,7 @@
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
         :insertContent="insertContent"
         :autoFocus="true"
-        :disabled="isDraftLoading"
+        :disabled="isDraftLoading || disabled"
         :enableMentions="messageType === 'private_note'"
         :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
@@ -348,6 +350,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  disabled: {
+    type: Boolean,
+    default: false
+  },
   canSendReply: {
     type: Boolean,
     required: true
@@ -421,7 +427,8 @@ const enableSend = computed(() => {
       props.uploadedFiles.length > 0) &&
     emailErrors.value.length === 0 &&
     !props.uploadingFiles.length &&
-    !props.isDraftLoading
+    !props.isDraftLoading &&
+    !props.disabled
   )
 })
 
