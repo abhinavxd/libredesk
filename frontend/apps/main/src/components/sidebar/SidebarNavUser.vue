@@ -1,11 +1,8 @@
 <template>
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
-      <SidebarMenuButton
-        size="default"
-        class="p-0 !overflow-visible"
-      >
-        <div class="relative">
+      <SidebarMenuButton size="default" class="p-0">
+        <div class="relative flex shrink-0">
           <Avatar class="h-8 w-8">
             <AvatarImage :src="userStore.avatar" alt="U" />
             <AvatarFallback>
@@ -15,7 +12,7 @@
           <StatusDot
             :status="userStore.user.availability_status"
             size="sm"
-            class="absolute -bottom-[3px] -right-[3px]"
+            class="absolute bottom-0 right-0"
           />
         </div>
         <div class="grid flex-1 text-left text-sm leading-tight">
@@ -107,7 +104,6 @@
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
-
 </template>
 
 <script setup>

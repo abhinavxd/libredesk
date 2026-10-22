@@ -172,7 +172,7 @@
         </FormField>
       </FormGrid>
     </fieldset>
-    <div class="sticky bottom-0 z-10 flex border-t border-border bg-card py-3">
+    <div class="flex border-t border-border pt-4">
       <Button type="submit" :isLoading="formLoading">{{ submitLabel }}</Button>
     </div>
   </form>

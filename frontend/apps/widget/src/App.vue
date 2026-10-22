@@ -214,7 +214,7 @@ const setupParentMessageListeners = () => {
       widgetStore.navigateToHome()
       signalWidgetLoaded()
     } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
-      await proactive.next(event.data.context)
+      await proactive.next(event.data.context, event.data.pageGeneration)
     } else if (event.data.type === 'CAMPAIGN_EVENT') {
       await proactive.event(event.data.event, event.data.id)
     } else if (event.data.type === 'PAGE_VISIT') {

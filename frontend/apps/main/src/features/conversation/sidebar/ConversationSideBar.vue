@@ -252,7 +252,8 @@ const sections = computed(() => [
   {
     id: 'contact_notes',
     label: t('globals.terms.note', 2),
-    visible: !!conversationStore.current?.contact?.id && userStore.can('contact_notes:read')
+    visible: !!conversationStore.current?.contact?.id,
+    permitted: userStore.can('contact_notes:read')
   },
   { id: 'previous_conversations', label: t('globals.terms.conversation', 2) }
 ])
@@ -268,7 +269,7 @@ const normalizedOrder = computed(() => {
 const visibleSections = computed(() =>
   normalizedOrder.value
     .map((id) => sections.value.find((section) => section.id === id))
-    .filter((section) => section.visible !== false)
+    .filter((section) => section.visible !== false && section.permitted !== false)
 )
 const reducedMotion = usePreferredReducedMotion()
 const editingSections = ref(false)
@@ -278,12 +279,12 @@ const editableSections = computed({
   get: () =>
     draftOrder.value
       .map((id) => sections.value.find((section) => section.id === id))
-      .filter((section) => section && section.visible !== false),
+      .filter((section) => section && section.permitted !== false),
   set: (reordered) => {
-    const visibleIds = new Set(editableSections.value.map((section) => section.id))
+    const editableIds = new Set(editableSections.value.map((section) => section.id))
     let index = 0
     draftOrder.value = draftOrder.value.map((id) =>
-      visibleIds.has(id) ? reordered[index++].id : id
+      editableIds.has(id) ? reordered[index++].id : id
     )
   }
 })

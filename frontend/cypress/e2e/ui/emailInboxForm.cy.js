@@ -431,7 +431,7 @@ describe('Email inbox form', () => {
     cy.get('@updateInbox.all').should('have.length', 0)
   })
 
-  it('fits a narrow viewport and keeps the save action visible', () => {
+  it('fits a narrow viewport and keeps the save action reachable', () => {
     cy.viewport(390, 844)
     cy.visit(editPath)
     field('aliases[0].email').should('be.visible')
@@ -446,7 +446,7 @@ describe('Email inbox form', () => {
     cy.get('form').should(($form) => {
       expect($form[0].scrollWidth).to.be.at.most($form[0].clientWidth)
     })
-    cy.get('form button[type="submit"]').should('be.visible')
+    cy.get('form button[type="submit"]').scrollIntoView().should('be.visible')
     cy.screenshot('email-inbox-mobile-connection', { capture: 'viewport' })
   })
 

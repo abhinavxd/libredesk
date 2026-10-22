@@ -1,6 +1,6 @@
 {{ define "header" }}
 <!doctype html>
-<html>
+<html lang="en">
 
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -10,7 +10,7 @@
         body {
             background-color: #f4f4f5;
             font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.6;
             margin: 0;
             color: #09090b;
@@ -20,24 +20,32 @@
 
         .wrap {
             background-color: #ffffff;
-            padding: 40px;
-            max-width: 560px;
-            margin: 0 auto;
+            padding: 28px;
             border-radius: 8px;
             border: 1px solid #e4e4e7;
         }
 
         .header {
-            padding-bottom: 24px;
-            margin-bottom: 28px;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
             border-bottom: 1px solid #e4e4e7;
+            line-height: 1;
+        }
+
+        .content {
+            overflow-wrap: anywhere;
+            word-wrap: break-word;
+        }
+
+        .content > :last-child {
+            margin-bottom: 0;
         }
 
         .footer {
             text-align: center;
             font-size: 12px;
             color: #71717a;
-            padding: 24px 0 8px;
+            padding: 16px 0 0;
         }
 
         .footer a {
@@ -50,33 +58,29 @@
             text-decoration: none;
         }
 
-        .gutter {
-            padding: 30px;
-        }
-
         .button {
             background-color: #18181b;
             color: #fafafa !important;
             display: inline-block;
             border-radius: 6px;
-            padding: 12px 32px;
+            padding: 10px 20px;
             text-align: center;
             text-decoration: none;
             font-weight: 500;
             font-size: 14px;
-            letter-spacing: 0.01em;
+            line-height: 20px;
         }
 
         h1 {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 20px;
+            font-weight: 600;
             color: #09090b;
             margin: 0 0 8px;
             line-height: 1.3;
         }
 
         p {
-            margin: 0 0 16px;
+            margin: 0 0 14px;
             color: #09090b;
         }
 
@@ -90,6 +94,16 @@
             height: auto;
         }
 
+        blockquote {
+            margin-left: 0;
+            margin-right: 0;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
         a {
             color: #0066cc;
             text-decoration: none;
@@ -100,42 +114,51 @@
         }
 
         @media screen and (max-width: 600px) {
-            .wrap {
-                max-width: 100%;
-                border-radius: 0;
-                border-left: none;
-                border-right: none;
-            }
-
-            .gutter {
-                padding: 16px;
+            .email-shell {
+                padding: 16px 12px !important;
             }
 
             .wrap {
-                padding: 28px 20px;
+                padding: 24px 20px !important;
+            }
+
+            .button {
+                padding: 12px 20px !important;
             }
         }
     </style>
 </head>
 
-<body style="background-color: #f4f4f5;">
-    <div class="gutter">&nbsp;</div>
-    <div class="wrap">
-        <div class="header">
-            {{ if ne LogoURL "" }}
-                <img src="{{ LogoURL }}" alt="{{ SiteName }}" style="max-height: 25px; width: auto;">
-            {{ else }}
-                <img src="{{ RootURL }}/images/logo.png" alt="{{ SiteName }}" style="max-height: 25px; width: auto;">
-            {{ end }}
-        </div>
+<body style="margin: 0; background-color: #f4f4f5; font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #09090b;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; background-color: #f4f4f5;">
+        <tr>
+            <td class="email-shell" align="center" style="padding: 32px 16px;">
+                <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 560px; table-layout: fixed;">
+                    <tr>
+                        <td class="wrap" style="padding: 28px; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; text-align: left;">
+                            <div class="header" style="padding-bottom: 16px; margin-bottom: 20px; border-bottom: 1px solid #e4e4e7; line-height: 1;">
+                                {{ if ne LogoURL "" }}
+                                    <img src="{{ LogoURL }}" alt="{{ SiteName }}" height="24" style="display: block; height: 24px; width: auto; max-width: 100%; border: 0;">
+                                {{ else }}
+                                    <img src="{{ RootURL }}/images/logo.png" alt="{{ SiteName }}" height="24" style="display: block; height: 24px; width: auto; max-width: 100%; border: 0;">
+                                {{ end }}
+                            </div>
+                            <div class="content" style="overflow-wrap: anywhere; word-wrap: break-word;">
 {{ end }}
 
 {{ define "footer" }}
-    </div>
-    <div class="footer">
-        <span>Powered by <a href="https://libredesk.io/" target="_blank">libredesk</a></span>
-    </div>
-    <div class="gutter">&nbsp;</div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="footer" align="center" style="padding-top: 16px; text-align: center; font-size: 12px; line-height: 18px; color: #71717a;">
+                            <span>Powered by <a href="https://libredesk.io/" target="_blank" style="color: #71717a; text-decoration: none;">libredesk</a></span>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 
 </html>

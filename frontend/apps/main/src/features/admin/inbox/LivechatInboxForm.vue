@@ -1729,13 +1729,19 @@ const jsApiSnippet = computed(() => {
   return `window.Libredesk.show();
 window.Libredesk.hide();
 window.Libredesk.toggle();
+window.Libredesk.isVisible();
+
+window.Libredesk.setLanguage('en-US');
+window.Libredesk.trackEvent('checkout_started');
 
 window.Libredesk.setUser('SIGNED_JWT_TOKEN');
 window.Libredesk.logout();
 
 window.Libredesk.onShow(function() {});
 window.Libredesk.onHide(function() {});
-window.Libredesk.onUnreadCountChange(function(count) {});`
+window.Libredesk.onUnreadCountChange(function(count) {});
+
+window.Libredesk.destroy();`
 })
 
 function defaultBranding(theme) {

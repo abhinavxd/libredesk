@@ -2,7 +2,7 @@
   <Button
     type="button"
     variant="outline"
-    class="h-full w-full min-w-0 flex-col items-stretch whitespace-normal bg-card p-4 text-left font-normal text-card-foreground"
+    class="h-full w-full min-w-0 flex-col items-stretch justify-start whitespace-normal bg-card p-4 text-left font-normal text-card-foreground"
     @click="handleClick">
     <span class="mb-2 flex items-center">
       <img v-if="typeof icon === 'string'" :src="icon" alt="" class="w-6 h-6 mr-2" />

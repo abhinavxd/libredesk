@@ -351,7 +351,11 @@ describe('Conversation lifecycle', () => {
 
   for (const field of ['CC', 'BCC']) {
     it(`keeps ${field} open and focused while replacing an address`, () => {
+      cy.intercept('GET', '**/api/v1/drafts', (req) => {
+        req.continue((res) => res.setDelay(1000))
+      }).as('loadDrafts')
       openConversation(ccConversationUuid)
+      cy.wait('@loadDrafts')
       cy.get('.tiptap.ProseMirror[contenteditable="true"]').should('be.focused')
       if (field === 'BCC') {
         cy.contains('button', /^BCC$/).click()

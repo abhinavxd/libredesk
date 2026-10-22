@@ -8,7 +8,7 @@
           variant="outline"
           role="combobox"
           :aria-expanded="open"
-          :class="['w-full justify-between px-3', buttonClass]"
+          :class="['w-full justify-between bg-transparent px-3', buttonClass]"
         >
           <span class="flex min-w-0 flex-1 items-center text-left">
             <slot name="selected" :selected="selectedItem">

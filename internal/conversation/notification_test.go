@@ -128,7 +128,7 @@ func TestAutomationNotifyUsesSystemLayout(t *testing.T) {
 			}
 			for _, want := range []string{
 				htmltemplate.HTMLEscapeString(message),
-				"<html>",
+				"<!doctype html>",
 				"</html>",
 				"support.example.com/images/logo.png",
 				"Powered by",

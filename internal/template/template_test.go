@@ -265,7 +265,7 @@ func TestRenderNotificationEmailUsesSystemLayout(t *testing.T) {
 			if strings.Contains(got, "<script>") || !strings.Contains(got, "{{ .Author.FirstName }}") {
 				t.Fatal("message content was interpreted as HTML or template code")
 			}
-			if !strings.Contains(got, "<html>") || !strings.Contains(got, "</html>") || !strings.Contains(got, "support.example.com/images/logo.png") {
+			if !strings.Contains(got, "<!doctype html>") || !strings.Contains(got, "</html>") || !strings.Contains(got, "support.example.com/images/logo.png") {
 				t.Fatal("notification lost the system layout")
 			}
 		})

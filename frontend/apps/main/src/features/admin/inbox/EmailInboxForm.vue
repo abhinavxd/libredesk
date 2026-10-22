@@ -780,7 +780,7 @@
         </AccordionItem>
       </Accordion>
 
-      <div class="sticky bottom-0 z-10 !mt-0 border-t bg-background py-4">
+      <div class="border-t border-border pt-4">
         <Button type="submit" :is-loading="isLoading" :disabled="isLoading">
           {{ submitLabel }}
         </Button>

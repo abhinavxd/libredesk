@@ -713,15 +713,10 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Repeat -->
       <div class="space-y-4">
-        <h4 class="ui-heading">
-          {{ t('globals.terms.repeat') }}
-        </h4>
-
         <div class="grid sm:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="campaign-repeat">{{ t('widget.campaign.repeat') }}</Label>
+            <Label for="campaign-repeat">{{ t('globals.terms.repeat') }}</Label>
             <Select :model-value="campaign.repeat" @update:model-value="update('repeat', $event)">
               <SelectTrigger id="campaign-repeat"><SelectValue /></SelectTrigger>
               <SelectContent>
