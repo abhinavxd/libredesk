@@ -193,6 +193,7 @@ CREATE TABLE users (
     "password" VARCHAR(150) NULL,
     avatar_url TEXT NULL,
 	custom_attributes JSONB DEFAULT '{}'::jsonb NOT NULL,
+	preferences JSONB DEFAULT '{}'::jsonb NOT NULL,
 	external_user_id TEXT NULL,
     reset_password_token TEXT NULL,
     reset_password_token_expiry TIMESTAMPTZ NULL,

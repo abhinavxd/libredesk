@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
@@ -378,6 +379,31 @@ func handleGetCurrentAgent(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 	u, err := app.user.GetAgentCachedOrLoad(auser.ID)
+	if err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	return r.SendEnvelope(u)
+}
+
+// handleUpdateCurrentAgentPreferences updates the preferences of the current agent.
+func handleUpdateCurrentAgentPreferences(r *fastglue.Request) error {
+	var (
+		app         = r.Context.(*App)
+		auser       = r.RequestCtx.UserValue("user").(amodels.User)
+		preferences = map[string]any{}
+	)
+	if err := r.Decode(&preferences, ""); err != nil {
+		app.lo.Error("error decoding preferences", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	data, err := json.Marshal(preferences)
+	if err != nil {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+	}
+	if err := app.user.UpdatePreferences(auser.ID, data); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	u, err := app.user.GetAgent(auser.ID, "")
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
