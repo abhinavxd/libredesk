@@ -52,6 +52,18 @@ describe('needsLightCanvas', () => {
     )
   })
 
+  test('keeps the canvas when the dark background is see-through', () => {
+    expect(needsLightCanvas('<p style="background:rgba(0,0,0,0);color:#000">text</p>')).toBe(true)
+    expect(needsLightCanvas('<p style="background:rgba(0, 0, 0, 50%);color:#000">text</p>')).toBe(
+      true
+    )
+    expect(needsLightCanvas('<p style="background:#0000;color:#000">text</p>')).toBe(true)
+    expect(needsLightCanvas('<p style="background:#00000080;color:#000">text</p>')).toBe(true)
+    expect(needsLightCanvas('<div style="background:rgba(17,17,17,1);color:#eee">dark</div>')).toBe(
+      false
+    )
+  })
+
   test('keeps the canvas when colored text sits outside the dark background', () => {
     expect(
       needsLightCanvas(

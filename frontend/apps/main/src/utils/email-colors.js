@@ -54,30 +54,35 @@ function textColorOf(el) {
   return colorValue(styleValue(el, ['color']) || fontColor || bodyText)
 }
 
-// Parses the first color in a CSS value into [r, g, b], or null if it can't be read.
+// Parses the first color in a CSS value into [r, g, b, alpha], or null if it can't be read.
 function parseColor(value) {
   const hex = value.match(/#([0-9a-f]{3,8})\b/i)
   if (hex) {
     let digits = hex[1]
     if (digits.length === 3 || digits.length === 4) {
       digits = digits
-        .slice(0, 3)
         .split('')
         .map((d) => d + d)
         .join('')
     }
     if (digits.length !== 6 && digits.length !== 8) return null
-    return [0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16))
+    const alpha = digits.length === 8 ? parseInt(digits.slice(6, 8), 16) / 255 : 1
+    return [...[0, 2, 4].map((i) => parseInt(digits.slice(i, i + 2), 16)), alpha]
   }
-  const rgb = value.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i)
-  if (rgb) return rgb.slice(1, 4).map(Number)
+  const rgb = value.match(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+)(%?))?/i)
+  if (rgb) {
+    const alpha = rgb[4] === undefined ? 1 : Number(rgb[4]) / (rgb[5] ? 100 : 1)
+    return [...rgb.slice(1, 4).map(Number), alpha]
+  }
   const named = value.toLowerCase().match(/^[a-z]+/)
-  return named && NAMED_COLORS[named[0]] ? NAMED_COLORS[named[0]] : null
+  return named && NAMED_COLORS[named[0]] ? [...NAMED_COLORS[named[0]], 1] : null
 }
 
+// A background only counts as dark when it is opaque; a see-through one shows the theme behind it.
 function isDark(value) {
-  const rgb = parseColor(value)
-  if (!rgb) return false
+  const color = parseColor(value)
+  if (!color || color[3] < 1) return false
+  const rgb = color.slice(0, 3)
   const [r, g, b] = rgb.map((c) => {
     const s = c / 255
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4

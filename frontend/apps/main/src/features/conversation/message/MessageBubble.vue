@@ -436,6 +436,7 @@ const useLightCanvas = computed(
   () =>
     !isOutgoing.value &&
     convStore.current?.inbox_channel === 'email' &&
+    props.message.content_type !== 'text' &&
     needsLightCanvas(sanitizedContent.value)
 )
 
