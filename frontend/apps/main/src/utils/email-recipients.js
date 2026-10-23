@@ -11,9 +11,11 @@ export function computeRecipientsFromMessage (message, contactEmail, ownedAddres
     const isIncoming = message.type === 'incoming'
 
     // Build TO field
+    // Prefer Reply-To (e.g. the customer behind a web form's no-reply sender).
+    const incomingTo = meta.reply_to?.length ? meta.reply_to : meta.from
     const toList = isIncoming
-        ? meta.from && meta.from.length
-            ? meta.from
+        ? incomingTo && incomingTo.length
+            ? incomingTo
             : contactEmail
                 ? [contactEmail]
                 : []

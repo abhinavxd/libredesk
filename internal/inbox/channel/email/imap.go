@@ -360,7 +360,9 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
-	var fromAddress = strings.ToLower(env.From[0].Addr())
+	// Web forms send from a no-reply address with the customer in Reply-To; the contact is whoever replies reach.
+	sender := e.contactAddress(env)
+	var fromAddress = strings.ToLower(sender.Addr())
 
 	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
 	messageID := env.MessageID
@@ -399,7 +401,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 	e.lo.Debug("processing new incoming message", "message_id", messageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
 
 	// Make contact.
-	firstName, lastName := getContactName(env.From[0])
+	firstName, lastName := getContactName(sender)
 	contact := models.IncomingContact{
 		FirstName: firstName,
 		LastName:  lastName,
@@ -432,13 +434,17 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		}
 	}
 
-	meta, err := json.Marshal(map[string]any{
+	metaMap := map[string]any{
 		"from":    fromAddr,
 		"cc":      ccAddr,
 		"bcc":     bccAddr,
 		"to":      toAddr,
 		"subject": env.Subject,
-	})
+	}
+	if !strings.EqualFold(sender.Addr(), env.From[0].Addr()) {
+		metaMap["reply_to"] = []string{fromAddress}
+	}
+	meta, err := json.Marshal(metaMap)
 	if err != nil {
 		e.lo.Error("error marshalling meta", "error", err)
 		return fmt.Errorf("marshalling meta: %w", err)
@@ -612,6 +618,16 @@ func partToAttachment(part *enmime.Part, disposition string) attachment.Attachme
 		Size:        len(part.Content),
 		Disposition: disposition,
 	}
+}
+
+// contactAddress returns the first Reply-To address that isn't one of this inbox's own addresses, else From.
+func (e *Email) contactAddress(env *imap.Envelope) imap.Address {
+	for _, rt := range env.ReplyTo {
+		if rt.Addr() != "" && !e.ReceivesAddress(rt.Addr()) {
+			return rt
+		}
+	}
+	return env.From[0]
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.
