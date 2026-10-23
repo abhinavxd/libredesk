@@ -115,6 +115,17 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField }" name="response_interval">
+        <FormItem>
+          <FormLabel>{{ t('admin.ai.assistant.responseInterval') }}</FormLabel>
+          <FormControl>
+            <Input type="number" min="0" max="300" step="1" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ t('admin.ai.assistant.responseIntervalHint') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="languages">
@@ -329,6 +340,11 @@ const form = useForm({
         .int()
         .min(1, { message: t('admin.ai.assistant.maxTurnsHint') })
         .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
+      response_interval: z.coerce
+        .number()
+        .int()
+        .min(0, { message: t('admin.ai.assistant.responseIntervalHint') })
+        .max(300, { message: t('admin.ai.assistant.responseIntervalHint') }),
       fallback_team_id: z.string().optional(),
       handoff_enabled: z.boolean().optional(),
       citations_enabled: z.boolean().optional(),
@@ -345,6 +361,7 @@ const form = useForm({
     tone: 'friendly',
     response_length: 'balanced',
     max_turns: 6,
+    response_interval: 0,
     fallback_team_id: 'none',
     handoff_enabled: true,
     citations_enabled: true,
@@ -374,6 +391,7 @@ watch(
         tone: values.tone || 'friendly',
         response_length: values.response_length || 'balanced',
         max_turns: values.max_turns ?? 6,
+        response_interval: values.response_interval ?? 0,
         fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
         handoff_enabled: values.handoff_enabled ?? true,
         citations_enabled: values.citations_enabled ?? !props.isEditing,
@@ -416,6 +434,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       tone: values.tone || 'friendly',
       response_length: values.response_length || 'balanced',
       max_turns: Number(values.max_turns),
+      response_interval: values.response_interval,
       fallback_team_id:
         values.fallback_team_id && values.fallback_team_id !== 'none'
           ? Number(values.fallback_team_id)

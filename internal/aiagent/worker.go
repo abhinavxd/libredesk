@@ -84,6 +84,17 @@ func (m *Manager) Close() {
 		return
 	}
 	m.closed = true
+	m.mu.Lock()
+	for convID, timer := range m.delayed {
+		timer.Stop()
+		delete(m.delayed, convID)
+		m.wg.Add(1)
+		go func() {
+			defer m.wg.Done()
+			m.handoffByConvID(convID, m.i18n.T("ai.agent.handoffError"))
+		}()
+	}
+	m.mu.Unlock()
 	close(m.queue)
 	close(m.miningQueue)
 	m.closedMu.Unlock()
@@ -96,7 +107,12 @@ func (m *Manager) worker(ctx context.Context) {
 		if ctx.Err() != nil {
 			m.handoffByConvID(convID, m.i18n.T("ai.agent.handoffError"))
 		} else {
-			m.handleWithRecover(ctx, convID)
+			m.mu.Lock()
+			waiting := m.delayed[convID] != nil
+			m.mu.Unlock()
+			if !waiting {
+				m.handleWithRecover(ctx, convID)
+			}
 		}
 		m.markDone(convID)
 	}
@@ -121,7 +137,51 @@ func (m *Manager) HandleConversationEvent(conversationID, assigneeUserID int) {
 	if !m.isAssistantUser(assigneeUserID) {
 		return
 	}
-	m.enqueue(conversationID)
+	var assistant models.Assistant
+	if err := m.q.GetAssistantByUserID.Get(&assistant, assigneeUserID); err != nil {
+		if err != sql.ErrNoRows {
+			m.lo.Error("error fetching assistant response interval", "user_id", assigneeUserID, "error", err)
+		}
+		return
+	}
+	m.scheduleResponse(conversationID, time.Duration(assistant.ResponseInterval)*time.Second)
+}
+
+func (m *Manager) scheduleResponse(convID int, interval time.Duration) {
+	m.closedMu.RLock()
+	if m.closed {
+		m.closedMu.RUnlock()
+		return
+	}
+	m.mu.Lock()
+	if timer := m.delayed[convID]; timer != nil {
+		timer.Stop()
+		delete(m.delayed, convID)
+	}
+	if interval > 0 {
+		var timer *time.Timer
+		timer = time.AfterFunc(interval, func() {
+			m.closedMu.RLock()
+			defer m.closedMu.RUnlock()
+			if m.closed {
+				return
+			}
+			m.mu.Lock()
+			if m.delayed[convID] != timer {
+				m.mu.Unlock()
+				return
+			}
+			delete(m.delayed, convID)
+			m.mu.Unlock()
+			m.enqueueLocked(convID)
+		})
+		m.delayed[convID] = timer
+	}
+	m.mu.Unlock()
+	m.closedMu.RUnlock()
+	if interval <= 0 {
+		m.enqueue(convID)
+	}
 }
 
 func (m *Manager) enqueue(convID int) {
@@ -130,6 +190,10 @@ func (m *Manager) enqueue(convID int) {
 	if m.closed {
 		return
 	}
+	m.enqueueLocked(convID)
+}
+
+func (m *Manager) enqueueLocked(convID int) {
 	m.mu.Lock()
 	if m.inflight[convID] {
 		// A response is already running; remember to run again so a message that arrives mid-response
@@ -190,7 +254,7 @@ func (m *Manager) markDone(convID int) {
 	requeue := m.pending[convID]
 	delete(m.pending, convID)
 	delete(m.inflight, convID)
-	if !requeue {
+	if !requeue && m.delayed[convID] == nil {
 		delete(m.lastSeen, convID)
 	}
 	m.mu.Unlock()
