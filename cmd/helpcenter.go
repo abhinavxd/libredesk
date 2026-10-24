@@ -101,7 +101,6 @@ var (
 		"/api/",
 		"/assets/",
 		"/login",
-		"/logout",
 		"/reset-password",
 		"/set-password",
 		"/csat/",

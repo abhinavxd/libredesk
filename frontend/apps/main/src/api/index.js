@@ -156,6 +156,7 @@ const login = (data) => http.post(`/api/v1/auth/login`, data, {
     'Content-Type': 'application/json'
   }
 })
+const logout = () => http.post(`/api/v1/auth/logout`)
 const getAutomationRules = (type) =>
   http.get(`/api/v1/automations/rules`, {
     params: { type: type }
@@ -663,6 +664,7 @@ const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaig
 export default {
  getCampaignStats,
   login,
+  logout,
   deleteUser,
   importAgents,
   getAgentImportStatus,

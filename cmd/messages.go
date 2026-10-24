@@ -267,7 +267,7 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Send private note.
 	if req.Private {
-		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, req.Message, req.Mentions)
+		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, app.conversation.RenderStaffTemplate(cuuid, user.ID, req.Message), req.Mentions)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -280,13 +280,16 @@ func handleSendMessage(r *fastglue.Request) error {
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
 	}
+	content := req.Message
 	if req.WhatsAppTemplateID > 0 {
 		meta["whatsapp_template_id"] = req.WhatsAppTemplateID
+	} else {
+		content = app.conversation.RenderStaffTemplate(cuuid, user.ID, content)
 	}
 	if len(req.WhatsAppTemplateParams) > 0 {
 		meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
 	}
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, req.SendFrom, meta)
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, content, req.To, req.CC, req.BCC, req.SendFrom, meta)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

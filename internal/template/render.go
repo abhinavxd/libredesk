@@ -56,7 +56,7 @@ func (m *Manager) RenderStoredTemplate(name string, data any) (string, error) {
 	return m.RenderString(data, tmpl.Body), nil
 }
 
-// RenderEmailWithTemplate renders content inside the default outgoing email template.
+// RenderEmailWithTemplate places content verbatim inside the default outgoing email template.
 func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
@@ -75,15 +75,17 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 		return "", fmt.Errorf("parsing base template: %w", err)
 	}
 
+	// The reply is already rendered and can hold contact-supplied text, so it is inserted as a value and never parsed as a template.
 	contentCount := 0
-	trackContent := template.FuncMap{
+	contentFuncs := template.FuncMap{
 		"_libredeskTrackContent": func() string {
 			contentCount++
 			return ""
 		},
+		"_libredeskReplyContent": func() string { return content },
 	}
-	baseTemplate.Funcs(trackContent)
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Funcs(trackContent).Parse(`{{_libredeskTrackContent}}` + content)
+	baseTemplate.Funcs(contentFuncs)
+	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Funcs(contentFuncs).Parse(`{{_libredeskTrackContent}}{{_libredeskReplyContent}}`)
 	if err != nil {
 		return "", fmt.Errorf("parsing content template: %w", err)
 	}

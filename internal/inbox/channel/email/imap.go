@@ -451,7 +451,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		"cc":      ccAddr,
 		"bcc":     bccAddr,
 		"to":      toAddr,
-		"subject": env.Subject,
+		"subject": stringutil.SanitizeUTF8(env.Subject),
 	})
 	if err != nil {
 		e.lo.Error("error marshalling meta", "error", err)

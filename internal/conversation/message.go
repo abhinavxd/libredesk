@@ -343,14 +343,9 @@ func (m *Manager) emailTemplateContent(message *models.Message, data map[string]
 	}
 	data["IsContinuityEmail"] = isContinuity
 	if isContinuity {
-		data["ContinuityContent"] = content
-		return "{{ .ContinuityContent }}"
+		return content
 	}
-	if references := m.emailArticleReferences(message); references != "" {
-		data["ArticleReferences"] = references
-		return content + "{{ .ArticleReferences }}"
-	}
-	return content
+	return content + m.emailArticleReferences(message)
 }
 
 // previousMessagesData returns the conversation's earlier messages exchanged with the contact, newest first, with incoming reply chains removed.
@@ -588,13 +583,17 @@ func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
 	return n > 0, err
 }
 
+// RenderStaffTemplate fills template variables in text written by staff. Returns content unchanged on any error.
+func (m *Manager) RenderStaffTemplate(conversationUUID string, senderID int, content string) string {
+	data, err := m.BuildTemplateData(conversationUUID, senderID)
+	if err != nil {
+		return content
+	}
+	return m.template.RenderString(data, content)
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
-	// Best-effort render template variables before saving.
-	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
-	}
-
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
@@ -668,11 +667,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
-	if !isWhatsAppTemplate {
-		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-			content = m.template.RenderString(data, content)
-		}
-	}
 
 	var (
 		sourceID    string
@@ -1061,6 +1055,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
 	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
 		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
 			if err := m.DeleteConversation(conversationUUID); err != nil {
@@ -1073,6 +1068,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 	// Insert message. On failure, delete the conversation if it was just created for this message.
 	if err = m.InsertMessage(&msg); err != nil {
 		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
+		// The source keeps redelivering a message that never got saved, so its files must not stay behind.
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
 				return models.Message{}, fmt.Errorf("deleting conversation after message insert failure: %w", delErr)
@@ -1586,6 +1583,20 @@ func (m *Manager) getOutgoingProcessingConversationIDs() []int {
 		return true
 	})
 	return out
+}
+
+// deleteUploadedMedia removes attachment files and their thumbnails uploaded for a message that was not saved.
+func (m *Manager) deleteUploadedMedia(media []mmodels.Media) {
+	for _, md := range media {
+		if err := m.mediaStore.Delete(md.UUID); err != nil {
+			m.lo.Error("error deleting media of unsaved message", "media_uuid", md.UUID, "error", err)
+		}
+		if strings.HasPrefix(md.ContentType, "image/") {
+			if err := m.mediaStore.Delete(image.ThumbPrefix + md.UUID); err != nil {
+				m.lo.Error("error deleting thumbnail of unsaved message", "media_uuid", md.UUID, "error", err)
+			}
+		}
+	}
 }
 
 // uploadThumbnailForMedia prepares and uploads a thumbnail for an image attachment.

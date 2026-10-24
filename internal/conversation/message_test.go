@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -790,7 +789,7 @@ func TestInlineArticleReferences(t *testing.T) {
 	if strings.Contains(mailContent, "ld-cite:") || strings.Contains(mailContent, "<sup>") {
 		t.Fatalf("email retained widget markers: %s", mailContent)
 	}
-	if !strings.Contains(data["ArticleReferences"].(string), ">(1)</a>") {
+	if !strings.Contains(mailContent, ">(1)</a>") {
 		t.Fatal("email lost its numbered references")
 	}
 }
@@ -836,16 +835,7 @@ func TestContinuityEmailArticleReferences(t *testing.T) {
 	}
 	message := models.Message{Content: rendered, Meta: json.RawMessage(`{"continuity_email":true}`)}
 	data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
-	content := m.emailTemplateContent(&message, data)
-	tmpl, err := template.New("content").Parse(content)
-	if err != nil {
-		t.Fatalf("parsing offline email: %v", err)
-	}
-	var output strings.Builder
-	if err := tmpl.Execute(&output, data); err != nil {
-		t.Fatalf("rendering offline email: %v", err)
-	}
-	if output.String() != rendered || data["IsContinuityEmail"] != true {
+	if m.emailTemplateContent(&message, data) != rendered || data["IsContinuityEmail"] != true {
 		t.Fatal("offline email changed literal message content or lost its template flag")
 	}
 	if strings.Index(rendered, wantURL) > strings.Index(rendered, "Human answer.") {
@@ -886,19 +876,11 @@ func TestEmailTemplateArticleReferences(t *testing.T) {
 			}
 			data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
 			content := m.emailTemplateContent(&message, data)
-			tmpl, err := template.New("content").Parse(content)
-			if err != nil {
-				t.Fatalf("parsing email: %v", err)
+			want := `<p>Hello {{ .Author.FirstName }}.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
+			if content != want || data["IsContinuityEmail"] != false {
+				t.Fatalf("unexpected email content: %s", content)
 			}
-			var output strings.Builder
-			if err := tmpl.Execute(&output, data); err != nil {
-				t.Fatalf("rendering email: %v", err)
-			}
-			want := `<p>Hello Agent.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
-			if output.String() != want || data["IsContinuityEmail"] != false {
-				t.Fatalf("unexpected email content: %s", output.String())
-			}
-			plain := stringutil.HTML2TextMarkdownLinks(output.String())
+			plain := stringutil.HTML2TextMarkdownLinks(content)
 			for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery"} {
 				if !strings.Contains(plain, part) {
 					t.Errorf("plain text email is missing %q: %s", part, plain)

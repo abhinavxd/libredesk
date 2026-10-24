@@ -114,7 +114,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	cfg.SessionLifetime = lifetime
 
 	sess := simplesessions.New(simplesessions.Options{
-		EnableAutoCreate: true,
+		EnableAutoCreate: false,
 		SessionIDLength:  64,
 		Cookie: simplesessions.CookieOptions{
 			Name:       "libredesk_session",
@@ -312,14 +312,14 @@ func (a *Auth) SaveSession(user amodels.User, r *fastglue.Request) error {
 	return nil
 }
 
-// SetSessionValues sets passed values in the session.
-func (a *Auth) SetSessionValues(r *fastglue.Request, values map[string]interface{}) error {
+// CreateSessionWithValues starts a new session holding the passed values.
+func (a *Auth) CreateSessionWithValues(r *fastglue.Request, values map[string]interface{}) error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	sess, err := a.sess.Acquire(r.RequestCtx, r, r)
+	sess, err := a.sess.NewSession(r, r)
 	if err != nil {
-		a.logger.Error("error acquiring session", "error", err)
+		a.logger.Error("error creating session", "error", err)
 		return err
 	}
 
@@ -419,6 +419,9 @@ func (a *Auth) DestroySession(r *fastglue.Request) error {
 	defer a.mu.RUnlock()
 
 	sess, err := a.sess.Acquire(r.RequestCtx, r, r)
+	if err == simplesessions.ErrInvalidSession {
+		return nil
+	}
 	if err != nil {
 		a.logger.Error("error acquiring session", "error", err)
 		return err
