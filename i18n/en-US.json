@@ -418,6 +418,7 @@
   "admin.inbox.maxConnections.description": "Maximum number of concurrent connections to the server.",
   "admin.inbox.maxRetries": "Max Retries",
   "admin.inbox.maxRetries.description": "Number of times to retry when a message fails.",
+  "admin.inbox.oauth.appOnly.tenantRequired": "App-only authentication needs your directory (tenant) ID or verified domain, not common, organizations, or consumers.",
   "admin.inbox.oauth.chooseSetupMethod": "Choose setup method",
   "admin.inbox.oauth.clientIDSecretRequired": "Please provide both client ID and client secret",
   "admin.inbox.oauth.connectAccount": "Connect {provider} account",
