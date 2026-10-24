@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -290,4 +291,45 @@ func (b *syncBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.String()
+}
+
+func TestQueueSentAppendCapsConcurrency(t *testing.T) {
+	e := &Email{}
+	release := make(chan struct{})
+	var running, peak, done atomic.Int32
+	const total = 5
+	for i := 0; i < total; i++ {
+		e.queueSentAppend(func() {
+			n := running.Add(1)
+			for {
+				p := peak.Load()
+				if n <= p || peak.CompareAndSwap(p, n) {
+					break
+				}
+			}
+			<-release
+			running.Add(-1)
+			done.Add(1)
+		})
+	}
+	// Give the goroutines time to start; only maxConcurrentSentAppends may get past the slot.
+	deadline := time.Now().Add(2 * time.Second)
+	for running.Load() < maxConcurrentSentAppends && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if got := running.Load(); got != maxConcurrentSentAppends {
+		t.Fatalf("running appends = %d, want %d", got, maxConcurrentSentAppends)
+	}
+	close(release)
+	deadline = time.Now().Add(2 * time.Second)
+	for done.Load() < total && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if done.Load() != total {
+		t.Fatalf("finished appends = %d, want %d", done.Load(), total)
+	}
+	if peak.Load() > maxConcurrentSentAppends {
+		t.Fatalf("peak concurrent appends = %d, want at most %d", peak.Load(), maxConcurrentSentAppends)
+	}
 }

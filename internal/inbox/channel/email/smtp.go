@@ -274,7 +274,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		return err
 	}
 	if appendSent {
-		go e.appendSent(appendCfg, email, sentAt)
+		e.queueSentAppend(func() { e.appendSent(appendCfg, email, sentAt) })
 	}
 	return nil
 }

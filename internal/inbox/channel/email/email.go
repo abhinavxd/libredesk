@@ -52,6 +52,8 @@ type Email struct {
 	aliasVerificationCallback func(context.Context, string, string) error
 	aliasExpiryCallback       func(context.Context, time.Time) error
 	authStatusCallback        AuthStatusCallback
+	sentAppendSlots           chan struct{}
+	sentAppendSlotsOnce       sync.Once
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.

@@ -104,3 +104,18 @@ func cloneHeader(h textproto.MIMEHeader) textproto.MIMEHeader {
 	}
 	return c
 }
+
+// maxConcurrentSentAppends caps the IMAP sessions one inbox opens to store sent copies, so a burst
+// of sends doesn't run into the server's connection limit.
+const maxConcurrentSentAppends = 2
+
+// queueSentAppend runs fn in the background, at most maxConcurrentSentAppends at a time per inbox.
+func (e *Email) queueSentAppend(fn func()) {
+	e.sentAppendSlotsOnce.Do(func() { e.sentAppendSlots = make(chan struct{}, maxConcurrentSentAppends) })
+	slots := e.sentAppendSlots
+	go func() {
+		slots <- struct{}{}
+		defer func() { <-slots }()
+		fn()
+	}()
+}
