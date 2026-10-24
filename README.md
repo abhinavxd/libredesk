@@ -63,6 +63,14 @@ The fastest way to get a libredesk instance running. Railway provisions the app,
 
 __________________
 
+### RepoCloud (1-click deploy)
+
+Deploy a fully managed LibreDesk instance on RepoCloud in one click.
+
+<a href="https://repocloud.io/details/LibreDesk/"><img src="https://d16t0pc4846x52.cloudfront.net/deploylobe.svg" alt="Deploy on RepoCloud" height="40"></a>
+
+__________________
+
 ### Docker
 
 The latest image is available on DockerHub at [`libredesk/libredesk:latest`](https://hub.docker.com/r/libredesk/libredesk/tags?page=1&ordering=last_updated&name=latest)
