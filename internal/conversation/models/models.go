@@ -563,6 +563,8 @@ type IncomingMessage struct {
 	ContentType string
 	Meta        json.RawMessage
 	Attachments attachment.Attachments
+	// ReceivedAt is when the channel received the message. Zero means "now" (DB default).
+	ReceivedAt time.Time
 
 	// Email threading
 	ConversationUUIDFromReplyTo string // UUID extracted from plus-addressed recipient (inbox+conv-{uuid}@domain)
@@ -587,6 +589,7 @@ func (in *IncomingMessage) ToMessage(senderID, conversationID int, conversationU
 		SenderID:         senderID,
 		ConversationID:   conversationID,
 		ConversationUUID: conversationUUID,
+		CreatedAt:        in.ReceivedAt,
 	}
 }
 

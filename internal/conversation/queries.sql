@@ -1064,11 +1064,11 @@ inserted_msg AS (
    INSERT INTO conversation_messages (
        "type", status, conversation_id, "content",
        text_content, sender_id, sender_type, private,
-       content_type, source_id, meta
+       content_type, source_id, meta, created_at
    )
    VALUES (
        $1, $2, (SELECT id FROM conversation_id),
-       $5, $6, $7, $8, $9, $10, $11, $12
+       $5, $6, $7, $8, $9, $10, $11, $12, COALESCE($13, NOW())
    )
    RETURNING *
 )
