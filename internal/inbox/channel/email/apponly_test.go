@@ -86,7 +86,7 @@ func newAppOnlyEmail(t *testing.T, smtpCfg []imodels.SMTPConfig, status *authSta
 			},
 			SMTP: smtpCfg,
 		},
-		TokenRefreshCallback: func(int, imodels.Config) error {
+		TokenRefreshCallback: func(int, *imodels.OAuthConfig, imodels.Config) error {
 			t.Error("app-only tokens must not be persisted")
 			return nil
 		},
