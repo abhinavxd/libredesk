@@ -242,6 +242,17 @@ func TestValidateEmailConfig(t *testing.T) {
 		{"smtp negative port", `{"smtp":[{"host":"smtp.example.com","port":-1}]}`, true},
 		{"smtp unknown auth protocol", `{"smtp":[{"host":"smtp.example.com","port":587,"auth_protocol":"ntlm"}]}`, true},
 		{"smtp auth protocol ignored for oauth2", `{"auth_type":"oauth2","oauth":{"provider":"google","client_id":"abc"},"smtp":[{"host":"smtp.example.com","port":587,"auth_protocol":"ntlm"}]}`, false},
+		{"app-only valid", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, false},
+		{"app-only google provider", `{"auth_type":"oauth2_app","oauth":{"provider":"google","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only empty tenant", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only common tenant", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"common","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only organizations tenant", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"Organizations","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only empty secret on create", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":""},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only empty client id", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only empty imap username", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":""}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"app-only empty smtp username", `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"","auth_protocol":"ntlm"}]}`, true},
+		{"app-only missing oauth", `{"auth_type":"oauth2_app","imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
+		{"unknown auth type oauth3", `{"auth_type":"oauth3","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc","client_secret":"s"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com","auth_protocol":"ntlm"}]}`, true},
 		{"smtp second entry invalid", `{"smtp":[{"host":"smtp.example.com","port":587},{"host":"","port":587}]}`, true},
 
 		{"imap empty host", `{"imap":[{"port":993,"mailbox":"INBOX","tls_type":"tls"}]}`, true},
@@ -255,7 +266,7 @@ func TestValidateEmailConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			assertValidation(t, validateEmailConfig(app, json.RawMessage(tc.config)), tc.wantErr)
+			assertValidation(t, validateEmailConfig(app, json.RawMessage(tc.config), false), tc.wantErr)
 		})
 	}
 }
@@ -263,19 +274,29 @@ func TestValidateEmailConfig(t *testing.T) {
 func TestValidateEmailConfigAuthTypeConstants(t *testing.T) {
 	app := newValidatorTestApp(t)
 
-	for _, authType := range []string{imodels.AuthTypePassword, imodels.AuthTypeOAuth2} {
+	for _, authType := range []string{imodels.AuthTypePassword, imodels.AuthTypeOAuth2, imodels.AuthTypeOAuth2App} {
 		cfg := imodels.Config{AuthType: authType}
-		if authType == imodels.AuthTypeOAuth2 {
+		switch authType {
+		case imodels.AuthTypeOAuth2:
 			cfg.OAuth = &imodels.OAuthConfig{Provider: "google", ClientID: "abc"}
+		case imodels.AuthTypeOAuth2App:
+			cfg.OAuth = &imodels.OAuthConfig{Provider: "microsoft", ClientID: "abc", TenantID: "contoso.onmicrosoft.com", ClientSecret: "s"}
 		}
 		b, err := json.Marshal(cfg)
 		if err != nil {
 			t.Fatalf("marshalling config: %v", err)
 		}
-		if err := validateEmailConfig(app, b); err != nil {
+		if err := validateEmailConfig(app, b, false); err != nil {
 			t.Fatalf("auth type %q: unexpected error: %v", authType, err)
 		}
 	}
+}
+
+func TestValidateEmailConfigAppOnlySecretOptionalOnUpdate(t *testing.T) {
+	app := newValidatorTestApp(t)
+	cfg := `{"auth_type":"oauth2_app","oauth":{"provider":"microsoft","tenant_id":"contoso.onmicrosoft.com","client_id":"abc"},"imap":[{"host":"outlook.office365.com","port":993,"mailbox":"INBOX","tls_type":"tls","username":"shared@contoso.com"}],"smtp":[{"host":"smtp.office365.com","port":587,"username":"shared@contoso.com"}]}`
+	assertValidation(t, validateEmailConfig(app, json.RawMessage(cfg), true), false)
+	assertValidation(t, validateEmailConfig(app, json.RawMessage(cfg), false), true)
 }
 
 func TestValidateHelpCenter(t *testing.T) {
