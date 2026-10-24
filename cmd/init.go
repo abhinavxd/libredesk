@@ -699,16 +699,20 @@ func initNotifier() *notifier.Service {
 	return notifier.NewService(notifierProviders, ko.MustInt("notification.concurrency"), ko.MustInt("notification.queue_size"), initLogger("notifier"))
 }
 
+// unmarshalInboxConfig decodes an inbox's JSON config. Each inbox gets its own koanf instance: merging into the
+// global one let keys missing from one inbox inherit another inbox's values, and leaked inbox keys into app config.
+func unmarshalInboxConfig(raw json.RawMessage, out any) error {
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider([]byte(raw)), kjson.Parser()); err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	return k.UnmarshalWithConf("", out, koanf.UnmarshalConf{Tag: "json"})
+}
+
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
 func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager, authStatusHook email.AuthStatusCallback) (inbox.Inbox, error) {
 	var config imodels.Config
-
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
-		return nil, fmt.Errorf("loading config: %w", err)
-	}
-
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := unmarshalInboxConfig(inboxRecord.Config, &config); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
@@ -775,13 +779,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 // initLiveChatInbox initializes the live chat inbox.
 func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String)) (inbox.Inbox, error) {
 	var config livechat.Config
-
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
-		return nil, fmt.Errorf("loading config: %w", err)
-	}
-
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := unmarshalInboxConfig(inboxRecord.Config, &config); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
