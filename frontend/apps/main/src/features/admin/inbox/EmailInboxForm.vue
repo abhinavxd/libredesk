@@ -14,7 +14,7 @@
           {{ $t('admin.inbox.oauth.selectConnectionMethod') }}
         </p>
       </div>
-      <div class="grid gap-3 sm:grid-cols-3">
+      <div class="grid gap-3 sm:grid-cols-2">
         <Button
           v-for="provider in setupProviders"
           :key="provider.value"
@@ -59,6 +59,18 @@
           <RefreshCw class="size-4" aria-hidden="true" />
           {{ $t('globals.terms.reconnect') }}
         </Button>
+      </div>
+
+      <div
+        v-show="isAppOnlyInbox && !isNewForm"
+        class="flex flex-wrap items-start gap-3 rounded-md border p-4"
+        data-testid="app-only-status"
+      >
+        <CheckCircle2 class="size-5 shrink-0 text-success" aria-hidden="true" />
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold text-foreground">{{ $t('admin.inbox.oauth.microsoftAppOnly') }}</p>
+          <p class="break-all ui-description">{{ oauthEmail }}</p>
+        </div>
       </div>
 
       <section class="space-y-4">
@@ -107,6 +119,71 @@
             />
           </FormItem>
         </FormField>
+      </section>
+
+      <section
+        v-if="isAppOnlyInbox"
+        class="space-y-4 border-t pt-6"
+        data-section="app-only"
+        aria-labelledby="inbox-app-only-heading"
+      >
+        <div class="space-y-1.5">
+          <h3 id="inbox-app-only-heading" class="ui-heading">
+            {{ $t('admin.inbox.oauth.appOnly.heading') }}
+          </h3>
+          <p class="ui-description">{{ $t('admin.inbox.oauth.appOnly.description') }}</p>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <FormField v-slot="{ componentField, handleChange, meta }" name="oauth.tenant_id">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.tenantID') }}</FormLabel>
+              <FormControl>
+                <Input
+                  type="text"
+                  placeholder="contoso.onmicrosoft.com"
+                  :name="componentField.name"
+                  :model-value="componentField.modelValue"
+                  @update:model-value="(v) => handleChange(v, meta.validated)"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+          <FormField v-slot="{ componentField, handleChange, meta }" name="oauth.client_id">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.clientID') }}</FormLabel>
+              <FormControl>
+                <Input
+                  type="text"
+                  :placeholder="t('admin.inbox.oauth.enterClientID')"
+                  :name="componentField.name"
+                  :model-value="componentField.modelValue"
+                  @update:model-value="(v) => handleChange(v, meta.validated)"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+          <FormField v-slot="{ componentField, handleChange, meta }" name="oauth.client_secret">
+            <FormItem>
+              <FormLabel>{{ $t('globals.terms.clientSecret') }}</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  autocomplete="new-password"
+                  :placeholder="t('admin.inbox.oauth.enterClientSecret')"
+                  :name="componentField.name"
+                  :model-value="componentField.modelValue"
+                  @update:model-value="(v) => handleChange(v, meta.validated)"
+                />
+              </FormControl>
+              <FormDescription v-if="!isNewForm">
+                {{ $t('admin.inbox.oauth.appOnly.keepSecret') }}
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </div>
       </section>
 
       <section
@@ -288,7 +365,7 @@
                 </FormItem>
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.password">
-                <FormItem>
+                <FormItem v-show="!isAppOnlyInbox">
                   <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
                   <FormControl>
                     <Input
@@ -477,7 +554,7 @@
                 </FormItem>
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.password">
-                <FormItem>
+                <FormItem v-show="!isAppOnlyInbox">
                   <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
                   <FormControl>
                     <Input
@@ -594,7 +671,11 @@
                       v-slot="{ componentField, handleChange, meta }"
                       name="smtp.auth_protocol"
                     >
-                      <FormItem v-show="!isOAuthInbox || form.errors.value['smtp.auth_protocol']">
+                      <FormItem
+                        v-show="
+                          (!isOAuthInbox && !isAppOnlyInbox) || form.errors.value['smtp.auth_protocol']
+                        "
+                      >
                         <FormLabel>{{ $t('admin.inbox.authProtocol') }}</FormLabel>
                         <FormControl>
                           <Select
@@ -955,9 +1036,11 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import {
   AUTH_TYPE_PASSWORD,
   AUTH_TYPE_OAUTH2,
+  AUTH_TYPE_OAUTH2_APP,
   PROVIDER_GOOGLE,
   PROVIDER_MICROSOFT
 } from '@/constants/auth.js'
+import { extractEmailAddress } from '@/utils/email-sender'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useAppSettingsStore } from '@/stores/appSettings'
 
@@ -993,6 +1076,7 @@ const IMAP_ADVANCED_FIELDS = [
   'imap.scan_inbox_since',
   'imap.tls_skip_verify'
 ]
+const SETUP_MICROSOFT_APP_ONLY = 'microsoft_app_only'
 const SMTP_ADVANCED_FIELDS = [
   'smtp.max_conns',
   'smtp.max_msg_retries',
@@ -1042,6 +1126,7 @@ const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
 
 const isOAuthInbox = ref(false)
+const isAppOnlyInbox = ref(false)
 const formEl = ref(null)
 const openSections = ref(props.isNewForm ? ['imap', 'smtp'] : [])
 
@@ -1065,6 +1150,7 @@ const callbackUrl = computed(() => {
 const showFormFields = computed(
   () =>
     isOAuthInbox.value ||
+    isAppOnlyInbox.value ||
     setupMethod.value === 'manual' ||
     (props.initialValues?.imap && Object.keys(props.initialValues?.imap).length > 0)
 )
@@ -1201,6 +1287,12 @@ const setupProviders = [
     icon: '/images/microsoft-logo.svg'
   },
   {
+    value: SETUP_MICROSOFT_APP_ONLY,
+    label: 'admin.inbox.oauth.microsoftAppOnly',
+    description: 'admin.inbox.oauth.microsoftAppOnlyDescription',
+    icon: '/images/microsoft-logo.svg'
+  },
+  {
     value: 'manual',
     label: 'admin.inbox.oauth.otherProvider',
     description: 'admin.inbox.oauth.otherProviderDescription'
@@ -1210,6 +1302,20 @@ const setupProviders = [
 const selectSetupMethod = (method) => {
   if (method === 'manual') {
     setupMethod.value = method
+    return
+  }
+  if (method === SETUP_MICROSOFT_APP_ONLY) {
+    setupMethod.value = method
+    isAppOnlyInbox.value = true
+    form.setValues(
+      {
+        auth_type: AUTH_TYPE_OAUTH2_APP,
+        oauth: { provider: PROVIDER_MICROSOFT, tenant_id: '', client_id: '', client_secret: '' },
+        imap: { ...form.values.imap, host: 'outlook.office365.com', port: 993, tls_type: 'tls' },
+        smtp: { ...form.values.smtp, host: 'smtp.office365.com', port: 587, tls_type: 'starttls' }
+      },
+      false
+    )
     return
   }
   flowType.value = 'new_inbox'
@@ -1278,17 +1384,34 @@ const copyToClipboard = async (text) => {
   }
 }
 
+// App-only inboxes sign in as the shared mailbox, so the IMAP and SMTP usernames follow the from address
+// until an admin changes them.
+watch(
+  () => form.values.from,
+  (from, previousFrom) => {
+    if (!isAppOnlyInbox.value) return
+    const address = extractEmailAddress(from || '')
+    const previousAddress = extractEmailAddress(previousFrom || '')
+    for (const field of ['imap.username', 'smtp.username']) {
+      const current = field === 'imap.username' ? form.values.imap?.username : form.values.smtp?.username
+      if (!current || current === previousAddress) form.setFieldValue(field, address, false)
+    }
+  }
+)
+
 watch(
   () => props.initialValues,
   (newValues) => {
     if (Object.keys(newValues).length === 0) {
       return
     }
-    if (newValues.config?.auth_type === AUTH_TYPE_OAUTH2) {
-      isOAuthInbox.value = true
+    isOAuthInbox.value = newValues.config?.auth_type === AUTH_TYPE_OAUTH2
+    isAppOnlyInbox.value = newValues.config?.auth_type === AUTH_TYPE_OAUTH2_APP
+    if (isOAuthInbox.value) {
       setupMethod.value = 'oauth'
+    } else if (isAppOnlyInbox.value) {
+      setupMethod.value = SETUP_MICROSOFT_APP_ONLY
     } else {
-      isOAuthInbox.value = false
       setupMethod.value = 'manual'
     }
     form.resetForm({ values: newValues })

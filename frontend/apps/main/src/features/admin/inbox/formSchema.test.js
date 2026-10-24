@@ -145,6 +145,57 @@ describe('Email Inbox Form Schema', () => {
         expect(() => schema.parse({ ...validForm, auth_type: 'oauth2' })).not.toThrow()
     })
 
+    test('oauth tenant_id kept', () => {
+        const parsed = schema.parse({ ...validForm, auth_type: 'oauth2', oauth: { provider: 'microsoft', tenant_id: 'contoso' } })
+        expect(parsed.oauth.tenant_id).toBe('contoso')
+    })
+
+    test('delegated OAuth does not need passwords', () => {
+        expect(() => schema.parse({
+            ...validForm,
+            auth_type: 'oauth2',
+            imap: { ...validImap, password: '' },
+            smtp: { ...validSmtp, password: '' }
+        })).not.toThrow()
+    })
+
+    describe('app-only', () => {
+        const appOnly = {
+            ...validForm,
+            auth_type: 'oauth2_app',
+            oauth: { provider: 'microsoft', tenant_id: 'contoso.onmicrosoft.com', client_id: 'app-id', client_secret: 'secret' },
+            imap: { ...validImap, password: '' },
+            smtp: { ...validSmtp, password: '' }
+        }
+        const issuePaths = (form) => schema.safeParse(form).error?.issues.map((issue) => issue.path.join('.')) ?? []
+
+        test('valid without IMAP or SMTP passwords', () => {
+            expect(() => schema.parse(appOnly)).not.toThrow()
+        })
+
+        test('requires tenant, client ID and secret', () => {
+            for (const field of ['tenant_id', 'client_id', 'client_secret']) {
+                for (const value of ['', '  ', undefined]) {
+                    expect(issuePaths({ ...appOnly, oauth: { ...appOnly.oauth, [field]: value } })).toContain(`oauth.${field}`)
+                }
+            }
+            expect(issuePaths({ ...appOnly, oauth: undefined })).toEqual(
+                expect.arrayContaining(['oauth.tenant_id', 'oauth.client_id', 'oauth.client_secret'])
+            )
+        })
+
+        test('rejects multi-tenant authorities', () => {
+            for (const tenant_id of ['common', 'Organizations', 'consumers']) {
+                expect(issuePaths({ ...appOnly, oauth: { ...appOnly.oauth, tenant_id } })).toEqual(['oauth.tenant_id'])
+            }
+        })
+
+        test('requires the mailbox as IMAP and SMTP username', () => {
+            expect(issuePaths({ ...appOnly, imap: { ...appOnly.imap, username: '' } })).toEqual(['imap.username'])
+            expect(issuePaths({ ...appOnly, smtp: { ...appOnly.smtp, username: '' } })).toEqual(['smtp.username'])
+        })
+    })
+
     test('imap block missing', () => {
         const { imap, ...form } = validForm
         expect(() => schema.parse(form)).toThrow()
