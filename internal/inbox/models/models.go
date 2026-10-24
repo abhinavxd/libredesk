@@ -139,6 +139,9 @@ type IMAPConfig struct {
 	ScanInboxSince string `json:"scan_inbox_since"`
 	TLSType        string `json:"tls_type"`
 	TLSSkipVerify  bool   `json:"tls_skip_verify"`
+	// AppendSent stores a copy of every sent email in SentMailbox, or in the server's \Sent mailbox if that is empty.
+	AppendSent  bool   `json:"append_sent"`
+	SentMailbox string `json:"sent_mailbox"`
 }
 
 // ClearPasswords masks all config passwords

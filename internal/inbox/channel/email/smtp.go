@@ -215,6 +215,20 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		e.lo.Debug("message-id header set", "message_id", m.SourceID)
 	}
 
+	// The copy stored in the sent mailbox must carry the same Message-ID and Date as the email that goes out.
+	sentAt := time.Now()
+	appendCfg, appendSent := e.appendSentConfig()
+	if appendSent {
+		if email.Headers.Get(headerMessageID) == "" {
+			messageID, err := stringutil.GenerateEmailMessageID(e.uuid, emailAddress)
+			if err != nil {
+				return fmt.Errorf("generating message id: %w", err)
+			}
+			email.Headers.Set(headerMessageID, fmt.Sprintf("<%s>", messageID))
+		}
+		email.Headers.Set("Date", sentAt.Format(time.RFC1123Z))
+	}
+
 	// Set references header
 	var references string
 	for _, ref := range m.References {
@@ -256,7 +270,13 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	} else {
 		server = e.smtpPools[0]
 	}
-	return server.Send(email)
+	if err := server.Send(email); err != nil {
+		return err
+	}
+	if appendSent {
+		e.queueSentAppend(func() { e.appendSent(appendCfg, email, sentAt) })
+	}
+	return nil
 }
 
 // buildPlusAddress creates a plus-addressed email for conversation matching.
