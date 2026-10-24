@@ -76,6 +76,24 @@ describe('Pre Chat Text Fields', () => {
         expect(() => schema.parse({ thing: '' })).toThrow()
         expect(() => schema.parse({ thing: 'ok' })).not.toThrow()
     })
+
+    test('pattern rejects a value that does not match', () => {
+        const schema = build(field({ key: 'order', type: 'text', required: true, pattern: '^\\d{8}$', pattern_message: 'must be 8 digits' }))
+        expect(() => schema.parse({ order: '12345' })).toThrow('must be 8 digits')
+        expect(() => schema.parse({ order: '12345678' })).not.toThrow()
+    })
+
+    test('pattern is skipped for an optional empty value', () => {
+        const schema = build(field({ key: 'order', type: 'text', pattern: '^\\d{8}$' }))
+        expect(() => schema.parse({ order: '' })).not.toThrow()
+        expect(() => schema.parse({})).not.toThrow()
+        expect(() => schema.parse({ order: '123' })).toThrow()
+    })
+
+    test('an invalid pattern from config is ignored rather than crashing', () => {
+        const schema = build(field({ key: 'order', type: 'text', required: true, pattern: '(' }))
+        expect(() => schema.parse({ order: 'anything' })).not.toThrow()
+    })
 })
 
 describe('Pre Chat Email Field', () => {
