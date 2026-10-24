@@ -41,6 +41,8 @@ var (
 
 	// ErrInboxNotFound is returned when an inbox is not found.
 	ErrInboxNotFound = errors.New("inbox not found")
+
+	ErrOAuthConfigChanged = errors.New("inbox authentication changed; discard stale OAuth tokens")
 )
 
 type initFn func(imodels.Inbox, MessageStore, UserStore) (Inbox, error)
@@ -727,6 +729,75 @@ func (m *Manager) insertEmailAddresses(tx *sqlx.Tx, inboxID int, primary string,
 func (m *Manager) persistenceError(action string, err error) error {
 	m.lo.Error("inbox persistence error", "action", action, "error", err)
 	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+}
+
+// UpdateOAuthConfig replaces delegated credentials only if the originating authentication is still current.
+func (m *Manager) UpdateOAuthConfig(id int, expectedAuthType string, previous, updated *imodels.OAuthConfig) error {
+	if expectedAuthType == imodels.AuthTypeOAuth2App || updated == nil {
+		return ErrOAuthConfigChanged
+	}
+	tx, err := m.db.Beginx()
+	if err != nil {
+		return m.persistenceError("starting OAuth update", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var lockedID int
+	if err := tx.Stmtx(m.queries.LockInbox).Get(&lockedID, id); err != nil {
+		return m.persistenceError("locking inbox for OAuth update", err)
+	}
+	var current imodels.Inbox
+	if err := tx.Stmtx(m.queries.GetInbox).Get(&current, id); err != nil {
+		return m.persistenceError("fetching inbox for OAuth update", err)
+	}
+	current.Config, err = m.decryptInboxConfig(current.Config)
+	if err != nil {
+		return m.persistenceError("decrypting OAuth config", err)
+	}
+	var cfg imodels.Config
+	if err := json.Unmarshal(current.Config, &cfg); err != nil {
+		return m.persistenceError("reading OAuth config", err)
+	}
+	if current.Channel != ChannelEmail || cfg.IsAppOnly() || cfg.AuthType != expectedAuthType || !sameOAuthConfig(cfg.OAuth, previous) {
+		return ErrOAuthConfigChanged
+	}
+
+	// Preserve live non-OAuth settings, including fields this version does not know about.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(current.Config, &fields); err != nil {
+		return m.persistenceError("reading inbox config fields", err)
+	}
+	fields["auth_type"], err = json.Marshal(imodels.AuthTypeOAuth2)
+	if err != nil {
+		return m.persistenceError("encoding OAuth auth type", err)
+	}
+	fields["oauth"], err = json.Marshal(updated)
+	if err != nil {
+		return m.persistenceError("encoding OAuth credentials", err)
+	}
+	configJSON, err := json.Marshal(fields)
+	if err != nil {
+		return m.persistenceError("encoding OAuth config", err)
+	}
+	encrypted, err := m.encryptInboxConfig(configJSON)
+	if err != nil {
+		return m.persistenceError("encrypting OAuth config", err)
+	}
+	if _, err := tx.Stmtx(m.queries.UpdateConfig).Exec(id, encrypted); err != nil {
+		return m.persistenceError("updating OAuth config", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return m.persistenceError("committing OAuth update", err)
+	}
+	return nil
+}
+
+func sameOAuthConfig(a, b *imodels.OAuthConfig) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Provider == b.Provider && a.ClientID == b.ClientID && a.ClientSecret == b.ClientSecret &&
+		a.TenantID == b.TenantID && a.AccessToken == b.AccessToken && a.RefreshToken == b.RefreshToken &&
+		a.ExpiresAt.Equal(b.ExpiresAt)
 }
 
 // UpdateConfig updates only the config field of an inbox in the DB.

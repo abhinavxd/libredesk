@@ -733,16 +733,9 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	}
 
 	// Callback to persist refreshed tokens in DB.
-	tokenRefreshCallback := func(inboxID int, updatedConfig imodels.Config) error {
-		// Marshal updated config to JSON
-		updatedConfigJSON, err := json.Marshal(updatedConfig)
-		if err != nil {
-			lo.Error("error encoding refreshed inbox tokens", "inbox_id", inboxID, "error", err)
-			return err
-		}
-
-		// Persist updated config to DB
-		if err := mgr.UpdateConfig(inboxID, updatedConfigJSON); err != nil {
+	tokenRefreshCallback := func(inboxID int, previous *imodels.OAuthConfig, updatedConfig imodels.Config) error {
+		if err := mgr.UpdateOAuthConfig(inboxID, imodels.AuthTypeOAuth2, previous, updatedConfig.OAuth); err != nil {
+			lo.Error("error persisting refreshed inbox tokens", "inbox_id", inboxID, "error", err)
 			return err
 		}
 

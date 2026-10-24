@@ -62,8 +62,8 @@ type Email struct {
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
-// It receives the inbox ID and the updated config with new tokens.
-type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
+// The previous credentials allow persistence to reject stale refreshes after an admin edit.
+type TokenRefreshCallback func(inboxID int, previous *models.OAuthConfig, updatedConfig models.Config) error
 
 // AuthStatusCallback reports the provider's latest verdict on the inbox credentials. Ok=true clears a previously flagged failure.
 type AuthStatusCallback func(inboxID int, ok bool)
@@ -303,7 +303,8 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	e.lo.Info("OAuth token expired, attempting refresh", "inbox_id", e.Identifier(), "expires_at", e.oauth.ExpiresAt)
 
 	// Attempt to refresh the token
-	newOAuth, err := RefreshOAuthConfig(models.Config{AuthType: e.authType, OAuth: e.oauth})
+	previousOAuth := e.oauth
+	newOAuth, err := RefreshOAuthConfig(models.Config{AuthType: e.authType, OAuth: previousOAuth})
 	if err != nil {
 		e.oauthMu.Unlock()
 		e.lo.Error("Failed to refresh OAuth token", "inbox_id", e.Identifier(), "error", err)
@@ -319,7 +320,8 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	// Persist tokens via callback if available.
 	if e.tokenRefreshCallback != nil {
 		updatedConfig := e.getCurrentConfig()
-		if err := e.tokenRefreshCallback(e.Identifier(), updatedConfig); err != nil {
+		updatedConfig.OAuth = newOAuth
+		if err := e.tokenRefreshCallback(e.Identifier(), previousOAuth, updatedConfig); err != nil {
 			e.lo.Error("Failed to persist refreshed tokens", "inbox_id", e.Identifier(), "error", err)
 		}
 	}

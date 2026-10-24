@@ -169,6 +169,47 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
+// requestAppOnlyToken requests a Microsoft client credentials token. Tests replace it.
+var requestAppOnlyToken = oauth.ClientCredentialsToken
+
+// checkAppOnlyCredentials requests a client credentials token so wrong Entra credentials fail on save rather than on
+// the first poll. On update it runs only when the credentials changed, and an empty secret means the stored one.
+// Exchange mailbox permissions are not checked here; they surface on the first IMAP poll.
+func checkAppOnlyCredentials(app *App, configJSON, previousJSON json.RawMessage) error {
+	var cfg imodels.Config
+	if err := json.Unmarshal(configJSON, &cfg); err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if !cfg.IsAppOnly() || cfg.OAuth == nil {
+		return nil
+	}
+	creds := *cfg.OAuth
+	if len(previousJSON) > 0 {
+		var previous imodels.Config
+		if err := json.Unmarshal(previousJSON, &previous); err == nil && previous.OAuth != nil {
+			if creds.ClientSecret == "" {
+				creds.ClientSecret = previous.OAuth.ClientSecret
+			}
+			if previous.IsAppOnly() && creds.TenantID == previous.OAuth.TenantID &&
+				creds.ClientID == previous.OAuth.ClientID && creds.ClientSecret == previous.OAuth.ClientSecret {
+				return nil
+			}
+		}
+	}
+	if creds.ClientSecret == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_secret"), nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if _, err := requestAppOnlyToken(ctx, creds.ClientID, creds.ClientSecret, creds.TenantID); err != nil {
+		safeErr := oauth.SafeTokenError(err)
+		app.lo.Error("app-only credential check failed", "error", safeErr)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.oauth.appOnly.credentialCheckFailed", "error", safeErr.Error()), nil)
+	}
+	return nil
+}
+
 // ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta. A language change creates a fresh one. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	defer func() {
@@ -200,6 +241,12 @@ func handleCreateInbox(r *fastglue.Request) error {
 
 	if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if inbox.Channel == "email" {
+		if err := checkAppOnlyCredentials(app, inbox.Config, nil); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
 	}
 
 	createdInbox, err := app.inbox.Create(inbox)
@@ -263,6 +310,16 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		}
 		inbox.Config = merged
 		if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+
+	if inbox.Channel == "email" {
+		previous, err := app.inbox.GetDBRecord(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if err := checkAppOnlyCredentials(app, inbox.Config, previous.Config); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}
