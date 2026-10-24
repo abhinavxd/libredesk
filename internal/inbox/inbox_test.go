@@ -221,6 +221,8 @@ func TestEmailSendingConfigChanged(t *testing.T) {
 		{"password", func(c *imodels.Config) { c.SMTP[0].Password = "new" }, true},
 		{"auth protocol", func(c *imodels.Config) { c.SMTP[0].AuthProtocol = "login" }, true},
 		{"auth type", func(c *imodels.Config) { c.AuthType = imodels.AuthTypePassword }, true},
+		{"app-only auth type", func(c *imodels.Config) { c.AuthType = imodels.AuthTypeOAuth2App }, true},
+		{"OAuth tenant", func(c *imodels.Config) { c.OAuth.TenantID = "other-tenant" }, true},
 		{"additional server", func(c *imodels.Config) { c.SMTP = append(c.SMTP, imodels.SMTPConfig{Host: "extra.example.com"}) }, true},
 		{"OAuth account", func(c *imodels.Config) { c.OAuth.RefreshToken = "other-refresh" }, true},
 		{"OAuth client", func(c *imodels.Config) { c.OAuth.ClientID = "other-client" }, true},
@@ -238,4 +240,89 @@ func TestEmailSendingConfigChanged(t *testing.T) {
 			require.Equal(t, tt.want, emailSendingConfigChanged(base, updated))
 		})
 	}
+
+	password := imodels.Config{SMTP: base.SMTP}
+	explicit := password
+	explicit.AuthType = imodels.AuthTypePassword
+	require.False(t, emailSendingConfigChanged(password, explicit), "unset and password auth types are equivalent")
+
+	appOnly := base
+	appOnly.AuthType = imodels.AuthTypeOAuth2App
+	appOnly.OAuth = &imodels.OAuthConfig{Provider: "microsoft", TenantID: "tenant", ClientID: "client", ClientSecret: "secret"}
+	rotated := appOnly
+	rotatedOAuth := *appOnly.OAuth
+	rotatedOAuth.ClientSecret = "rotated"
+	rotated.OAuth = &rotatedOAuth
+	require.True(t, emailSendingConfigChanged(appOnly, rotated), "app-only secret rotation")
+	require.False(t, emailSendingConfigChanged(appOnly, appOnly))
+}
+
+func TestAppOnlyConfigSecrets(t *testing.T) {
+	db := testutil.NewDB(t, "inbox_app_only_secrets")
+	lo := logf.New(logf.Opts{})
+	mgr, err := New(&lo, db, testutil.NewI18n(t), "01234567890123456789012345678901")
+	require.NoError(t, err)
+
+	appOnly := func(secret string) json.RawMessage {
+		cfg, err := json.Marshal(imodels.Config{
+			AuthType: imodels.AuthTypeOAuth2App,
+			OAuth:    &imodels.OAuthConfig{Provider: "microsoft", TenantID: "contoso.onmicrosoft.com", ClientID: "app-id", ClientSecret: secret},
+			IMAP:     []imodels.IMAPConfig{{Host: "outlook.office365.com", Username: "shared@contoso.com"}},
+			SMTP:     []imodels.SMTPConfig{{Host: "smtp.office365.com", Username: "shared@contoso.com"}},
+		})
+		require.NoError(t, err)
+		return cfg
+	}
+	storedOAuth := func(id int) map[string]any {
+		var raw json.RawMessage
+		require.NoError(t, db.Get(&raw, `SELECT config FROM inboxes WHERE id = $1`, id))
+		var cfg struct {
+			OAuth map[string]any `json:"oauth"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &cfg))
+		return cfg.OAuth
+	}
+	decryptedOAuth := func(id int) imodels.OAuthConfig {
+		record, err := mgr.GetDBRecord(id)
+		require.NoError(t, err)
+		var cfg imodels.Config
+		require.NoError(t, json.Unmarshal(record.Config, &cfg))
+		return *cfg.OAuth
+	}
+
+	created, err := mgr.Create(imodels.Inbox{Name: "Shared", Channel: ChannelEmail, From: "shared@contoso.com", Enabled: true, Config: appOnly("s3cret")})
+	require.NoError(t, err)
+
+	stored := storedOAuth(created.ID)
+	require.True(t, crypto.IsEncrypted(stored["client_secret"].(string)))
+	require.Equal(t, "contoso.onmicrosoft.com", stored["tenant_id"])
+	require.Equal(t, "app-id", stored["client_id"])
+	require.Equal(t, "s3cret", decryptedOAuth(created.ID).ClientSecret)
+
+	created.Config = appOnly("")
+	_, err = mgr.Update(created.ID, created)
+	require.NoError(t, err)
+	require.Equal(t, "s3cret", decryptedOAuth(created.ID).ClientSecret)
+
+	delegated, err := json.Marshal(imodels.Config{
+		AuthType: imodels.AuthTypeOAuth2,
+		OAuth:    &imodels.OAuthConfig{Provider: "microsoft", TenantID: "contoso.onmicrosoft.com", ClientID: "app-id", ClientSecret: "s3cret", AccessToken: "access", RefreshToken: "refresh", ExpiresAt: time.Now().Add(time.Hour)},
+		IMAP:     []imodels.IMAPConfig{{Host: "outlook.office365.com", Username: "agent@contoso.com"}},
+		SMTP:     []imodels.SMTPConfig{{Host: "smtp.office365.com", Username: "agent@contoso.com"}},
+	})
+	require.NoError(t, err)
+	converted, err := mgr.Create(imodels.Inbox{Name: "Converted", Channel: ChannelEmail, From: "agent@contoso.com", Enabled: true, Config: delegated})
+	require.NoError(t, err)
+	converted.Config = appOnly("")
+	_, err = mgr.Update(converted.ID, converted)
+	require.NoError(t, err)
+
+	stored = storedOAuth(converted.ID)
+	require.Contains(t, stored, "access_token", "token keys stay present so config loaders overwrite earlier values")
+	require.Contains(t, stored, "expires_at")
+	oauth := decryptedOAuth(converted.ID)
+	require.Empty(t, oauth.AccessToken)
+	require.Empty(t, oauth.RefreshToken)
+	require.True(t, oauth.ExpiresAt.IsZero())
+	require.Equal(t, "s3cret", oauth.ClientSecret)
 }

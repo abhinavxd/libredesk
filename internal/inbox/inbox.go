@@ -484,6 +484,13 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 		}
 
+		// App-only tokens live in memory, so blank any delegated tokens carried over from a previous auth type.
+		if updateCfg.AuthType == imodels.AuthTypeOAuth2App && updateCfg.OAuth != nil {
+			updateCfg.OAuth["access_token"] = ""
+			updateCfg.OAuth["refresh_token"] = ""
+			updateCfg.OAuth["expires_at"] = time.Time{}.Format(time.RFC3339)
+		}
+
 		updatedConfig, err := json.Marshal(updateCfg)
 		if err != nil {
 			m.lo.Error("error marshalling updated config", "id", id, "error", err)
@@ -1015,7 +1022,7 @@ func (m *Manager) decryptInboxSecret(inbox *imodels.Inbox) {
 }
 
 func emailSendingConfigChanged(current, updated imodels.Config) bool {
-	if (current.AuthType == imodels.AuthTypeOAuth2) != (updated.AuthType == imodels.AuthTypeOAuth2) {
+	if normalizedAuthType(current.AuthType) != normalizedAuthType(updated.AuthType) {
 		return true
 	}
 	if !slices.EqualFunc(current.SMTP, updated.SMTP, func(a, b imodels.SMTPConfig) bool {
@@ -1024,7 +1031,7 @@ func emailSendingConfigChanged(current, updated imodels.Config) bool {
 	}) {
 		return true
 	}
-	if updated.AuthType != imodels.AuthTypeOAuth2 {
+	if updated.AuthType != imodels.AuthTypeOAuth2 && updated.AuthType != imodels.AuthTypeOAuth2App {
 		return false
 	}
 	if current.OAuth == nil || updated.OAuth == nil {
@@ -1033,4 +1040,12 @@ func emailSendingConfigChanged(current, updated imodels.Config) bool {
 	a, b := current.OAuth, updated.OAuth
 	return a.Provider != b.Provider || a.ClientID != b.ClientID || a.ClientSecret != b.ClientSecret ||
 		a.TenantID != b.TenantID || a.RefreshToken != b.RefreshToken
+}
+
+// normalizedAuthType treats an unset auth type as password auth.
+func normalizedAuthType(authType string) string {
+	if authType == "" {
+		return imodels.AuthTypePassword
+	}
+	return authType
 }
