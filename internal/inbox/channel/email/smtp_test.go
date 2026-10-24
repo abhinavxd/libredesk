@@ -2,6 +2,7 @@ package email
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -442,7 +443,7 @@ func TestNewSmtpPoolDefaultRetries(t *testing.T) {
 	require.NoError(t, err)
 	port, err := strconv.Atoi(portText)
 	require.NoError(t, err)
-	pools, err := NewSmtpPool([]imodels.SMTPConfig{{Host: host, Port: port, TLSType: "none", MaxConns: 1}}, nil /* oauth */)
+	pools, err := NewSmtpPool([]imodels.SMTPConfig{{Host: host, Port: port, TLSType: "none", MaxConns: 1}}, "" /* xoauth2Token */, false /* useXOAUTH2 */)
 	require.NoError(t, err)
 	logger := logf.New(logf.Opts{Writer: io.Discard})
 	e := &Email{smtpPools: pools, lo: &logger}
@@ -525,7 +526,7 @@ func captureSMTPMessageWithTLS(t *testing.T, tlsMode string, send func(*Email) e
 	require.NoError(t, err)
 	pools, err := NewSmtpPool([]imodels.SMTPConfig{{
 		Host: host, Port: port, TLSType: tlsMode, TLSSkipVerify: tlsMode != "none", MaxConns: 1, MaxMessageRetries: 1,
-	}}, nil /* oauth */)
+	}}, "" /* xoauth2Token */, false /* useXOAUTH2 */)
 	require.NoError(t, err)
 	logger := logf.New(logf.Opts{Writer: io.Discard})
 	e := &Email{
@@ -551,5 +552,99 @@ func captureSMTPMessageWithTLS(t *testing.T, tlsMode string, send func(*Email) e
 	case <-t.Context().Done():
 		t.Fatal("no SMTP message received")
 		return nil
+	}
+}
+
+// startAuthSMTPServer runs a plaintext SMTP server that advertises AUTH and reports each AUTH command it receives.
+func startAuthSMTPServer(t *testing.T) (string, int, <-chan string) {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+	auths := make(chan string, 10)
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer conn.Close()
+				conn.SetDeadline(time.Now().Add(5 * time.Second))
+				protocol := textproto.NewConn(conn)
+				protocol.PrintfLine("220 localhost SMTP")
+				for {
+					line, err := protocol.ReadLine()
+					if err != nil {
+						return
+					}
+					switch {
+					case strings.HasPrefix(line, "EHLO"):
+						protocol.PrintfLine("250-localhost\r\n250 AUTH XOAUTH2 LOGIN PLAIN")
+					case strings.HasPrefix(line, "AUTH "):
+						auths <- line
+						protocol.PrintfLine("235 authenticated")
+					case line == "DATA":
+						protocol.PrintfLine("354 send message")
+						if _, err := protocol.ReadDotBytes(); err != nil {
+							return
+						}
+						protocol.PrintfLine("250 accepted")
+					case line == "QUIT":
+						protocol.PrintfLine("221 bye")
+						return
+					default:
+						protocol.PrintfLine("250 ok")
+					}
+				}
+			}(conn)
+		}
+	}()
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	return host, port, auths
+}
+
+func xoauth2AuthLine(user, token string) string {
+	return "AUTH XOAUTH2 " + base64.StdEncoding.EncodeToString([]byte("user="+user+"\x01auth=Bearer "+token+"\x01\x01"))
+}
+
+func TestNewSmtpPoolXOAUTH2(t *testing.T) {
+	host, port, auths := startAuthSMTPServer(t)
+	pools, err := NewSmtpPool([]imodels.SMTPConfig{{Host: host, Port: port, TLSType: "none", Username: "shared@contoso.com", Password: "ignored", AuthProtocol: "login", MaxConns: 1}}, "app-token", true)
+	require.NoError(t, err)
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	e := &Email{smtpPools: pools, lo: &logger}
+	t.Cleanup(func() { e.Close() })
+	require.NoError(t, e.Send(models.OutboundMessage{From: "shared@contoso.com", To: []string{"customer@example.net"}, ContentType: "plain", Content: "Reply\n"}))
+	require.Equal(t, xoauth2AuthLine("shared@contoso.com", "app-token"), <-auths)
+}
+
+func TestNewSmtpPoolXOAUTH2NeedsToken(t *testing.T) {
+	_, err := NewSmtpPool([]imodels.SMTPConfig{{Host: "smtp.office365.com", Port: 587, Username: "shared@contoso.com"}}, "", true)
+	require.Error(t, err)
+}
+
+func TestNewDefersXOAUTH2PoolsWithoutToken(t *testing.T) {
+	smtpCfg := []imodels.SMTPConfig{{Host: "smtp.office365.com", Port: 587, TLSType: "starttls", Username: "shared@contoso.com", AuthProtocol: "login", MaxConns: 1}}
+	for _, tt := range []struct {
+		name  string
+		cfg   imodels.Config
+		pools int
+	}{
+		{"password", imodels.Config{AuthType: imodels.AuthTypePassword, SMTP: smtpCfg}, 1},
+		{"delegated without token", imodels.Config{AuthType: imodels.AuthTypeOAuth2, OAuth: &imodels.OAuthConfig{Provider: "microsoft"}, SMTP: smtpCfg}, 0},
+		{"delegated with token", imodels.Config{AuthType: imodels.AuthTypeOAuth2, OAuth: &imodels.OAuthConfig{Provider: "microsoft", AccessToken: "tok"}, SMTP: smtpCfg}, 1},
+		{"app-only without token", imodels.Config{AuthType: imodels.AuthTypeOAuth2App, OAuth: &imodels.OAuthConfig{Provider: "microsoft"}, SMTP: smtpCfg}, 0},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			e, err := New(nil, nil, Opts{Config: tt.cfg})
+			require.NoError(t, err)
+			t.Cleanup(func() { e.Close() })
+			require.Len(t, e.smtpPools, tt.pools)
+			require.Equal(t, tt.cfg.UsesXOAUTH2(), e.usesXOAUTH2())
+		})
 	}
 }
