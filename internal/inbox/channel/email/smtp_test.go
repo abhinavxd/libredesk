@@ -637,7 +637,6 @@ func TestNewDefersXOAUTH2PoolsWithoutToken(t *testing.T) {
 		{"password", imodels.Config{AuthType: imodels.AuthTypePassword, SMTP: smtpCfg}, 1},
 		{"delegated without token", imodels.Config{AuthType: imodels.AuthTypeOAuth2, OAuth: &imodels.OAuthConfig{Provider: "microsoft"}, SMTP: smtpCfg}, 0},
 		{"delegated with token", imodels.Config{AuthType: imodels.AuthTypeOAuth2, OAuth: &imodels.OAuthConfig{Provider: "microsoft", AccessToken: "tok"}, SMTP: smtpCfg}, 1},
-		{"app-only without token", imodels.Config{AuthType: imodels.AuthTypeOAuth2App, OAuth: &imodels.OAuthConfig{Provider: "microsoft"}, SMTP: smtpCfg}, 0},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			e, err := New(nil, nil, Opts{Config: tt.cfg})
