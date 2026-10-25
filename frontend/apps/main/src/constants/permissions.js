@@ -40,6 +40,7 @@ export const permissions = {
   CONTACTS_WRITE: 'contacts:write',
   CONTACTS_BLOCK: 'contacts:block',
   CONTACTS_DELETE: 'contacts:delete',
+  CONTACTS_MERGE: 'contacts:merge',
   CONTACTS_EXPORT: 'contacts:export',
   CONTACT_NOTES_READ: 'contact_notes:read',
   CONTACT_NOTES_WRITE: 'contact_notes:write',

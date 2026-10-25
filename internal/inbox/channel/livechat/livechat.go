@@ -539,6 +539,18 @@ func (lc *LiveChat) AddClient(userID string, disconnect func()) (*Client, error)
 	return client, nil
 }
 
+func (lc *LiveChat) DisconnectContact(userID string) {
+	lc.clientsMutex.Lock()
+	defer lc.clientsMutex.Unlock()
+	for _, client := range lc.clients[userID] {
+		client.CloseChannel()
+		if client.disconnect != nil {
+			client.disconnect()
+		}
+	}
+	delete(lc.clients, userID)
+}
+
 // RemoveClient removes a client from the live chat session.
 func (lc *LiveChat) RemoveClient(c *Client) {
 	lc.clientsMutex.Lock()

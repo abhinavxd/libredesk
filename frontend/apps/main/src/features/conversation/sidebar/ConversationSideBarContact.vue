@@ -17,6 +17,10 @@
       </div>
       <div class="flex items-center gap-1">
         <slot name="actions" />
+        <Button v-if="userStore.can('contacts:merge')" type="button" variant="ghost" size="icon"
+          class="h-11 w-11 lg:h-7 lg:w-7" :aria-label="t('contact.merge.title')" @click="showMerge = true">
+          <MergeIcon class="size-4" aria-hidden="true" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -96,6 +100,9 @@
       </span>
     </div>
 
+    <ContactMergeDialog v-if="showMerge && conversation?.contact" v-model:open="showMerge"
+      :contact="{ ...conversation.contact, id: conversation.contact_id }" @merged="onMerged" />
+
     <!-- Livechat visitor info -->
     <template v-if="isLivechat">
       <div v-if="conversation?.contact?.country" class="flex gap-2 items-center">
@@ -141,6 +148,7 @@ import StatusDot from '@shared-ui/components/StatusDot.vue'
 import CopyButton from '@/components/button/CopyButton.vue'
 import {
   Mail,
+  MergeIcon,
   Phone,
   ExternalLink,
   IdCard,
@@ -159,11 +167,16 @@ import { useConversationStore } from '@/stores/conversation'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
+import ContactMergeDialog from '@/features/contact/ContactMergeDialog.vue'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
 const { t } = useI18n()
 const userStore = useUserStore()
+const showMerge = ref(false)
+async function onMerged() {
+  await conversationStore.silentRefetchConversation(conversation.value.uuid)
+}
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''

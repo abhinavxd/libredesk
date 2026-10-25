@@ -222,6 +222,9 @@ const blockContact = (id, data) => http.put(`/api/v1/contacts/${id}/block`, data
   }
 })
 const deleteContact = (id) => http.delete(`/api/v1/contacts/${id}`)
+const searchMergeContacts = (params) => http.get('/api/v1/contacts/merge/search', { params })
+const previewContactMerge = (id, removeId) => http.post(`/api/v1/contacts/${id}/merge/preview`, { remove_id: removeId })
+const mergeContacts = (id, data) => http.post(`/api/v1/contacts/${id}/merge`, data)
 const exportContact = (id) => http.get(`/api/v1/contacts/${id}/export`, { responseType: 'blob' })
 const getTeam = (id) => http.get(`/api/v1/teams/${id}`)
 const getTeams = () => http.get('/api/v1/teams')
@@ -876,6 +879,9 @@ export default {
   updateContact,
   blockContact,
   deleteContact,
+  searchMergeContacts,
+  previewContactMerge,
+  mergeContacts,
   exportContact,
   getCustomAttributes,
   createCustomAttribute,

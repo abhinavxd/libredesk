@@ -111,6 +111,11 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 		}
 
+		resolvedID, err := app.user.ResolveMergedContactID(session.UserID)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		session.UserID = resolvedID
 		// Verify user exists, is enabled, and is a contact or visitor.
 		u, err := app.user.Get(session.UserID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 		if err != nil || !u.Enabled {

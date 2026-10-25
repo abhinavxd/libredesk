@@ -133,6 +133,26 @@ type queries struct {
 	UpdateAPISecretHash  *sqlx.Stmt `query:"update-api-secret-hash"`
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
+	SearchMergeContacts        *sqlx.Stmt `query:"search-merge-contacts"`
+	LockMergeContacts          *sqlx.Stmt `query:"lock-merge-contacts"`
+	GetMergeContacts           *sqlx.Stmt `query:"get-merge-contacts"`
+	MarkContactMerged          *sqlx.Stmt `query:"mark-contact-merged"`
+	SaveMergedContact          *sqlx.Stmt `query:"save-merged-contact"`
+	TransferMergeConversations *sqlx.Stmt `query:"transfer-merge-conversations"`
+	TransferMergeMessages      *sqlx.Stmt `query:"transfer-merge-messages"`
+	TransferMergeNotes         *sqlx.Stmt `query:"transfer-merge-notes"`
+	RegisterMergeEmails        *sqlx.Stmt `query:"register-merge-emails"`
+	TransferMergeIdentities    *sqlx.Stmt `query:"transfer-merge-identities"`
+	TransferMergeParticipants  *sqlx.Stmt `query:"transfer-merge-participants"`
+	DeleteMergeParticipants    *sqlx.Stmt `query:"delete-merge-participants"`
+	TransferMergeLastSeen      *sqlx.Stmt `query:"transfer-merge-last-seen"`
+	DeleteMergeLastSeen        *sqlx.Stmt `query:"delete-merge-last-seen"`
+	TransferMergeMedia         *sqlx.Stmt `query:"transfer-merge-media"`
+	TransferMergeCampaigns     *sqlx.Stmt `query:"transfer-merge-campaigns"`
+	RedirectContactMerges      *sqlx.Stmt `query:"redirect-contact-merges"`
+	ResolveMergedContactID     *sqlx.Stmt `query:"resolve-merged-contact-id"`
+	LogContactMerge            *sqlx.Stmt `query:"log-contact-merge"`
+
 	MergeVisitorToContact *sqlx.Stmt `query:"merge-visitor-to-contact"`
 	DeleteContact         *sqlx.Stmt `query:"delete-contact"`
 	ExportContactData     *sqlx.Stmt `query:"export-contact-data"`

@@ -157,6 +157,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.POST("/api/v1/agents/set-password", rateLimit(tryAuth(sessionChange(handleSetPassword)), "auth"))
 
 	// Contacts.
+	g.GET("/api/v1/contacts/merge/search", perm(handleSearchMergeContacts, "contacts:merge"))
 	g.GET("/api/v1/contacts", perm(handleGetContacts, "contacts:read_all"))
 	g.POST("/api/v1/contacts", perm(handleCreateContact, "contacts:write"))
 	g.GET("/api/v1/contacts/{id}", perm(handleGetContact, "contacts:read"))
@@ -164,6 +165,8 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.PUT("/api/v1/contacts/{id}/block", perm(handleBlockContact, "contacts:block"))
 	g.DELETE("/api/v1/contacts/{id}", perm(handleDeleteContact, "contacts:delete"))
 	g.GET("/api/v1/contacts/{id}/export", perm(handleExportContact, "contacts:export"))
+	g.POST("/api/v1/contacts/{id}/merge/preview", perm(handlePreviewContactMerge, "contacts:merge"))
+	g.POST("/api/v1/contacts/{id}/merge", perm(handleMergeContacts, "contacts:merge"))
 
 	// Contact notes.
 	g.GET("/api/v1/contacts/{id}/notes", perm(handleGetContactNotes, "contact_notes:read"))
