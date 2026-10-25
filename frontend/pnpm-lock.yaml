@@ -94,7 +94,7 @@ importers:
         version: 1.7.1(@unovis/ts@1.7.1(supports-color@8.1.1))(vue@3.5.44)
       '@vee-validate/zod':
         specifier: ^4.15.0
-        version: 4.15.1(vue@3.5.44)(zod@3.25.76)
+        version: 4.15.1(vue@3.5.44)(zod@4.6.7)
       '@vueuse/core':
         specifier: ^12.4.0
         version: 12.8.2
@@ -174,8 +174,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(vue@3.5.44)
       zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+        specifier: ^4.6.6
+        version: 4.6.7
     devDependencies:
       '@rushstack/eslint-patch':
         specifier: ^1.10.5
@@ -3728,8 +3728,8 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -4978,11 +4978,11 @@ snapshots:
       '@unovis/ts': 1.7.1(supports-color@8.1.1)
       vue: 3.5.44
 
-  '@vee-validate/zod@4.15.1(vue@3.5.44)(zod@3.25.76)':
+  '@vee-validate/zod@4.15.1(vue@3.5.44)(zod@4.6.7)':
     dependencies:
       type-fest: 4.41.0
       vee-validate: 4.15.1(vue@3.5.44)
-      zod: 3.25.76
+      zod: 4.6.7
     transitivePeerDependencies:
       - vue
 
@@ -7410,4 +7410,4 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod@3.25.76: {}
+  zod@4.6.7: {}
