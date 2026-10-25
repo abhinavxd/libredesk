@@ -247,9 +247,21 @@ func (u *Manager) GetContactIDByChannelIdentity(channel, identifier string) (int
 
 func (u *Manager) LinkChannelIdentity(contactID int, channel, identifier string) (int, error) {
 	var linkedID int
-	if err := u.q.InsertChannelIdentity.QueryRow(contactID, channel, identifier).Scan(&linkedID); err != nil {
+	tx, err := u.db.Beginx()
+	if err != nil {
+		return 0, u.mergeError(err)
+	}
+	defer tx.Rollback()
+	contactID, err = u.ResolveMergedContactIDTx(tx, contactID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Stmtx(u.q.InsertChannelIdentity).QueryRow(contactID, channel, identifier).Scan(&linkedID); err != nil {
 		u.lo.Error("error linking channel identity", "contact_id", contactID, "channel", channel, "error", err)
 		return 0, fmt.Errorf("linking channel identity: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, u.mergeError(err)
 	}
 	return linkedID, nil
 }

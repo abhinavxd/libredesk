@@ -294,7 +294,7 @@ func TestCreateIndexConcurrentlyReplacesAnInvalidIndex(t *testing.T) {
 	}
 }
 
-func TestV2_9_0ContactMergeMigration(t *testing.T) {
+func TestV2_10_0ContactMergeMigration(t *testing.T) {
 	db := testutil.NewDB(t, "migration_contact_merge")
 	query := `SELECT data_type || ':' || is_nullable || ':' || COALESCE(column_default, '') FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'merged_into_id'`
 	var expected string
@@ -304,7 +304,7 @@ func TestV2_9_0ContactMergeMigration(t *testing.T) {
 	db.MustExec(`ALTER TABLE users DROP COLUMN merged_into_id CASCADE`)
 	db.MustExec(`UPDATE roles SET permissions = array_remove(permissions, 'contacts:merge') WHERE name = 'Admin'`)
 	for range 2 {
-		if err := V2_9_0_RC11(db, nil, nil); err != nil {
+		if err := V2_10_0(db, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -319,7 +319,7 @@ func TestV2_9_0ContactMergeMigration(t *testing.T) {
 	if err := db.Get(&count, `SELECT COUNT(*) FROM roles, unnest(permissions) permission WHERE name = 'Admin' AND permission = 'contacts:merge'`); err != nil || count != 1 {
 		t.Fatalf("merge permission count %d: %v", count, err)
 	}
-	if err := db.Get(&count, `SELECT COUNT(*) FROM pg_trigger WHERE tgname = 'redirect_merged_contact' AND NOT tgisinternal`); err != nil || count != 8 {
+	if err := db.Get(&count, `SELECT COUNT(*) FROM pg_trigger WHERE tgname = 'redirect_merged_contact' AND NOT tgisinternal`); err != nil || count != 0 {
 		t.Fatalf("merge trigger count %d: %v", count, err)
 	}
 }

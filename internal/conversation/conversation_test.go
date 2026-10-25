@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	am "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -11,6 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/abhinavxd/libredesk/internal/user"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
@@ -151,5 +153,62 @@ func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 				t.Fatalf("missing base permission: rows=%d err=%v", len(got), err)
 			}
 		})
+	}
+}
+
+func TestMergedContactMessageWrites(t *testing.T) {
+	db := testutil.NewDB(t, "merged_contact_writes")
+	lo := logf.New(logf.Opts{})
+	lang := testutil.NewI18n(t)
+	users, err := user.New(lang, user.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &Manager{db: db, lo: &lo, i18n: lang, userStore: users, mediaStore: whatsAppReplyMedia{}, wsHub: ws.NewHub(&lo, nil /** userStore **/), subjectRefFormat: "#{ref}"}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var keep, removed, inboxID int
+	if err := db.Get(&keep, `INSERT INTO users (type, first_name, external_user_id) VALUES ('contact', 'Saved', 'saved-customer') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&removed, `INSERT INTO users (type, first_name, merged_into_id, deleted_at) VALUES ('contact', 'Removed', $1, NOW()) RETURNING id`, keep); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Merge writes', 'livechat') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	id, uuid, err := m.CreateConversation(removed, inboxID, "Hello", time.Now(), "Merge", false /** appendRefNumToSubject **/, nil /** meta **/, nil /** customAttributes **/, 0 /** maxConversations **/, 0 /** rateLimitWindow **/)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := models.Message{ConversationID: id, ConversationUUID: uuid, SenderID: removed, UploadUserID: removed, SenderType: models.SenderTypeContact, Type: models.MessageIncoming, Status: models.MessageStatusReceived, Content: "After merge"}
+	tx, err := db.Beginx()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := m.InsertMessageTx(tx, &message); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if message.SenderID != keep || message.UploadUserID != keep {
+		t.Fatalf("message retained removed identity: %+v", message)
+	}
+	if err := m.UpdateConversationLastMessage(id, uuid, message.Content, message.SenderType, message.Type, false /** private **/, time.Now(), removed); err != nil {
+		t.Fatal(err)
+	}
+	var actual struct {
+		ContactID     int `db:"contact_id"`
+		SenderID      int `db:"last_message_sender_id"`
+		InteractionID int `db:"last_interaction_sender_id"`
+	}
+	if err := db.Get(&actual, `SELECT contact_id, last_message_sender_id, last_interaction_sender_id FROM conversations WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if actual.ContactID != keep || actual.SenderID != keep || actual.InteractionID != keep {
+		t.Fatalf("conversation retained removed identity: %+v", actual)
 	}
 }

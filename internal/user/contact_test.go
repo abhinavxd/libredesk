@@ -150,13 +150,18 @@ func TestContactMerge(t *testing.T) {
 	if err != nil || resolved != keep.ID {
 		t.Fatalf("old session no longer resolves: %d %v", resolved, err)
 	}
-	var lateSender int
-	if err := db.QueryRow(`INSERT INTO conversation_messages (conversation_id, sender_id, type, status, sender_type, content) VALUES ($1, $2, 'incoming', 'received', 'contact', 'Late message') RETURNING sender_id`, conversationID, remove.ID).Scan(&lateSender); err != nil || lateSender != keep.ID {
-		t.Fatalf("late message uses removed contact: %d %v", lateSender, err)
+	if _, err := u.CreateNote(remove.ID, actor, "After merge"); err != nil {
+		t.Fatal(err)
 	}
-	var lateContact int
-	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, subject, status_id) VALUES ($1, $2, 'Late conversation', (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING contact_id`, inboxID, remove.ID).Scan(&lateContact); err != nil || lateContact != keep.ID {
-		t.Fatalf("late conversation uses removed contact: %d %v", lateContact, err)
+	if _, err := u.LinkChannelIdentity(remove.ID, "email", "late-alias@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	var noteOwner int
+	if err := db.Get(&noteOwner, `SELECT contact_id FROM contact_notes WHERE note = 'After merge'`); err != nil || noteOwner != keep.ID {
+		t.Fatalf("late note owner %d: %v", noteOwner, err)
+	}
+	if err := db.Get(&identityOwner, `SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = 'late-alias@example.com'`); err != nil || identityOwner != keep.ID {
+		t.Fatalf("late identity owner %d: %v", identityOwner, err)
 	}
 	var logs int
 	db.Get(&logs, `SELECT COUNT(*) FROM activity_logs WHERE activity_type = 'contact_merged' AND target_model_id = $1`, keep.ID)
@@ -244,6 +249,11 @@ func TestContactMergeVisitorAndAliasChain(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	identified := newContact("", "chain-customer", "Incoming", "")
+	resolve(t, u, identified, models.ContactReuse)
+	if identified.ID != visitorID {
+		t.Fatalf("external identity lost after merge: %d", identified.ID)
+	}
 	row := fetchRow(t, db, visitorID)
 	if row.Type != models.UserTypeContact || row.ExtID != "chain-customer" {
 		t.Fatalf("lost authenticated identity: %+v", row)
@@ -306,7 +316,19 @@ func TestContactMergeConcurrentMessage(t *testing.T) {
 	}()
 	go func() {
 		<-start
-		_, err := db.Exec(`INSERT INTO conversation_messages (conversation_id,sender_id,type,status,sender_type,content) VALUES ($1,$2,'incoming','received','contact','During merge')`, conversationID, remove.ID)
+		tx, err := db.Beginx()
+		if err != nil {
+			results <- err
+			return
+		}
+		defer tx.Rollback()
+		senderID, err := u.ResolveMergedContactIDTx(tx, remove.ID)
+		if err == nil {
+			_, err = tx.Exec(`INSERT INTO conversation_messages (conversation_id,sender_id,type,status,sender_type,content) VALUES ($1,$2,'incoming','received','contact','During merge')`, conversationID, senderID)
+		}
+		if err == nil {
+			err = tx.Commit()
+		}
 		results <- err
 	}()
 	close(start)

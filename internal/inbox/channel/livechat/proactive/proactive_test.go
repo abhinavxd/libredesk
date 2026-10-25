@@ -86,4 +86,25 @@ func TestConcurrentDeliveryAndOwnership(t *testing.T) {
 	if Suppression(c, ctx, history, 24*time.Hour) != "repeat" {
 		t.Fatal("identified contact lost delivery history")
 	}
+	var savedID int
+	if err := db.Get(&savedID, `INSERT INTO users(type,first_name) VALUES ('contact','Saved') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`UPDATE users SET merged_into_id = $1, deleted_at = NOW() WHERE id = $2`, savedID, contactID)
+	late, err := m.Reserve(inboxID, c, ctx, Snapshot{Message: "During merge"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.ContactID = savedID
+	ctx.BrowserKey = uuid.NewString()
+	history, err = m.History(inboxID, ctx)
+	if err != nil || len(history) != 2 {
+		t.Fatalf("merged contact lost delivery history: %+v %v", history, err)
+	}
+	if _, err := m.Get(late.ID, inboxID, ctx.BrowserKey, savedID); err != nil {
+		t.Fatal("merged contact lost delivery access", err)
+	}
+	if _, err := m.Get(late.ID, inboxID, ctx.BrowserKey, savedID+1); err == nil {
+		t.Fatal("unrelated contact accessed merged delivery")
+	}
 }

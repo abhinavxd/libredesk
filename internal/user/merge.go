@@ -64,6 +64,11 @@ type mergeContact struct {
 	Notes         int `db:"notes"`
 }
 
+type contactMergeReference struct {
+	ID           int           `db:"id"`
+	MergedIntoID sql.NullInt64 `db:"merged_into_id"`
+}
+
 func (u *Manager) PreviewContactMerge(keepID, removeID int) (ContactMergePreview, error) {
 	tx, err := u.db.Beginx()
 	if err != nil {
@@ -187,6 +192,23 @@ func (u *Manager) ResolveMergedContactID(id int) (int, error) {
 		return 0, u.mergeError(err)
 	}
 	return resolved, nil
+}
+
+// ResolveMergedContactIDTx holds the current contact until the caller's write commits.
+func (u *Manager) ResolveMergedContactIDTx(tx *sqlx.Tx, id int) (int, error) {
+	for {
+		var reference contactMergeReference
+		if err := tx.Stmtx(u.q.LockContactMergeReference).Get(&reference, id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return id, nil
+			}
+			return 0, u.mergeError(err)
+		}
+		if !reference.MergedIntoID.Valid {
+			return reference.ID, nil
+		}
+		id = int(reference.MergedIntoID.Int64)
+	}
 }
 
 func (u *Manager) SearchMergeContacts(query string) ([]models.UserCompact, error) {

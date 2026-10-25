@@ -689,3 +689,6 @@ FROM users
 WHERE type IN ('contact', 'visitor') AND deleted_at IS NULL
 AND (concat_ws(' ', first_name, last_name) ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\' OR external_user_id ILIKE $1 ESCAPE '\')
 ORDER BY first_name, last_name, id LIMIT 30;
+
+-- name: lock-contact-merge-reference
+SELECT id, merged_into_id FROM users WHERE id = $1 FOR KEY SHARE;

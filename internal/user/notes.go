@@ -28,9 +28,21 @@ func (u *Manager) GetNote(id int) (models.Note, error) {
 // CreateNote creates a new note for a user.
 func (u *Manager) CreateNote(userID, authorID int, note string) (models.Note, error) {
 	var createdNote models.Note
-	if err := u.q.InsertNote.Get(&createdNote, userID, authorID, note); err != nil {
+	tx, err := u.db.Beginx()
+	if err != nil {
+		return createdNote, u.mergeError(err)
+	}
+	defer tx.Rollback()
+	userID, err = u.ResolveMergedContactIDTx(tx, userID)
+	if err != nil {
+		return createdNote, err
+	}
+	if err := tx.Stmtx(u.q.InsertNote).Get(&createdNote, userID, authorID, note); err != nil {
 		u.lo.Error("error creating user note", "error", err)
 		return createdNote, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if err := tx.Commit(); err != nil {
+		return createdNote, u.mergeError(err)
 	}
 	return createdNote, nil
 }

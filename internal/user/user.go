@@ -133,6 +133,7 @@ type queries struct {
 	UpdateAPISecretHash  *sqlx.Stmt `query:"update-api-secret-hash"`
 	UpdateAPIKeyLastUsed *sqlx.Stmt `query:"update-api-key-last-used"`
 
+	LockContactMergeReference  *sqlx.Stmt `query:"lock-contact-merge-reference"`
 	SearchMergeContacts        *sqlx.Stmt `query:"search-merge-contacts"`
 	LockMergeContacts          *sqlx.Stmt `query:"lock-merge-contacts"`
 	GetMergeContacts           *sqlx.Stmt `query:"get-merge-contacts"`
