@@ -196,9 +196,9 @@ func (u *Manager) syncContact(user *models.User) error {
 	}
 
 	if user.Email.Valid && user.Email.String != "" {
-		// An ext_id contact owns this email - reuse it; the no-ext-id upsert below can't match it and would insert a duplicate.
+		// A merged email alias keeps the profile values chosen during the merge.
 		existing, err := u.GetContactByEmail(user.Email.String)
-		if err == nil && existing.ExternalUserID.String != "" {
+		if err == nil && (existing.ExternalUserID.String != "" || existing.Email.String != user.Email.String) {
 			user.ID = existing.ID
 			return nil
 		}

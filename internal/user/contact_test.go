@@ -41,6 +41,321 @@ func newContact(email, extID, firstName, lastName string) *models.User {
 	}
 }
 
+func TestContactMerge(t *testing.T) {
+	u, db := newTestManager(t)
+	keep := newContact("keep@example.com", "customer-merge", "Keep", "Person")
+	remove := newContact("remove@example.com", "", "Other", "Person")
+	resolve(t, u, keep, models.ContactReuse)
+	resolve(t, u, remove, models.ContactReuse)
+	actor := insertAgent(t, db, "merge-agent@example.com", "")
+	db.MustExec(`UPDATE users SET custom_attributes = '{"zero":0,"flag":false,"plan":"old"}' WHERE id = $1`, keep.ID)
+	db.MustExec(`UPDATE users SET custom_attributes = '{"zero":1,"flag":true,"plan":"new","extra":"value"}', enabled = false WHERE id = $1`, remove.ID)
+	var inboxID, conversationID, messageID int
+	if err := db.QueryRow(`INSERT INTO inboxes (name, channel) VALUES ('Merge test', 'email') RETURNING id`).Scan(&inboxID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, subject, status_id) VALUES ($1, $2, 'Keep my history', (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, inboxID, remove.ID).Scan(&conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`INSERT INTO conversation_messages (conversation_id, sender_id, type, status, sender_type, content) VALUES ($1, $2, 'incoming', 'received', 'contact', 'Original message') RETURNING id`, conversationID, remove.ID).Scan(&messageID); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`INSERT INTO media (store, filename, content_type, model_type, model_id, uploaded_by) VALUES ('fs', 'original.txt', 'text/plain', 'message', $1, $2)`, messageID, remove.ID)
+	db.MustExec(`UPDATE conversations SET last_message_sender_id = $1, last_interaction_sender_id = $1 WHERE id = $2`, remove.ID, conversationID)
+	db.MustExec(`INSERT INTO contact_notes (contact_id, user_id, note) VALUES ($1, $2, 'Original note')`, remove.ID, actor)
+	db.MustExec(`INSERT INTO contact_channel_identities (contact_id, channel, identifier) VALUES ($1, 'whatsapp', '123456789')`, remove.ID)
+	for _, id := range []int{keep.ID, remove.ID} {
+		db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conversationID, id)
+		db.MustExec(`INSERT INTO conversation_last_seen (conversation_id, user_id) VALUES ($1, $2)`, conversationID, id)
+	}
+	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview.Remove.Conversations != 1 || preview.Remove.Notes != 1 {
+		t.Fatalf("wrong history counts: %+v", preview.Remove)
+	}
+	again, err := u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil || preview.Version != again.Version {
+		t.Fatalf("preview changed without edits: %v", err)
+	}
+	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{}}
+	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err == nil {
+		t.Fatal("accepted missing conflict choices")
+	}
+	for _, field := range preview.Fields {
+		if field.Conflict {
+			req.Choices[field.Key] = "keep"
+		}
+	}
+	req.Choices["email"] = "remove"
+	req.Choices["custom.plan"] = "remove"
+	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	row := fetchRow(t, db, keep.ID)
+	if row.Email != "remove@example.com" || row.ExtID != "customer-merge" {
+		t.Fatalf("wrong merged profile: %+v", row)
+	}
+	var enabled bool
+	var attributes string
+	if err := db.QueryRow(`SELECT enabled, custom_attributes::text FROM users WHERE id = $1`, keep.ID).Scan(&enabled, &attributes); err != nil {
+		t.Fatal(err)
+	}
+	if enabled {
+		t.Fatal("merge unblocked contact")
+	}
+	var attrs map[string]any
+	if err := json.Unmarshal([]byte(attributes), &attrs); err != nil {
+		t.Fatal(err)
+	}
+	if attrs["zero"] != float64(0) || attrs["flag"] != false || attrs["plan"] != "new" || attrs["extra"] != "value" {
+		t.Fatalf("lost attributes: %v", attrs)
+	}
+	for _, query := range []string{
+		`SELECT contact_id FROM conversations WHERE id = $1`,
+		`SELECT sender_id FROM conversation_messages WHERE conversation_id = $1`,
+		`SELECT last_message_sender_id FROM conversations WHERE id = $1`,
+		`SELECT last_interaction_sender_id FROM conversations WHERE id = $1`,
+		`SELECT user_id FROM conversation_participants WHERE conversation_id = $1`,
+		`SELECT user_id FROM conversation_last_seen WHERE conversation_id = $1`,
+	} {
+		var id int
+		if err := db.QueryRow(query, conversationID).Scan(&id); err != nil || id != keep.ID {
+			t.Fatalf("history lost in %s: %d, %v", query, id, err)
+		}
+	}
+	var noteCount, mediaOwner int
+	if err := db.Get(&noteCount, `SELECT COUNT(*) FROM contact_notes WHERE contact_id = $1 AND note = 'Original note'`, keep.ID); err != nil || noteCount != 1 {
+		t.Fatalf("note lost after merge: %d %v", noteCount, err)
+	}
+	if err := db.Get(&mediaOwner, `SELECT uploaded_by FROM media WHERE model_type = 'message' AND model_id = $1 AND filename = 'original.txt'`, messageID); err != nil || mediaOwner != keep.ID {
+		t.Fatalf("attachment lost after merge: %d %v", mediaOwner, err)
+	}
+	identityOwner, err := u.GetContactIDByChannelIdentity("whatsapp", "123456789")
+	if err != nil || identityOwner != keep.ID {
+		t.Fatalf("channel identity lost: %d %v", identityOwner, err)
+	}
+	for _, email := range []string{"keep@example.com", "remove@example.com"} {
+		found, err := u.GetContactByEmail(email)
+		if err != nil || found.ID != keep.ID {
+			t.Fatalf("email %s no longer resolves: %+v, %v", email, found, err)
+		}
+		blocked, err := u.IsEmailBlocked(email)
+		if err != nil || !blocked {
+			t.Fatalf("email %s bypasses block: %v", email, err)
+		}
+	}
+	resolved, err := u.ResolveMergedContactID(remove.ID)
+	if err != nil || resolved != keep.ID {
+		t.Fatalf("old session no longer resolves: %d %v", resolved, err)
+	}
+	var lateSender int
+	if err := db.QueryRow(`INSERT INTO conversation_messages (conversation_id, sender_id, type, status, sender_type, content) VALUES ($1, $2, 'incoming', 'received', 'contact', 'Late message') RETURNING sender_id`, conversationID, remove.ID).Scan(&lateSender); err != nil || lateSender != keep.ID {
+		t.Fatalf("late message uses removed contact: %d %v", lateSender, err)
+	}
+	var lateContact int
+	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, subject, status_id) VALUES ($1, $2, 'Late conversation', (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING contact_id`, inboxID, remove.ID).Scan(&lateContact); err != nil || lateContact != keep.ID {
+		t.Fatalf("late conversation uses removed contact: %d %v", lateContact, err)
+	}
+	var logs int
+	db.Get(&logs, `SELECT COUNT(*) FROM activity_logs WHERE activity_type = 'contact_merged' AND target_model_id = $1`, keep.ID)
+	if logs != 1 {
+		t.Fatalf("expected one merge audit, got %d", logs)
+	}
+	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err == nil {
+		t.Fatal("repeated merge accepted")
+	}
+}
+
+func TestContactMergeRejectsUnsafeChanges(t *testing.T) {
+	u, db := newTestManager(t)
+	keep := newContact("merge-a@example.com", "", "A", "")
+	remove := newContact("merge-b@example.com", "", "B", "")
+	resolve(t, u, keep, models.ContactReuse)
+	resolve(t, u, remove, models.ContactReuse)
+	actor := insertAgent(t, db, "merge-actor@example.com", "")
+	for _, ids := range [][2]int{{0, remove.ID}, {-1, remove.ID}, {keep.ID, 0}, {keep.ID, -1}, {keep.ID, keep.ID}, {keep.ID, actor}} {
+		if _, err := u.PreviewContactMerge(ids[0], ids[1]); err == nil {
+			t.Fatalf("accepted invalid contacts: %v", ids)
+		}
+	}
+	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{"email": "keep", "first_name": "keep"}}
+	db.MustExec(`UPDATE users SET first_name = 'Changed' WHERE id = $1`, remove.ID)
+	if _, err := u.MergeContacts(keep.ID, req, actor, "actor@example.com", "127.0.0.1"); err == nil {
+		t.Fatal("accepted changed preview")
+	}
+	preview, err = u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Version = preview.Version
+	req.Choices["unknown"] = "keep"
+	if _, err := u.MergeContacts(keep.ID, req, actor, "actor@example.com", "127.0.0.1"); err == nil {
+		t.Fatal("accepted unknown choice")
+	}
+	delete(req.Choices, "unknown")
+	if _, err := u.MergeContacts(keep.ID, req, -1, "actor@example.com", "127.0.0.1"); err == nil {
+		t.Fatal("expected audit failure")
+	}
+	if row := fetchRow(t, db, keep.ID); row.Email != "merge-a@example.com" {
+		t.Fatalf("failed merge changed contact: %+v", row)
+	}
+	if _, err := u.GetContactOrVisitor(remove.ID, ""); err != nil {
+		t.Fatal("failed merge removed source", err)
+	}
+	db.MustExec(`UPDATE users SET external_user_id = 'customer-a' WHERE id = $1`, keep.ID)
+	db.MustExec(`UPDATE users SET external_user_id = 'customer-b' WHERE id = $1`, remove.ID)
+	if _, err := u.PreviewContactMerge(keep.ID, remove.ID); err == nil {
+		t.Fatal("accepted different customer identities")
+	}
+}
+
+func TestContactMergeVisitorAndAliasChain(t *testing.T) {
+	u, db := newTestManager(t)
+	actor := insertAgent(t, db, "chain-actor@example.com", "")
+	first := newContact("chain-first@example.com", "chain-customer", "Person", "")
+	second := newContact("chain-second@example.com", "", "Person", "")
+	resolve(t, u, first, models.ContactReuse)
+	resolve(t, u, second, models.ContactReuse)
+	visitorID := insertVisitor(t, db, "chain-visitor@example.com")
+	for _, query := range []string{"chain-first", "chain-customer", "Visitor"} {
+		contacts, err := u.SearchMergeContacts(query)
+		if err != nil || len(contacts) == 0 {
+			t.Fatalf("merge search failed for %s: %v", query, err)
+		}
+	}
+	for _, pair := range [][2]int{{second.ID, first.ID}, {visitorID, second.ID}} {
+		preview, err := u.PreviewContactMerge(pair[0], pair[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := ContactMergeRequest{RemoveID: pair[1], Version: preview.Version, Choices: map[string]string{}}
+		for _, field := range preview.Fields {
+			if field.Conflict {
+				req.Choices[field.Key] = "keep"
+			}
+		}
+		if _, err := u.MergeContacts(pair[0], req, actor, "chain-actor@example.com", "127.0.0.1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	row := fetchRow(t, db, visitorID)
+	if row.Type != models.UserTypeContact || row.ExtID != "chain-customer" {
+		t.Fatalf("lost authenticated identity: %+v", row)
+	}
+	for _, id := range []int{first.ID, second.ID} {
+		resolved, err := u.ResolveMergedContactID(id)
+		if err != nil || resolved != visitorID {
+			t.Fatalf("alias chain lost: %d -> %d, %v", id, resolved, err)
+		}
+	}
+	for _, email := range []string{"chain-first@example.com", "chain-second@example.com", "chain-visitor@example.com"} {
+		contact, err := u.GetContactByEmail(email)
+		if err != nil || contact.ID != visitorID {
+			t.Fatalf("email alias lost: %s %v", email, err)
+		}
+	}
+	db.MustExec(`UPDATE users SET email = NULL WHERE id = $1`, visitorID)
+	var reassignedID int
+	if err := db.QueryRow(`INSERT INTO users (type, first_name, email, external_user_id) VALUES ('contact', 'New owner', 'chain-first@example.com', 'new-customer') RETURNING id`).Scan(&reassignedID); err != nil {
+		t.Fatal(err)
+	}
+	owner, err := u.GetContactByEmail("chain-first@example.com")
+	if err != nil || owner.ID != reassignedID {
+		t.Fatalf("old alias took precedence over current email owner: %d %v", owner.ID, err)
+	}
+	if err := u.DeleteContact(visitorID); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := db.Get(&remaining, `SELECT COUNT(*) FROM users WHERE id = ANY($1)`, pq.Array([]int{visitorID, first.ID, second.ID})); err != nil || remaining != 0 {
+		t.Fatalf("contact deletion retained merged personal data: %d %v", remaining, err)
+	}
+}
+
+func TestContactMergeConcurrentMessage(t *testing.T) {
+	u, db := newTestManager(t)
+	actor := insertAgent(t, db, "concurrent-actor@example.com", "")
+	keep := newContact("concurrent-keep@example.com", "", "Person", "")
+	remove := newContact("concurrent-remove@example.com", "", "Person", "")
+	resolve(t, u, keep, models.ContactReuse)
+	resolve(t, u, remove, models.ContactReuse)
+	var conversationID, inboxID int
+	if err := db.QueryRow(`INSERT INTO inboxes (name, channel) VALUES ('Concurrent merge', 'email') RETURNING id`).Scan(&inboxID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, status_id) VALUES ($2, $1, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, remove.ID, inboxID).Scan(&conversationID); err != nil {
+		t.Fatal(err)
+	}
+	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{"email": "keep"}}
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	go func() {
+		<-start
+		_, err := u.MergeContacts(keep.ID, req, actor, "concurrent-actor@example.com", "127.0.0.1")
+		results <- err
+	}()
+	go func() {
+		<-start
+		_, err := db.Exec(`INSERT INTO conversation_messages (conversation_id,sender_id,type,status,sender_type,content) VALUES ($1,$2,'incoming','received','contact','During merge')`, conversationID, remove.ID)
+		results <- err
+	}()
+	close(start)
+	for range 2 {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	var sender int
+	if err := db.Get(&sender, `SELECT sender_id FROM conversation_messages WHERE conversation_id=$1`, conversationID); err != nil || sender != keep.ID {
+		t.Fatalf("concurrent message lost: sender %d %v", sender, err)
+	}
+}
+
+func TestContactMergeSyncAliases(t *testing.T) {
+	u, db := newTestManager(t)
+	keep := newContact("sync-merge-primary@example.com", "", "Selected", "Name")
+	remove := newContact("sync-merge-alias@example.com", "", "Duplicate", "Name")
+	resolve(t, u, keep, models.ContactReuse)
+	resolve(t, u, remove, models.ContactReuse)
+	actor := insertAgent(t, db, "sync-merge-actor@example.com", "")
+	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{"email": "keep", "first_name": "keep"}}
+	if _, err := u.MergeContacts(keep.ID, req, actor, "sync-merge-actor@example.com", "127.0.0.1"); err != nil {
+		t.Fatal(err)
+	}
+	for _, externalID := range []string{"", "sync-merged-customer"} {
+		incoming := newContact("sync-merge-alias@example.com", externalID, "Incoming", "Name")
+		resolve(t, u, incoming, models.ContactSync)
+		if incoming.ID != keep.ID {
+			t.Fatalf("sync created contact %d instead of reusing %d", incoming.ID, keep.ID)
+		}
+		row := fetchRow(t, db, keep.ID)
+		if row.Email != "sync-merge-primary@example.com" || row.FirstName != "Selected" {
+			t.Fatalf("alias intake replaced chosen profile details: %+v", row)
+		}
+		if externalID != "" && row.ExtID != externalID {
+			t.Fatalf("alias intake did not enrich customer ID: %+v", row)
+		}
+	}
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(*) FROM users WHERE type = 'contact' AND deleted_at IS NULL`); err != nil || count != 1 {
+		t.Fatalf("sync left duplicate contacts: %d %v", count, err)
+	}
+}
+
 func resolve(t *testing.T, u *Manager, c *models.User, policy models.ContactPolicy) {
 	t.Helper()
 	if err := u.ResolveContact(c, policy); err != nil {
@@ -415,284 +730,4 @@ func TestResolveContactConcurrent(t *testing.T) {
 	race(models.ContactReuse, "race-reuse-ext@example.com", "ext-race-reuse")
 	race(models.ContactSync, "race-sync@example.com", "")
 	race(models.ContactSync, "race-sync-ext@example.com", "ext-race-sync")
-}
-
-func TestContactMerge(t *testing.T) {
-	u, db := newTestManager(t)
-	keep := newContact("keep@example.com", "customer-merge", "Keep", "Person")
-	remove := newContact("remove@example.com", "", "Other", "Person")
-	resolve(t, u, keep, models.ContactReuse)
-	resolve(t, u, remove, models.ContactReuse)
-	actor := insertAgent(t, db, "merge-agent@example.com", "")
-	db.MustExec(`UPDATE users SET custom_attributes = '{"zero":0,"flag":false,"plan":"old"}' WHERE id = $1`, keep.ID)
-	db.MustExec(`UPDATE users SET custom_attributes = '{"zero":1,"flag":true,"plan":"new","extra":"value"}', enabled = false WHERE id = $1`, remove.ID)
-	var inboxID, conversationID, messageID int
-	if err := db.QueryRow(`INSERT INTO inboxes (name, channel) VALUES ('Merge test', 'email') RETURNING id`).Scan(&inboxID); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, subject, status_id) VALUES ($1, $2, 'Keep my history', (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, inboxID, remove.ID).Scan(&conversationID); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.QueryRow(`INSERT INTO conversation_messages (conversation_id, sender_id, type, status, sender_type, content) VALUES ($1, $2, 'incoming', 'received', 'contact', 'Original message') RETURNING id`, conversationID, remove.ID).Scan(&messageID); err != nil {
-		t.Fatal(err)
-	}
-	db.MustExec(`INSERT INTO media (store, filename, content_type, model_type, model_id, uploaded_by) VALUES ('fs', 'original.txt', 'text/plain', 'message', $1, $2)`, messageID, remove.ID)
-	db.MustExec(`UPDATE conversations SET last_message_sender_id = $1, last_interaction_sender_id = $1 WHERE id = $2`, remove.ID, conversationID)
-	db.MustExec(`INSERT INTO contact_notes (contact_id, user_id, note) VALUES ($1, $2, 'Original note')`, remove.ID, actor)
-	db.MustExec(`INSERT INTO contact_channel_identities (contact_id, channel, identifier) VALUES ($1, 'whatsapp', '123456789')`, remove.ID)
-	for _, id := range []int{keep.ID, remove.ID} {
-		db.MustExec(`INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2)`, conversationID, id)
-		db.MustExec(`INSERT INTO conversation_last_seen (conversation_id, user_id) VALUES ($1, $2)`, conversationID, id)
-	}
-	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if preview.Remove.Conversations != 1 || preview.Remove.Notes != 1 {
-		t.Fatalf("wrong history counts: %+v", preview.Remove)
-	}
-	again, err := u.PreviewContactMerge(keep.ID, remove.ID)
-	if err != nil || preview.Version != again.Version {
-		t.Fatalf("preview changed without edits: %v", err)
-	}
-	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{}}
-	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err == nil {
-		t.Fatal("accepted missing conflict choices")
-	}
-	for _, field := range preview.Fields {
-		if field.Conflict {
-			req.Choices[field.Key] = "keep"
-		}
-	}
-	req.Choices["email"] = "remove"
-	req.Choices["custom.plan"] = "remove"
-	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err != nil {
-		t.Fatal(err)
-	}
-	row := fetchRow(t, db, keep.ID)
-	if row.Email != "remove@example.com" || row.ExtID != "customer-merge" {
-		t.Fatalf("wrong merged profile: %+v", row)
-	}
-	var enabled bool
-	var attributes string
-	if err := db.QueryRow(`SELECT enabled, custom_attributes::text FROM users WHERE id = $1`, keep.ID).Scan(&enabled, &attributes); err != nil {
-		t.Fatal(err)
-	}
-	if enabled {
-		t.Fatal("merge unblocked contact")
-	}
-	var attrs map[string]any
-	if err := json.Unmarshal([]byte(attributes), &attrs); err != nil {
-		t.Fatal(err)
-	}
-	if attrs["zero"] != float64(0) || attrs["flag"] != false || attrs["plan"] != "new" || attrs["extra"] != "value" {
-		t.Fatalf("lost attributes: %v", attrs)
-	}
-	for _, query := range []string{
-		`SELECT contact_id FROM conversations WHERE id = $1`,
-		`SELECT sender_id FROM conversation_messages WHERE conversation_id = $1`,
-		`SELECT last_message_sender_id FROM conversations WHERE id = $1`,
-		`SELECT last_interaction_sender_id FROM conversations WHERE id = $1`,
-		`SELECT user_id FROM conversation_participants WHERE conversation_id = $1`,
-		`SELECT user_id FROM conversation_last_seen WHERE conversation_id = $1`,
-	} {
-		var id int
-		if err := db.QueryRow(query, conversationID).Scan(&id); err != nil || id != keep.ID {
-			t.Fatalf("history lost in %s: %d, %v", query, id, err)
-		}
-	}
-	var noteCount, mediaOwner int
-	if err := db.Get(&noteCount, `SELECT COUNT(*) FROM contact_notes WHERE contact_id = $1 AND note = 'Original note'`, keep.ID); err != nil || noteCount != 1 {
-		t.Fatalf("note lost after merge: %d %v", noteCount, err)
-	}
-	if err := db.Get(&mediaOwner, `SELECT uploaded_by FROM media WHERE model_type = 'message' AND model_id = $1 AND filename = 'original.txt'`, messageID); err != nil || mediaOwner != keep.ID {
-		t.Fatalf("attachment lost after merge: %d %v", mediaOwner, err)
-	}
-	identityOwner, err := u.GetContactIDByChannelIdentity("whatsapp", "123456789")
-	if err != nil || identityOwner != keep.ID {
-		t.Fatalf("channel identity lost: %d %v", identityOwner, err)
-	}
-	for _, email := range []string{"keep@example.com", "remove@example.com"} {
-		found, err := u.GetContactByEmail(email)
-		if err != nil || found.ID != keep.ID {
-			t.Fatalf("email %s no longer resolves: %+v, %v", email, found, err)
-		}
-		blocked, err := u.IsEmailBlocked(email)
-		if err != nil || !blocked {
-			t.Fatalf("email %s bypasses block: %v", email, err)
-		}
-	}
-	resolved, err := u.ResolveMergedContactID(remove.ID)
-	if err != nil || resolved != keep.ID {
-		t.Fatalf("old session no longer resolves: %d %v", resolved, err)
-	}
-	var lateSender int
-	if err := db.QueryRow(`INSERT INTO conversation_messages (conversation_id, sender_id, type, status, sender_type, content) VALUES ($1, $2, 'incoming', 'received', 'contact', 'Late message') RETURNING sender_id`, conversationID, remove.ID).Scan(&lateSender); err != nil || lateSender != keep.ID {
-		t.Fatalf("late message uses removed contact: %d %v", lateSender, err)
-	}
-	var lateContact int
-	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, subject, status_id) VALUES ($1, $2, 'Late conversation', (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING contact_id`, inboxID, remove.ID).Scan(&lateContact); err != nil || lateContact != keep.ID {
-		t.Fatalf("late conversation uses removed contact: %d %v", lateContact, err)
-	}
-	var logs int
-	db.Get(&logs, `SELECT COUNT(*) FROM activity_logs WHERE activity_type = 'contact_merged' AND target_model_id = $1`, keep.ID)
-	if logs != 1 {
-		t.Fatalf("expected one merge audit, got %d", logs)
-	}
-	if _, err := u.MergeContacts(keep.ID, req, actor, "merge-agent@example.com", "127.0.0.1"); err == nil {
-		t.Fatal("repeated merge accepted")
-	}
-}
-
-func TestContactMergeRejectsUnsafeChanges(t *testing.T) {
-	u, db := newTestManager(t)
-	keep := newContact("merge-a@example.com", "", "A", "")
-	remove := newContact("merge-b@example.com", "", "B", "")
-	resolve(t, u, keep, models.ContactReuse)
-	resolve(t, u, remove, models.ContactReuse)
-	actor := insertAgent(t, db, "merge-actor@example.com", "")
-	for _, ids := range [][2]int{{0, remove.ID}, {-1, remove.ID}, {keep.ID, 0}, {keep.ID, -1}, {keep.ID, keep.ID}, {keep.ID, actor}} {
-		if _, err := u.PreviewContactMerge(ids[0], ids[1]); err == nil {
-			t.Fatalf("accepted invalid contacts: %v", ids)
-		}
-	}
-	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{"email": "keep", "first_name": "keep"}}
-	db.MustExec(`UPDATE users SET first_name = 'Changed' WHERE id = $1`, remove.ID)
-	if _, err := u.MergeContacts(keep.ID, req, actor, "actor@example.com", "127.0.0.1"); err == nil {
-		t.Fatal("accepted changed preview")
-	}
-	preview, err = u.PreviewContactMerge(keep.ID, remove.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Version = preview.Version
-	req.Choices["unknown"] = "keep"
-	if _, err := u.MergeContacts(keep.ID, req, actor, "actor@example.com", "127.0.0.1"); err == nil {
-		t.Fatal("accepted unknown choice")
-	}
-	delete(req.Choices, "unknown")
-	if _, err := u.MergeContacts(keep.ID, req, -1, "actor@example.com", "127.0.0.1"); err == nil {
-		t.Fatal("expected audit failure")
-	}
-	if row := fetchRow(t, db, keep.ID); row.Email != "merge-a@example.com" {
-		t.Fatalf("failed merge changed contact: %+v", row)
-	}
-	if _, err := u.GetContactOrVisitor(remove.ID, ""); err != nil {
-		t.Fatal("failed merge removed source", err)
-	}
-	db.MustExec(`UPDATE users SET external_user_id = 'customer-a' WHERE id = $1`, keep.ID)
-	db.MustExec(`UPDATE users SET external_user_id = 'customer-b' WHERE id = $1`, remove.ID)
-	if _, err := u.PreviewContactMerge(keep.ID, remove.ID); err == nil {
-		t.Fatal("accepted different customer identities")
-	}
-}
-
-func TestContactMergeVisitorAndAliasChain(t *testing.T) {
-	u, db := newTestManager(t)
-	actor := insertAgent(t, db, "chain-actor@example.com", "")
-	first := newContact("chain-first@example.com", "chain-customer", "Person", "")
-	second := newContact("chain-second@example.com", "", "Person", "")
-	resolve(t, u, first, models.ContactReuse)
-	resolve(t, u, second, models.ContactReuse)
-	visitorID := insertVisitor(t, db, "chain-visitor@example.com")
-	for _, query := range []string{"chain-first", "chain-customer", "Visitor"} {
-		contacts, err := u.SearchMergeContacts(query)
-		if err != nil || len(contacts) == 0 {
-			t.Fatalf("merge search failed for %s: %v", query, err)
-		}
-	}
-	for _, pair := range [][2]int{{second.ID, first.ID}, {visitorID, second.ID}} {
-		preview, err := u.PreviewContactMerge(pair[0], pair[1])
-		if err != nil {
-			t.Fatal(err)
-		}
-		req := ContactMergeRequest{RemoveID: pair[1], Version: preview.Version, Choices: map[string]string{}}
-		for _, field := range preview.Fields {
-			if field.Conflict {
-				req.Choices[field.Key] = "keep"
-			}
-		}
-		if _, err := u.MergeContacts(pair[0], req, actor, "chain-actor@example.com", "127.0.0.1"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	row := fetchRow(t, db, visitorID)
-	if row.Type != models.UserTypeContact || row.ExtID != "chain-customer" {
-		t.Fatalf("lost authenticated identity: %+v", row)
-	}
-	for _, id := range []int{first.ID, second.ID} {
-		resolved, err := u.ResolveMergedContactID(id)
-		if err != nil || resolved != visitorID {
-			t.Fatalf("alias chain lost: %d -> %d, %v", id, resolved, err)
-		}
-	}
-	for _, email := range []string{"chain-first@example.com", "chain-second@example.com", "chain-visitor@example.com"} {
-		contact, err := u.GetContactByEmail(email)
-		if err != nil || contact.ID != visitorID {
-			t.Fatalf("email alias lost: %s %v", email, err)
-		}
-	}
-	db.MustExec(`UPDATE users SET email = NULL WHERE id = $1`, visitorID)
-	var reassignedID int
-	if err := db.QueryRow(`INSERT INTO users (type, first_name, email, external_user_id) VALUES ('contact', 'New owner', 'chain-first@example.com', 'new-customer') RETURNING id`).Scan(&reassignedID); err != nil {
-		t.Fatal(err)
-	}
-	owner, err := u.GetContactByEmail("chain-first@example.com")
-	if err != nil || owner.ID != reassignedID {
-		t.Fatalf("old alias took precedence over current email owner: %d %v", owner.ID, err)
-	}
-	if err := u.DeleteContact(visitorID); err != nil {
-		t.Fatal(err)
-	}
-	var remaining int
-	if err := db.Get(&remaining, `SELECT COUNT(*) FROM users WHERE id = ANY($1)`, pq.Array([]int{visitorID, first.ID, second.ID})); err != nil || remaining != 0 {
-		t.Fatalf("contact deletion retained merged personal data: %d %v", remaining, err)
-	}
-}
-
-func TestContactMergeConcurrentMessage(t *testing.T) {
-	u, db := newTestManager(t)
-	actor := insertAgent(t, db, "concurrent-actor@example.com", "")
-	keep := newContact("concurrent-keep@example.com", "", "Person", "")
-	remove := newContact("concurrent-remove@example.com", "", "Person", "")
-	resolve(t, u, keep, models.ContactReuse)
-	resolve(t, u, remove, models.ContactReuse)
-	var conversationID, inboxID int
-	if err := db.QueryRow(`INSERT INTO inboxes (name, channel) VALUES ('Concurrent merge', 'email') RETURNING id`).Scan(&inboxID); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.QueryRow(`INSERT INTO conversations (inbox_id, contact_id, status_id) VALUES ($2, $1, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, remove.ID, inboxID).Scan(&conversationID); err != nil {
-		t.Fatal(err)
-	}
-	preview, err := u.PreviewContactMerge(keep.ID, remove.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := ContactMergeRequest{RemoveID: remove.ID, Version: preview.Version, Choices: map[string]string{"email": "keep"}}
-	start := make(chan struct{})
-	results := make(chan error, 2)
-	go func() {
-		<-start
-		_, err := u.MergeContacts(keep.ID, req, actor, "concurrent-actor@example.com", "127.0.0.1")
-		results <- err
-	}()
-	go func() {
-		<-start
-		_, err := db.Exec(`INSERT INTO conversation_messages (conversation_id,sender_id,type,status,sender_type,content) VALUES ($1,$2,'incoming','received','contact','During merge')`, conversationID, remove.ID)
-		results <- err
-	}()
-	close(start)
-	for range 2 {
-		if err := <-results; err != nil {
-			t.Fatal(err)
-		}
-	}
-	var sender int
-	if err := db.Get(&sender, `SELECT sender_id FROM conversation_messages WHERE conversation_id=$1`, conversationID); err != nil || sender != keep.ID {
-		t.Fatalf("concurrent message lost: sender %d %v", sender, err)
-	}
 }

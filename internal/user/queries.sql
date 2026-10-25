@@ -211,7 +211,7 @@ ON CONFLICT DO NOTHING
 RETURNING id;
 
 -- name: get-contact-by-email
-SELECT id, external_user_id FROM users
+SELECT id, email, external_user_id FROM users
 WHERE type = 'contact' AND deleted_at IS NULL AND (email = $1 OR id IN (
     SELECT merged_into_id FROM users WHERE email = $1 AND merged_into_id IS NOT NULL
     UNION SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = $1
@@ -220,8 +220,12 @@ ORDER BY (email = $1) DESC NULLS LAST, (external_user_id IS NOT NULL) DESC, id A
 
 -- name: get-contact-by-email-without-ext-id
 SELECT id FROM users
-WHERE email = $1 AND type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
-LIMIT 1;
+WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
+AND (email = $1 OR id IN (
+    SELECT merged_into_id FROM users WHERE email = $1 AND merged_into_id IS NOT NULL
+    UNION SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = $1
+))
+ORDER BY (email = $1) DESC NULLS LAST, id LIMIT 1;
 
 -- name: is-email-blocked
 SELECT EXISTS(
