@@ -642,7 +642,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 		merged := make(map[string]any)
 		_ = json.Unmarshal(conversation.CustomAttributes, &merged)
 		maps.Copy(merged, conversationAttrs)
-		if err := app.conversation.UpdateConversationCustomAttributes(conversation.UUID, merged); err != nil {
+		if err := app.conversation.UpdateConversationCustomAttributes(conversation.UUID, merged, umodels.User{ID: contactID}); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}

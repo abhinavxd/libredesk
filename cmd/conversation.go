@@ -764,7 +764,7 @@ func handleUpdateConversationCustomAttributes(r *fastglue.Request) error {
 	}
 
 	// Update custom attributes.
-	if err := app.conversation.UpdateConversationCustomAttributes(uuid, attributes); err != nil {
+	if err := app.conversation.UpdateConversationCustomAttributes(uuid, attributes, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	return r.SendEnvelope(true)
@@ -797,6 +797,7 @@ func handleUpdateContactCustomAttributes(r *fastglue.Request) error {
 	}
 	// Broadcast update.
 	app.conversation.BroadcastContactUpdate(conversation.ContactID, map[string]any{"custom_attributes": attributes})
+	app.automation.EvaluateConversationUpdateRulesByID(conversation.ID, uuid, models.EventConversationContactAttributesChange, user)
 	return r.SendEnvelope(true)
 }
 

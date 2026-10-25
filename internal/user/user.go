@@ -91,6 +91,7 @@ type queries struct {
 	UpdateAgent                      *sqlx.Stmt `query:"update-agent"`
 	UpdateCustomAttributes           *sqlx.Stmt `query:"update-custom-attributes"`
 	UpsertCustomAttributes           *sqlx.Stmt `query:"upsert-custom-attributes"`
+	RemoveCustomAttribute            *sqlx.Stmt `query:"remove-custom-attribute"`
 	UpdateAvatar                     *sqlx.Stmt `query:"update-avatar"`
 	UpdateAvailability               *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt               *sqlx.Stmt `query:"update-last-active-at"`
@@ -417,6 +418,14 @@ func (u *Manager) SaveCustomAttributes(id int, customAttributes map[string]any, 
 	}
 	if execErr != nil {
 		u.lo.Error("error saving custom attributes", "error", execErr)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+func (u *Manager) RemoveCustomAttribute(id int, key string) error {
+	if _, err := u.q.RemoveCustomAttribute.Exec(id, key); err != nil {
+		u.lo.Error("error removing custom attribute", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil

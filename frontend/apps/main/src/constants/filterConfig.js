@@ -6,6 +6,8 @@ export const LOGIC = {
 // Mirrors dbutil.MaxFilterGroups on the backend.
 export const MAX_FILTER_GROUPS = 10
 
+export const AUTOMATION_ACTIONS_WITHOUT_VALUE = ['send_csat', 'unassign_user', 'unassign_team', 'clear_tags']
+
 export const FIELD_TYPE = {
     SELECT: 'select',
     TAG: 'tag',
@@ -85,5 +87,6 @@ export const FIELD_OPERATORS = {
         OPERATOR.LESS_THAN
     ],
     NUMBER: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.GREATER_THAN, OPERATOR.LESS_THAN],
+    NUMBER_OPTIONAL: [OPERATOR.EQUALS, OPERATOR.NOT_EQUALS, OPERATOR.GREATER_THAN, OPERATOR.LESS_THAN, OPERATOR.SET, OPERATOR.NOT_SET],
     MULTI_SELECT: [OPERATOR.CONTAINS, OPERATOR.NOT_CONTAINS, OPERATOR.SET, OPERATOR.NOT_SET]
 }
