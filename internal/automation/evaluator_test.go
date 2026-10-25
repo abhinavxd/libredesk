@@ -45,6 +45,7 @@ func TestAdditionalConversationConditions(t *testing.T) {
 		c.InboxChannel = "whatsapp"
 		c.StatusCategory = null.StringFrom("waiting")
 		c.LastMessageSender = null.StringFrom("contact")
+		c.LastInteractionSender = null.StringFrom("contact")
 		c.WaitingSince = null.TimeFrom(time.Now().Add(-90 * time.Minute))
 		c.LastMessageAt = null.TimeFrom(time.Now().Add(-2 * time.Hour))
 		c.LastInboundAt = null.TimeFrom(time.Now().Add(-3 * time.Hour))
@@ -80,7 +81,7 @@ func TestAdditionalConversationConditions(t *testing.T) {
 		{models.ConversationHoursWaiting, models.RuleOperatorGreaterThan, "2", false},
 		{models.ConversationHoursSinceLastMessage, models.RuleOperatorGreaterThan, "1", true},
 		{models.ConversationHoursSinceLastIncoming, models.RuleOperatorGreaterThan, "2", true},
-		{models.ConversationHoursSinceLastActivity, models.RuleOperatorGreaterThan, "3", true},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorGreaterThan, "1", true},
 		{models.ConversationHoursUntilSLADeadline, models.RuleOperatorLessThan, "1", true},
 		{models.ConversationHoursUntilSLADeadline, models.RuleOperatorLessThan, "0", false},
 		{models.ConversationCSATRating, models.RuleOperatorEquals, "1", true},
@@ -110,6 +111,35 @@ func TestAdditionalConversationConditions(t *testing.T) {
 	conv.CSATRating = null.IntFrom(0)
 	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationCSATRating, Operator: models.RuleOperatorSet}, conv, nil))
 	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationCSATRating, Operator: models.RuleOperatorLessThan, Value: "3"}, conv, nil))
+}
+
+func TestPublicMessageConditionsIgnorePrivateNotesAndActivity(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conv := cmodels.Conversation{
+		LastMessageAt:         null.TimeFrom(time.Now().Add(-30 * time.Minute)),
+		LastMessageSender:     null.StringFrom("agent"),
+		LastInteractionAt:     null.TimeFrom(time.Now().Add(-26 * time.Hour)),
+		LastInteractionSender: null.StringFrom("contact"),
+	}
+	for _, tc := range []struct {
+		field, operator, value string
+		want                   bool
+	}{
+		{models.ConversationHoursSinceLastMessage, models.RuleOperatorGreaterThan, "24", true},
+		{models.ConversationHoursSinceLastMessage, models.RuleOperatorLessThan, "1", false},
+		{models.ConversationLastMessageSender, models.RuleOperatorEquals, "contact", true},
+		{models.ConversationLastMessageSender, models.RuleOperatorEquals, "agent", false},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorLessThan, "1", true},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorGreaterThan, "24", false},
+	} {
+		t.Run(tc.field+"/"+tc.operator+"/"+tc.value, func(t *testing.T) {
+			assert.Equal(t, tc.want, engine.evaluateRule(models.RuleDetail{Field: tc.field, Operator: tc.operator, Value: tc.value}, conv, nil))
+		})
+	}
+	conv.LastInteractionAt = null.TimeFrom(time.Now())
+	conv.LastInteractionSender = null.StringFrom("agent")
+	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationHoursSinceLastMessage, Operator: models.RuleOperatorGreaterThan, Value: "24"}, conv, nil))
+	assert.True(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationLastMessageSender, Operator: models.RuleOperatorEquals, Value: "agent"}, conv, nil))
 }
 
 func TestAutomationTagConditions(t *testing.T) {

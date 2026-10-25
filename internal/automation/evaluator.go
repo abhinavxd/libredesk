@@ -146,7 +146,7 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		case models.ConversationStatusCategory:
 			valueToCompare = conversation.StatusCategory.String
 		case models.ConversationLastMessageSender:
-			valueToCompare = conversation.LastMessageSender.String
+			valueToCompare = conversation.LastInteractionSender.String
 		case models.ContactCountry:
 			valueToCompare = conversation.Contact.Country.String
 		case models.ContactExternalID:
@@ -190,11 +190,11 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			case models.ConversationHoursWaiting:
 				at = conversation.WaitingSince.Time
 			case models.ConversationHoursSinceLastMessage:
-				at = conversation.LastMessageAt.Time
+				at = conversation.LastInteractionAt.Time
 			case models.ConversationHoursSinceLastIncoming:
 				at = conversation.LastInboundAt.Time
 			case models.ConversationHoursSinceLastActivity:
-				at = conversation.LastInteractionAt.Time
+				at = conversation.LastMessageAt.Time
 			}
 			if !at.IsZero() {
 				valueToCompare = strconv.FormatFloat(time.Since(at).Hours(), 'f', -1, 64)

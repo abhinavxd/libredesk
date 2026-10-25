@@ -368,6 +368,36 @@ func TestAutomationChangeEvents(t *testing.T) {
 	}
 }
 
+func TestAutomationPublicMessageTimestamps(t *testing.T) {
+	m, conv, actor := automationActionFixture(t, "automation_public_message")
+	publicAt := time.Now().Add(-26 * time.Hour).Truncate(time.Millisecond)
+	_, err := m.db.Exec(`UPDATE conversations SET last_message_at = $2, last_interaction_at = $2,
+		last_message_sender = 'contact', last_interaction_sender = 'contact' WHERE id = $1`, conv.ID, publicAt)
+	require.NoError(t, err)
+	for _, kind := range []string{models.MessageOutgoing, models.MessageActivity} {
+		message := models.Message{
+			ConversationID: conv.ID, ConversationUUID: conv.UUID, SenderID: actor.ID,
+			SenderType: models.SenderTypeAgent, Type: kind, Private: true, Content: "Internal update",
+		}
+		require.NoError(t, m.InsertMessage(&message))
+		fresh, err := m.GetConversation(0 /** id **/, conv.UUID, "" /** refNum **/)
+		require.NoError(t, err)
+		require.True(t, publicAt.Equal(fresh.LastInteractionAt.Time))
+		require.Equal(t, "contact", fresh.LastInteractionSender.String)
+		require.True(t, fresh.LastMessageAt.Time.After(publicAt))
+		require.Equal(t, "agent", fresh.LastMessageSender.String)
+	}
+	publicReply := models.Message{
+		ConversationID: conv.ID, ConversationUUID: conv.UUID, SenderID: actor.ID,
+		SenderType: models.SenderTypeAgent, Type: models.MessageOutgoing, Status: models.MessageStatusSent, Content: "Public reply",
+	}
+	require.NoError(t, m.InsertMessage(&publicReply))
+	fresh, err := m.GetConversation(0 /** id **/, conv.UUID, "" /** refNum **/)
+	require.NoError(t, err)
+	require.True(t, fresh.LastInteractionAt.Time.After(publicAt))
+	require.Equal(t, "agent", fresh.LastInteractionSender.String)
+}
+
 func automationActionFixture(t *testing.T, name string) (*Manager, models.Conversation, umodels.User) {
 	t.Helper()
 	db := testutil.NewDB(t, name)
