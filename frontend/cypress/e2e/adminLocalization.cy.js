@@ -69,12 +69,15 @@ describe('Standalone admin localization', () => {
             cy.get('form button[type="submit"]')
               .should('be.visible')
               .and('have.text', labels['globals.actions.create'])
-            cy.get('[aria-current="page"]')
+            cy.get('nav[aria-label="breadcrumb"] li')
+              .last()
               .should('be.visible')
               .and('have.text', labels['globals.labels.new'])
 
             cy.visit(`/admin/${section}/10001/edit`)
-            cy.get('[aria-current="page"]').should('have.text', labels['globals.actions.edit'])
+            cy.get('nav[aria-label="breadcrumb"] li')
+              .last()
+              .should('have.text', labels['globals.actions.edit'])
             cy.get('form button[type="submit"]').should(
               'have.text',
               german['globals.messages.save']
