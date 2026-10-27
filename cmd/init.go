@@ -1238,6 +1238,8 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhoo
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		MaxAttempts:   ko.Int("webhook.max_attempts"),
+		RetryBackoff:  ko.Duration("webhook.retry_backoff"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
