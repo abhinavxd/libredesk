@@ -75,9 +75,14 @@ type DeliveryTask struct {
 	// Zero means fan out to all subscribers of Event.
 	WebhookID int
 
-	attempt    int
-	deliveryID string
-	body       []byte
+	attempt          int
+	deliveryID       string
+	body             []byte
+	webhookUpdatedAt time.Time
+}
+
+func (t DeliveryTask) staleFor(webhook models.Webhook) bool {
+	return !t.webhookUpdatedAt.IsZero() && !t.webhookUpdatedAt.Equal(webhook.UpdatedAt)
 }
 
 const (
@@ -367,6 +372,13 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 			m.lo.Debug("skipping delivery, webhook is inactive", "webhook_id", webhook.ID, "event", task.Event)
 			return
 		}
+		if task.staleFor(webhook) {
+			m.lo.Info("dropping webhook retry, the webhook was edited after the first attempt",
+				"webhook_id", webhook.ID,
+				"event", task.Event,
+				"delivery_id", task.deliveryID)
+			return
+		}
 		m.deliverSingleWebhook(webhook, task)
 		return
 	}
@@ -505,11 +517,12 @@ func (m *Manager) retryLater(webhook models.Webhook, task DeliveryTask) {
 	}
 
 	next := DeliveryTask{
-		Event:      task.Event,
-		WebhookID:  webhook.ID,
-		attempt:    task.attempt + 1,
-		deliveryID: task.deliveryID,
-		body:       task.body,
+		Event:            task.Event,
+		WebhookID:        webhook.ID,
+		attempt:          task.attempt + 1,
+		deliveryID:       task.deliveryID,
+		body:             task.body,
+		webhookUpdatedAt: webhook.UpdatedAt,
 	}
 	delay := m.retryDelay(task.attempt)
 	m.lo.Warn("scheduling webhook delivery retry",

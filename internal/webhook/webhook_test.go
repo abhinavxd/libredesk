@@ -190,12 +190,37 @@ func TestUnreachableReceiversAreRetried(t *testing.T) {
 	url := server.URL
 	server.Close()
 	m := newDeliveryManager(2)
+	edited := time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC)
 
-	m.deliverSingleWebhook(models.Webhook{ID: 7, URL: url, IsActive: true}, DeliveryTask{Event: models.EventConversationCreated})
+	m.deliverSingleWebhook(models.Webhook{ID: 7, URL: url, IsActive: true, UpdatedAt: edited}, DeliveryTask{Event: models.EventConversationCreated})
 
 	next, ok := scheduledRetry(t, m)
 	if !ok || next.attempt != 2 {
 		t.Fatalf("no second attempt was scheduled after a connection error: %+v", next)
+	}
+	if !next.webhookUpdatedAt.Equal(edited) {
+		t.Fatalf("the retry remembers revision %v, want %v", next.webhookUpdatedAt, edited)
+	}
+}
+
+func TestARetryIsStaleOnlyWhenTheWebhookChanged(t *testing.T) {
+	first := time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC)
+	later := first.Add(time.Minute)
+	for _, tt := range []struct {
+		name    string
+		task    DeliveryTask
+		webhook models.Webhook
+		stale   bool
+	}{
+		{"first attempt", DeliveryTask{}, models.Webhook{UpdatedAt: later}, false},
+		{"unchanged webhook", DeliveryTask{webhookUpdatedAt: first}, models.Webhook{UpdatedAt: first}, false},
+		{"edited webhook", DeliveryTask{webhookUpdatedAt: first}, models.Webhook{UpdatedAt: later}, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.task.staleFor(tt.webhook); got != tt.stale {
+				t.Fatalf("staleFor = %v, want %v", got, tt.stale)
+			}
+		})
 	}
 }
 
@@ -258,11 +283,9 @@ func TestRetryDelayDoublesUpToTheCap(t *testing.T) {
 	}
 }
 
-func TestRetriesGoThroughTheWorkerAndReadTheWebhookAgain(t *testing.T) {
+func newStoredWebhook(t *testing.T, url string, retryBackoff time.Duration) (*Manager, models.Webhook) {
+	t.Helper()
 	db := testutil.NewDB(t, "webhook_delivery")
-	receiver := newRecordingReceiver(http.StatusServiceUnavailable, http.StatusOK)
-	server := httptest.NewServer(receiver)
-	defer server.Close()
 	lo := logf.New(logf.Opts{})
 	m, err := New(Opts{
 		DB:            db,
@@ -273,29 +296,62 @@ func TestRetriesGoThroughTheWorkerAndReadTheWebhookAgain(t *testing.T) {
 		Timeout:       2 * time.Second,
 		EncryptionKey: testEncryptionKey,
 		MaxAttempts:   3,
-		RetryBackoff:  10 * time.Millisecond,
+		RetryBackoff:  retryBackoff,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := m.Create(models.Webhook{
+	webhook, err := m.Create(models.Webhook{
 		Name:     "receiver",
-		URL:      server.URL,
+		URL:      url,
 		Events:   []string{string(models.EventConversationCreated)},
 		Secret:   "receiver-secret",
 		IsActive: true,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	m.Run(ctx)
-	defer m.Close()
+	t.Cleanup(func() {
+		cancel()
+		m.Close()
+	})
+	return m, webhook
+}
+
+func TestRetriesGoThroughTheWorkerAndReadTheWebhookAgain(t *testing.T) {
+	receiver := newRecordingReceiver(http.StatusServiceUnavailable, http.StatusOK)
+	server := httptest.NewServer(receiver)
+	defer server.Close()
+	m, _ := newStoredWebhook(t, server.URL, 10*time.Millisecond)
 
 	m.TriggerEvent(models.EventConversationCreated, map[string]any{"uuid": "c-1"})
 
 	deliveries := receiver.waitFor(t, 2)
 	if deliveries[0].deliveryID != deliveries[1].deliveryID || deliveries[1].attempt != "2" {
 		t.Fatalf("the retry is not the same delivery: %+v", deliveries)
+	}
+}
+
+func TestARetryIsDroppedWhenTheWebhookWasEdited(t *testing.T) {
+	oldReceiver := newRecordingReceiver(http.StatusServiceUnavailable, http.StatusOK)
+	oldServer := httptest.NewServer(oldReceiver)
+	defer oldServer.Close()
+	newReceiver := newRecordingReceiver()
+	newServer := httptest.NewServer(newReceiver)
+	defer newServer.Close()
+	m, webhook := newStoredWebhook(t, oldServer.URL, 300*time.Millisecond)
+
+	m.TriggerEvent(models.EventConversationCreated, map[string]any{"uuid": "c-1"})
+	oldReceiver.waitFor(t, 1)
+	webhook.URL = newServer.URL
+	if _, err := m.Update(webhook.ID, webhook); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+
+	if got := len(oldReceiver.received()) + len(newReceiver.received()); got != 1 {
+		t.Fatalf("received %d deliveries after the webhook was edited, want only the first one", got)
 	}
 }
