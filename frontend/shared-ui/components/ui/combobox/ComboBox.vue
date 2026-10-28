@@ -160,7 +160,7 @@ const selectedItem = computed(
     props.items.find((i) => i.value === value.value) ||
     (pickedItem.value?.value === value.value ? pickedItem.value : null)
 )
-const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel)
+const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel || props.placeholder)
 
 watch(
   [value, () => props.items],
