@@ -10,9 +10,13 @@ import (
 type fakeProvider struct {
 	name    string
 	got     []Message
-	closed  bool
+	closed  chan struct{} // closed by Close
 	started chan struct{} // when set, closed once Send has been entered
 	release chan struct{} // when set, Send blocks until it is closed
+}
+
+func newFakeProvider() *fakeProvider {
+	return &fakeProvider{name: ProviderEmail, closed: make(chan struct{})}
 }
 
 func (f *fakeProvider) Send(m Message) error {
@@ -26,80 +30,103 @@ func (f *fakeProvider) Send(m Message) error {
 	return nil
 }
 func (f *fakeProvider) Name() string { return f.name }
-func (f *fakeProvider) Close()       { f.closed = true }
+func (f *fakeProvider) Close()       { close(f.closed) }
+
+func (f *fakeProvider) isClosed() bool {
+	select {
+	case <-f.closed:
+		return true
+	default:
+		return false
+	}
+}
+
+func waitClosed(t *testing.T, f *fakeProvider) {
+	t.Helper()
+	select {
+	case <-f.closed:
+	case <-time.After(time.Second):
+		t.Fatal("old provider was not closed")
+	}
+}
 
 // A settings save swaps the provider on the running service: the next message
 // reaches the new one, the old one sees nothing more and is closed.
 func TestSetProviderRoutesSubsequentSendsAndClosesOld(t *testing.T) {
-	old := &fakeProvider{name: ProviderEmail}
+	old := newFakeProvider()
 	s := NewService(map[string]Notifier{ProviderEmail: old}, 1, 1, nil)
 
 	if err := s.SendSync(Message{Provider: ProviderEmail, Subject: "before"}); err != nil {
 		t.Fatal(err)
 	}
-	next := &fakeProvider{name: ProviderEmail}
+	next := newFakeProvider()
 	s.SetProvider(next)
 	if err := s.SendSync(Message{Provider: ProviderEmail, Subject: "after"}); err != nil {
 		t.Fatal(err)
 	}
 
+	waitClosed(t, old)
 	if len(old.got) != 1 || old.got[0].Subject != "before" {
 		t.Fatalf("old provider got %+v, want only the message sent before the swap", old.got)
-	}
-	if !old.closed {
-		t.Fatal("old provider was not closed after the swap")
 	}
 	if len(next.got) != 1 || next.got[0].Subject != "after" {
 		t.Fatalf("new provider got %+v, want only the message sent after the swap", next.got)
 	}
-	if next.closed {
+	if next.isClosed() {
 		t.Fatal("new provider must not be closed")
 	}
 }
 
-// A swap must not close a provider while one of its sends is still running.
-func TestSetProviderWaitsForInFlightSend(t *testing.T) {
-	old := &fakeProvider{name: ProviderEmail, started: make(chan struct{}), release: make(chan struct{})}
+// A send stuck on a hung relay must not block the swap: SetProvider returns, new
+// sends use the new provider, and the old one is closed only once its send finishes.
+func TestSetProviderDoesNotWaitForInFlightSend(t *testing.T) {
+	old := newFakeProvider()
+	old.started, old.release = make(chan struct{}), make(chan struct{})
 	s := NewService(map[string]Notifier{ProviderEmail: old}, 1, 1, nil)
 
 	sendDone := make(chan struct{})
 	go func() {
-		_ = s.SendSync(Message{Provider: ProviderEmail})
+		_ = s.SendSync(Message{Provider: ProviderEmail, Subject: "stuck"})
 		close(sendDone)
 	}()
 	// Wait until the send is inside the provider and blocked there.
 	<-old.started
 
+	next := newFakeProvider()
 	swapDone := make(chan struct{})
 	go func() {
-		s.SetProvider(&fakeProvider{name: ProviderEmail})
+		s.SetProvider(next)
 		close(swapDone)
 	}()
-
 	select {
 	case <-swapDone:
-		t.Fatal("SetProvider returned while a send was still in flight on the old provider")
-	case <-time.After(50 * time.Millisecond):
+	case <-time.After(time.Second):
+		t.Fatal("SetProvider blocked behind a send in flight on the old provider")
 	}
-	if old.closed {
+
+	if err := s.SendSync(Message{Provider: ProviderEmail, Subject: "after"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(next.got) != 1 || next.got[0].Subject != "after" {
+		t.Fatalf("new provider got %+v, want the message sent after the swap", next.got)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+	if old.isClosed() {
 		t.Fatal("old provider closed under an in-flight send")
 	}
 
 	close(old.release)
 	<-sendDone
-	select {
-	case <-swapDone:
-	case <-time.After(time.Second):
-		t.Fatal("SetProvider did not complete once the in-flight send finished")
-	}
-	if !old.closed {
-		t.Fatal("old provider not closed after its send drained")
+	waitClosed(t, old)
+	if len(old.got) != 1 || old.got[0].Subject != "stuck" {
+		t.Fatalf("old provider got %+v, want only the in-flight message", old.got)
 	}
 }
 
 // Notification emails can be switched off and on again on a running queue.
 func TestEmailQueueSetEnabled(t *testing.T) {
-	provider := &fakeProvider{name: ProviderEmail}
+	provider := newFakeProvider()
 	q := &EmailQueue{outbound: NewService(map[string]Notifier{ProviderEmail: provider}, 1, 1, nil)}
 	email := models.Email{Recipient: "agent@example.com", Subject: "Reply"}
 

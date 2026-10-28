@@ -41,23 +41,33 @@ type Notifier interface {
 	Name() string
 }
 
+// provider pairs a Notifier with its in-flight sends, so a retired provider is closed only after they finish.
+type provider struct {
+	Notifier
+	active sync.WaitGroup
+}
+
 // Service manages message providers and a worker pool.
 type Service struct {
-	providers      map[string]Notifier
+	providers      map[string]*provider
 	messageChannel chan Message
 	concurrency    int
 	lo             *logf.Logger
 	closed         bool
 	mu             sync.RWMutex
 	wg             sync.WaitGroup
-	// Held across SendSync so SetProvider waits for in-flight sends; separate from mu, which Close holds while waiting for the workers.
+	// Guards providers only, never held across a send; separate from mu, which Close holds while waiting for the workers.
 	providersMu sync.RWMutex
 }
 
 // NewService initializes the Service with given concurrency, channel capacity, and logger.
 func NewService(providers map[string]Notifier, concurrency, capacity int, logger *logf.Logger) *Service {
+	wrapped := make(map[string]*provider, len(providers))
+	for name, n := range providers {
+		wrapped[name] = &provider{Notifier: n}
+	}
 	return &Service{
-		providers:      providers,
+		providers:      wrapped,
 		messageChannel: make(chan Message, capacity),
 		concurrency:    concurrency,
 		lo:             logger,
@@ -84,30 +94,43 @@ func (s *Service) Send(message Message) error {
 // SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock shared with Send or Close, so a slow relay cannot stall them.
 func (s *Service) SendSync(message Message) error {
 	s.providersMu.RLock()
-	defer s.providersMu.RUnlock()
-	provider, exists := s.providers[message.Provider]
+	p, exists := s.providers[message.Provider]
+	if exists {
+		// Added under the lock so SetProvider cannot retire p between the lookup and the Add.
+		p.active.Add(1)
+	}
+	s.providersMu.RUnlock()
 	if !exists {
 		return fmt.Errorf("unsupported provider: %s", message.Provider)
 	}
-	return provider.Send(message)
+	defer p.active.Done()
+	return p.Send(message)
 }
 
-// SetProvider replaces the provider registered under p.Name(). It waits for in-flight
-// sends, then closes the old provider if it has a Close method.
-func (s *Service) SetProvider(p Notifier) {
+// SetProvider replaces the provider registered under n.Name() and returns without waiting
+// for the old one's in-flight sends; the old provider is closed, if it has a Close method,
+// once they finish.
+func (s *Service) SetProvider(n Notifier) {
 	s.providersMu.Lock()
 	if s.providers == nil {
-		s.providers = map[string]Notifier{}
+		s.providers = map[string]*provider{}
 	}
-	old := s.providers[p.Name()]
-	s.providers[p.Name()] = p
-	s.providersMu.Unlock()
-
-	if old == nil || old == p {
+	old := s.providers[n.Name()]
+	if old != nil && old.Notifier == n {
+		s.providersMu.Unlock()
 		return
 	}
-	if c, ok := old.(interface{ Close() }); ok {
-		c.Close()
+	s.providers[n.Name()] = &provider{Notifier: n}
+	s.providersMu.Unlock()
+
+	if old == nil {
+		return
+	}
+	if c, ok := old.Notifier.(interface{ Close() }); ok {
+		go func() {
+			old.active.Wait()
+			c.Close()
+		}()
 	}
 }
 
