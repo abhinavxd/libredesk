@@ -1546,6 +1546,7 @@
   "importer.startingImport": "Starting import of {count} {type}",
   "importer.tagExists": "Row {row}: Error - tag already exists: \"{name}\"",
   "inbox.edit": "Edit inbox",
+  "inbox.emptyIMAP": "Empty IMAP config",
   "inbox.emptySMTP": "Empty SMTP config",
   "inbox.newInbox": "New inbox",
   "inbox.oauthAlreadyExists": "An inbox with this email already exists. Use Reconnect to update credentials.",
