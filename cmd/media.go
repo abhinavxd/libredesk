@@ -39,6 +39,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	var (
 		app     = r.Context.(*App)
 		cleanUp = false
+		auser   = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 
 	form, err := r.RequestCtx.MultipartForm()
@@ -98,14 +99,14 @@ func handleMediaUpload(r *fastglue.Request) error {
 
 	// Check if file is empty
 	if srcFileSize == 0 {
-		app.lo.Error("error: uploaded file is empty (0 bytes)")
+		app.lo.Debug("upload rejected: file is empty")
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileEmpty"), nil, envelope.InputError)
 	}
 
 	// Check file size
 	consts := app.consts.Load().(*constants)
 	if bytesToMegabytes(srcFileSize) > float64(consts.MaxFileUploadSizeMB) {
-		app.lo.Error("error: uploaded file size is larger than max allowed", "size", bytesToMegabytes(srcFileSize), "max_allowed", consts.MaxFileUploadSizeMB)
+		app.lo.Debug("upload rejected: file exceeds size limit", "size_mb", bytesToMegabytes(srcFileSize), "max_allowed_mb", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
 			fasthttp.StatusRequestEntityTooLarge,
 			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
@@ -133,22 +134,21 @@ func handleMediaUpload(r *fastglue.Request) error {
 	if slices.Contains(image.Exts, srcExt) && image.IsImageByContent(file) {
 		prepared, err := prepareImageUpload(file)
 		if err != nil {
-			cleanUp = true
-			app.lo.Error("error getting image dimensions", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorUploadingFile"), nil, envelope.GeneralError)
-		}
-		if prepared.thumbnailErr != nil {
-			app.lo.Error("error creating thumb image", "error", prepared.thumbnailErr)
+			app.lo.Warn("skipping thumbnail and dimensions, unsupported image format", "error", err)
 		} else {
-			// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
-			uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
-			if err != nil {
-				cleanUp = true
-				return sendErrorEnvelope(r, err)
+			if prepared.thumbnailErr != nil {
+				app.lo.Warn("skipping thumbnail, unsupported image format", "error", prepared.thumbnailErr)
+			} else {
+				// A failed upload returns an empty name, keep the original so cleanup can delete a partial file.
+				uploadedThumb, _, err := app.media.Upload(thumbName, srcContentType, prepared.thumbnail)
+				if err != nil {
+					cleanUp = true
+					return sendErrorEnvelope(r, err)
+				}
+				thumbName = uploadedThumb
 			}
-			thumbName = uploadedThumb
+			meta = prepared.meta
 		}
-		meta = prepared.meta
 	}
 
 	// Reset ptr.
@@ -163,7 +163,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	}
 
 	// Insert in DB.
-	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel))
+	media, err := app.media.Insert(disposition, srcFileName, srcContentType, "" /**content_id**/, null.NewString(linkedModel, linkedModel != ""), uuid.String(), null.Int{} /**model_id**/, int(srcFileSize), meta, !mmodels.IsPublicModel(linkedModel), null.IntFrom(auser.ID))
 	if err != nil {
 		cleanUp = true
 		app.lo.Error("error inserting metadata into database", "error", err)
@@ -210,6 +210,10 @@ func handleServeMedia(r *fastglue.Request) error {
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if media.ModelID.Int <= 0 && !media.UploadedByUser(auser.ID) {
+		return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
 	}
 
 	// Check if the user has permission to access the linked model.
@@ -289,14 +293,21 @@ func bytesToMegabytes(bytes int64) float64 {
 	return float64(bytes) / 1024 / 1024
 }
 
-// getUnassociatedMedia fetches media by IDs, skipping any already associated with a model.
-func getUnassociatedMedia(app *App, ids []int) ([]mmodels.Media, error) {
+func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, error) {
 	all, err := app.media.GetMany(ids)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]mmodels.Media, 0, len(all))
+	seen := make(map[int]bool, len(all))
 	for _, m := range all {
+		if !m.UploadedByUser(userID) || (m.Model.String != "" && m.Model.String != mmodels.ModelMessages) {
+			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+		}
+		if seen[m.ID] {
+			continue
+		}
+		seen[m.ID] = true
 		if m.ModelID.Int > 0 {
 			app.lo.Warn("attachment already associated with another model, skipping", "media_id", m.ID, "model", m.Model.String, "model_id", m.ModelID.Int)
 			continue

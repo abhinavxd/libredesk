@@ -27,13 +27,14 @@ import { useHelpStore } from '@widget/store/help.js'
 import { useI18n } from 'vue-i18n'
 import { useProactiveStore } from '@widget/store/proactive.js'
 import { useReplyPreviews } from '@widget/composables/useReplyPreviews.js'
+import { resolveLanguage } from '@widget/utils/language.js'
 
 const widgetStore = useWidgetStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
 const help = useHelpStore()
 const proactive = useProactiveStore()
-const { locale } = useI18n()
+const { locale, setLocaleMessage } = useI18n()
 useReplyPreviews()
 
 // Register stores for the global 401 response interceptor.
@@ -42,7 +43,10 @@ registerStores({ userStore, chatStore, widgetStore })
 // Initialize unread count tracking and sending to parent window.
 useUnreadCount()
 
-const widgetConfig = getCurrentInstance().appContext.config.globalProperties.$widgetConfig
+const globals = getCurrentInstance().appContext.config.globalProperties
+const widgetConfig = globals.$widgetConfig
+help.requestedLocale = globals.$widgetLanguagePreference || locale.value
+help.fallbackLocale = locale.value
 if (widgetConfig) {
   widgetStore.updateConfig(widgetConfig)
 }
@@ -70,7 +74,7 @@ onMounted(() => {
 })
 
 const signalWidgetLoaded = async () => {
-  if (widgetStore.config.help?.help_center_id) await help.load(locale.value)
+  if (widgetStore.config.help?.help_center_id) await help.load()
   window.parent.postMessage(
     {
       type: 'WIDGET_LOADED',
@@ -93,6 +97,37 @@ const fetchInitialConversations = async () => {
     audience?.direct_to_conversation ?? widgetStore.config?.direct_to_conversation
   if (directToConversation && success) {
     widgetStore.navigateToChat()
+  }
+}
+
+let languageRequest = 0
+const setLanguage = async (requested) => {
+  if (widgetStore.config.language !== 'auto') return
+  const request = ++languageRequest
+  try {
+    const available = await api.getAvailableLanguages()
+    const availableCodes = available.data.data.map((l) => l.code)
+    const browserLanguages = [navigator.language || navigator.languages?.[0] || '']
+    const language = resolveLanguage(widgetStore.config, requested, browserLanguages, availableCodes)
+    if (request !== languageRequest) return
+    if (language.locale === locale.value && language.requestedLocale === help.requestedLocale) return
+    if (language.locale !== locale.value) {
+      const messages = await api.getLanguage(language.locale)
+      if (request !== languageRequest) return
+      setLocaleMessage(language.locale, messages.data)
+      locale.value = language.locale
+    }
+    help.requestedLocale = language.requestedLocale
+    help.fallbackLocale = language.locale
+    if (widgetStore.config.help?.help_center_id) {
+      if (widgetStore.currentView === 'help' && widgetStore.isExpanded) {
+        widgetStore.collapseWidget()
+      }
+      help.reset()
+      await help.load()
+    }
+  } catch (error) {
+    console.error('Error switching widget language:', error)
   }
 }
 
@@ -138,6 +173,8 @@ const setupParentMessageListeners = () => {
       } finally {
         signalWidgetLoaded()
       }
+    } else if (event.data.type === 'SET_LANGUAGE') {
+      await setLanguage(event.data.language)
     } else if (event.data.type === 'SET_JWT_TOKEN') {
       if (event.data.visitorToken) {
         initVisitorToken(event.data.visitorToken)
@@ -177,7 +214,7 @@ const setupParentMessageListeners = () => {
       widgetStore.navigateToHome()
       signalWidgetLoaded()
     } else if (event.data.type === 'CAMPAIGN_CONTEXT') {
-      await proactive.next(event.data.context)
+      await proactive.next(event.data.context, event.data.pageGeneration)
     } else if (event.data.type === 'CAMPAIGN_EVENT') {
       await proactive.event(event.data.event, event.data.id)
     } else if (event.data.type === 'PAGE_VISIT') {

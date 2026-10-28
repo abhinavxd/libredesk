@@ -8,6 +8,8 @@ const readExpandArticles = () => {
 }
 
 export const useHelpStore = defineStore('help', () => {
+  const requestedLocale = ref('en-US')
+  const fallbackLocale = ref('en-US')
   const data = ref(null)
   const loading = ref(false)
   const failed = ref(false)
@@ -50,12 +52,12 @@ export const useHelpStore = defineStore('help', () => {
     collectionPath.value = []
     navigationHistory.value = []
   }
-  const load = async (locale) => {
+  const load = async () => {
     const request = ++generation
     loading.value = true
     failed.value = false
     try {
-      const response = await api.getHelp(locale)
+      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value)
       if (request === generation) data.value = response.data.data
     } catch {
       if (request === generation) {
@@ -71,6 +73,8 @@ export const useHelpStore = defineStore('help', () => {
     try { localStorage.setItem(EXPAND_KEY, String(value)) } catch { /* storage blocked */ }
   }
   return {
+    requestedLocale,
+    fallbackLocale,
     focusSearch,
     expandArticles,
     setExpandArticles,

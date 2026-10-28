@@ -3,6 +3,7 @@
     <Toaster
       class="pointer-events-auto"
       position="top-center"
+      close-button
       :theme="mode === 'auto' ? 'system' : mode"
     />
     <RouterView />

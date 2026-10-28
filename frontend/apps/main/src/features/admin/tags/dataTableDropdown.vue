@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only"></span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTag">
         <Pencil class="mr-2 h-4 w-4" />
@@ -41,16 +36,15 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import { Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
-import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,10 +55,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog/index.js'
-import { useEmitter } from '../../../composables/useEmitter.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter.js'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api/index.js'
+import api from '@/api/index.js'
 
 const { t } = useI18n()
 const alertOpen = ref(false)

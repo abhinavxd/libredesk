@@ -1,6 +1,7 @@
 import { useConversationStore } from './stores/conversation'
 import { useNotificationStore } from './stores/notification'
 import { useUsersStore } from './stores/users'
+import { useUserStore } from './stores/user'
 import { useConnectionStore } from './stores/connection'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
@@ -20,6 +21,7 @@ export class WebSocketClient {
     this.convStore = useConversationStore()
     this.notificationStore = useNotificationStore()
     this.usersStore = useUsersStore()
+    this.userStore = useUserStore()
     this.connectionStore = useConnectionStore()
     this.messageQueue = []
     this.maxQueueSize = 50
@@ -85,6 +87,9 @@ export class WebSocketClient {
           const uuid = data.data.conversation_uuid
           const isOpen = this.convStore.conversation.data?.uuid === uuid
           const isFromContact = data.data.sender_type === 'contact'
+          const isOwnMessage = data.data.sender_type === 'agent' &&
+            Number(data.data.sender_id) > 0 &&
+            Number(data.data.sender_id) === Number(this.userStore.userID)
           const convPayload = data.data.conversation
 
           if (convPayload) {
@@ -106,8 +111,8 @@ export class WebSocketClient {
             }
           }
 
-          if (!isOpen && this.convStore.isConversationInList(uuid)) {
-            this.convStore.incrementUnread(uuid)
+          if (!isOwnMessage && this.convStore.isConversationInList(uuid)) {
+            this.convStore.incrementUnread(uuid, data.data.created_at)
           }
 
           this.convStore.updateConversationMessage(data.data)
@@ -128,6 +133,7 @@ export class WebSocketClient {
             this.convStore.refreshSidebarCounts()
           }
         },
+        [WS_EVENT.CONVERSATION_READ]: () => this.convStore.applyConversationRead(data.data),
         [WS_EVENT.CONTACT_UPDATE]: () => this.convStore.mergeContactUpdate(data.data),
         [WS_EVENT.TYPING]: () => {
           this.convStore.updateTypingStatus(data.data)

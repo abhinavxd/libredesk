@@ -29,7 +29,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
 <template>
   <Dialog v-bind="forwarded">
-    <DialogContent :class="['overflow-hidden p-0 shadow-lg', props.class]">
+    <DialogContent :class="['overflow-hidden p-0 shadow-lg !animate-none', props.class]" overlay-class="!animate-none">
       <Command
         :search-term="props.searchTerm"
         :selected-value="props.selectedValue"

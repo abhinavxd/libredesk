@@ -12,6 +12,8 @@ export const useNotificationStore = defineStore('notification', () => {
   const isLoading = ref(false)
   const hasMore = ref(true)
   const emitter = useEmitter()
+  let statsRequest = 0
+  let notificationsRequest = 0
 
   const unreadNotifications = computed(() =>
     notifications.value.filter(n => !n.is_read)
@@ -23,10 +25,18 @@ export const useNotificationStore = defineStore('notification', () => {
 
   // Fetch notifications with pagination
   const fetchNotifications = async (limit = 30, offset = 0, append = false) => {
+    const request = ++notificationsRequest
     isLoading.value = true
     try {
-      const response = await api.getNotifications({ limit, offset })
-      const data = response?.data?.data || []
+      const data = []
+      while (data.length < limit) {
+        const pageLimit = Math.min(100, limit - data.length)
+        const response = await api.getNotifications({ limit: pageLimit, offset: offset + data.length })
+        if (request !== notificationsRequest) return
+        const page = response?.data?.data || []
+        data.push(...page)
+        if (page.length < pageLimit) break
+      }
 
       if (append) {
         notifications.value = [...notifications.value, ...data]
@@ -36,21 +46,23 @@ export const useNotificationStore = defineStore('notification', () => {
 
       hasMore.value = data.length === limit
     } catch (error) {
+      if (request !== notificationsRequest) return
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
         description: handleHTTPError(error).message
       })
     } finally {
-      isLoading.value = false
+      if (request === notificationsRequest) isLoading.value = false
     }
   }
 
   // Fetch notification stats (unread count)
   const fetchStats = async () => {
+    const request = ++statsRequest
     try {
       const response = await api.getNotificationStats()
       const stats = response?.data?.data
-      if (stats) {
+      if (stats && request === statsRequest) {
         unreadCount.value = stats.unread_count || 0
         totalCount.value = stats.total_count || 0
       }
@@ -93,6 +105,13 @@ export const useNotificationStore = defineStore('notification', () => {
 
     if (markedCount > 0) {
       unreadCount.value = Math.max(0, unreadCount.value - markedCount)
+    }
+  }
+
+  const refreshConversationRead = (uuid) => {
+    fetchStats()
+    if (notifications.value.some(n => !n.is_read && n.conversation_uuid === uuid)) {
+      fetchNotifications(Math.max(30, notifications.value.length))
     }
   }
 
@@ -152,7 +171,7 @@ export const useNotificationStore = defineStore('notification', () => {
   const addNotification = (notification) => {
     // Add to the beginning of the list
     notifications.value.unshift(notification)
-    unreadCount.value += 1
+    if (!notification.is_read) unreadCount.value += 1
     totalCount.value += 1
   }
 
@@ -173,6 +192,7 @@ export const useNotificationStore = defineStore('notification', () => {
     fetchNotifications,
     fetchStats,
     markAsRead,
+    refreshConversationRead,
     markAssignmentAsReadForConversation,
     markAllAsRead,
     deleteNotification,

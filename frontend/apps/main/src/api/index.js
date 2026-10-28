@@ -156,6 +156,7 @@ const login = (data) => http.post(`/api/v1/auth/login`, data, {
     'Content-Type': 'application/json'
   }
 })
+const logout = () => http.post(`/api/v1/auth/logout`)
 const getAutomationRules = (type) =>
   http.get(`/api/v1/automations/rules`, {
     params: { type: type }
@@ -335,7 +336,7 @@ const updateConversationPriority = (uuid, data) =>
       'Content-Type': 'application/json'
     }
   })
-const updateAssigneeLastSeen = (uuid) => http.put(`/api/v1/conversations/${uuid}/last-seen`)
+const updateAssigneeLastSeen = (uuid, messageUUID) => http.put(`/api/v1/conversations/${uuid}/last-seen`, { message_uuid: messageUUID })
 const markConversationAsUnread = (uuid) => http.put(`/api/v1/conversations/${uuid}/mark-unread`)
 const getConversationMessage = (cuuid, uuid) =>
   http.get(`/api/v1/conversations/${cuuid}/messages/${uuid}`)
@@ -421,6 +422,26 @@ const updateInbox = (id, data) =>
     }
   })
 const deleteInbox = (id) => http.delete(`/api/v1/inboxes/${id}`)
+const verifyInboxAlias = (id, data) => http.post(`/api/v1/inboxes/${id}/aliases/verify`, data)
+
+const getWhatsAppTemplates = (inboxId) =>
+  http.get('/api/v1/whatsapp/templates', { params: { inbox_id: inboxId } })
+const getWhatsAppTemplate = (id) => http.get(`/api/v1/whatsapp/templates/${id}`)
+const updateWhatsAppTemplate = (id, data) =>
+  http.put(`/api/v1/whatsapp/templates/${id}`, data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const createWhatsAppTemplate = (data) =>
+  http.post('/api/v1/whatsapp/templates', data, {
+    headers: { 'Content-Type': 'application/json' }
+  })
+const deleteWhatsAppTemplate = (id) => http.delete(`/api/v1/whatsapp/templates/${id}`)
+const syncWhatsAppTemplates = (inboxId) =>
+  http.post(`/api/v1/whatsapp/templates/sync?inbox_id=${inboxId}`, {})
+const getWhatsAppOpenConversation = (contactId, inboxId) =>
+  http.get(`/api/v1/whatsapp/contacts/${contactId}/open-conversation`, {
+    params: { inbox_id: inboxId }
+  })
 const saveDraft = (uuid, type, data) =>
   http.post(`/api/v1/conversations/${uuid}/draft`, { ...data, type }, {
     headers: {
@@ -643,6 +664,7 @@ const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaig
 export default {
  getCampaignStats,
   login,
+  logout,
   deleteUser,
   importAgents,
   getAgentImportStatus,
@@ -731,6 +753,14 @@ export default {
   updateInbox,
   deleteInbox,
   toggleInbox,
+  verifyInboxAlias,
+  getWhatsAppTemplates,
+  getWhatsAppTemplate,
+  updateWhatsAppTemplate,
+  createWhatsAppTemplate,
+  deleteWhatsAppTemplate,
+  syncWhatsAppTemplates,
+  getWhatsAppOpenConversation,
   createTeam,
   updateTeam,
   getSettings,

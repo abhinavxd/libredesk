@@ -1,15 +1,24 @@
 <template>
-  <div
-    v-if="banner"
-    role="status"
-    aria-live="polite"
-    aria-atomic="true"
-    class="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shadow-md"
-    :class="banner.colorClass"
+  <Transition
+    enter-active-class="transition-opacity duration-150 ease-out motion-reduce:duration-100"
+    enter-from-class="opacity-0"
+    enter-to-class="opacity-100"
+    leave-active-class="transition-opacity duration-100 ease-out"
+    leave-from-class="opacity-100"
+    leave-to-class="opacity-0"
   >
-    <div class="w-2 h-2 rounded-full bg-current animate-pulse"></div>
-    {{ banner.text }}
-  </div>
+    <div
+      v-if="banner"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      class="fixed top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-4 py-1.5 text-sm shadow-md"
+      :class="banner.colorClass"
+    >
+      <div class="w-2 h-2 rounded-full bg-current animate-pulse"></div>
+      {{ banner.text }}
+    </div>
+  </Transition>
 </template>
 
 <script setup>

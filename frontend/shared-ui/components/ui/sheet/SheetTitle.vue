@@ -1,7 +1,7 @@
 <script setup>
 import { reactiveOmit } from '@vueuse/core';
 import { DialogTitle } from 'radix-vue';
-import { cn } from '../../../lib/utils';
+import { cn } from '@shared-ui/lib/utils';
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -14,7 +14,7 @@ const delegatedProps = reactiveOmit(props, 'class');
 
 <template>
   <DialogTitle
-    :class="cn('text-lg font-semibold text-foreground', props.class)"
+    :class="cn('ui-dialog-heading', props.class)"
     v-bind="delegatedProps"
   >
     <slot />

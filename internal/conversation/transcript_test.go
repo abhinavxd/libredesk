@@ -1,12 +1,14 @@
 package conversation
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/volatiletech/null/v9"
 )
@@ -67,6 +69,32 @@ func TestBuildTranscript(t *testing.T) {
 	for _, want := range wantContains {
 		if !strings.Contains(out, want) {
 			t.Errorf("transcript missing %q\n---\n%s", want, out)
+		}
+	}
+}
+
+func TestBuildTranscriptArticleReferences(t *testing.T) {
+	m := Manager{
+		articleReferenceStore: citationArticleStore{references: []hcmodels.ArticleReference{
+			{ID: 12, Title: "Refund policy", HelpCenterSlug: "support", Locale: "en", Slug: "refunds"},
+		}},
+		settingsStore: citationSettingsStore{rootURL: "https://desk.example.com"},
+		i18n:          testutil.NewI18n(t),
+	}
+	for _, text := range []string{"Answer.", ""} {
+		messages := []models.Message{{
+			Content:     "<p>Answer.</p>",
+			TextContent: text,
+			Meta:        json.RawMessage(`{"ai_assistant_id":1,"ai_article_ids":[12]}`),
+		}}
+		out := string(m.BuildTranscript(models.Conversation{}, messages, time.Now() /* downloadedAt */))
+		for _, want := range []string{"Answer.", "Article references", "Refund policy", "https://desk.example.com/hc/support/en/articles/refunds"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("transcript missing %q: %s", want, out)
+			}
+		}
+		if strings.Contains(messages[0].Content, "https://") {
+			t.Fatal("transcript rendering changed the saved reply")
 		}
 	}
 }

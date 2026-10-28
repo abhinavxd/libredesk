@@ -8,6 +8,7 @@ import (
 	realip "github.com/ferluci/fast-realip"
 	"github.com/redis/go-redis/v9"
 	"github.com/valyala/fasthttp"
+	"github.com/zerodha/logf"
 )
 
 // Rule defines a rate limiting rule for a named group of endpoints.
@@ -21,12 +22,14 @@ type Rule struct {
 type Limiter struct {
 	redis *redis.Client
 	rules map[string]Rule
+	lo    *logf.Logger
 }
 
 // New creates a new rate limiter.
-func New(redisClient *redis.Client) *Limiter {
+func New(redisClient *redis.Client, lo *logf.Logger) *Limiter {
 	return &Limiter{
 		redis: redisClient,
+		lo:    lo,
 		rules: make(map[string]Rule),
 	}
 }
@@ -58,6 +61,7 @@ func (l *Limiter) Check(ctx *fasthttp.RequestCtx, ruleName string) error {
 	countCmd := pipe.ZCard(ctx, key)
 	pipe.Expire(ctx, key, time.Minute*2)
 	if _, err := pipe.Exec(ctx); err != nil {
+		l.lo.Warn("rate limit check unavailable, allowing request", "rule", ruleName, "error", err)
 		return nil
 	}
 

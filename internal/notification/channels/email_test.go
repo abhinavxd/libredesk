@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/notification/models"
+	"github.com/volatiletech/null/v9"
 )
 
 type emailQueueStub struct {
@@ -59,5 +60,37 @@ func TestEmailProviderSchedulesDelay(t *testing.T) {
 	})
 	if !result.Sent || len(queue.delayed) != 1 || queue.delay != time.Minute {
 		t.Fatalf("unexpected delivery: result=%#v queue=%#v", result, queue)
+	}
+}
+
+func TestEmailProviderKeepsNotificationAndMessageReferences(t *testing.T) {
+	for _, delay := range []time.Duration{0, 5 * time.Minute} {
+		t.Run(delay.String(), func(t *testing.T) {
+			queue := &emailQueueStub{}
+			result := NewEmail(queue).Send(Delivery{
+				Recipient: models.Recipient{UserID: 42, Email: &models.EmailNotification{
+					Recipient: "agent@example.com", Subject: "New reply", Content: "Latest reply", Delay: delay,
+				}},
+				NotificationID: null.IntFrom(7),
+				Notification: models.Notification{
+					Type: models.NotificationTypeNewReply, ConversationID: null.IntFrom(8), MessageID: null.IntFrom(9),
+				},
+			})
+			if !result.Sent {
+				t.Fatal("email was not accepted by the queue")
+			}
+			messages := queue.sent
+			if delay > 0 {
+				messages = queue.delayed
+			}
+			want := models.Email{
+				UserID: 42, NotificationID: null.IntFrom(7), Type: models.NotificationTypeNewReply,
+				ConversationID: null.IntFrom(8), MessageID: null.IntFrom(9),
+				Recipient: "agent@example.com", Subject: "New reply", Content: "Latest reply",
+			}
+			if len(queue.sent)+len(queue.delayed) != 1 || len(messages) != 1 || messages[0] != want || queue.delay != delay {
+				t.Fatalf("queued messages = %#v, delay = %v, want %#v after %v", messages, queue.delay, want, delay)
+			}
+		})
 	}
 }

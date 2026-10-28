@@ -1,4 +1,5 @@
 import { differenceInMinutes } from 'date-fns'
+import { getRelativeTime } from '@shared-ui/utils/datetime'
 
 /**
  * Calculates the SLA (Service Level Agreement) status based on the due date.
@@ -20,7 +21,7 @@ export function calculateSla (dueAt, actualAt) {
         if (diffInMinutes >= 2880) {
             return {
                 status: 'remaining',
-                value: `${Math.floor(diffInMinutes / 1440)}d`
+                value: getRelativeTime(compareTime, dueTime)
             }
         }
         return {
@@ -38,7 +39,7 @@ export function calculateSla (dueAt, actualAt) {
     if (overdueMins >= 2880) {
         return {
             status,
-            value: `${Math.floor(overdueMins / 1440)}d`
+            value: diffInMinutes < 0 ? getRelativeTime(dueTime, compareTime) : getRelativeTime(compareTime, dueTime)
         }
     }
     return {

@@ -62,7 +62,7 @@
       </FormItem>
     </FormField>
 
-    <div class="grid gap-6 md:grid-cols-3">
+    <FormGrid compact>
       <FormField v-slot="{ componentField }" name="tone">
         <FormItem>
           <FormLabel>{{ t('admin.ai.assistant.tone') }}</FormLabel>
@@ -115,7 +115,7 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="languages">
       <FormItem>
@@ -131,6 +131,17 @@
         </FormControl>
         <FormDescription>{{ t('admin.ai.assistant.languagesHint') }}</FormDescription>
         <FormMessage />
+      </FormItem>
+    </FormField>
+
+    <FormField v-slot="{ componentField, handleChange, meta }" name="citations_enabled">
+      <FormItem>
+        <SwitchField
+          :title="t('admin.ai.assistant.includeArticleReferences')"
+          :description="t('admin.ai.assistant.includeArticleReferencesHint')"
+          :checked="componentField.modelValue"
+          @update:checked="(value) => handleChange(value, meta.validated)"
+        />
       </FormItem>
     </FormField>
 
@@ -200,7 +211,7 @@
 
     <div class="space-y-2">
       <div class="text-sm font-medium leading-none">{{ t('admin.ai.assistant.tools') }}</div>
-      <p class="text-sm text-muted-foreground">{{ t('admin.ai.assistant.toolsHint') }}</p>
+      <p class="ui-description">{{ t('admin.ai.assistant.toolsHint') }}</p>
       <div class="space-y-3 mt-3">
         <div v-for="tool in tools" :key="tool.id" class="flex items-center space-x-2">
           <Checkbox
@@ -212,7 +223,7 @@
             {{ tool.name }}
           </label>
         </div>
-        <p v-if="!tools.length" class="text-sm text-muted-foreground">
+        <p v-if="!tools.length" class="ui-description">
           {{ t('admin.ai.assistant.toolsEmpty') }}
         </p>
       </div>
@@ -227,6 +238,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -285,7 +297,9 @@ const avatarFile = ref(null)
 const avatarPreview = ref('')
 const removeAvatar = ref(false)
 
-const avatarInitials = computed(() => (form.values.name || '').trim().charAt(0).toUpperCase() || 'A')
+const avatarInitials = computed(
+  () => (form.values.name || '').trim().charAt(0).toUpperCase() || 'A'
+)
 
 const onAvatarUpload = (file) => {
   if (!file) return
@@ -317,6 +331,7 @@ const form = useForm({
         .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
       fallback_team_id: z.string().optional(),
       handoff_enabled: z.boolean().optional(),
+      citations_enabled: z.boolean().optional(),
       languages: z.array(z.string()).optional(),
       instructions: z.string().optional(),
       guardrails: z.string().optional(),
@@ -332,6 +347,7 @@ const form = useForm({
     max_turns: 6,
     fallback_team_id: 'none',
     handoff_enabled: true,
+    citations_enabled: true,
     languages: [],
     instructions: '',
     guardrails: '',
@@ -360,6 +376,7 @@ watch(
         max_turns: values.max_turns ?? 6,
         fallback_team_id: values.fallback_team_id ? String(values.fallback_team_id) : 'none',
         handoff_enabled: values.handoff_enabled ?? true,
+        citations_enabled: values.citations_enabled ?? !props.isEditing,
         languages: [...(values.languages || [])],
         instructions: values.instructions || '',
         guardrails: values.guardrails || '',
@@ -404,6 +421,7 @@ const onSubmit = form.handleSubmit(async (values) => {
           ? Number(values.fallback_team_id)
           : null,
       handoff_enabled: !!values.handoff_enabled,
+      citations_enabled: !!values.citations_enabled,
       languages: values.languages || [],
       instructions: values.instructions || '',
       guardrails: values.guardrails || '',

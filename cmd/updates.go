@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -37,31 +36,22 @@ type AppUpdate struct {
 	} `json:"messages"`
 }
 
-var reSemver = regexp.MustCompile(`-(.*)`)
-
 // checkUpdates is a blocking function that checks for updates to the app
 // at the given intervals. On detecting a new update (new semver), it
 // sets the global update status that renders a prompt on the UI.
 func checkUpdates(curVersion string, interval time.Duration, app *App) {
-	// Strip -* suffix.
-	curVersion = reSemver.ReplaceAllString(curVersion, "")
-
 	client := &http.Client{Timeout: updateCheckTimeout}
 
 	fnCheck := func() {
 		out, err := fetchAppUpdate(client, updateCheckURL)
 		if err != nil {
-			app.lo.Error("error checking for app updates", "err", err)
+			app.lo.Warn("error checking for app updates", "err", err)
 			return
 		}
 
-		// There is an update. Set it on the global app state.
-		if semver.IsValid(out.Update.ReleaseVersion) {
-			v := reSemver.ReplaceAllString(out.Update.ReleaseVersion, "")
-			if semver.Compare(v, curVersion) > 0 {
-				out.Update.IsNew = true
-				app.lo.Info("new update available", "version", out.Update.ReleaseVersion)
-			}
+		if isNewRelease(curVersion, out.Update.ReleaseVersion) {
+			out.Update.IsNew = true
+			app.lo.Info("new update available", "version", out.Update.ReleaseVersion)
 		}
 
 		app.Lock()
@@ -81,6 +71,10 @@ func checkUpdates(curVersion string, interval time.Duration, app *App) {
 	for range ticker.C {
 		fnCheck()
 	}
+}
+
+func isNewRelease(curVersion, releaseVersion string) bool {
+	return semver.IsValid(releaseVersion) && semver.Compare(releaseVersion, curVersion) > 0
 }
 
 func fetchAppUpdate(client *http.Client, url string) (*AppUpdate, error) {

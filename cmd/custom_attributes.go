@@ -16,6 +16,7 @@ var (
 	// disallowedKeys contains keys that are not allowed for custom attributes as they're the default fields.
 	disallowedKeys = []string{
 		"contact_email",
+		"to",
 		"content",
 		"subject",
 		"status",
@@ -27,6 +28,10 @@ var (
 		"hours_since_last_reply",
 		"hours_since_resolved",
 		"inbox",
+		"previous_status",
+		"previous_priority",
+		"previous_assigned_user",
+		"previous_assigned_team",
 	}
 )
 

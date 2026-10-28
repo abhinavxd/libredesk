@@ -1,15 +1,15 @@
 import { h } from 'vue'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 
 export const createColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         onEdit
           ? h('span', {
               class: 'text-foreground font-medium hover:underline cursor-pointer',
@@ -21,22 +21,24 @@ export const createColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
+      return h('div', null, t('globals.terms.updatedAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('updated_at') })
     }
   },
   {

@@ -1,6 +1,6 @@
 <script setup>
 import { Primitive } from 'reka-ui'
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 import { buttonVariants } from '.'
 import { Loader2 } from 'lucide-vue-next'
 const props = defineProps({
@@ -20,14 +20,14 @@ const props = defineProps({
     :as-child="asChild"
     :class="cn(buttonVariants({ variant, size }), 'relative', props.class)"
     :disabled="isLoading || disabled"
+    :aria-busy="isLoading || undefined"
   >
-    <!-- display:contents keeps the button's flex/gap layout; the spinner inherits the variant's text color. -->
     <span class="contents" :class="{ invisible: isLoading }"><slot /></span>
     <span
       v-if="isLoading"
       class="absolute inset-0 flex items-center justify-center pointer-events-none"
     >
-      <Loader2 class="h-5 w-5 animate-spin" />
+      <Loader2 class="h-5 w-5 animate-spin" aria-hidden="true" />
     </span>
   </Primitive>
 </template>

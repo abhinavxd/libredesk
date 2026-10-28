@@ -199,7 +199,7 @@ func handleChatInit(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat init request", "error", err)
+		app.lo.Debug("error unmarshalling chat init request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -388,7 +388,7 @@ func handleAuthExchange(r *fastglue.Request) error {
 	// Verify the customer-generated JWT.
 	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
 	if err != nil {
-		app.lo.Error("invalid JWT in auth exchange", "error", err)
+		app.lo.Warn("widget authentication rejected: invalid JWT", "inbox_id", inbox.ID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
@@ -431,7 +431,9 @@ func handleAuthExchange(r *fastglue.Request) error {
 	sessionTTL := getSessionDuration(config)
 
 	sendSession := func(token string) error {
-		app.redis.Set(ctx, reverseKey, token, sessionTTL)
+		if err := app.redis.Set(ctx, reverseKey, token, sessionTTL).Err(); err != nil {
+			app.lo.Warn("error indexing widget session", "inbox_id", inbox.ID, "contact_id", contactID, "error", err)
+		}
 		return r.SendEnvelope(map[string]any{
 			"session_token": token,
 			"user": map[string]any{
@@ -557,7 +559,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat message request", "error", err)
+		app.lo.Debug("error unmarshalling chat message request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -723,7 +725,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Check file size
 	consts := app.consts.Load().(*constants)
 	if bytesToMegabytes(srcFileSize) > float64(consts.MaxFileUploadSizeMB) {
-		app.lo.Error("error: uploaded file size is larger than max allowed", "size", bytesToMegabytes(srcFileSize), "max_allowed", consts.MaxFileUploadSizeMB)
+		app.lo.Debug("widget upload rejected: file exceeds size limit", "size_mb", bytesToMegabytes(srcFileSize), "max_allowed_mb", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
 			fasthttp.StatusRequestEntityTooLarge,
 			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
@@ -794,6 +796,7 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 		CreatedAt:        message.CreatedAt,
 		Content:          message.Content,
 		TextContent:      message.TextContent,
+		ContentType:      message.ContentType,
 		ConversationUUID: message.ConversationUUID,
 		Status:           message.Status,
 		Author:           author,
@@ -825,7 +828,7 @@ func getContactConversation(r *fastglue.Request, conversationUUID string) (int, 
 	}
 
 	if conversation.ContactID != contactID || conversation.InboxID != inbox.ID {
-		app.lo.Error("unauthorized access to conversation", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
+		app.lo.Warn("widget conversation access denied: contact or inbox does not match", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
 		return 0, cmodels.Conversation{}, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 	}
 
@@ -1087,6 +1090,7 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 
 	data, err := app.redis.HGetAll(ctx, key).Result()
 	if err != nil {
+		app.lo.Error("error loading widget session", "error", err)
 		return nil, fmt.Errorf("looking up session: %w", err)
 	}
 	if len(data) == 0 {
@@ -1101,7 +1105,9 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 	if isVisitor {
 		ttl = defaultSessionTTL
 	}
-	app.redis.Expire(ctx, key, ttl)
+	if err := app.redis.Expire(ctx, key, ttl).Err(); err != nil {
+		app.lo.Warn("error refreshing widget session expiry", "inbox_id", inboxID, "contact_id", userID, "error", err)
+	}
 
 	return &WidgetSession{
 		UserID:         userID,
@@ -1113,7 +1119,9 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 
 // deleteSessionToken removes a session from Redis.
 func deleteSessionToken(app *App, token string) {
-	app.redis.Del(context.Background(), widgetSessionPrefix+token)
+	if err := app.redis.Del(context.Background(), widgetSessionPrefix+token).Err(); err != nil {
+		app.lo.Error("error deleting widget session", "error", err)
+	}
 }
 
 // marshalCustomAttributes marshals custom attributes to JSON, returning "{}" on error or empty input.
@@ -1225,7 +1233,7 @@ func validateAttributeValue(key string, value any, app *App) any {
 		const maxValueLength = 1000
 		if len(strValue) > maxValueLength {
 			app.lo.Warn("form field value exceeds maximum length", "key", key, "length", len(strValue), "max", maxValueLength)
-			return strValue[:maxValueLength]
+			return stringutil.TruncateUTF8(strValue, maxValueLength)
 		}
 		return strValue
 	}

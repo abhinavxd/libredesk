@@ -110,7 +110,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         icon: CheckCircle2,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
         shortcut: ['Alt', 'E'],
-        run: () => conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.RESOLVED)
+        run: () => conversationStore.updateStatus(conv.uuid, CONVERSATION_DEFAULT_STATUSES.RESOLVED)
       })
     }
     if (REOPENABLE_STATUSES.includes(current)) {
@@ -122,7 +122,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         icon: RotateCcw,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
         shortcut: ['Alt', 'O'],
-        run: () => conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.OPEN)
+        run: () => conversationStore.updateStatus(conv.uuid, CONVERSATION_DEFAULT_STATUSES.OPEN)
       })
     }
     commands.push(...snoozeCommands())
@@ -144,7 +144,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         parent: 'conv.status',
         icon: isSnooze ? CalendarClock : CircleDot,
         navigateTo: isSnooze ? SNOOZE_COMMAND : undefined,
-        run: isSnooze ? undefined : () => conversationStore.updateStatus(status.label)
+        run: isSnooze ? undefined : () => conversationStore.updateStatus(conv.uuid, status.label)
       })
     }
     return commands

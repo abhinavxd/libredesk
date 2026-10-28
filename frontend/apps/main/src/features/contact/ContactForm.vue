@@ -54,6 +54,7 @@
                 v-bind="componentField"
                 :items="countryOptions"
                 :placeholder="t('globals.terms.select')"
+                button-class="bg-transparent"
               >
                 <template #item="{ item }">
                   <div class="flex items-center gap-2">

@@ -2,16 +2,16 @@ import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import UserDataTableDropDown from '@/features/admin/agents/dataTableDropdown.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 
 export const createColumns = (t) => [
   {
     accessorKey: 'first_name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.firstName'))
+      return h('div', null, t('globals.terms.firstName'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-agent', params: { id: row.original.id } },
@@ -25,22 +25,23 @@ export const createColumns = (t) => [
   {
     accessorKey: 'last_name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.lastName'))
+      return h('div', null, t('globals.terms.lastName'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('last_name'))
+      return h('div', null, row.getValue('last_name'))
     }
   },
   {
     accessorKey: 'enabled',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.status'))
+      return h('div', null, t('globals.terms.status'))
     },
     cell: function ({ row }) {
       return h(
         'div',
-        { class: 'text-center' },
+        null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
           row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
         )
@@ -50,38 +51,32 @@ export const createColumns = (t) => [
   {
     accessorKey: 'email',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.email'))
+      return h('div', null, t('globals.terms.email'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('email'))
+      return h('div', null, row.getValue('email'))
     }
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('created_at'), 'PPpp')
-      )
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
+      return h('div', null, t('globals.terms.updatedAt'))
     },
     cell: function ({ row }) {
-      return h(
-        'div',
-        { class: 'text-center' },
-        format(row.getValue('updated_at'), 'PPpp')
-      )
+      return h(TableDate, { value: row.getValue('updated_at') })
     }
   },
   {

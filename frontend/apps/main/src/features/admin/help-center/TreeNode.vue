@@ -1,13 +1,16 @@
 <template>
   <Collapsible v-if="item.type === 'collection'" v-model:open="isOpen" as-child>
-    <section :class="depth === 0 ? 'overflow-hidden rounded-lg border bg-card' : 'border-t'">
+    <section
+      class="motion-reduce:transition-opacity motion-reduce:duration-100 motion-reduce:ease-out"
+      :class="depth === 0 ? 'overflow-hidden rounded-lg border bg-card' : 'border-t'"
+    >
       <div
         class="group tree-node tree-node--collection"
         :class="{ 'tree-node--selected': isSelected }"
         :style="indentStyle"
       >
         <GripVertical
-          class="drag-handle -m-1 h-4 w-4 flex-shrink-0 cursor-grab p-1 text-muted-foreground opacity-0 group-hover:opacity-100 box-content"
+          :class="DRAG_HANDLE_CLASS"
           aria-hidden="true"
           @click.stop
         />
@@ -78,12 +81,14 @@
           :scroll-sensitivity="120"
           :scroll-speed="18"
           ghost-class="tree-node--ghost"
+          :animation="reducedMotion === 'reduce' ? 0 : 200"
+          easing="cubic-bezier(0.23, 1, 0.32, 1)"
           @change="onArticleChange"
         >
           <template #header>
             <p
               v-if="!childCollections.length && !articles.length"
-              class="px-4 py-2.5 text-sm text-muted-foreground"
+              class="px-4 py-2.5 ui-description"
               :style="childIndentStyle"
             >
               {{ $t('globals.messages.empty', { name: $t('globals.terms.collection') }) }}
@@ -117,6 +122,8 @@
           :scroll-sensitivity="120"
           :scroll-speed="18"
           ghost-class="tree-node--ghost"
+          :animation="reducedMotion === 'reduce' ? 0 : 200"
+          easing="cubic-bezier(0.23, 1, 0.32, 1)"
           @end="emitCollectionOrder"
         >
           <template #item="{ element, index }">
@@ -145,12 +152,12 @@
 
   <div
     v-else
-    class="group tree-node"
+    class="group tree-node motion-reduce:transition-opacity motion-reduce:duration-100 motion-reduce:ease-out"
     :class="{ 'tree-node--selected': isSelected }"
     :style="indentStyle"
   >
     <GripVertical
-      class="drag-handle -m-1 h-4 w-4 flex-shrink-0 cursor-grab p-1 text-muted-foreground opacity-0 group-hover:opacity-100 box-content"
+      :class="DRAG_HANDLE_CLASS"
       aria-hidden="true"
       @click.stop
     />
@@ -186,8 +193,11 @@
 </template>
 
 <script setup>
+const DRAG_HANDLE_CLASS = 'drag-handle -m-1 h-4 w-4 flex-shrink-0 cursor-grab p-1 text-muted-foreground opacity-0 group-hover:opacity-100 box-content'
+
 import { ref, computed, watch, inject } from 'vue'
 import Draggable from 'vuedraggable'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
@@ -200,6 +210,8 @@ import TreeDropdown from './TreeDropdown.vue'
 import { moveWithin } from './treeReorder.js'
 
 const { t } = useI18n()
+
+const reducedMotion = usePreferredReducedMotion()
 
 const props = defineProps({
   item: {

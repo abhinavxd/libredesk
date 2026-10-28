@@ -21,7 +21,7 @@ jobs:
         shard: [1, 2, 3, 4, 5]
     services:
       db:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         ports:
           - 5432:5432
         env:
@@ -34,11 +34,11 @@ jobs:
           --health-timeout=5s
           --health-retries=5
       redis:
-        image: redis
+        image: mirror.gcr.io/library/redis:latest
         ports:
           - 6379:6379
       mailhog:
-        image: mailhog/mailhog
+        image: mirror.gcr.io/mailhog/mailhog:latest
         ports:
           - 1025:1025
           - 8025:8025
@@ -49,17 +49,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.25.0"
-
-      - name: Install pnpm
-        run: npm install -g pnpm@9.15.3
+          go-version: "1.27.3"
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          node-version: "24"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+          cache: true
+          cache_dependency_path: frontend/pnpm-lock.yaml
 
       - name: Cache the cypress binary
         uses: actions/cache@v4
@@ -94,11 +96,24 @@ jobs:
           # The livechat widget suite makes far more than 100 widget requests a minute.
           LIBREDESK_RATE_LIMIT__WIDGET__REQUESTS_PER_MINUTE: "100000"
           LIBREDESK_RATE_LIMIT__PUBLIC__REQUESTS_PER_MINUTE: "100000"
+          # The WhatsApp suite drives the channel against the stand-in Graph API cypress starts.
+          LIBREDESK_WHATSAPP__API_URL: "http://127.0.0.1:9099"
           CYPRESS_SYSTEM_PASSWORD: "StrongPass!123"
           CYPRESS_MAILHOG_URL: "http://localhost:8025"
         run: |
           ./libredesk --install --idempotent-install --yes --config ./config.toml
           ./libredesk --upgrade --yes --config ./config.toml
+          # Fixtures simulate incoming messages through the contact writing permission.
+          docker exec -i '${{ job.services.db.id }}' psql -U libredesk -d libredesk -v ON_ERROR_STOP=1 <<'SQL'
+          WITH fixture_role AS (
+            INSERT INTO roles (name, description, permissions)
+            VALUES ('Cypress contact writer', 'Create incoming test messages', '{messages:write_as_contact}')
+            RETURNING id
+          )
+          INSERT INTO user_roles (user_id, role_id)
+          SELECT users.id, fixture_role.id FROM users CROSS JOIN fixture_role
+          WHERE users.email = 'System';
+          SQL
           ./libredesk --config ./config.toml &
           for i in $(seq 1 60); do
             if [ "$(curl --connect-timeout 1 --max-time 2 -s -o /dev/null -w '%{http_code}' http://localhost:9000/ || true)" = "200" ]; then

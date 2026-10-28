@@ -24,6 +24,8 @@ vi.mock('@main/stores/user', () => ({
 
 import api from '@main/api'
 import { useMacroStore } from '@main/stores/macro'
+import { useCommandPalette } from '@main/features/command/useCommandPalette'
+import { MACRO_CONTEXT } from '@main/constants/conversation'
 
 const compactMacro = (overrides = {}) => ({
   id: 1,
@@ -43,6 +45,31 @@ describe('macro store', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     userMock.allowed = null
+    useCommandPalette().setMacroContext(MACRO_CONTEXT.REPLY)
+  })
+
+  it.each(['replying', 'adding_private_note'])('restores %s macros after hiding the new composer', async (view) => {
+    api.searchMacros.mockResolvedValue({ data: { data: [] } })
+    const store = useMacroStore()
+    const palette = useCommandPalette()
+    store.setCurrentView(view)
+    palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+    await store.searchMacros()
+    expect(api.searchMacros).toHaveBeenLastCalledWith({ view: 'starting_conversation' })
+    palette.setMacroContext(MACRO_CONTEXT.REPLY)
+    await store.searchMacros()
+    expect(api.searchMacros).toHaveBeenLastCalledWith({ view })
+  })
+
+  it('uses the latest reply mode when the new composer closes', () => {
+    const store = useMacroStore()
+    const palette = useCommandPalette()
+    store.setCurrentView('replying')
+    palette.setMacroContext(MACRO_CONTEXT.NEW_CONVERSATION)
+    store.setCurrentView('adding_private_note')
+    expect(store.currentView).toBe('starting_conversation')
+    palette.setMacroContext(MACRO_CONTEXT.REPLY)
+    expect(store.currentView).toBe('adding_private_note')
   })
 
   it('searches with the query and the current view', async () => {

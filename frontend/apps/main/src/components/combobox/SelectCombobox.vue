@@ -17,7 +17,7 @@
     <template #item="{ item }">
       <div class="flex items-center gap-2">
         <!--USER -->
-        <div v-if="type === 'user'" class="relative">
+        <div v-if="type === 'user'" class="relative flex shrink-0">
           <Avatar class="w-7 h-7">
             <AvatarImage :src="item.avatar_url || ''" :alt="item.label.slice(0, 2)" />
             <AvatarFallback>{{ item.label.slice(0, 2).toUpperCase() }}</AvatarFallback>
@@ -26,11 +26,12 @@
             v-if="item.availability_status"
             :status="item.availability_status"
             size="sm"
-            class="absolute bottom-0 right-0 border border-background"
+            class="absolute bottom-0 right-0"
           />
         </div>
 
         <!-- Others -->
+        <PriorityMarker v-else-if="type === 'priority'" :priority="item.label" :tooltip="false" />
         <span v-else-if="item.emoji">{{ item.emoji }}</span>
         <span>{{ item.label }}</span>
         <span v-if="isCurrentUser(item)" class="text-muted-foreground text-xs"
@@ -44,7 +45,7 @@
       <div class="flex items-center gap-2 min-w-0">
         <div v-if="selected" class="flex items-center gap-2 min-w-0">
           <!--USER -->
-          <div v-if="type === 'user'" class="relative shrink-0">
+          <div v-if="type === 'user'" class="relative flex shrink-0">
             <Avatar class="w-7 h-7">
               <AvatarImage :src="selected.avatar_url || ''" :alt="selected.label.slice(0, 2)" />
               <AvatarFallback>{{ selected.label.slice(0, 2).toUpperCase() }}</AvatarFallback>
@@ -53,20 +54,23 @@
               v-if="selected.availability_status"
               :status="selected.availability_status"
               size="sm"
-              class="absolute bottom-0 right-0 border border-background"
+              class="absolute bottom-0 right-0"
             />
           </div>
 
           <!-- Others -->
+          <PriorityMarker
+            v-else-if="type === 'priority'"
+            :priority="selected.label"
+            :tooltip="false"
+          />
           <span v-else-if="selected.emoji" class="shrink-0">{{ selected.emoji }}</span>
           <span class="truncate">{{ selected.label }}</span>
-          <span
-            v-if="isCurrentUser(selected)"
-            class="text-muted-foreground text-xs shrink-0"
+          <span v-if="isCurrentUser(selected)" class="text-muted-foreground text-xs shrink-0"
             >({{ t('globals.terms.you') }})</span
           >
         </div>
-        <span v-else class="truncate">{{ placeholder }}</span>
+        <span v-else class="truncate font-normal text-muted-foreground">{{ placeholder }}</span>
       </div>
     </template>
   </ComboBox>
@@ -77,6 +81,7 @@ import { computed } from 'vue'
 import { Avatar, AvatarImage, AvatarFallback } from '@shared-ui/components/ui/avatar'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
+import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()

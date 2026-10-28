@@ -38,7 +38,9 @@ func (e *Engine) evalConversationRules(rules []models.Rule, conversation cmodels
 			e.suppress(conversation.UUID)
 			for _, action := range rule.Actions {
 				if err := e.conversationStore.ApplyAction(action, conversation, umodels.User{}); err != nil {
-					e.lo.Error("error applying action on conversation", "action", action, "conversation_uuid", conversation.UUID, "error", err)
+					e.lo.Error("error applying action on conversation", "rule_id", rule.ID, "action", action, "conversation_uuid", conversation.UUID, "error", err)
+				} else {
+					e.lo.Info("automation action completed", "rule_id", rule.ID, "action", action.Type, "conversation_uuid", conversation.UUID)
 				}
 			}
 			e.unsuppress(conversation.UUID)
@@ -119,6 +121,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 		switch rule.Field {
 		case models.ContactEmail:
 			valueToCompare = conversation.Contact.Email.String
+			// Email addresses are case-insensitive, older rules may still carry the flag.
+			rule.CaseSensitiveMatch = false
 		case models.ConversationSubject:
 			valueToCompare = conversation.Subject.String
 		case models.ConversationContent:
@@ -149,6 +153,12 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			if !conversation.ResolvedAt.IsZero() {
 				valueToCompare = fmt.Sprintf("%.0f", (time.Since(conversation.ResolvedAt.Time).Hours()))
 			}
+		case models.ConversationHoursSinceLastResolved:
+			if !conversation.LastResolvedAt.IsZero() {
+				valueToCompare = fmt.Sprintf("%.0f", time.Since(conversation.LastResolvedAt.Time).Hours())
+			} else if rule.Operator != models.RuleOperatorSet && rule.Operator != models.RuleOperatorNotSet {
+				return false
+			}
 		case models.ConversationInbox:
 			valueToCompare = strconv.Itoa(conversation.InboxID)
 		case models.ConversationPreviousStatus, models.ConversationPreviousPriority,
@@ -160,6 +170,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 				return false
 			}
 			valueToCompare = previous
+		case models.ConversationIncomingTo:
+			return evaluateRecipientRule(conversation.IncomingTo, rule)
 		default:
 			e.lo.Error("error unrecognized conversation field", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
 			return false
@@ -304,4 +316,54 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 	}
 	e.lo.Debug("conversation automation rule status", "has_met", conditionMet, "conversation_uuid", conversation.UUID)
 	return conditionMet
+}
+
+func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
+	negative := rule.Operator == models.RuleOperatorNotEqual || rule.Operator == models.RuleOperatorNotContains
+	ruleValue := strings.ToLower(strings.TrimSpace(rule.Value))
+
+	for _, recipient := range recipients {
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			continue
+		}
+		if rule.Operator == models.RuleOperatorSet {
+			return true
+		}
+		if rule.Operator == models.RuleOperatorNotSet {
+			return false
+		}
+		recipient = strings.ToLower(recipient)
+
+		var matched bool
+		switch rule.Operator {
+		case models.RuleOperatorEquals, models.RuleOperatorNotEqual:
+			matched = recipient == ruleValue
+		case models.RuleOperatorContains, models.RuleOperatorNotContains:
+			recipient = strings.Join(strings.Fields(recipient), " ")
+			for candidate := range strings.SplitSeq(ruleValue, ",") {
+				candidate = strings.Join(strings.Fields(candidate), " ")
+				if candidate == "" {
+					continue
+				}
+				if strings.Contains(recipient, candidate) {
+					matched = true
+					break
+				}
+			}
+		default:
+			return false
+		}
+		if matched {
+			return !negative
+		}
+	}
+
+	if rule.Operator == models.RuleOperatorSet {
+		return false
+	}
+	if rule.Operator == models.RuleOperatorNotSet {
+		return true
+	}
+	return negative
 }

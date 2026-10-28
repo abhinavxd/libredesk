@@ -1,32 +1,40 @@
 <template>
   <div class="space-y-3">
     <Card
-      @click="continueConversation"
-      class="cursor-pointer rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
+      class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
     >
-      <CardContent class="p-4">
-        <div class="flex items-start justify-between">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="text-sm font-medium">
-                {{ $t('globals.messages.continueConversation') }}
+      <button
+        type="button"
+        class="block w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        @click="continueConversation"
+      >
+        <CardContent class="p-4">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="text-sm font-medium">
+                  {{ $t('globals.messages.continueConversation') }}
+                </div>
+              </div>
+              <div class="flex gap-2 items-start">
+                <div class="text-sm text-foreground line-clamp-2 flex-1 min-w-0">
+                  {{ lastMessagePreview(conversation.last_message, t) }}
+                </div>
+                <UnreadCountBadge
+                  :count="conversation.unread_message_count"
+                  class="flex-shrink-0"
+                />
+              </div>
+              <div class="text-xs text-muted-foreground mt-1">
+                <span>{{ authorDisplayName }}</span>
+                <span class="mx-1">•</span>
+                <span>{{ getRelativeTime(new Date(conversation.last_message.created_at)) }}</span>
               </div>
             </div>
-            <div class="flex gap-2 items-start">
-              <div class="text-sm text-foreground line-clamp-2 flex-1 min-w-0">
-                {{ lastMessagePreview(conversation.last_message, t) }}
-              </div>
-              <UnreadCountBadge :count="conversation.unread_message_count" class="flex-shrink-0" />
-            </div>
-            <div class="text-xs text-muted-foreground mt-1">
-              <span>{{ authorDisplayName }}</span>
-              <span class="mx-1">•</span>
-              <span>{{ getRelativeTime(new Date(conversation.last_message.created_at)) }}</span>
-            </div>
+            <ArrowRight class="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 self-center" />
           </div>
-          <ArrowRight class="w-4 h-4 text-muted-foreground ml-2 flex-shrink-0 self-center" />
-        </div>
-      </CardContent>
+        </CardContent>
+      </button>
     </Card>
   </div>
 </template>

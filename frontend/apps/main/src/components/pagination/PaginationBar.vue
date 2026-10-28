@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky bottom-0 bg-background border-t border-border px-4 py-3 mt-auto">
+  <div class="sticky bottom-0 bg-card border-t border-border px-4 py-3 mt-auto">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <span class="text-sm text-muted-foreground tabular-nums">
@@ -56,7 +56,7 @@
               @click="goToPage(pageNumber)"
               :aria-label="`${t('globals.terms.page')} ${pageNumber}`"
               :aria-current="pageNumber === page ? 'page' : undefined"
-              class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               :class="
                 pageNumber === page
                   ? 'bg-background text-foreground shadow-sm'

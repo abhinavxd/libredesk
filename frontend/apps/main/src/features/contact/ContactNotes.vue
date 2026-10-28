@@ -2,15 +2,16 @@
   <div class="w-full space-y-4 relative">
     <!-- Header -->
     <div class="flex items-center mb-4" :class="compact ? 'justify-end' : 'justify-between'">
-      <span v-if="!compact" class="text-xl font-semibold text-foreground">
+      <span v-if="!compact" class="ui-heading">
         {{ $t('globals.terms.note', 2) }}
       </span>
       <Button
+        type="button"
         variant="outline"
-        size="sm"
+        :size="compact ? 'xs' : 'sm'"
         @click="startAddingNote"
         v-if="!isAddingNote && !isLoading && (notes.length !== 0 || compact) && userStore.can('contact_notes:write')"
-        class="transition-all hover:bg-primary/10 hover:border-primary/30"
+        :class="compact ? 'gap-1 text-xs [&_svg]:size-3.5' : 'hover:bg-primary/10 hover:border-primary/30'"
       >
         <PlusIcon size="18" />
         {{ $t('contact.newNote') }}
@@ -53,7 +54,7 @@
       <Card
         v-for="note in visibleNotes"
         :key="note.id"
-        class="overflow-hidden hover:border-border transition-all duration-200 box hover:shadow-md"
+        class="overflow-hidden hover:border-border transition-[border-color,box-shadow] duration-200 box hover:shadow-md"
       >
         <!-- Header -->
         <CardHeader :class="compact ? 'p-3 pb-2' : 'bg-background border-b p-2'">
@@ -156,7 +157,7 @@
       </div>
       <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
         <div class="flex flex-col items-center">
-          <h3 class="mt-2 text-base font-medium text-foreground">
+          <h3 class="ui-heading mt-2">
             {{ $t('contact.notes.empty') }}
           </h3>
           <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">

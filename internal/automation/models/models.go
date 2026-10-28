@@ -43,18 +43,20 @@ const (
 	RuleTypeConversationUpdate = "conversation_update"
 	RuleTypeTimeTrigger        = "time_trigger"
 
-	ConversationSubject              = "subject"
-	ConversationContent              = "content"
-	ConversationStatus               = "status"
-	ConversationPriority             = "priority"
-	ConversationAssignedUser         = "assigned_user"
-	ConversationAssignedTeam         = "assigned_team"
-	ConversationHoursSinceCreated    = "hours_since_created"
-	ConversationHoursSinceFirstReply = "hours_since_first_reply"
-	ConversationHoursSinceLastReply  = "hours_since_last_reply"
-	ConversationHoursSinceResolved   = "hours_since_resolved"
-	ConversationInbox                = "inbox"
-	ContactEmail                     = "contact_email"
+	ConversationSubject                = "subject"
+	ConversationContent                = "content"
+	ConversationStatus                 = "status"
+	ConversationPriority               = "priority"
+	ConversationAssignedUser           = "assigned_user"
+	ConversationAssignedTeam           = "assigned_team"
+	ConversationHoursSinceCreated      = "hours_since_created"
+	ConversationHoursSinceFirstReply   = "hours_since_first_reply"
+	ConversationHoursSinceLastReply    = "hours_since_last_reply"
+	ConversationHoursSinceResolved     = "hours_since_resolved"
+	ConversationHoursSinceLastResolved = "hours_since_last_resolved"
+	ConversationInbox                  = "inbox"
+	ConversationIncomingTo             = "to"
+	ContactEmail                       = "contact_email"
 
 	ConversationPreviousStatus       = "previous_status"
 	ConversationPreviousPriority     = "previous_priority"
@@ -112,6 +114,7 @@ type RuleRecord struct {
 }
 
 type Rule struct {
+	ID            int          `json:"-"`
 	Type          string       `json:"type"`
 	ExecutionMode string       `json:"execution_mode"`
 	Events        []string     `json:"event"`

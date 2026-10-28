@@ -1,8 +1,11 @@
 package ws
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/zerodha/logf"
 )
 
@@ -57,5 +60,46 @@ func TestRemoveClientUnknown(t *testing.T) {
 	h.RemoveClient(&Client{ID: 1, Hub: h})
 	if len(h.clients[1]) != 1 || h.clients[1][0] != a {
 		t.Fatalf("removing an unregistered client must not change the slice: %v", h.clients[1])
+	}
+}
+
+func TestRetainSubscribersDropsRevokedAccess(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	h := NewHub(&lo, nil /** userStore **/)
+	first, second := &Client{ID: 1}, &Client{ID: 2}
+	h.SubscribeListReplace(first, []string{"ticket", "ticket"})
+	h.SubscribeOpenConv(first, "ticket")
+	h.SubscribeOpenConv(second, "ticket")
+	h.RetainSubscribers("ticket", []int{1, 2})
+	if got := h.ListSubscribers("ticket"); len(got) != 2 {
+		t.Fatalf("expected two unique subscribers, got %d", len(got))
+	}
+	h.RetainSubscribers("ticket", []int{2})
+	if got := h.ListSubscribers("ticket"); len(got) != 1 || got[0] != second {
+		t.Fatalf("revoked subscriber remained: %v", got)
+	}
+	if _, ok := h.clientListSubs[first]["ticket"]; ok || h.clientOpenSub[first] != "" {
+		t.Fatal("revoked subscriptions were retained")
+	}
+	h.RetainSubscribers("missing", nil /** allowedAgentIDs **/)
+}
+
+func TestClientBufferDropIsVisible(t *testing.T) {
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	client := &Client{ID: 7, Hub: NewHub(&lo, nil /** userStore **/), Send: make(chan models.WSMessage, 1)}
+	client.SendMessage([]byte("first"), 1 /** typ **/)
+	if logs.Len() != 0 {
+		t.Fatal("successful enqueue produced a warning")
+	}
+	client.SendMessage([]byte("second"), 1 /** typ **/)
+	if !strings.Contains(logs.String(), "level=warn") || !strings.Contains(logs.String(), "client_id=7") {
+		t.Fatalf("missing drop warning: %s", logs.String())
+	}
+	logs.Reset()
+	client.close()
+	client.SendMessage([]byte("closed"), 1 /** typ **/)
+	if logs.Len() != 0 {
+		t.Fatal("normal closed connection produced a warning")
 	}
 }

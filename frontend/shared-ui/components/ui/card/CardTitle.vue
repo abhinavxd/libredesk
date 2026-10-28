@@ -1,5 +1,5 @@
 <script setup>
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 
 const props = defineProps({
   class: { type: null, required: false }
@@ -7,7 +7,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <h3 :class="cn('font-semibold leading-none tracking-tight', props.class)">
+  <h3 :class="cn('ui-heading', props.class)">
     <slot />
   </h3>
 </template>

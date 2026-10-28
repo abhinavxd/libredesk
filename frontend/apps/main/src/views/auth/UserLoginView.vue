@@ -8,7 +8,7 @@
     >
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
-          <CardTitle class="text-2xl font-bold text-foreground">
+          <CardTitle class="ui-display-heading">
             {{ appSettingsStore.public_config?.['app.site_name'] || 'libredesk' }}
           </CardTitle>
           <p class="text-sm text-muted-foreground">{{ t('auth.signIn') }}</p>
@@ -50,6 +50,9 @@
               type="text"
               autofocus
               autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              :aria-invalid="emailHasError || undefined"
               v-model.trim="loginForm.email"
               :class="{ 'border-destructive': emailHasError }"
             />
@@ -64,19 +67,22 @@
                 id="password"
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="current-password"
+                :aria-invalid="passwordHasError || undefined"
                 v-model="loginForm.password"
                 :class="{ 'border-destructive': passwordHasError }"
                 class="pr-10"
               />
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
-                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                class="absolute right-0 top-0 text-muted-foreground"
                 @click="showPassword = !showPassword"
               >
-                <Eye v-if="!showPassword" class="w-5 h-5" />
-                <EyeOff v-else class="w-5 h-5" />
-              </button>
+                <Eye v-if="!showPassword" class="w-5 h-5" aria-hidden="true" />
+                <EyeOff v-else class="w-5 h-5" aria-hidden="true" />
+              </Button>
             </div>
           </div>
 
@@ -115,7 +121,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../api'
+import api from '@main/api'
 import { validateEmail } from '@shared-ui/utils/string'
 import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
@@ -123,11 +129,11 @@ import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
-import { useEmitter } from '../../composables/useEmitter'
-import { useUserStore } from '../../stores/user'
+import { useEmitter } from '@main/composables/useEmitter'
+import { useUserStore } from '@main/stores/user'
 import { useI18n } from 'vue-i18n'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useAppSettingsStore } from '../../stores/appSettings'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useAppSettingsStore } from '@main/stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
@@ -177,7 +183,9 @@ onMounted(async () => {
 const showOIDCError = () => {
   const { error, ...query } = router.currentRoute.value.query
   if (!error) return
-  errorMessage.value = t(Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed')
+  errorMessage.value = t(
+    Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed'
+  )
   applyTemporaryClass('login-container', 'animate-shake')
   router.replace({ query })
 }

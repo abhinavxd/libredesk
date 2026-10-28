@@ -1,28 +1,30 @@
 <template>
   <form @submit="onSubmit" class="space-y-8">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>
-          {{ t('globals.terms.name') }}
-        </FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>
+            {{ t('globals.terms.name') }}
+          </FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="description">
-      <FormItem>
-        <FormLabel>
-          {{ t('globals.terms.description') }}
-        </FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="description">
+        <FormItem>
+          <FormLabel>
+            {{ t('globals.terms.description') }}
+          </FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <FormField v-slot="{ componentField }" name="is_always_open">
       <FormItem>
@@ -50,11 +52,11 @@
     <FormField name="hours">
       <div v-if="form.values.is_always_open === false">
         <FormItem>
-          <div>
+          <div class="space-y-4">
             <div
               v-for="day in WEEKDAYS"
               :key="day"
-              class="flex items-center justify-between space-y-2"
+              class="business-hours-row grid items-center gap-2"
             >
               <div class="flex items-center space-x-3">
                 <Checkbox
@@ -62,22 +64,29 @@
                   :checked="!!selectedDays[day]"
                   @update:checked="handleDayToggle(day, $event)"
                 />
-                <Label :for="day" class="font-medium">{{ day }}</Label>
+                <Label :id="`${day}-label`" :for="day" class="font-medium">{{ day }}</Label>
               </div>
-              <div class="flex space-x-2 items-center">
-                <div class="flex flex-col items-start">
-                  <Input
-                    type="time"
-                    :modelValue="hours[day]?.open || '09:00'"
+              <div
+                class="grid min-w-0 max-w-56 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+              >
+                <div class="min-w-0">
+                  <span :id="`${day}-from`" class="sr-only">{{ t('globals.terms.from') }}</span>
+                  <TimeField
+                    class="min-w-0"
+                    :aria-labelledby="`${day}-label ${day}-from`"
+                    :modelValue="hours[day]?.open ?? '09:00'"
                     @update:modelValue="(val) => updateHours(day, 'open', val)"
                     :disabled="!selectedDays[day]"
                   />
                 </div>
-                <span class="text-muted-foreground">to</span>
-                <div class="flex flex-col items-start">
-                  <Input
-                    type="time"
-                    :modelValue="hours[day]?.close || '17:00'"
+                <span :id="`${day}-to`" class="text-muted-foreground">{{
+                  t('globals.terms.to')
+                }}</span>
+                <div class="min-w-0">
+                  <TimeField
+                    class="min-w-0"
+                    :aria-labelledby="`${day}-label ${day}-to`"
+                    :modelValue="hours[day]?.close ?? '17:00'"
                     @update:modelValue="(val) => updateHours(day, 'close', val)"
                     :disabled="!selectedDays[day]"
                   />
@@ -96,9 +105,7 @@
           <div></div>
           <DialogTrigger as-child>
             <Button type="button" @click="openHolidayForm = true">
-              {{
-                t('businessHour.newHoliday')
-              }}
+              {{ t('businessHour.newHoliday') }}
             </Button>
           </DialogTrigger>
         </div>
@@ -112,26 +119,31 @@
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {{
-              t('businessHour.newHoliday')
-            }}
+            {{ t('businessHour.newHoliday') }}
           </DialogTitle>
           <DialogDescription />
         </DialogHeader>
         <div class="grid gap-4 py-4">
-          <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="holiday_name" class="text-right"> {{ t('globals.terms.name') }} </Label>
-            <Input id="holiday_name" ref="holidayNameRef" v-model="holidayName" class="col-span-3" />
+          <div class="grid items-center gap-2 sm:grid-cols-4 sm:gap-4">
+            <Label for="holiday_name" class="sm:text-right"> {{ t('globals.terms.name') }} </Label>
+            <Input
+              id="holiday_name"
+              ref="holidayNameRef"
+              v-model="holidayName"
+              class="min-w-0 sm:col-span-3"
+            />
           </div>
-          <div class="grid grid-cols-4 items-center gap-4">
-            <Label for="date" class="text-right"> {{ t('globals.terms.date') }} </Label>
+          <div class="grid items-center gap-2 sm:grid-cols-4 sm:gap-4">
+            <Label for="date" class="sm:text-right"> {{ t('globals.terms.date') }} </Label>
             <Popover :open="datePickerOpen" @update:open="datePickerOpen = $event">
               <PopoverTrigger as-child>
                 <Button
+                  type="button"
+                  id="date"
                   variant="outline"
                   :class="
                     cn(
-                      'w-[280px] justify-start text-left font-normal',
+                      'w-full min-w-0 justify-start text-left font-normal sm:col-span-3',
                       !holidayDate && 'text-muted-foreground'
                     )
                   "
@@ -151,7 +163,7 @@
           </div>
         </div>
         <DialogFooter>
-          <Button :disabled="!holidayName || !holidayDate" @click="saveHoliday">
+          <Button type="button" :disabled="!holidayName || !holidayDate" @click="saveHoliday">
             {{ t('globals.messages.add') }}
           </Button>
         </DialogFooter>
@@ -162,6 +174,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref, watch, reactive, computed, nextTick } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -170,13 +183,20 @@ import { createFormSchema } from './formSchema.js'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group/index.js'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@shared-ui/components/ui/form/index.js'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@shared-ui/components/ui/form/index.js'
 import { Calendar } from '@shared-ui/components/ui/calendar/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import TimeField from '@shared-ui/components/TimeField.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover/index.js'
 import { cn } from '@shared-ui/lib/utils.js'
 import { format } from 'date-fns'
-import { WEEKDAYS } from '../../../constants/date.js'
+import { WEEKDAYS } from '@main/constants/date.js'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import SimpleTable from '@main/components/table/SimpleTable.vue'
@@ -214,7 +234,10 @@ const props = defineProps({
 })
 
 const submitLabel = computed(() => {
-  return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  return (
+    props.submitLabel ||
+    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  )
 })
 
 let holidays = reactive([])
@@ -243,7 +266,6 @@ const form = useForm({
   }
 })
 
-// Sync form field with local state
 const syncHoursToForm = () => {
   form.setFieldValue('hours', { ...hours.value })
 }
@@ -296,16 +318,13 @@ const onSubmit = form.handleSubmit((values) => {
   props.submitForm(finalValues)
 })
 
-// Initialize state from props
 const initializeFromValues = (values) => {
   if (!values) return
 
-  // Reset state
   hours.value = {}
   selectedDays.value = {}
   holidays.length = 0
 
-  // Set hours and selected days
   if (values.hours && typeof values.hours === 'object') {
     // Copy each day: mutating a shared day object retriggers the watcher and resets the form.
     hours.value = Object.fromEntries(
@@ -317,16 +336,21 @@ const initializeFromValues = (values) => {
     }, {})
   }
 
-  // Set holidays
   if (values.holidays) {
     holidays.push(...values.holidays.map((holiday) => ({ ...holiday })))
   }
 
-  // Update form
   form.setValues(values, false)
   syncHoursToForm()
 }
 
-// Watch for initial values
 watch(() => props.initialValues, initializeFromValues, { immediate: true, deep: true })
 </script>
+
+<style scoped>
+@container (min-width: 32rem) {
+  .business-hours-row {
+    grid-template-columns: minmax(8rem, 1fr) minmax(0, 14rem);
+  }
+}
+</style>

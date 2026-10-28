@@ -202,9 +202,7 @@
               v-if="config.show_powered_by !== false"
               class="flex items-center justify-center pb-1.5 shrink-0"
             >
-              <span class="text-[10px] text-muted-foreground/70"
-                >Powered by <span class="font-medium">libredesk</span></span
-              >
+              <PoweredBy />
             </div>
           </template>
 
@@ -474,7 +472,7 @@
     <button
       type="button"
       :aria-label="open ? $t('globals.messages.closeChat') : $t('globals.messages.openChat')"
-      class="absolute flex items-center justify-center rounded-full transition-transform hover:scale-105"
+      class="absolute flex items-center justify-center rounded-full transition-transform motion-safe:can-hover:hover:scale-105"
       :style="launcherStyle"
       @click="open = !open"
     >
@@ -504,6 +502,7 @@ const BACK_BUTTON_CLASS =
 const PREVIEW_NAV_TAB_CLASS = 'flex w-full flex-col items-center justify-center gap-1 py-4'
 
 import { computed, ref, watch } from 'vue'
+import PoweredBy from '@shared-ui/components/PoweredBy.vue'
 import { useElementSize } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@shared-ui/components/ui/button'
@@ -780,5 +779,15 @@ const launcherStyle = computed(() => ({
 .ld-preview-window-leave-to {
   opacity: 0;
   transform: translateY(8px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ld-preview-window-enter-active,
+  .ld-preview-window-leave-active {
+    transition-property: opacity;
+  }
+  .ld-preview-window-enter-from,
+  .ld-preview-window-leave-to {
+    transform: none;
+  }
 }
 </style>

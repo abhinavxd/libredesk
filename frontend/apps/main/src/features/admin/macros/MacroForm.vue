@@ -48,7 +48,7 @@
       </FormItem>
     </FormField>
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <FormGrid>
       <FormField v-slot="{ componentField, handleChange }" name="visible_when">
         <FormItem>
           <FormLabel>{{ t('globals.messages.visibleWhen') }}</FormLabel>
@@ -129,12 +129,13 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
     <Button type="submit" :isLoading="isLoading">{{ submitLabel }}</Button>
   </form>
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref, watch, computed } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -149,7 +150,7 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
 import ActionBuilder from '@/features/admin/macros/ActionBuilder.vue'
-import { useConversationFilters } from '../../../composables/useConversationFilters.js'
+import { useConversationFilters } from '@main/composables/useConversationFilters.js'
 import { getTextFromHTML } from '@shared-ui/utils/string'
 import { createFormSchema } from './formSchema.js'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'

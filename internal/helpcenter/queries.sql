@@ -529,3 +529,24 @@ LIMIT $2;
 -- name: delete-stale-search-queries
 DELETE FROM help_search_queries
 WHERE created_at < NOW() - ($1 * INTERVAL '1 day');
+
+-- name: get-article-references
+WITH RECURSIVE article_ancestors AS (
+    SELECT a.id AS article_id, c.id, c.parent_id, c.help_center_id, c.is_published
+    FROM help_articles a
+    JOIN article_collections c ON c.id = a.collection_id AND c.locale = a.locale
+    WHERE a.id = ANY($1) AND a.status = 'published' AND a.ai_enabled = true
+    UNION
+    SELECT p.article_id, c.id, c.parent_id, c.help_center_id, c.is_published
+    FROM article_collections c
+    JOIN article_ancestors p ON c.id = p.parent_id AND c.help_center_id = p.help_center_id
+)
+SELECT a.id, a.title, a.slug, a.locale, hc.slug AS help_center_slug, hc.custom_domain
+FROM help_articles a
+JOIN article_collections c ON c.id = a.collection_id
+JOIN help_centers hc ON hc.id = c.help_center_id
+WHERE a.id = ANY($1) AND a.status = 'published' AND a.ai_enabled = true AND hc.is_active = true
+    AND (a.locale = hc.default_locale OR hc.allowed_locales ? a.locale)
+    AND EXISTS (SELECT 1 FROM article_ancestors p WHERE p.article_id = a.id AND p.parent_id IS NULL)
+    AND NOT EXISTS (SELECT 1 FROM article_ancestors p WHERE p.article_id = a.id AND p.is_published = false)
+ORDER BY array_position($1::integer[], a.id);

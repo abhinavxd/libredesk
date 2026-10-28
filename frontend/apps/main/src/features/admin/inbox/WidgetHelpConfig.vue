@@ -1,4 +1,5 @@
 <script setup>
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Label } from '@shared-ui/components/ui/label'
@@ -14,6 +15,8 @@ import SwitchField from '@shared-ui/components/SwitchField.vue'
 import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
 import { GripVertical, X, FileText } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
+
+const reducedMotion = usePreferredReducedMotion()
 
 const MAX_FEATURED = 10
 const AUDIENCES = ['visitors', 'users']
@@ -93,7 +96,7 @@ const unusedArticles = computed(() =>
     <template v-if="modelValue.help_center_id">
 
       <div class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">{{ t('widget.helpPlacement') }}</h4>
+        <h4 class="ui-heading">{{ t('widget.helpPlacement') }}</h4>
         <div class="grid sm:grid-cols-2 gap-4">
           <div
             v-for="audience in AUDIENCES"
@@ -112,19 +115,19 @@ const unusedArticles = computed(() =>
           </div>
         </div>
 
-        <p class="text-sm text-muted-foreground">{{ t('widget.helpOnHomeHint') }}</p>
+        <p class="ui-description">{{ t('widget.helpOnHomeHint') }}</p>
       </div>
 
       <div data-featured-articles class="space-y-4">
-        <h4 class="text-base font-semibold text-foreground">
+        <h4 class="ui-heading">
           {{ t('globals.terms.featuredArticle', 2) }}
         </h4>
-        <p class="text-sm text-muted-foreground">{{ t('widget.featuredArticlesHint') }}</p>
+        <p class="ui-description">{{ t('widget.featuredArticlesHint') }}</p>
 
         <Draggable
           v-model="featured"
           item-key="id"
-          :animation="200"
+          :animation="reducedMotion === 'reduce' ? 0 : 200"
           handle=".drag-handle"
           :force-fallback="true"
           fallback-on-body
@@ -133,7 +136,7 @@ const unusedArticles = computed(() =>
           class="space-y-2"
         >
           <template #item="{ element: item, index }">
-            <div class="flex items-center gap-2 p-2 border rounded-md">
+            <div class="group/reorder flex items-center gap-2 p-2 border rounded-md">
               <div class="drag-handle cursor-move text-muted-foreground">
                 <GripVertical class="size-4" aria-hidden="true" />
               </div>

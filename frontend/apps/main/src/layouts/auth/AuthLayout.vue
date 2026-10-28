@@ -1,21 +1,24 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-secondary">
-    <main class="flex-1 flex items-start justify-center pt-[15vh] p-4">
-      <div class="w-full max-w-sm">
-        <slot></slot>
-      </div>
-    </main>
-    <div class="flex justify-center mb-6">
-      <a
-        href="https://libredesk.io/"
-        class="text-xs text-center text-muted-foreground"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Powered by libredesk
-      </a>
+  <div class="h-screen overflow-y-auto overscroll-contain bg-secondary">
+    <div class="flex min-h-full flex-col">
+      <main class="flex flex-1 items-start justify-center px-4 pb-10 pt-[15vh] sm:px-6">
+        <div class="auth-content w-full max-w-sm">
+          <slot />
+        </div>
+      </main>
+      <footer class="flex justify-center px-4 pb-6">
+        <PoweredBy />
+      </footer>
     </div>
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+import PoweredBy from '@shared-ui/components/PoweredBy.vue'
+</script>
+
+<style scoped>
+.auth-content > :deep(*) {
+  border-radius: calc(var(--radius) + 0.25rem);
+}
+</style>

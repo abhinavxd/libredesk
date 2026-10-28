@@ -1,17 +1,17 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge'
 
 export const createColumns = (t) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-webhook', params: { id: row.original.id } },
@@ -25,22 +25,23 @@ export const createColumns = (t) => [
   {
     accessorKey: 'url',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.url'))
+      return h('div', null, t('globals.terms.url'))
     },
     cell: function ({ row }) {
       const url = row.getValue('url')
-      return h('div', { class: 'text-center font-mono mt-1 max-w-sm truncate' }, url)
+      return h('div', { class: 'font-mono text-xs' }, url)
     }
   },
   {
     accessorKey: 'events',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.event', 2))
+      return h('div', null, t('globals.terms.event', 2))
     },
     cell: function ({ row }) {
       const events = row.getValue('events')
-      return h('div', { class: 'text-center' }, [
+      return h('div', null, [
         h(
           Badge,
           { variant: 'secondary', class: 'text-xs' },
@@ -56,11 +57,12 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'is_active',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
+    header: () => h('div', null, t('globals.terms.status')),
     cell: ({ row }) => {
       const isActive = row.getValue('is_active')
-      return h('div', { class: 'text-center' }, [
+      return h('div', null, [
         h(
           Badge,
           {
@@ -74,12 +76,13 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center text-sm' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {

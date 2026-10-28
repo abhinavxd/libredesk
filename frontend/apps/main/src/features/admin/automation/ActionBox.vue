@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6" :class="{ 'box p-5': actions.length > 0 }">
+  <div class="box p-5 space-y-6">
     <div class="space-y-6">
       <div v-for="(action, index) in actions" :key="index" class="space-y-6">
         <div v-if="index > 0">
@@ -30,6 +30,13 @@
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div
+                v-if="action.type && conversationActions[action.type]?.type === 'richtext'"
+                class="flex self-center"
+              >
+                <HelpPopover :text="messageVariablesHelp" />
               </div>
 
               <!-- Value -->
@@ -169,8 +176,9 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { SelectTag } from '@shared-ui/components/ui/select'
+import HelpPopover from '@main/components/HelpPopover.vue'
 import { useConversationFilters } from '@main/composables/useConversationFilters'
-import { getTextFromHTML } from '@shared-ui/utils/string'
+import { getTextFromHTML, formatTemplateVariables } from '@shared-ui/utils/string'
 import { useI18n } from 'vue-i18n'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
@@ -187,6 +195,18 @@ const props = defineProps({
 
 const fieldClass = 'flex-1 min-w-0 max-w-xs'
 
+// Automations send as the System user, so the Author fields would render blank.
+const MESSAGE_VARIABLES = [
+  '.Conversation.ReferenceNumber',
+  '.Conversation.Subject',
+  '.Conversation.Priority',
+  '.Contact.FirstName',
+  '.Contact.LastName',
+  '.Contact.FullName',
+  '.Contact.Email',
+  '.Inbox.Name'
+]
+
 const { actions } = toRefs(props)
 const { t } = useI18n()
 const emit = defineEmits(['update-actions', 'add-action', 'remove-action'])
@@ -194,6 +214,9 @@ const webhookStore = useWebhookStore()
 const uStore = useUsersStore()
 const tStore = useTeamStore()
 const { conversationActions } = useConversationFilters()
+const messageVariablesHelp = computed(
+  () => `${t('globals.terms.variable', 2)}: ${formatTemplateVariables(MESSAGE_VARIABLES)}`
+)
 
 webhookStore.fetchWebhooks()
 

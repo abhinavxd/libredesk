@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
@@ -56,10 +57,16 @@ var (
 	ActivityTagRemoved          = "tag_removed"
 	ActivitySLASet              = "sla_set"
 	ActivityParticipantAdded    = "participant_added"
+	ActivityCSATNotSent         = "csat_not_sent"
 
 	ContentTypeText = "text"
 	ContentTypeHTML = "html"
 )
+
+type ConversationReadState struct {
+	LastSeenAt  time.Time `db:"last_seen_at" json:"last_seen_at"`
+	ReadVersion int64     `db:"read_version" json:"read_version"`
+}
 
 type ContinuityConversation struct {
 	ID                        int         `db:"id"`
@@ -111,6 +118,7 @@ type ChatMessage struct {
 	CreatedAt        time.Time              `json:"created_at"`
 	Content          string                 `json:"content"`
 	TextContent      string                 `json:"text_content"`
+	ContentType      string                 `json:"content_type"`
 	Author           MessageAuthor          `json:"author"`
 	Attachments      attachment.Attachments `json:"attachments"`
 	Meta             json.RawMessage        `json:"meta"`
@@ -132,6 +140,7 @@ type ConversationListItem struct {
 	FirstReplyAt          null.Time               `db:"first_reply_at" json:"first_reply_at"`
 	LastReplyAt           null.Time               `db:"last_reply_at" json:"last_reply_at"`
 	ResolvedAt            null.Time               `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt        null.Time               `db:"last_resolved_at" json:"last_resolved_at"`
 	Subject               null.String             `db:"subject" json:"subject"`
 	LastMessage           null.String             `db:"last_message" json:"last_message"`
 	LastMessageAt         null.Time               `db:"last_message_at" json:"last_message_at"`
@@ -143,6 +152,7 @@ type ConversationListItem struct {
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
 	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee              json.RawMessage         `db:"assignee" json:"assignee"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -179,6 +189,7 @@ type Conversation struct {
 	InboxID                   int                    `db:"inbox_id" json:"inbox_id"`
 	ClosedAt                  null.Time              `db:"closed_at" json:"closed_at"`
 	ResolvedAt                null.Time              `db:"resolved_at" json:"resolved_at"`
+	LastResolvedAt            null.Time              `db:"last_resolved_at" json:"last_resolved_at"`
 	ContactLastSeenAt         null.Time              `db:"contact_last_seen_at" json:"contact_last_seen_at"`
 	ReferenceNumber           string                 `db:"reference_number" json:"reference_number"`
 	Priority                  null.String            `db:"priority" json:"priority"`
@@ -190,11 +201,13 @@ type Conversation struct {
 	LastReplyAt               null.Time              `db:"last_reply_at" json:"last_reply_at"`
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee                  json.RawMessage        `db:"assignee" json:"assignee"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
 	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`
 	InboxMail                 string                 `db:"inbox_mail" json:"inbox_mail"`
 	InboxReplyTo              string                 `db:"inbox_reply_to" json:"inbox_reply_to"`
+	InboxAliases              imodels.EmailAliases   `db:"inbox_aliases" json:"inbox_aliases"`
 	InboxName                 string                 `db:"inbox_name" json:"inbox_name"`
 	InboxChannel              string                 `db:"inbox_channel" json:"inbox_channel"`
 	Tags                      null.JSON              `db:"tags" json:"tags"`
@@ -216,10 +229,13 @@ type Conversation struct {
 	NextResponseDueAt         null.Time              `db:"next_response_deadline_at" json:"next_response_deadline_at"`
 	NextResponseMetAt         null.Time              `db:"next_response_met_at" json:"next_response_met_at"`
 	LastContinuityEmailSentAt null.Time              `db:"last_continuity_email_sent_at" json:"-"`
+	LastInboundAt             null.Time              `db:"last_inbound_at" json:"last_inbound_at"`
+	ContactLastInboundAt      null.Time              `db:"contact_last_inbound_at" json:"contact_last_inbound_at"`
 	CSATRating                null.Int               `db:"csat_rating" json:"csat_rating"`
 	CSATFeedback              null.String            `db:"csat_feedback" json:"csat_feedback"`
 	CSATRespondedAt           null.Time              `db:"csat_responded_at" json:"csat_responded_at"`
 	PreviousConversations     []PreviousConversation `db:"-" json:"previous_conversations"`
+	IncomingTo                []string               `db:"-" json:"-"`
 }
 
 type ConversationContact struct {
@@ -240,6 +256,8 @@ type ConversationContact struct {
 	LastActiveAt           null.Time       `db:"last_active_at" json:"last_active_at"`
 	LastLoginAt            null.Time       `db:"last_login_at" json:"last_login_at"`
 	ExternalUserID         null.String     `db:"external_user_id" json:"external_user_id"`
+
+	ChannelIdentities umodels.ChannelIdentities `db:"channel_identities" json:"channel_identities,omitempty"`
 }
 
 func (c *ConversationContact) FullName() string {
@@ -319,6 +337,7 @@ type NewConversationsStats struct {
 
 // Message represents a message in a conversation
 type Message struct {
+	UploadUserID      int                    `db:"-" json:"-"`
 	Total             int                    `db:"total" json:"-"`
 	ID                int                    `db:"id" json:"id"`
 	CreatedAt         time.Time              `db:"created_at" json:"created_at"`
@@ -345,6 +364,7 @@ type Message struct {
 	CC                pq.StringArray         `db:"cc" json:"-"`
 	BCC               pq.StringArray         `db:"bcc" json:"-"`
 	MessageReceiverID int                    `db:"message_receiver_id" json:"-"`
+	ReferenceNumber   string                 `db:"reference_number" json:"-"`
 	Media             []mmodels.Media        `json:"-"`
 	Author            MessageAuthor          `db:"author" json:"author"`
 }
@@ -358,6 +378,12 @@ func (m *Message) IsContinuityMessage() bool {
 	isContinuity, _ := meta["continuity_email"].(bool)
 	return isContinuity
 }
+
+// SendFrom returns the immutable sender address stored for an outgoing message.
+func (m *Message) SendFrom() string { return metaString(m.Meta, "send_from") }
+
+// InboxAddress returns the owned address that received an incoming message.
+func (m *Message) InboxAddress() string { return metaString(m.Meta, "inbox_address") }
 
 // ShouldEvaluateAutomation reports whether this outgoing message may trigger automation rules; machine-generated messages must not, else they loop.
 func (m *Message) ShouldEvaluateAutomation(systemUserID int) bool {
@@ -431,14 +457,25 @@ func (m *Message) CensorCSATContentWithStatus(csatSubmitted bool, csatUUID strin
 	}
 }
 
-// StripCSATUUID removes the csat_uuid from the message meta.
-// Used to hide CSAT links from agent sessions while keeping them for API key callers.
 func (m *Message) StripCSATUUID() {
 	var meta map[string]any
-	if err := json.Unmarshal([]byte(m.Meta), &meta); err != nil {
+	if err := json.Unmarshal(m.Meta, &meta); err != nil {
+		return
+	}
+	isCSAT, _ := meta["is_csat"].(bool)
+	_, hasUUID := meta["csat_uuid"]
+	if !isCSAT && !hasUUID {
 		return
 	}
 	delete(meta, "csat_uuid")
+	if params, ok := meta["whatsapp_template_params"].(map[string]any); ok {
+		delete(params, "button_url_0")
+	}
+	if whatsapp, ok := meta["whatsapp"].(map[string]any); ok {
+		if params, ok := whatsapp["template_params"].(map[string]any); ok {
+			delete(params, "button_url_0")
+		}
+	}
 	if updatedMeta, err := json.Marshal(meta); err == nil {
 		m.Meta = json.RawMessage(updatedMeta)
 	}
@@ -469,9 +506,10 @@ type OutboundMessage struct {
 	SourceID string
 
 	// Threading (email)
-	References []string
-	InReplyTo  string
-	ReplyTo    string
+	References             []string
+	InReplyTo              string
+	ReplyTo                string
+	AliasVerificationToken string
 
 	// Attachments
 	Attachments attachment.Attachments
@@ -611,4 +649,13 @@ func Transcript(msgs []Message, max int) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func metaString(meta json.RawMessage, key string) string {
+	var values map[string]any
+	if err := json.Unmarshal(meta, &values); err != nil {
+		return ""
+	}
+	value, _ := values[key].(string)
+	return value
 }

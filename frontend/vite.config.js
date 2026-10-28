@@ -63,11 +63,11 @@ export default defineConfig(({ mode, command }) => {
           target: apiTarget,
           changeOrigin: true,
         },
-        '/logout': {
+        '/uploads': {
           target: apiTarget,
           changeOrigin: true,
         },
-        '/uploads': {
+        '/webhooks': {
           target: apiTarget,
           changeOrigin: true,
         },
@@ -130,6 +130,7 @@ export default defineConfig(({ mode, command }) => {
         '@main': path.resolve(__dirname, 'apps/main/src'),
         '@widget': path.resolve(__dirname, 'apps/widget/src'),
         '@shared-ui': path.resolve(__dirname, 'shared-ui'),
+        '@countries': path.resolve(__dirname, '../internal/countries/countries.json'),
         '@public-static': path.resolve(__dirname, '../static/public/static'),
       },
     },

@@ -7,7 +7,7 @@ import (
 )
 
 type PushSender interface {
-	Send(userID int, payload models.PushPayload) bool
+	Send(userID int, payload models.PushPayload, reference models.NotificationReference) bool
 }
 
 type push struct {
@@ -29,7 +29,7 @@ func (p *push) Send(delivery Delivery) Result {
 		Body:  n.Body.String,
 		Tag:   fmt.Sprintf("%s_%s", n.Type, n.ConversationUUID),
 		URL:   pushRoute(n.Type, n.ConversationUUID, n.MessageUUID),
-	})
+	}, models.NotificationReference{Type: n.Type, ConversationID: n.ConversationID, MessageID: n.MessageID, NotificationID: delivery.NotificationID})
 	return Result{Sent: sent}
 }
 

@@ -29,8 +29,8 @@ func Encrypt(plaintext, key string) (string, error) {
 		return "", nil
 	}
 
-	// Check if already encrypted
-	if strings.HasPrefix(plaintext, EncryptedPrefix) {
+	if IsEncrypted(plaintext) {
+		// Already encrypted, return as-is
 		return plaintext, nil
 	}
 
@@ -66,8 +66,7 @@ func Decrypt(ciphertext, key string) (string, error) {
 		return "", nil
 	}
 
-	// Check if it's encrypted
-	if !strings.HasPrefix(ciphertext, EncryptedPrefix) {
+	if !IsEncrypted(ciphertext) {
 		// Not encrypted, return as-is
 		return ciphertext, nil
 	}

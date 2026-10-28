@@ -67,7 +67,7 @@ WITH latest_applied AS (
         resolution_met_at, resolution_breached_at
     FROM applied_slas
     WHERE created_at >= CASE
-        WHEN %d = 0 THEN CURRENT_DATE
+        WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
         ELSE NOW() - INTERVAL '%d days'
     END
     ORDER BY conversation_id, created_at DESC, id DESC
@@ -148,7 +148,7 @@ next_response AS (
         sla_events
     WHERE
         created_at >= CASE
-            WHEN %d = 0 THEN CURRENT_DATE
+            WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
             ELSE NOW() - INTERVAL '%d days'
         END
         AND type = 'next_response'
@@ -189,13 +189,13 @@ WITH new_conversations AS (
     FROM
         (
             SELECT
-                TO_CHAR(created_at :: date, 'YYYY-MM-DD') AS date,
+                TO_CHAR(created_at AT TIME ZONE $1, 'YYYY-MM-DD') AS date,
                 COUNT(*) AS count
             FROM
                 conversations c
             WHERE
                 c.created_at >= CASE
-                    WHEN %d = 0 THEN CURRENT_DATE
+                    WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
                     ELSE NOW() - INTERVAL '%d days'
                 END
             GROUP BY
@@ -210,13 +210,13 @@ resolved_conversations AS (
     FROM
         (
             SELECT
-                TO_CHAR(resolved_at :: date, 'YYYY-MM-DD') AS date,
+                TO_CHAR(resolved_at AT TIME ZONE $1, 'YYYY-MM-DD') AS date,
                 COUNT(*) AS count
             FROM
                 conversations c
             WHERE
                 c.resolved_at >= CASE
-                    WHEN %d = 0 THEN CURRENT_DATE
+                    WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
                     ELSE NOW() - INTERVAL '%d days'
                 END
             GROUP BY
@@ -263,7 +263,7 @@ FROM
     csat_responses
 WHERE
     created_at >= CASE
-        WHEN %d = 0 THEN CURRENT_DATE
+        WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
         ELSE NOW() - INTERVAL '%d days'
     END;
 
@@ -281,7 +281,7 @@ WITH per_conversation AS (
         AND private = false
         AND (type = 'incoming' OR status = 'sent')
         AND created_at >= CASE
-            WHEN %d = 0 THEN CURRENT_DATE
+            WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
             ELSE NOW() - INTERVAL '%d days'
         END
     GROUP BY
@@ -321,7 +321,7 @@ WITH tag_counts AS (
         LEFT JOIN conversation_tags ct ON t.id = ct.tag_id
         LEFT JOIN conversations c ON ct.conversation_id = c.id
             AND c.created_at >= CASE
-                WHEN %d = 0 THEN CURRENT_DATE
+                WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
                 ELSE NOW() - INTERVAL '%d days'
             END
     GROUP BY
@@ -343,7 +343,7 @@ tagging AS (
         conversations c
     WHERE
         c.created_at >= CASE
-            WHEN %d = 0 THEN CURRENT_DATE
+            WHEN %d = 0 THEN DATE_TRUNC('day', NOW() AT TIME ZONE $1) AT TIME ZONE $1
             ELSE NOW() - INTERVAL '%d days'
         END
 )

@@ -1,15 +1,15 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import dropdown from './editorPromptDropdown.vue'
 
 export const createEditorPromptColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'title',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.title')),
+    header: () => h('div', null, t('globals.terms.title')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         onEdit
           ? h(
               'span',
@@ -24,10 +24,11 @@ export const createEditorPromptColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
+    header: () => h('div', null, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h(TableDate, { value: row.getValue('updated_at') })
   },
   {
     id: 'actions',

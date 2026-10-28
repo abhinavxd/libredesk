@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTool">
         <Pencil class="mr-2 h-4 w-4" />
@@ -45,16 +40,15 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
+import { Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
-import { Button } from '@shared-ui/components/ui/button/index.js'
 import {
   AlertDialog,
   AlertDialogAction,

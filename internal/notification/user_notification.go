@@ -13,9 +13,12 @@ import (
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/go-i18n"
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
+
+const notificationBodyRunes = 400
 
 //go:embed queries.sql
 var queriesFS embed.FS
@@ -33,6 +36,7 @@ type UserNotificationOpts struct {
 }
 
 type queries struct {
+	ReplyDeliveryState     *sqlx.Stmt `query:"reply-delivery-state"`
 	GetNotifications       *sqlx.Stmt `query:"get-notifications"`
 	GetNotificationStats   *sqlx.Stmt `query:"get-notification-stats"`
 	InsertNotification     *sqlx.Stmt `query:"insert-notification"`
@@ -60,7 +64,7 @@ func NewUserNotificationManager(opts UserNotificationOpts) (*UserNotificationMan
 // GetAll retrieves notifications for a user with pagination.
 func (m *UserNotificationManager) GetAll(userID, limit, offset int) ([]models.UserNotification, error) {
 	var notifications = make([]models.UserNotification, 0)
-	if err := m.q.GetNotifications.Select(&notifications, userID, limit, offset); err != nil {
+	if err := m.q.GetNotifications.Select(&notifications, userID, limit, offset, pq.Array(models.ReplyTypes)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return notifications, nil
 		}
@@ -73,7 +77,7 @@ func (m *UserNotificationManager) GetAll(userID, limit, offset int) ([]models.Us
 // GetStats retrieves notification statistics for a user.
 func (m *UserNotificationManager) GetStats(userID int) (models.NotificationStats, error) {
 	var stats models.NotificationStats
-	if err := m.q.GetNotificationStats.Get(&stats, userID); err != nil {
+	if err := m.q.GetNotificationStats.Get(&stats, userID, pq.Array(models.ReplyTypes)); err != nil {
 		m.lo.Error("error fetching notification stats", "user_id", userID, "error", err)
 		return stats, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -86,8 +90,9 @@ func (m *UserNotificationManager) Create(userID int, notificationType models.Not
 	if meta == nil {
 		meta = json.RawMessage("{}")
 	}
-	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta); err != nil {
-		m.lo.Error("error creating notification", "user_id", userID, "error", err)
+	body.String = pushPreview(body.String, notificationBodyRunes)
+	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta, pq.Array(models.ReplyTypes)); err != nil {
+		m.lo.Error("error creating notification", "user_id", userID, "type", notificationType, "conversation_id", conversationID.Int, "message_id", messageID.Int, "error", err)
 		return notification, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return notification, nil
@@ -146,7 +151,9 @@ func (m *UserNotificationManager) DeleteAll(userID int) error {
 func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) error {
 	res, err := m.q.DeleteOldNotifications.ExecContext(ctx)
 	if err != nil {
-		m.lo.Error("error deleting old notifications", "error", err)
+		if !errors.Is(err, context.Canceled) {
+			m.lo.Error("error deleting old notifications", "error", err)
+		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
@@ -162,9 +169,7 @@ func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
 		return
 	case <-time.After(60 * time.Second):
 	}
-	if err := m.DeleteOldNotifications(ctx); err != nil {
-		m.lo.Error("error cleaning old notifications", "error", err)
-	}
+	_ = m.DeleteOldNotifications(ctx)
 
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
@@ -174,9 +179,7 @@ func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := m.DeleteOldNotifications(ctx); err != nil {
-				m.lo.Error("error cleaning old notifications", "error", err)
-			}
+			_ = m.DeleteOldNotifications(ctx)
 		}
 	}
 }

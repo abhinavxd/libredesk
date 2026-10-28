@@ -30,6 +30,7 @@ func IsPublicModel(modelType string) bool {
 
 // Media represents an uploaded object in DB and storage backend.
 type Media struct {
+	UploadedBy  null.Int        `db:"uploaded_by" json:"-"`
 	ID          int             `db:"id" json:"id"`
 	CreatedAt   time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt   time.Time       `db:"updated_at" json:"updated_at"`
@@ -48,6 +49,11 @@ type Media struct {
 	// Pseudo fields
 	URL     string `json:"url"`
 	Content []byte `json:"-"`
+}
+
+// UploadedByUser reports whether the given user uploaded this media.
+func (m Media) UploadedByUser(userID int) bool {
+	return m.UploadedBy.Valid && m.UploadedBy.Int == userID
 }
 
 // NormalizeContentType returns the lowercased type/subtype of a Content-Type value, or application/octet-stream if it does not parse.

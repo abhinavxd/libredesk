@@ -52,7 +52,11 @@ func New(opt Opt) (media.Store, error) {
 	}
 
 	if opt.AccessKey == "" && opt.SecretKey == "" {
-		cl, _ = simples3.NewUsingIAM(opt.Region)
+		var err error
+		cl, err = simples3.NewUsingIAM(opt.Region)
+		if err != nil {
+			return nil, fmt.Errorf("initializing S3 IAM credentials: %w", err)
+		}
 	} else {
 		cl = simples3.New(opt.Region, opt.AccessKey, opt.SecretKey)
 	}

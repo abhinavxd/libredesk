@@ -1,10 +1,24 @@
 package email
 
 import (
+	"crypto/tls"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/textproto"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/jhillyerd/enmime/v2"
+	"github.com/stretchr/testify/require"
+	"github.com/zerodha/logf"
 )
 
 func TestResolveReplyTo(t *testing.T) {
@@ -274,5 +288,242 @@ func TestResolveReplyTo_PlusAddressIsRoundTrippable(t *testing.T) {
 				t.Errorf("UUID round-trip failed: got %q from %q, want %q", extracted, got, uuid)
 			}
 		})
+	}
+}
+
+func TestAliasReplyRouting(t *testing.T) {
+	for _, tt := range []struct {
+		name        string
+		from        string
+		override    string
+		want        string
+		replyTo     string
+		disablePlus bool
+	}{
+		{name: "alias", from: "billing@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
+		{name: "primary", from: "support@example.com", want: "support+conv-550e8400-e29b-41d4-a716-446655440000@example.com"},
+		{name: "explicit override", from: "billing@example.com", override: "replies@example.com", want: "replies@example.com"},
+		{name: "alias with receiving mailbox", from: "Billing <billing@example.com>", replyTo: "Replies <replies@example.net>", want: "replies+conv-550e8400-e29b-41d4-a716-446655440000@example.net"},
+		{name: "alias without plus addressing", from: "billing@example.com", replyTo: "replies@example.net", disablePlus: true},
+		{name: "alias without plus addressing or reply-to", from: "billing@example.com", disablePlus: true},
+		{name: "primary with reply-to", from: "support@example.com", replyTo: "replies@example.net", want: "replies+conv-550e8400-e29b-41d4-a716-446655440000@example.net"},
+		{name: "primary with reply-to without plus addressing", from: "support@example.com", replyTo: "replies@example.net", disablePlus: true, want: "replies@example.net"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			message := captureSMTPMessage(t, func(e *Email) error {
+				e.replyTo = tt.replyTo
+				e.enablePlusAddressing = !tt.disablePlus
+				return e.Send(models.OutboundMessage{
+					From: tt.from, To: []string{"customer@example.net"}, ReplyTo: tt.override,
+					ConversationUUID: "550e8400-e29b-41d4-a716-446655440000", Content: "Reply",
+				})
+			})
+			require.Equal(t, tt.want, message.GetHeader("Reply-To"))
+		})
+	}
+}
+
+func TestAliasVerificationMessageFormat(t *testing.T) {
+	message := captureSMTPMessage(t, func(e *Email) error {
+		return e.StartAliasVerification("billing@example.com", "test-token")
+	})
+	require.Contains(t, message.GetHeader("Content-Type"), "text/plain")
+	require.Equal(t, "<alias-verification-test-token@example.com>", message.GetHeader("Message-ID"))
+	require.Equal(t, "test-token", message.GetHeader(headerAliasVerification))
+	require.Equal(t, "<billing@example.com>", message.GetHeader("From"))
+	require.Equal(t, "<support@example.com>", message.GetHeader("To"))
+}
+
+func TestAliasVerificationReceivingAddress(t *testing.T) {
+	for _, replyTo := range []string{"replies@example.net", "Replies <replies@example.net>"} {
+		t.Run(replyTo, func(t *testing.T) {
+			message := captureSMTPMessage(t, func(e *Email) error {
+				e.replyTo = replyTo
+				return e.StartAliasVerification("billing@example.com", "test-token")
+			})
+			addresses, err := message.AddressList("To")
+			require.NoError(t, err)
+			require.Len(t, addresses, 1)
+			require.Equal(t, "replies@example.net", addresses[0].Address)
+		})
+	}
+}
+
+func TestSMTPTransportAndLongReferences(t *testing.T) {
+	for _, tlsMode := range []string{"none", "tls", "starttls"} {
+		for _, count := range []int{15, 20} {
+			for _, idBytes := range []int{66, 90, 130} {
+				for _, subject := range []string{"Reply", "é" + strings.Repeat("a", 50)} {
+					name := fmt.Sprintf("tls=%s/count=%d/bytes=%d/subject=%q", tlsMode, count, idBytes, subject)
+					t.Run(name, func(t *testing.T) {
+						references := make([]string, count)
+						for i := range count {
+							references[i] = fmt.Sprintf("%03d", i) + strings.Repeat("a", idBytes-15) + "@example.com"
+						}
+						message := captureSMTPMessageWithTLS(t, tlsMode, func(e *Email) error {
+							return e.Send(models.OutboundMessage{
+								From: "support@example.com", To: []string{"customer@example.net"},
+								Subject: subject, References: references, InReplyTo: references[count-1],
+								ContentType: "plain", Content: "Reply body\n",
+							})
+						})
+						require.Equal(t, "<"+strings.Join(references, "> <")+">", message.GetHeader(headerReferences))
+						require.Equal(t, "<"+references[count-1]+">", message.GetHeader(headerInReplyTo))
+						require.Equal(t, subject, message.GetHeader("Subject"))
+						require.Equal(t, "Reply body\n", message.Text)
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestNewSmtpPoolDefaultRetries(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+	go func() {
+		for attempt := range 2 {
+			conn, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			conn.SetDeadline(time.Now().Add(5 * time.Second))
+			protocol := textproto.NewConn(conn)
+			if attempt == 0 {
+				protocol.PrintfLine("421 temporarily unavailable")
+				conn.Close()
+				continue
+			}
+			defer conn.Close()
+			protocol.PrintfLine("220 localhost SMTP")
+			for {
+				line, err := protocol.ReadLine()
+				if err != nil {
+					return
+				}
+				if line == "DATA" {
+					protocol.PrintfLine("354 send message")
+					if _, err := protocol.ReadDotBytes(); err != nil {
+						return
+					}
+				}
+				protocol.PrintfLine("250 ok")
+			}
+		}
+	}()
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	pools, err := NewSmtpPool([]imodels.SMTPConfig{{Host: host, Port: port, TLSType: "none", MaxConns: 1}}, nil /* oauth */)
+	require.NoError(t, err)
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	e := &Email{smtpPools: pools, lo: &logger}
+	t.Cleanup(func() { e.Close() })
+	require.NoError(t, e.Send(models.OutboundMessage{
+		From: "support@example.com", To: []string{"customer@example.net"}, ContentType: "plain", Content: "Reply\n",
+	}))
+}
+
+func captureSMTPMessage(t *testing.T, send func(*Email) error) *enmime.Envelope {
+	t.Helper()
+	return captureSMTPMessageWithTLS(t, "none" /* tlsMode */, send)
+}
+
+func captureSMTPMessageWithTLS(t *testing.T, tlsMode string, send func(*Email) error) *enmime.Envelope {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	var tlsConfig *tls.Config
+	if tlsMode != "none" {
+		certificateServer := httptest.NewTLSServer(http.NotFoundHandler())
+		tlsConfig = certificateServer.TLS.Clone()
+		certificateServer.Close()
+		if tlsMode == "tls" {
+			listener = tls.NewListener(listener, tlsConfig)
+		}
+	}
+	t.Cleanup(func() { listener.Close() })
+	messages := make(chan []byte, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		conn.SetDeadline(time.Now().Add(5 * time.Second))
+		protocol := textproto.NewConn(conn)
+		protocol.PrintfLine("220 localhost SMTP")
+		for {
+			line, err := protocol.ReadLine()
+			if err != nil {
+				return
+			}
+			switch {
+			case strings.HasPrefix(line, "EHLO"), strings.HasPrefix(line, "HELO"):
+				if tlsMode == "starttls" {
+					protocol.PrintfLine("250-localhost\r\n250 STARTTLS")
+				} else {
+					protocol.PrintfLine("250 localhost")
+				}
+			case line == "STARTTLS" && tlsMode == "starttls":
+				protocol.PrintfLine("220 ready for TLS")
+				conn = tls.Server(conn, tlsConfig)
+				protocol = textproto.NewConn(conn)
+			case line == "DATA":
+				if tlsMode != "none" {
+					if _, secure := conn.(*tls.Conn); !secure {
+						protocol.PrintfLine("530 TLS required")
+						return
+					}
+				}
+				protocol.PrintfLine("354 send message")
+				body, err := protocol.ReadDotBytes()
+				if err != nil {
+					return
+				}
+				protocol.PrintfLine("250 accepted")
+				messages <- body
+			case line == "QUIT":
+				protocol.PrintfLine("221 bye")
+				return
+			default:
+				protocol.PrintfLine("250 ok")
+			}
+		}
+	}()
+	host, portText, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	pools, err := NewSmtpPool([]imodels.SMTPConfig{{
+		Host: host, Port: port, TLSType: tlsMode, TLSSkipVerify: tlsMode != "none", MaxConns: 1, MaxMessageRetries: 1,
+	}}, nil /* oauth */)
+	require.NoError(t, err)
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	e := &Email{
+		primary: "support@example.com", from: "support@example.com",
+		smtpPools: pools, lo: &logger, enablePlusAddressing: true,
+	}
+	t.Cleanup(func() { e.Close() })
+	require.NoError(t, send(e))
+	select {
+	case raw := <-messages:
+		header, _, ok := strings.Cut(string(raw), "\n\n")
+		require.True(t, ok)
+		for line := range strings.SplitSeq(header, "\n") {
+			require.LessOrEqual(t, len(line), 998)
+			require.NotEmpty(t, strings.TrimSpace(line))
+			if strings.Contains(line, "=?UTF-8?") {
+				require.LessOrEqual(t, len(line), 76)
+			}
+		}
+		message, err := enmime.ReadEnvelope(strings.NewReader(string(raw)))
+		require.NoError(t, err)
+		return message
+	case <-t.Context().Done():
+		t.Fatal("no SMTP message received")
+		return nil
 	}
 }

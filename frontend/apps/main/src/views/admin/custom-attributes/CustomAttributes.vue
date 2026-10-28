@@ -3,61 +3,66 @@
     <AdminSplitLayout>
       <template #content>
         <LoadingOverlay :loading="isLoading" reserve-height>
-          <div class="flex justify-between mb-5">
-            <div></div>
-            <div class="flex justify-end mb-4">
-              <Dialog v-model:open="dialogOpen">
-                <DialogTrigger as-child @click="newCustomAttribute">
-                  <Button class="ml-auto">
-                    {{
-                      $t('customAttribute.new')
-                    }}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent class="sm:max-w-[600px]">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {{
-                        isEditing
-                          ? $t('customAttribute.edit')
-                          : $t('customAttribute.new')
-                      }}
-                    </DialogTitle>
-                    <DialogDescription/>
-                  </DialogHeader>
-                  <CustomAttributesForm @submit.prevent="onSubmit" :form="form">
-                    <template #footer>
-                      <DialogFooter class="mt-10">
-                        <Button type="submit" :isLoading="isLoading">
-                          {{
-                            isEditing ? $t('globals.messages.save') : $t('globals.messages.create')
-                          }}
-                        </Button>
-                      </DialogFooter>
-                    </template>
-                  </CustomAttributesForm>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-          <div>
-            <Tabs default-value="contact" v-model="appliesTo">
-              <TabsList class="grid w-full grid-cols-2 mb-5">
-                <TabsTrigger value="contact">
-                  {{ $t('globals.terms.contact') }}
-                </TabsTrigger>
-                <TabsTrigger value="conversation">
-                  {{ $t('globals.terms.conversation') }}
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="contact">
-                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" />
-              </TabsContent>
-              <TabsContent value="conversation">
-                <DataTable :columns="createColumns(t, { onEdit: editCustomAttribute })" :data="customAttributes" :loading="isLoading" />
-              </TabsContent>
-            </Tabs>
-          </div>
+          <Tabs default-value="contact" v-model="appliesTo">
+            <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+              <template #left>
+                <TabsList class="w-max justify-start">
+                  <TabsTrigger value="contact">{{ $t('globals.terms.contact') }}</TabsTrigger>
+                  <TabsTrigger value="conversation">{{
+                    $t('globals.terms.conversation')
+                  }}</TabsTrigger>
+                </TabsList>
+              </template>
+              <template #actions>
+                <Dialog v-model:open="dialogOpen">
+                  <DialogTrigger as-child @click="newCustomAttribute">
+                    <Button type="button">
+                      {{ $t('customAttribute.new') }}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent class="sm:max-w-[600px]">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {{ isEditing ? $t('customAttribute.edit') : $t('customAttribute.new') }}
+                      </DialogTitle>
+                      <DialogDescription />
+                    </DialogHeader>
+                    <CustomAttributesForm @submit.prevent="onSubmit" :form="form">
+                      <template #footer>
+                        <DialogFooter class="mt-10">
+                          <Button type="submit" :isLoading="isLoading">
+                            {{
+                              isEditing
+                                ? $t('globals.messages.save')
+                                : $t('globals.messages.create')
+                            }}
+                          </Button>
+                        </DialogFooter>
+                      </template>
+                    </CustomAttributesForm>
+                  </DialogContent>
+                </Dialog>
+              </template>
+            </AdminToolbar>
+            <TabsContent value="contact">
+              <DataTable
+                v-model:search="searchTerm"
+                :searchable="false"
+                :columns="createColumns(t, { onEdit: editCustomAttribute })"
+                :data="customAttributes"
+                :loading="isLoading"
+              />
+            </TabsContent>
+            <TabsContent value="conversation">
+              <DataTable
+                v-model:search="searchTerm"
+                :searchable="false"
+                :columns="createColumns(t, { onEdit: editCustomAttribute })"
+                :data="customAttributes"
+                :loading="isLoading"
+              />
+            </TabsContent>
+          </Tabs>
         </LoadingOverlay>
       </template>
 
@@ -71,15 +76,16 @@
 <script setup>
 import { ref, onMounted, watch, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
-import { createColumns } from '../../../features/admin/custom-attributes/dataTableColumns.js'
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+import { createColumns } from '@main/features/admin/custom-attributes/dataTableColumns.js'
 import CustomAttributesForm from '@/features/admin/custom-attributes/CustomAttributesForm.vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from '../../../features/admin/custom-attributes/formSchema.js'
+import { createFormSchema } from '@main/features/admin/custom-attributes/formSchema.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import {
   Dialog,
   DialogContent,
@@ -94,9 +100,10 @@ import { useStorage } from '@vueuse/core'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../../api'
+import api from '@main/api'
 
 const appliesTo = useStorage('appliesTo', 'contact')
+const searchTerm = ref('')
 const { t } = useI18n()
 const customAttributes = ref([])
 const isLoading = ref(false)
@@ -198,6 +205,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 watch(
   appliesTo,
   (newVal) => {
+    searchTerm.value = ''
     form.resetForm({
       values: {
         ...form.values,

@@ -4,7 +4,11 @@
       <FormItem>
         <FormControl>
           <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Checkbox
+              :aria-label="$t('globals.terms.enabled')"
+              :checked="value"
+              @update:checked="handleChange"
+            />
             <Label>{{ $t('globals.terms.enabled') }}</Label>
           </div>
         </FormControl>
@@ -12,16 +16,14 @@
       </FormItem>
     </FormField>
 
-    <div class="grid gap-6 md:grid-cols-2">
+    <FormGrid>
       <FormField v-slot="{ componentField }" name="provider">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.provider') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue
-                  :placeholder="t('placeholders.selectProvider')"
-                />
+                <SelectValue :placeholder="t('placeholders.selectProvider')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -37,7 +39,7 @@
       </FormField>
 
       <FormField v-slot="{ componentField }" name="name">
-        <FormItem v-auto-animate>
+        <FormItem>
           <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="Google" v-bind="componentField" />
@@ -45,9 +47,10 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
+    </FormGrid>
+    <FormGrid>
       <FormField v-slot="{ componentField }" name="provider_url">
-        <FormItem v-auto-animate>
+        <FormItem>
           <FormLabel>{{ $t('globals.terms.providerURL') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="https://accounts.google.com" v-bind="componentField" />
@@ -56,8 +59,12 @@
         </FormItem>
       </FormField>
 
-      <FormField v-slot="{ componentField }" name="logo_url" v-if="form.values.provider === 'Custom'">
-        <FormItem v-auto-animate>
+      <FormField
+        v-slot="{ componentField }"
+        name="logo_url"
+        v-if="form.values.provider === 'Custom'"
+      >
+        <FormItem>
           <FormLabel>{{ $t('globals.terms.logoUrl') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="https://example.com/logo.svg" v-bind="componentField" />
@@ -66,9 +73,10 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
+    </FormGrid>
+    <FormGrid>
       <FormField v-slot="{ componentField }" name="client_id">
-        <FormItem v-auto-animate>
+        <FormItem>
           <FormLabel>{{ $t('globals.terms.clientID') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
@@ -78,7 +86,7 @@
       </FormField>
 
       <FormField v-slot="{ componentField }" name="client_secret">
-        <FormItem v-auto-animate>
+        <FormItem>
           <FormLabel>{{ $t('globals.terms.clientSecret') }}</FormLabel>
           <FormControl>
             <Input type="password" placeholder="" v-bind="componentField" />
@@ -86,25 +94,24 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
-      <FormField v-slot="{ componentField }" name="redirect_uri" v-if="!isNewForm">
-        <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.callbackURL') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="" v-bind="componentField" readonly />
-          </FormControl>
-          <FormDescription>{{ $t('admin.sso.setThisUrlForCallback') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-    </div>
+    </FormGrid>
+    <FormField v-slot="{ componentField }" name="redirect_uri" v-if="!isNewForm">
+      <FormItem>
+        <FormLabel>{{ $t('globals.terms.callbackURL') }}</FormLabel>
+        <FormControl>
+          <Input type="text" placeholder="" v-bind="componentField" readonly />
+        </FormControl>
+        <FormDescription>{{ $t('admin.sso.setThisUrlForCallback') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -112,7 +119,6 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema.js'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useI18n } from 'vue-i18n'
 import {
   FormControl,
@@ -157,11 +163,14 @@ const props = defineProps({
 const { t } = useI18n()
 
 const submitLabel = computed(() => {
-  return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  return (
+    props.submitLabel ||
+    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  )
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(t))
 })
 
 const onSubmit = form.handleSubmit((values) => {

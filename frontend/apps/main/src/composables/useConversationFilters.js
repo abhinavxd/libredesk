@@ -145,6 +145,7 @@ export function useConversationFilters () {
                     label: attribute.label,
                     type: customAttributeDataTypeToFieldType[attribute.data_type] || FIELD_TYPE.TEXT,
                     operators: customAttributeDataTypeToFieldOperators[attribute.data_type] || FIELD_OPERATORS.TEXT,
+                    allowCaseSensitive: ['text', 'link'].includes(attribute.data_type),
                     options: attribute.values.map(value => ({
                         label: value,
                         value: value
@@ -160,15 +161,22 @@ export function useConversationFilters () {
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT_AUTOMATION
         },
+        to: {
+            label: t('globals.terms.toEmailAddress'),
+            type: FIELD_TYPE.TEXT,
+            operators: FIELD_OPERATORS.TEXT
+        },
         content: {
             label: t('globals.terms.content'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT_AUTOMATION
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION,
+            allowCaseSensitive: true
         },
         subject: {
             label: t('globals.terms.subject'),
             type: FIELD_TYPE.TEXT,
-            operators: FIELD_OPERATORS.TEXT_AUTOMATION
+            operators: FIELD_OPERATORS.TEXT_AUTOMATION,
+            allowCaseSensitive: true
         },
         status: {
             label: t('globals.terms.status'),
@@ -244,6 +252,11 @@ export function useConversationFilters () {
         },
         hours_since_resolved: {
             label: t('globals.messages.hoursSinceResolved'),
+            type: FIELD_TYPE.NUMBER,
+            operators: FIELD_OPERATORS.NUMBER
+        },
+        hours_since_last_resolved: {
+            label: t('globals.messages.hoursSinceLastResolved'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },

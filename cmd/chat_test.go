@@ -1,12 +1,33 @@
 package main
 
 import (
+	"bytes"
 	"math"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
+	"github.com/zerodha/logf"
 )
+
+func TestValidateAttributeValuePreservesUTF8(t *testing.T) {
+	lo := logf.New(logf.Opts{})
+	app := &App{lo: &lo}
+	for _, char := range []string{"a", "é", "界", "😀"} {
+		for padding := range len(char) {
+			prefix := strings.Repeat("a", padding)
+			value := prefix + strings.Repeat(char, 1001)
+			want := prefix + strings.Repeat(char, (1000-padding)/len(char))
+			got := validateAttributeValue("description", value, app).(string)
+			if !utf8.ValidString(got) || got != want {
+				t.Fatalf("padding %d: got %q, want %q", padding, got, want)
+			}
+		}
+	}
+}
 
 func TestIsFormFieldValuePresent(t *testing.T) {
 	tests := []struct {
@@ -78,6 +99,29 @@ func TestValidateHandoffFormUsesSubmittedContactDetails(t *testing.T) {
 	}
 	if name != "QA Visitor" {
 		t.Fatalf("got name %q", name)
+	}
+}
+
+func TestWidgetSessionStorageFailureIsVisible(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { client.Close() })
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	app := &App{lo: &lo, redis: client}
+	const token = "private-session-token"
+	if _, err := loadSession(app, token, livechat.Config{}); err == nil {
+		t.Fatal("missing session accepted")
+	}
+	if logs.Len() != 0 {
+		t.Fatal("expired session produced an application error")
+	}
+	server.SetError("storage unavailable")
+	if _, err := loadSession(app, token, livechat.Config{}); err == nil {
+		t.Fatal("storage failure ignored")
+	}
+	if !strings.Contains(logs.String(), "level=error") || strings.Contains(logs.String(), token) {
+		t.Fatalf("storage failure logging is missing or exposes the session: %s", logs.String())
 	}
 }
 

@@ -232,6 +232,7 @@ func (m *Manager) statWindow(a models.Assistant, start, end time.Time) (models.S
 
 // recordEvent logs a handoff/resolve marker so rate and reopen metrics are queryable.
 func (m *Manager) recordEvent(assistantID, conversationID int, eventType string) {
+	m.lo.Info("ai agent decision", "assistant_id", assistantID, "conversation_id", conversationID, "decision", eventType)
 	if _, err := m.q.InsertAIAgentEvent.Exec(assistantID, conversationID, eventType); err != nil {
 		m.lo.Error("error recording ai agent event", "type", eventType, "error", err)
 	}
@@ -280,7 +281,7 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 	}
 
 	var id int
-	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages).Scan(&id); err != nil {
+	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled).Scan(&id); err != nil {
 		m.lo.Error("error creating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -317,7 +318,7 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages); err != nil {
+	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled); err != nil {
 		m.lo.Error("error updating assistant", "error", err)
 		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

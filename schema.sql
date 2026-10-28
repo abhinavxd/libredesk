@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat');
+DROP TYPE IF EXISTS "channels" CASCADE; CREATE TYPE "channels" AS ENUM ('email', 'livechat', 'whatsapp');
 DROP TYPE IF EXISTS "message_type" CASCADE; CREATE TYPE "message_type" AS ENUM ('incoming','outgoing','activity');
 DROP TYPE IF EXISTS "message_sender_type" CASCADE; CREATE TYPE "message_sender_type" AS ENUM ('agent','contact');
 DROP TYPE IF EXISTS "message_status" CASCADE; CREATE TYPE "message_status" AS ENUM ('received','sent','failed','pending');
@@ -118,6 +118,7 @@ CREATE TABLE inboxes (
 	enabled bool DEFAULT TRUE NOT NULL,
 	csat_enabled bool DEFAULT false NOT NULL,
 	prompt_tags_on_reply bool DEFAULT false NOT NULL,
+	reopen_window_hours INT DEFAULT 0 NOT NULL,
 	config jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"from" TEXT NULL,
 	from_name_template TEXT NOT NULL DEFAULT '',
@@ -125,6 +126,22 @@ CREATE TABLE inboxes (
 	linked_email_inbox_id INT REFERENCES inboxes(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_inboxes_on_name CHECK (length("name") <= 140)
 );
+
+DROP TABLE IF EXISTS inbox_email_addresses CASCADE;
+CREATE TABLE inbox_email_addresses (
+	id SERIAL PRIMARY KEY,
+	inbox_id INTEGER NOT NULL REFERENCES inboxes(id) ON DELETE CASCADE,
+	email TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	verification_status TEXT NOT NULL DEFAULT 'not_verified',
+	verification_token TEXT NULL,
+	verification_started_at TIMESTAMPTZ NULL,
+	verified_at TIMESTAMPTZ NULL,
+	CONSTRAINT constraint_inbox_email_addresses_on_kind CHECK (kind IN ('primary', 'alias'))
+);
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_inbox_email ON inbox_email_addresses (inbox_id, LOWER(email));
+CREATE UNIQUE INDEX index_unique_inbox_email_addresses_on_primary ON inbox_email_addresses (inbox_id) WHERE kind = 'primary';
 
 DROP TABLE IF EXISTS teams CASCADE;
 CREATE TABLE teams (
@@ -194,6 +211,7 @@ CREATE TABLE users (
     CONSTRAINT constraint_users_on_last_name CHECK (LENGTH(last_name) <= 140)
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
+CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
@@ -269,6 +287,7 @@ CREATE TABLE conversations (
     last_reply_at TIMESTAMPTZ NULL,
     closed_at TIMESTAMPTZ NULL,
     resolved_at TIMESTAMPTZ NULL,
+    last_resolved_at TIMESTAMPTZ NULL,
 
 	"subject" TEXT NULL,
 	waiting_since TIMESTAMPTZ NULL,
@@ -282,7 +301,8 @@ CREATE TABLE conversations (
 	last_interaction_at TIMESTAMPTZ NULL,
 	next_sla_deadline_at TIMESTAMPTZ NULL,
 	snoozed_until TIMESTAMPTZ NULL,
-	last_continuity_email_sent_at TIMESTAMPTZ NULL
+	last_continuity_email_sent_at TIMESTAMPTZ NULL,
+	last_inbound_at TIMESTAMPTZ NULL
 );
 CREATE INDEX index_conversations_on_assigned_user_id ON conversations (assigned_user_id);
 CREATE INDEX index_conversations_on_assigned_team_id ON conversations (assigned_team_id);
@@ -298,6 +318,7 @@ CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_i
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
 CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
+CREATE INDEX index_conversations_on_last_inbound_at ON conversations (last_inbound_at);
 
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (
@@ -372,7 +393,7 @@ CREATE TABLE macros (
    team_id BIGINT REFERENCES teams(id) ON DELETE CASCADE ON UPDATE CASCADE,
    usage_count INT DEFAULT 0 NOT NULL,
    CONSTRAINT name_length CHECK (length(name) <= 140),
-   CONSTRAINT message_content_length CHECK (length(message_content) <= 5000)
+   CONSTRAINT message_content_length CHECK (length(message_content) <= 100000)
 );
 
 DROP TABLE IF EXISTS conversation_participants CASCADE;
@@ -431,11 +452,13 @@ CREATE TABLE media (
 	"size" INT NULL,
 	meta jsonb DEFAULT '{}'::jsonb NOT NULL,
 	private BOOLEAN NOT NULL DEFAULT true,
+	uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
 	CONSTRAINT constraint_media_on_filename CHECK (length(filename) <= 1000),
 	CONSTRAINT constraint_media_on_content_id CHECK (length(content_id) <= 300)
 );
 CREATE INDEX index_media_on_model_type_and_model_id ON media(model_type, model_id);
 CREATE INDEX index_media_on_content_id ON media(content_id);
+CREATE INDEX index_media_on_uploaded_by ON media(uploaded_by) WHERE uploaded_by IS NOT NULL;
 
 DROP TABLE IF EXISTS oidc CASCADE;
 CREATE TABLE oidc (
@@ -500,6 +523,35 @@ CREATE TABLE templates (
 );
 CREATE UNIQUE INDEX index_unique_templates_on_is_default_when_is_default_is_true ON templates USING btree (is_default)
 WHERE (is_default = true);
+
+DROP TABLE IF EXISTS whatsapp_templates CASCADE;
+CREATE TABLE whatsapp_templates (
+	id SERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+	updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+	inbox_id INT REFERENCES inboxes(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	meta_template_id TEXT NULL,
+	name TEXT NOT NULL,
+	language TEXT NOT NULL,
+	category TEXT NOT NULL,
+	status TEXT DEFAULT 'PENDING' NOT NULL,
+	header_type TEXT NULL,
+	header_content TEXT NULL,
+	body_content TEXT NOT NULL,
+	footer_content TEXT NULL,
+	buttons JSONB DEFAULT '[]'::jsonb NOT NULL,
+	sample_values JSONB DEFAULT '{}'::jsonb NOT NULL,
+	rejection_reason TEXT NULL,
+	component_types TEXT[] NULL,
+	CONSTRAINT constraint_whatsapp_templates_on_name CHECK (length(name) <= 512),
+	CONSTRAINT constraint_whatsapp_templates_on_language CHECK (length(language) <= 20),
+	CONSTRAINT constraint_whatsapp_templates_on_category CHECK (length(category) <= 32),
+	CONSTRAINT constraint_whatsapp_templates_on_status CHECK (length(status) <= 32),
+	CONSTRAINT constraint_whatsapp_templates_on_header_type CHECK (length(header_type) <= 32)
+);
+CREATE UNIQUE INDEX index_unique_whatsapp_templates_on_inbox_name_language ON whatsapp_templates (inbox_id, name, language);
+CREATE INDEX index_whatsapp_templates_on_inbox_id ON whatsapp_templates (inbox_id);
+CREATE INDEX index_whatsapp_templates_on_meta_template_id ON whatsapp_templates (meta_template_id);
 
 DROP TABLE IF EXISTS conversation_tags CASCADE;
 CREATE TABLE conversation_tags (
@@ -799,6 +851,7 @@ CREATE TABLE ai_assistants (
 	max_turns INTEGER NOT NULL DEFAULT 6,
 	fallback_team_id INTEGER NULL REFERENCES teams(id) ON DELETE SET NULL,
 	handoff_enabled BOOLEAN NOT NULL DEFAULT true,
+	citations_enabled BOOLEAN NOT NULL DEFAULT false,
 	languages TEXT[] NOT NULL DEFAULT '{}',
 	enabled BOOLEAN NOT NULL DEFAULT true,
 	CONSTRAINT constraint_ai_assistants_on_tone CHECK (tone IN ('friendly', 'professional', 'neutral', 'casual')),
@@ -890,6 +943,19 @@ CREATE TABLE contact_notes (
 	user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE INDEX index_contact_notes_on_contact_id_created_at ON contact_notes (contact_id, created_at);
+
+DROP TABLE IF EXISTS contact_channel_identities CASCADE;
+CREATE TABLE contact_channel_identities (
+	id BIGSERIAL PRIMARY KEY,
+	created_at TIMESTAMPTZ DEFAULT NOW(),
+	updated_at TIMESTAMPTZ DEFAULT NOW(),
+	contact_id BIGINT REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE NOT NULL,
+	channel channels NOT NULL,
+	identifier TEXT NOT NULL,
+	CONSTRAINT constraint_contact_channel_identities_on_identifier CHECK (length(identifier) <= 1000)
+);
+CREATE UNIQUE INDEX index_unique_contact_channel_identities_on_channel_identifier ON contact_channel_identities (channel, identifier);
+CREATE INDEX index_contact_channel_identities_on_contact_id ON contact_channel_identities (contact_id);
 
 DROP TABLE IF EXISTS activity_logs CASCADE;
 CREATE TABLE activity_logs (
@@ -993,6 +1059,7 @@ CREATE TABLE notification_email_queue (
 	notification_id BIGINT REFERENCES user_notifications(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	notification_type user_notification_type NOT NULL,
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE,
+	message_id BIGINT REFERENCES conversation_messages(id) ON DELETE CASCADE ON UPDATE CASCADE,
 	recipient_email TEXT NOT NULL,
 	subject TEXT NOT NULL,
 	content TEXT NOT NULL,
@@ -1107,6 +1174,8 @@ VALUES
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>A new conversation has been assigned to you:</p>
 
 <div>
@@ -1128,6 +1197,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation assigned to you:</p>
 
 <div>
@@ -1153,6 +1224,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation you are participating in:</p>
 
 <div>
@@ -1178,6 +1251,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied and reopened a conversation assigned to you:</p>
 
 <div>
@@ -1205,6 +1280,7 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
 
 <p>This is a notification that the SLA for conversation {{ .Conversation.ReferenceNumber }} is approaching the SLA deadline for {{ .SLA.Metric }}.</p>
 
@@ -1237,6 +1313,8 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>This is an urgent alert that the SLA for conversation {{ .Conversation.ReferenceNumber }} has been breached for {{ .SLA.Metric }}. Please take immediate action.</p>
 
 <p>
@@ -1268,6 +1346,8 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .MentionedBy.FullName }} mentioned you in a private note on conversation #{{ .Conversation.ReferenceNumber }}.</p>
 
 <blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">

@@ -37,7 +37,7 @@ func handleOIDCLogin(r *fastglue.Request) error {
 		providerID, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if err != nil {
-		app.lo.Error("error parsing provider id", "error", err)
+		app.lo.Debug("error parsing provider id", "error", err)
 		return redirectLoginError(r, oidcErrLoginFailed, next)
 	}
 
@@ -54,14 +54,13 @@ func handleOIDCLogin(r *fastglue.Request) error {
 		oidcNextSessKey: next,
 	}
 
-	if err = app.auth.SetSessionValues(r, sessionValues); err != nil {
-		app.lo.Error("error saving state in session", "error", err)
-		return redirectLoginError(r, oidcErrLoginFailed, next)
-	}
-
 	authURL, err := app.auth.LoginURL(providerID, state)
 	if err != nil {
 		app.lo.Error("error getting oidc login url", "provider_id", providerID, "error", err)
+		return redirectLoginError(r, oidcErrLoginFailed, next)
+	}
+	if err = app.auth.SetSessionValues(r, sessionValues); err != nil {
+		app.lo.Error("error saving state in session", "error", err)
 		return redirectLoginError(r, oidcErrLoginFailed, next)
 	}
 	app.lo.Debug("redirecting to oidc provider for login", "provider_id", providerID)
@@ -81,7 +80,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	nextStr, _ := next.(string)
 
 	if err != nil {
-		app.lo.Error("error parsing provider id", "error", err)
+		app.lo.Debug("OIDC callback rejected: invalid provider ID", "error", err)
 		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}
 
@@ -105,7 +104,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		return redirectLoginError(r, oidcErrSessionExpired, nextStr)
 	}
 	if state != sessionState {
-		app.lo.Error("oidc state mismatch, the session cookie may be missing or expired or the callback URL is stale", "provider_id", providerID)
+		app.lo.Warn("OIDC login rejected: state mismatch, session may have expired", "provider_id", providerID, "ip", ip)
 		return redirectLoginError(r, oidcErrSessionExpired, nextStr)
 	}
 
@@ -144,7 +143,6 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 	}, r); err != nil {
-		app.lo.Error("error saving session for oidc login", "user_id", user.ID, "error", err)
 		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}
 

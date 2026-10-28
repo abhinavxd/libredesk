@@ -16,7 +16,7 @@ describe('Admin setup and outgoing conversation', () => {
   const subject = `Cypress subject ${stamp}`
   const replyBody = `Automated reply from Cypress ${stamp}`
 
-  // SMTP points at the MailHog sink running as a CI service; IMAP is dummy.
+  // MailHog captures outgoing mail. IMAP is dummy.
   const smtpHost = Cypress.env('SMTP_HOST') || '127.0.0.1'
   const smtpPort = Cypress.env('SMTP_PORT') || '1025'
   const mailhogUrl = Cypress.env('MAILHOG_URL')
@@ -41,14 +41,16 @@ describe('Admin setup and outgoing conversation', () => {
     cy.get('input[name="imap.username"]').type('cypress')
     cy.get('input[name="imap.password"]').type('cypress')
 
-    // smtp.host/port also exist in the hidden OAuth section, so target the visible ones.
-    cy.get('input[name="smtp.host"]:visible').clear().type(smtpHost)
-    cy.get('input[name="smtp.port"]:visible').clear().type(smtpPort)
+    cy.get('input[name="smtp.host"]').clear().type(smtpHost)
+    cy.get('input[name="smtp.port"]').clear().type(smtpPort)
     cy.get('input[name="smtp.username"]').type('cypress')
     cy.get('input[name="smtp.password"]').type('cypress')
+    cy.toggleEmailInboxAdvanced('smtp')
     cy.selectOption('Login', 'None') // SMTP auth protocol -> None (MailHog needs none)
 
-    cy.contains('button', 'Create').click()
+    cy.setEmailInboxSection('imap', false)
+    cy.setEmailInboxSection('smtp', false)
+    cy.get('button[type="submit"]').click()
     cy.wait('@createInbox').its('response.statusCode').should('eq', 200)
     cy.location('pathname').should('eq', '/admin/inboxes')
   })
@@ -58,10 +60,9 @@ describe('Admin setup and outgoing conversation', () => {
 
     cy.visit('/admin/teams/teams/new')
 
-    // Emoji is required. Pick it first so the picker overlay is closed (by the
-    // next click) before filling the rest of the form.
-    cy.get('input[name="emoji"]').click()
+    cy.contains('label', 'Emoji').click()
     cy.get('.v3-emoji-picker .v3-emojis button').first().click()
+    cy.get('.v3-emoji-picker').should('not.exist')
 
     cy.get('input[name="name"]').type(teamName)
     cy.selectOption('Select an assignment type', 'Round robin')
@@ -81,7 +82,7 @@ describe('Admin setup and outgoing conversation', () => {
     cy.get('input[name="first_name"]').type(agentFirstName)
     cy.get('input[name="email"]').type(agentEmail)
 
-    cy.get('input[placeholder="Select roles"]').click()
+    cy.get('input[aria-label="Select roles"]').click()
     cy.get('[role="option"]').contains('Agent').click()
 
     cy.contains('button', 'Create').click()
@@ -109,7 +110,7 @@ describe('Admin setup and outgoing conversation', () => {
       .find('.tiptap.ProseMirror')
       .click()
       .type('Hello, this is an automated outgoing conversation.')
-    cy.get('[role="dialog"]').contains('button', 'Submit').click()
+    cy.get('[role="dialog"]').find('button[type="submit"]:visible').click()
 
     cy.wait('@createConversation').then(({ response }) => {
       expect(response.statusCode).to.eq(200)
@@ -128,7 +129,9 @@ describe('Admin setup and outgoing conversation', () => {
     // Wait for the thread to load before replying: the recipient (To) is derived from the
     // latest message, so sending before it loads is rejected with "recipient required".
     cy.wait('@loadMessages')
-    cy.get('input[placeholder="Email addresses separated by comma"]').first().should('not.have.value', '')
+    cy.get('input[placeholder="Email addresses separated by comma"]')
+      .first()
+      .should('not.have.value', '')
     cy.get('.tiptap.ProseMirror').first().click().type(replyBody)
     cy.contains('button', /^Send$/).click() // exact: avoid the adjacent "Send and set status" split button
 
@@ -153,5 +156,32 @@ describe('Admin setup and outgoing conversation', () => {
       }
       findInMailHog()
     }
+  })
+})
+
+describe('Recovering a stale route after deployment', () => {
+  it('reloads a missing route chunk once and opens the requested page', () => {
+    let loads = 0
+    cy.login()
+    cy.viewport(1280, 800)
+    cy.on('window:before:load', () => { loads++ })
+    cy.on('uncaught:exception', (error) => {
+      if (error.message.includes('Failed to fetch dynamically imported module:') &&
+          error.message.includes('/assets/WebhookList-')) return false
+    })
+    cy.intercept({ method: 'GET', url: '**/assets/WebhookList-*.js', times: 1 }, {
+      statusCode: 404, body: '', headers: { 'content-type': 'text/javascript' }
+    }).as('missingRouteChunk')
+    cy.visit('/admin/conversations/tags')
+    cy.contains('button', /^Integrations$/).click()
+    cy.get('a[href="/admin/webhooks"]').first().scrollIntoView()
+    cy.get('a[href="/admin/webhooks"]').first().click()
+    cy.wait('@missingRouteChunk').its('response.statusCode').should('eq', 404)
+    cy.location('pathname').should('eq', '/admin/webhooks')
+    cy.contains('button', 'New webhook').should('be.visible')
+    cy.window().should((win) => {
+      expect(loads).to.eq(2)
+      expect(win.sessionStorage.getItem('libredesk:preload-reload')).to.eq(null)
+    })
   })
 })

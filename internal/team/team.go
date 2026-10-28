@@ -108,7 +108,6 @@ func (u *Manager) Get(id int) (models.Team, error) {
 	var team models.Team
 	if err := u.q.GetTeam.Get(&team, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			u.lo.Error("team not found", "id", id, "error", err)
 			return team, envelope.NewError(envelope.InputError, u.i18n.T("validation.notFoundTeam"), nil)
 		}
 		u.lo.Error("error fetching team", "id", id, "error", err)

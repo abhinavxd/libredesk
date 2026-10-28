@@ -8,7 +8,7 @@ jobs:
 
     services:
       db:
-        image: postgres:17-alpine
+        image: mirror.gcr.io/library/postgres:17-alpine
         ports:
           - 5432:5432
         env:
@@ -31,7 +31,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.0"
+          go-version: "1.27.3"
 
       - name: Install dependencies
         run: go get -v ./...

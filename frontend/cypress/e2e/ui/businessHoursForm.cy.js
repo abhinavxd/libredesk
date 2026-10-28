@@ -9,13 +9,26 @@ const listPath = '/admin/business-hours'
 
 const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)
 
-// A weekday row holds its checkbox label plus the open and close time inputs.
 const dayRow = (day) => cy.get(`label[for="${day}"]`).parent().parent()
+
+const timeField = (day, index) => dayRow(day).find('[data-time-field]').eq(index)
+
+const setTime = (day, index, value) => {
+  const [hour, minute] = value.split(':')
+  timeField(day, index).find('[data-reka-time-field-segment="hour"]').type(`{selectall}${hour}`)
+  timeField(day, index).find('[data-reka-time-field-segment="minute"]').type(`{selectall}${minute}`)
+}
+
+const assertTime = (day, index, value) => {
+  const [hour, minute] = value.split(':')
+  timeField(day, index).find('[data-reka-time-field-segment="hour"]').should('have.text', hour)
+  timeField(day, index).find('[data-reka-time-field-segment="minute"]').should('have.text', minute)
+}
 
 const setDay = (day, open, close) => {
   cy.get(`button[role="checkbox"]#${day}`).click()
-  dayRow(day).find('input[type="time"]').eq(0).clear().type(open)
-  dayRow(day).find('input[type="time"]').eq(1).clear().type(close)
+  setTime(day, 0, open)
+  setTime(day, 1, close)
 }
 
 describe('Business hours form', () => {
@@ -79,10 +92,10 @@ describe('Business hours form', () => {
     cy.get('button[role="checkbox"]#Wednesday').should('have.attr', 'data-state', 'checked')
     cy.get('button[role="checkbox"]#Tuesday').should('have.attr', 'data-state', 'unchecked')
 
-    dayRow('Monday').find('input[type="time"]').eq(0).should('have.value', '08:30')
-    dayRow('Monday').find('input[type="time"]').eq(1).should('have.value', '16:45')
-    dayRow('Wednesday').find('input[type="time"]').eq(0).should('have.value', '10:00')
-    dayRow('Wednesday').find('input[type="time"]').eq(1).should('have.value', '18:00')
+    assertTime('Monday', 0, '08:30')
+    assertTime('Monday', 1, '16:45')
+    assertTime('Wednesday', 0, '10:00')
+    assertTime('Wednesday', 1, '18:00')
 
     cy.contains('td', holidayName).should('exist')
   })
@@ -104,20 +117,20 @@ describe('Business hours form', () => {
     cy.intercept('PUT', `**/api/v1/business-hours/${hoursId}`).as('updateHours')
 
     cy.visit(`${listPath}/${hoursId}/edit`)
-    dayRow('Monday').find('input[type="time"]').eq(1).should('have.value', '16:45')
-    dayRow('Monday').find('input[type="time"]').eq(1).clear().type('20:15')
+    assertTime('Monday', 1, '16:45')
+    setTime('Monday', 1, '20:15')
 
     cy.get('button[type="submit"]').click()
     cy.wait('@updateHours').its('response.statusCode').should('eq', 200)
 
     cy.visit(`${listPath}/${hoursId}/edit`)
-    dayRow('Monday').find('input[type="time"]').eq(1).should('have.value', '20:15')
+    assertTime('Monday', 1, '20:15')
   })
 
   it('keeps an edited name when a weekday time is changed too', () => {
     cy.visit(`${listPath}/${hoursId}/edit`)
     cy.get('input[name="name"]').should('have.value', renamedHours).clear().type(`${renamedHours} v2`)
-    dayRow('Wednesday').find('input[type="time"]').eq(1).clear().type('19:30')
+    setTime('Wednesday', 1, '19:30')
 
     cy.get('input[name="name"]').should('have.value', `${renamedHours} v2`)
   })
