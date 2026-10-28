@@ -49,6 +49,13 @@ func (e *Email) Name() string {
 	return notifier.ProviderEmail
 }
 
+// Close closes every SMTP pool.
+func (e *Email) Close() {
+	for _, p := range e.smtpPools {
+		p.Close()
+	}
+}
+
 // send sends an email message.
 func (e *Email) send(em smtppool.Email) error {
 	srv := e.selectSmtpPool()

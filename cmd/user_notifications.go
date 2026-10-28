@@ -115,7 +115,7 @@ func handleGetNotificationPreferences(r *fastglue.Request) error {
 	}
 	return r.SendEnvelope(map[string]any{
 		"preferences":      prefs,
-		"email_enabled":    ko.Bool("notification.email.enabled"),
+		"email_enabled":    app.notifEmailQueue.Enabled(),
 		"vapid_public_key": app.pushNotification.PublicKey(),
 		"push_endpoints":   pushEndpoints,
 	})

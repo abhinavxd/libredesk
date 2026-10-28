@@ -50,6 +50,8 @@ type Service struct {
 	closed         bool
 	mu             sync.RWMutex
 	wg             sync.WaitGroup
+	// Held across SendSync so SetProvider waits for in-flight sends; separate from mu, which Close holds while waiting for the workers.
+	providersMu sync.RWMutex
 }
 
 // NewService initializes the Service with given concurrency, channel capacity, and logger.
@@ -79,13 +81,34 @@ func (s *Service) Send(message Message) error {
 	}
 }
 
-// SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock, so a slow relay cannot stall Send or Close.
+// SendSync sends on the caller's goroutine so delivery failures reach the caller; it holds no lock shared with Send or Close, so a slow relay cannot stall them.
 func (s *Service) SendSync(message Message) error {
+	s.providersMu.RLock()
+	defer s.providersMu.RUnlock()
 	provider, exists := s.providers[message.Provider]
 	if !exists {
 		return fmt.Errorf("unsupported provider: %s", message.Provider)
 	}
 	return provider.Send(message)
+}
+
+// SetProvider replaces the provider registered under p.Name(). It waits for in-flight
+// sends, then closes the old provider if it has a Close method.
+func (s *Service) SetProvider(p Notifier) {
+	s.providersMu.Lock()
+	if s.providers == nil {
+		s.providers = map[string]Notifier{}
+	}
+	old := s.providers[p.Name()]
+	s.providers[p.Name()] = p
+	s.providersMu.Unlock()
+
+	if old == nil || old == p {
+		return
+	}
+	if c, ok := old.(interface{ Close() }); ok {
+		c.Close()
+	}
 }
 
 // Run starts the worker pool to process messages.
