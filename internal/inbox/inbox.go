@@ -449,10 +449,6 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 
-		if len(updateCfg.IMAP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
-		}
-
 		if len(updateCfg.SMTP) == 0 {
 			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptySMTP"), nil)
 		}
@@ -539,7 +535,9 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		if err := json.Unmarshal(inbox.Config, &updatedConfig); err != nil {
 			return imodels.Inbox{}, m.persistenceError("reading updated email config", err)
 		}
-		if emailSendingConfigChanged(currentConfig, updatedConfig) {
+		// Pending verifications expire during the IMAP scan, so turning IMAP off resets them too.
+		imapTurnedOff := len(currentConfig.IMAP) > 0 && len(updatedConfig.IMAP) == 0
+		if emailSendingConfigChanged(currentConfig, updatedConfig) || imapTurnedOff {
 			if _, err := tx.Stmtx(m.queries.ResetAliasVerification).Exec(id); err != nil {
 				return imodels.Inbox{}, m.persistenceError("resetting alias verification", err)
 			}
@@ -652,6 +650,14 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	idx := slices.IndexFunc(inbox.Aliases, func(alias imodels.EmailAlias) bool { return strings.EqualFold(alias.Email, normalized) })
 	if idx < 0 {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.inbox.aliases.saveBeforeVerify"), nil)
+	}
+	// Verification completes when IMAP reads back the message sent here.
+	var cfg imodels.Config
+	if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
+		return m.persistenceError("reading email config", err)
+	}
+	if len(cfg.IMAP) == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("admin.inbox.aliases.verifyNeedsIMAP"), nil)
 	}
 	runtimeInbox, err := m.Get(id)
 	if err != nil {

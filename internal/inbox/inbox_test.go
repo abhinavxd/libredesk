@@ -176,6 +176,19 @@ func TestInboxEmailAddresses(t *testing.T) {
 	require.Equal(t, imodels.AliasVerificationNotVerified, updated.Aliases[0].VerificationStatus)
 	require.Nil(t, updated.Aliases[0].VerifiedAt)
 
+	_, err = mgr.queries.StartAliasVerification.Exec(first.ID, "accounts@example.com", imodels.AliasVerificationPending, "imap-token")
+	require.NoError(t, err)
+	record, err = mgr.GetDBRecord(first.ID)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(record.Config, &newConfig))
+	newConfig.IMAP = nil
+	record.Config, err = json.Marshal(newConfig)
+	require.NoError(t, err)
+	updated, err = mgr.Update(first.ID, record)
+	require.NoError(t, err)
+	require.Equal(t, imodels.AliasVerificationNotVerified, updated.Aliases[0].VerificationStatus)
+	require.Error(t, mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com"))
+
 	updated.Aliases = imodels.EmailAliases{}
 	updated, err = mgr.Update(first.ID, updated)
 	require.NoError(t, err)
