@@ -41,6 +41,43 @@
 
               <!-- Value -->
               <div
+                v-if="conversationActions[action.type]?.type === 'custom_attribute'"
+                :class="ACTION_DETAILS_CLASS"
+              >
+                <SelectComboBox
+                  :modelValue="action.value[0] || ''"
+                  :items="attributeOptions(action)"
+                  :placeholder="t('globals.terms.customAttribute')"
+                  :aria-label="t('globals.terms.customAttribute')"
+                  @select="handleAttributeChange($event, index)"
+                />
+                <template v-if="action.value[0] && !conversationActions[action.type].remove">
+                  <SelectComboBox
+                    v-if="['checkbox', 'list'].includes(selectedAttribute(action)?.data_type)"
+                    :modelValue="action.value[1] || ''"
+                    :items="attributeValueOptions(action)"
+                    :placeholder="t('actions.setValue')"
+                    :aria-label="t('actions.setValue')"
+                    @select="handleAttributeValueChange($event, index)"
+                  />
+                  <Input
+                    v-else
+                    :type="
+                      selectedAttribute(action)?.data_type === 'number'
+                        ? 'number'
+                        : selectedAttribute(action)?.data_type === 'date'
+                          ? 'date'
+                          : 'text'
+                    "
+                    :step="selectedAttribute(action)?.data_type === 'number' ? 'any' : undefined"
+                    :modelValue="action.value[1] ?? ''"
+                    :placeholder="t('actions.setValue')"
+                    :aria-label="t('actions.setValue')"
+                    @update:modelValue="handleAttributeValueChange($event, index)"
+                  />
+                </template>
+              </div>
+              <div
                 v-if="action.type && conversationActions[action.type]?.type === 'tag'"
                 class="flex-1 min-w-0 max-w-md"
               >
@@ -49,7 +86,7 @@
 
               <div
                 v-if="action.type && conversationActions[action.type]?.type === 'recipients'"
-                class="flex-1 min-w-0 max-w-md space-y-3"
+                :class="ACTION_DETAILS_CLASS"
               >
                 <SelectTag
                   :modelValue="action.recipients || []"
@@ -159,6 +196,8 @@
 </template>
 
 <script setup>
+const ACTION_DETAILS_CLASS = 'flex-1 min-w-0 max-w-md space-y-3'
+
 import { toRefs, computed, watch, onMounted } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
@@ -185,6 +224,7 @@ import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
 import SelectTagCombobox from '@main/components/combobox/SelectTagCombobox.vue'
+import { useCustomAttributeStore } from '@main/stores/customAttributes'
 
 const props = defineProps({
   actions: {
@@ -213,6 +253,7 @@ const emit = defineEmits(['update-actions', 'add-action', 'remove-action'])
 const webhookStore = useWebhookStore()
 const uStore = useUsersStore()
 const tStore = useTeamStore()
+const customAttributeStore = useCustomAttributeStore()
 const { conversationActions } = useConversationFilters()
 const messageVariablesHelp = computed(
   () => `${t('globals.terms.variable', 2)}: ${formatTemplateVariables(MESSAGE_VARIABLES)}`
@@ -225,12 +266,14 @@ const recipientKeywords = computed(() => [
   { label: t('globals.terms.assignedTeam'), value: 'assigned_team' }
 ])
 
-const toTeamRecipients = (options) => options.map((o) => ({
+const toTeamRecipients = (options) =>
+  options.map((o) => ({
     label: `${t('globals.terms.team')}: ${o.label}`,
     value: `team:${o.value}`
   }))
 
-const toUserRecipients = (options) => options.map((o) => ({
+const toUserRecipients = (options) =>
+  options.map((o) => ({
     label: `${t('globals.terms.agent')}: ${o.label}`,
     value: `user:${o.value}`
   }))
@@ -242,15 +285,8 @@ const notifyRecipientOptions = computed(() => [
 ])
 
 const searchRecipients = async (query) => {
-  const [teams, users] = await Promise.all([
-    tStore.searchTeams(query),
-    uStore.searchUsers(query)
-  ])
-  return [
-    ...recipientKeywords.value,
-    ...toTeamRecipients(teams),
-    ...toUserRecipients(users)
-  ]
+  const [teams, users] = await Promise.all([tStore.searchTeams(query), uStore.searchUsers(query)])
+  return [...recipientKeywords.value, ...toTeamRecipients(teams), ...toUserRecipients(users)]
 }
 
 // Recipients are prefixed, e.g. "user:12" / "team:3", alongside keywords like "assignee".
@@ -264,7 +300,34 @@ const recipientIDs = (prefix) =>
 onMounted(() => {
   uStore.fetchUsers()
   tStore.fetchTeams()
+  customAttributeStore.fetchCustomAttributes()
 })
+
+const attributeOptions = (action) =>
+  conversationActions.value[action.type]?.scope === 'contact'
+    ? customAttributeStore.contactAttributeOptions
+    : customAttributeStore.conversationAttributeOptions
+
+const selectedAttribute = (action) =>
+  attributeOptions(action).find((attribute) => String(attribute.id) === action.value[0])
+
+const attributeValueOptions = (action) =>
+  selectedAttribute(action)?.data_type === 'checkbox'
+    ? [
+        { label: t('globals.messages.true'), value: 'true' },
+        { label: t('globals.messages.false'), value: 'false' }
+      ]
+    : (selectedAttribute(action)?.values || []).map((value) => ({ label: value, value }))
+
+const handleAttributeChange = (value, index) => {
+  actions.value[index].value = [String(value?.value ?? value)]
+  emitUpdate(index)
+}
+
+const handleAttributeValueChange = (value, index) => {
+  actions.value[index].value = [actions.value[index].value[0], String(value?.value ?? value)]
+  emitUpdate(index)
+}
 
 // Keyed on the ids alone: a deep watch on actions would refire on every subject/message keystroke.
 const recipientIDKey = computed(() => JSON.stringify([recipientIDs('user'), recipientIDs('team')]))

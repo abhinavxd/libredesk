@@ -40,7 +40,7 @@
           <div class="flex items-start gap-3" data-cy="automation-condition">
             <div class="condition-fields grid min-w-0 flex-1 gap-3">
               <Select
-                v-model="rule.field"
+                :modelValue="fieldSelection(rule)"
                 @update:modelValue="(value) => handleFieldChange(value, index)"
               >
                 <SelectTrigger :class="FIELD_CLASS">
@@ -51,16 +51,34 @@
                     <SelectLabel v-if="!contactsOnly">{{
                       $t('globals.terms.conversation')
                     }}</SelectLabel>
-                    <SelectItem v-for="(field, key) in currentFilters" :key="key" :value="key">
+                    <SelectItem
+                      v-for="(field, key) in currentFilters"
+                      :key="key"
+                      :value="`conversation:${key}`"
+                    >
                       {{ field.label }}
                     </SelectItem>
+                    <template
+                      v-if="!contactsOnly && Object.keys(conversationCustomAttributes).length"
+                    >
+                      <SelectLabel>{{
+                        $t('admin.automation.conversationCustomAttributes')
+                      }}</SelectLabel>
+                      <SelectItem
+                        v-for="(field, key) in conversationCustomAttributes"
+                        :key="`conversation_custom_attribute:${key}`"
+                        :value="`conversation_custom_attribute:${key}`"
+                      >
+                        {{ field.label }}
+                      </SelectItem>
+                    </template>
                     <SelectLabel v-if="hasContactCustomAttributes">{{
                       $t('globals.terms.contact')
                     }}</SelectLabel>
                     <SelectItem
                       v-for="(field, key) in contactCustomAttributes"
-                      :key="key"
-                      :value="key"
+                      :key="`contact_custom_attribute:${key}`"
+                      :value="`contact_custom_attribute:${key}`"
                     >
                       {{ field.label }}
                     </SelectItem>
@@ -89,6 +107,12 @@
               </Select>
 
               <div v-if="showInput(index)" :class="FIELD_CLASS">
+                <SelectTagCombobox
+                  v-if="inputType(index) === 'multi-select'"
+                  multiple
+                  :modelValue="tagValues(rule.value)"
+                  @update:modelValue="(value) => handleValueChange(value, index)"
+                />
                 <Input
                   type="text"
                   :placeholder="t('actions.setValue')"
@@ -100,6 +124,8 @@
 
                 <Input
                   type="number"
+                  step="any"
+                  :aria-label="t('actions.setValue')"
                   :placeholder="t('actions.setValue')"
                   v-if="inputType(index) === 'number'"
                   v-model="rule.value"
@@ -230,6 +256,7 @@ import { useConversationFilters } from '@/composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
+import SelectTagCombobox from '@main/components/combobox/SelectTagCombobox.vue'
 import { operatorLabel } from '@/constants/filterConfig'
 
 const props = defineProps({
@@ -250,10 +277,15 @@ const props = defineProps({
 
 const fieldTypeConstants = {
   conversation: 'conversation',
-  contact_custom_attribute: 'contact_custom_attribute'
+  contact_custom_attribute: 'contact_custom_attribute',
+  conversation_custom_attribute: 'conversation_custom_attribute'
 }
-const { conversationFilters, newConversationFilters, contactCustomAttributes } =
-  useConversationFilters()
+const {
+  conversationFilters,
+  newConversationFilters,
+  contactCustomAttributes,
+  conversationCustomAttributes
+} = useConversationFilters()
 const hasContactCustomAttributes = computed(
   () => Object.keys(contactCustomAttributes.value).length > 0
 )
@@ -292,16 +324,14 @@ const handleGroupOperator = (value) => {
 }
 
 const handleFieldChange = (value, ruleIndex) => {
-  // Set the field type based on the selected field value.
-  let fieldType = fieldTypeConstants.conversation
-  if (contactCustomAttributes.value[value]) {
-    fieldType = fieldTypeConstants.contact_custom_attribute
-  }
+  const separator = value.indexOf(':')
+  const fieldType = value.slice(0, separator)
+  const field = value.slice(separator + 1)
 
   ruleGroup.value.rules[ruleIndex].operator = ''
   ruleGroup.value.rules[ruleIndex].value = ''
   ruleGroup.value.rules[ruleIndex].case_sensitive_match = false
-  ruleGroup.value.rules[ruleIndex].field = value
+  ruleGroup.value.rules[ruleIndex].field = field
   ruleGroup.value.rules[ruleIndex].field_type = fieldType
   emitUpdate()
 }
@@ -320,6 +350,12 @@ const handleValueChange = (value, ruleIndex) => {
   // Fetch the rule.
   const rule = ruleGroup.value.rules[ruleIndex]
 
+  if (rule.field === 'tags' && (rule.field_type || 'conversation') === 'conversation') {
+    rule.value = JSON.stringify(val || [])
+    emitUpdate()
+    return
+  }
+
   // Array values are stored as comma separated string.
   rule.value = ['contains', 'not contains'].includes(rule.operator)
     ? Array.isArray(val)
@@ -332,6 +368,27 @@ const handleValueChange = (value, ruleIndex) => {
 
 const fieldValueAsArray = (value) => {
   return Array.isArray(value) ? value : value ? value.split(',') : []
+}
+
+const fieldSelection = (rule) =>
+  rule.field ? `${rule.field_type || 'conversation'}:${rule.field}` : ''
+
+const tagValues = (value) => {
+  if (!value) return []
+  try {
+    const tags = JSON.parse(value)
+    return Array.isArray(tags) ? tags : []
+  } catch {
+    return []
+  }
+}
+
+const fieldConfig = (field, fieldType) => {
+  if (fieldType === fieldTypeConstants.contact_custom_attribute)
+    return contactCustomAttributes.value[field]
+  if (fieldType === fieldTypeConstants.conversation_custom_attribute)
+    return conversationCustomAttributes.value[field]
+  return currentFilters.value[field]
 }
 
 const handleCaseSensitiveCheck = (value, ruleIndex) => {
@@ -352,17 +409,7 @@ const emitUpdate = () => {
 }
 
 const getFieldOperators = (field, fieldType) => {
-  // Set default field type if not set for backwards compatibility as this field was added later.
-  if (!fieldType) {
-    fieldType = fieldTypeConstants.conversation
-  }
-  if (fieldType === fieldTypeConstants.contact_custom_attribute) {
-    return contactCustomAttributes.value[field]?.operators || []
-  }
-  if (fieldType === fieldTypeConstants.conversation) {
-    return currentFilters.value[field]?.operators || []
-  }
-  return []
+  return fieldConfig(field, fieldType)?.operators || []
 }
 
 const getFieldEntity = (field, fieldType) => {
@@ -371,38 +418,16 @@ const getFieldEntity = (field, fieldType) => {
 }
 
 const getFieldOptions = (field, fieldType) => {
-  // Set default field type if not set for backwards compatibility as this field was added later.
-  if (!fieldType) {
-    fieldType = fieldTypeConstants.conversation
-  }
-  if (fieldType === fieldTypeConstants.contact_custom_attribute) {
-    return contactCustomAttributes.value[field]?.options || []
-  }
-  if (fieldType === fieldTypeConstants.conversation) {
-    return currentFilters.value[field]?.options || []
-  }
-  return []
+  return fieldConfig(field, fieldType)?.options || []
 }
 
 const inputType = (index) => {
   const field = ruleGroup.value.rules[index]?.field
   const operator = ruleGroup.value.rules[index]?.operator
-  let fieldType = ruleGroup.value.rules[index]?.field_type
+  const fieldType = ruleGroup.value.rules[index]?.field_type
+  if (field === 'tags' && (fieldType || 'conversation') === 'conversation') return 'multi-select'
   if (['contains', 'not contains'].includes(operator)) return 'tag'
-
-  // Set default field type if not set for backwards compatibility as this field was added later.
-  if (!fieldType) {
-    fieldType = fieldTypeConstants.conversation
-  }
-  if (field && fieldType) {
-    if (fieldType === fieldTypeConstants.contact_custom_attribute) {
-      return contactCustomAttributes.value[field]?.type || ''
-    }
-    if (fieldType === fieldTypeConstants.conversation) {
-      return currentFilters.value[field]?.type || ''
-    }
-  }
-  return ''
+  return fieldConfig(field, fieldType)?.type || ''
 }
 
 const showInput = (index) => {
@@ -412,10 +437,7 @@ const showInput = (index) => {
 
 const showCaseSensitive = (index) => {
   const rule = ruleGroup.value.rules[index]
-  const field =
-    rule?.field_type === fieldTypeConstants.contact_custom_attribute
-      ? contactCustomAttributes.value[rule.field]
-      : currentFilters.value[rule?.field]
+  const field = fieldConfig(rule?.field, rule?.field_type)
   return field?.allowCaseSensitive === true
 }
 </script>

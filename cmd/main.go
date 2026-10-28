@@ -273,6 +273,7 @@ func main() {
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
+		customAttributes            = initCustomAttribute(db, i18n)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, inbox, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
@@ -281,12 +282,14 @@ func main() {
 
 	wsHub.SetConversationStore(conversation)
 	automation.SetConversationStore(conversation)
+	automation.SetBusinessHoursChecker(sla.IsWithinBusinessHours)
 	systemUser, err := user.GetSystemUser()
 	if err != nil {
 		log.Fatalf("error fetching system user: %v", err)
 	}
 	automation.SetSystemUserID(systemUser.ID)
 	conversation.SetAIAgent(aiAgent)
+	conversation.SetCustomAttributeStore(customAttributes)
 
 	waClient := initWhatsAppClient()
 	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
@@ -336,7 +339,7 @@ func main() {
 		automation:       automation,
 		businessHours:    businessHours,
 		activityLog:      initActivityLog(db, i18n),
-		customAttribute:  initCustomAttribute(db, i18n),
+		customAttribute:  customAttributes,
 		authz:            initAuthz(i18n),
 		view:             initView(db, i18n),
 		report:           initReport(db, i18n),

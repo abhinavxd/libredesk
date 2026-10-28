@@ -128,6 +128,7 @@ type Manager struct {
 	continuityConfig           ContinuityConfig
 	subjectRefFormat           string
 	aiAgent                    AIAgentEngine
+	customAttributeStore       customAttributeStore
 }
 
 type replyNotificationGroup struct {
@@ -195,6 +196,8 @@ type userStore interface {
 	UpgradeVisitorToContact(visitorID int) error
 	GetChannelIdentity(contactID int, channel string) (string, error)
 	LinkChannelIdentity(contactID int, channel, identifier string) (int, error)
+	SaveCustomAttributes(id int, attributes map[string]any, replace bool) error
+	RemoveCustomAttribute(id int, key string) error
 }
 
 type mediaStore interface {
@@ -366,6 +369,9 @@ type queries struct {
 	ClaimUnassignedConversation         *sqlx.Stmt `query:"claim-unassigned-conversation"`
 	UpdateConversationAssignedTeam      *sqlx.Stmt `query:"update-conversation-assigned-team"`
 	UpdateConversationCustomAttributes  *sqlx.Stmt `query:"update-conversation-custom-attributes"`
+	UpsertConversationCustomAttribute   *sqlx.Stmt `query:"upsert-conversation-custom-attribute"`
+	RemoveConversationCustomAttribute   *sqlx.Stmt `query:"remove-conversation-custom-attribute"`
+	UpdateConversationSubject           *sqlx.Stmt `query:"update-conversation-subject"`
 	UpdateConversationPriority          *sqlx.Stmt `query:"update-conversation-priority"`
 	UpdateConversationStatus            *sqlx.Stmt `query:"update-conversation-status"`
 	UpdateConversationLastMessage       *sqlx.Stmt `query:"update-conversation-last-message"`
@@ -1270,6 +1276,9 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	}
 
 	c.BroadcastConversationUpdate(uuid, map[string]any{"tags": newTags})
+	if c.automation != nil && (len(prevTags) != len(newTags) || slices.ContainsFunc(prevTags, func(tag string) bool { return !slices.Contains(newTags, tag) })) {
+		c.automation.EvaluateConversationUpdateRulesByID(0 /** conversationID **/, uuid, amodels.EventConversationTagsChange, actor)
+	}
 
 	return nil
 }
@@ -1590,8 +1599,8 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 // ApplyAction applies an action to a conversation, this can be called from multiple packages across the app to perform actions on conversations.
 // all actions are executed on behalf of the provided user if the user is not provided, system user is used.
 func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversation, user umodels.User) error {
-	// CSAT has no value; notify carries its data in dedicated fields.
-	if len(action.Value) == 0 && action.Type != amodels.ActionSendCSAT && action.Type != amodels.ActionNotify {
+	if len(action.Value) == 0 && !slices.Contains([]string{amodels.ActionSendCSAT, amodels.ActionNotify,
+		amodels.ActionUnassignUser, amodels.ActionUnassignTeam, amodels.ActionClearTags}, action.Type) {
 		m.lo.Warn("empty value for action", "type", action.Type, "conversation_uuid", conv.UUID)
 		return fmt.Errorf("empty value for action %s", action.Type)
 	}
@@ -1612,6 +1621,25 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 	)
 
 	switch action.Type {
+	case amodels.ActionUnassignUser:
+		return m.UnassignConversationUser(conv.UUID, user)
+	case amodels.ActionUnassignTeam:
+		return m.RemoveConversationAssignee(conv.UUID, models.AssigneeTypeTeam, user)
+	case amodels.ActionClearTags:
+		return m.SetConversationTags(conv.UUID, amodels.ActionSetTags, []string{}, user)
+	case amodels.ActionSetSubject:
+		subject := strings.TrimSpace(action.Value[0])
+		if subject == "" {
+			return fmt.Errorf("set subject action requires a subject")
+		}
+		if _, err := m.q.UpdateConversationSubject.Exec(conv.UUID, subject); err != nil {
+			return fmt.Errorf("updating conversation subject: %w", err)
+		}
+		m.BroadcastConversationUpdate(conv.UUID, map[string]any{"subject": subject})
+		return nil
+	case amodels.ActionSetContactAttribute, amodels.ActionRemoveContactAttribute,
+		amodels.ActionSetConversationAttribute, amodels.ActionRemoveConversationAttribute:
+		return m.applyCustomAttributeAction(action, conv, user)
 	case amodels.ActionAssignTeam:
 		teamID, err := strconv.Atoi(action.Value[0])
 		if err != nil {
@@ -1966,6 +1994,14 @@ func (m *Manager) UpdateCSATResponse(uuid string, rating int, feedback string, m
 	if err := m.csatStore.UpdateResponse(uuid, rating, feedback, meta); err != nil {
 		return err
 	}
+	if m.automation != nil {
+		response, err := m.csatStore.Get(uuid)
+		if err != nil {
+			m.lo.Error("error fetching submitted CSAT response", "error", err)
+		} else {
+			m.automation.EvaluateConversationUpdateRulesByID(response.ConversationID, "" /** conversationUUID **/, amodels.EventConversationCSATSubmitted, umodels.User{} /** actor **/)
+		}
+	}
 	var messages []models.Message
 	if err := m.q.GetCSATMessages.Select(&messages, uuid); err != nil {
 		m.lo.Error("error fetching CSAT messages for update", "csat_uuid", uuid, "error", err)
@@ -1992,7 +2028,7 @@ func (m *Manager) DeleteConversation(uuid string) error {
 }
 
 // UpdateConversationCustomAttributes updates the custom attributes of a conversation.
-func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttributes map[string]any) error {
+func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttributes map[string]any, actor umodels.User) error {
 	jsonb, err := json.Marshal(customAttributes)
 	if err != nil {
 		c.lo.Error("error marshalling custom attributes", "error", err)
@@ -2004,6 +2040,9 @@ func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttribut
 	}
 	// Broadcast the custom attributes update.
 	c.BroadcastConversationUpdate(uuid, map[string]any{"custom_attributes": customAttributes})
+	if c.automation != nil {
+		c.automation.EvaluateConversationUpdateRulesByID(0 /** conversationID **/, uuid, amodels.EventConversationAttributesChange, actor)
+	}
 	return nil
 }
 

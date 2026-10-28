@@ -285,7 +285,21 @@ SELECT
    (SELECT MAX(c2.last_inbound_at) FROM conversations c2 WHERE c2.contact_id = c.contact_id AND c2.inbox_id = c.inbox_id) AS contact_last_inbound_at,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
-   csat.response_timestamp as csat_responded_at
+   csat.response_timestamp as csat_responded_at,
+   COALESCE(
+       as_latest.first_response_breached_at IS NOT NULL
+       OR as_latest.resolution_breached_at IS NOT NULL
+       OR as_latest.first_response_met_at > as_latest.first_response_deadline_at
+       OR as_latest.resolution_met_at > as_latest.resolution_deadline_at
+       OR (as_latest.first_response_met_at IS NULL AND as_latest.first_response_deadline_at <= NOW())
+       OR (as_latest.resolution_met_at IS NULL AND as_latest.resolution_deadline_at <= NOW()),
+       false
+   ) OR EXISTS (
+       SELECT 1 FROM sla_events se
+       WHERE se.applied_sla_id = as_latest.id
+           AND (se.breached_at IS NOT NULL OR se.met_at > se.deadline_at
+               OR (se.met_at IS NULL AND se.deadline_at <= NOW()))
+   ) AS sla_breached
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
 LEFT JOIN users assignee ON c.assigned_user_id = assignee.id
@@ -303,7 +317,8 @@ LEFT JOIN teams at ON at.id = c.assigned_team_id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 LEFT JOIN conversation_priorities p ON c.priority_id = p.id
 LEFT JOIN LATERAL (
-    SELECT id, first_response_deadline_at, resolution_deadline_at
+    SELECT id, first_response_deadline_at, resolution_deadline_at,
+        first_response_met_at, resolution_met_at, first_response_breached_at, resolution_breached_at
     FROM applied_slas
     WHERE conversation_id = c.id 
     ORDER BY created_at DESC LIMIT 1
@@ -763,6 +778,23 @@ WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_status
 UPDATE conversations
 SET custom_attributes = $2,
     updated_at = NOW()
+WHERE uuid = $1;
+
+-- name: upsert-conversation-custom-attribute
+UPDATE conversations
+SET custom_attributes = custom_attributes || $2::jsonb, updated_at = NOW()
+WHERE uuid = $1
+RETURNING custom_attributes;
+
+-- name: remove-conversation-custom-attribute
+UPDATE conversations
+SET custom_attributes = custom_attributes - $2::text, updated_at = NOW()
+WHERE uuid = $1
+RETURNING custom_attributes;
+
+-- name: update-conversation-subject
+UPDATE conversations
+SET subject = $2, updated_at = NOW()
 WHERE uuid = $1;
 
 -- name: start-conversation-waiting-since

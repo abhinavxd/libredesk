@@ -60,6 +60,7 @@ type Engine struct {
 	closedMu                sync.RWMutex
 	wg                      sync.WaitGroup
 	timeTriggerLookbackDays int
+	businessHoursChecker    func(int, time.Time) (bool, error)
 
 	suppressed   map[string]int
 	suppressedMu sync.Mutex
@@ -117,6 +118,10 @@ func (e *Engine) SetConversationStore(store conversationStore) {
 // SetSystemUserID sets the system user ID used to identify events raised by automation actions.
 func (e *Engine) SetSystemUserID(id int) {
 	e.systemUserID = id
+}
+
+func (e *Engine) SetBusinessHoursChecker(check func(int, time.Time) (bool, error)) {
+	e.businessHoursChecker = check
 }
 
 // ReloadRules reloads automation rules from DB.

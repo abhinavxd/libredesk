@@ -127,6 +127,11 @@ SET custom_attributes = COALESCE(custom_attributes, '{}'::jsonb) || $2,
 updated_at = now()
 WHERE id = $1;
 
+-- name: remove-custom-attribute
+UPDATE users
+SET custom_attributes = custom_attributes - $2::text, updated_at = NOW()
+WHERE id = $1;
+
 -- name: update-avatar
 UPDATE users  
 SET avatar_url = $2, updated_at = now()
