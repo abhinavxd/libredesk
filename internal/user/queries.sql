@@ -211,19 +211,28 @@ ON CONFLICT DO NOTHING
 RETURNING id;
 
 -- name: get-contact-by-email
-SELECT id, external_user_id FROM users
-WHERE email = $1 AND type = 'contact' AND deleted_at IS NULL
-ORDER BY (external_user_id IS NOT NULL) DESC, id ASC LIMIT 1;
+SELECT id, email, external_user_id FROM users
+WHERE type = 'contact' AND deleted_at IS NULL AND (email = $1 OR id IN (
+    SELECT merged_into_id FROM users WHERE email = $1 AND merged_into_id IS NOT NULL
+    UNION SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = $1
+))
+ORDER BY (email = $1) DESC NULLS LAST, (external_user_id IS NOT NULL) DESC, id ASC LIMIT 1;
 
 -- name: get-contact-by-email-without-ext-id
 SELECT id FROM users
-WHERE email = $1 AND type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
-LIMIT 1;
+WHERE type = 'contact' AND deleted_at IS NULL AND external_user_id IS NULL
+AND (email = $1 OR id IN (
+    SELECT merged_into_id FROM users WHERE email = $1 AND merged_into_id IS NOT NULL
+    UNION SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = $1
+))
+ORDER BY (email = $1) DESC NULLS LAST, id LIMIT 1;
 
 -- name: is-email-blocked
 SELECT EXISTS(
     SELECT 1 FROM users
-    WHERE email = $1 AND type IN ('contact', 'visitor') AND deleted_at IS NULL AND enabled = false
+    WHERE (email = $1 OR id IN (SELECT merged_into_id FROM users WHERE email = $1 AND merged_into_id IS NOT NULL
+    UNION SELECT contact_id FROM contact_channel_identities WHERE channel = 'email' AND identifier = $1))
+    AND type IN ('contact', 'visitor') AND deleted_at IS NULL AND enabled = false
 ) AS is_blocked;
 
 -- name: set-external-user-id
@@ -527,7 +536,7 @@ transfer_notes AS (
 ),
 delete_visitor AS (
     DELETE FROM users
-    WHERE id = $1 AND type = 'visitor'
+    WHERE id = $1 AND type = 'visitor' AND deleted_at IS NULL
     RETURNING id
 )
 SELECT
@@ -598,3 +607,88 @@ SELECT jsonb_build_object(
         WHERE c.contact_id = $1
     )
 );
+
+-- name: lock-merge-contacts
+SELECT id FROM users WHERE id = ANY($1) ORDER BY id FOR UPDATE;
+
+-- name: get-merge-contacts
+SELECT u.id, u.first_name, COALESCE(u.last_name, '') AS last_name, u.email, u.external_user_id,
+    u.type, u.enabled, u.phone_number, u.phone_number_country_code, u.country, u.avatar_url, u.custom_attributes,
+    (SELECT COUNT(*) FROM conversations WHERE contact_id = u.id) AS conversations,
+    (SELECT COUNT(*) FROM contact_notes WHERE contact_id = u.id) AS notes,
+    (SELECT json_agg(json_build_object('channel', channel, 'identifier', identifier) ORDER BY channel, identifier)
+     FROM contact_channel_identities WHERE contact_id = u.id) AS channel_identities
+FROM users u WHERE u.id = ANY($1) AND u.type IN ('contact', 'visitor') AND u.deleted_at IS NULL ORDER BY u.id;
+
+-- name: mark-contact-merged
+UPDATE users SET merged_into_id = $2, deleted_at = now(), updated_at = now() WHERE id = $1;
+
+-- name: save-merged-contact
+UPDATE users SET first_name = $2, last_name = $3, email = NULLIF($4, ''), phone_number = NULLIF($5, ''),
+    phone_number_country_code = NULLIF($6, ''), country = NULLIF($7, ''), avatar_url = NULLIF($8, ''),
+    external_user_id = $9, custom_attributes = $10, enabled = $11, type = $12, updated_at = now()
+WHERE id = $1;
+
+-- name: transfer-merge-conversations
+UPDATE conversations SET contact_id = CASE WHEN contact_id = $1 THEN $2 ELSE contact_id END,
+    last_message_sender_id = CASE WHEN last_message_sender_id = $1 THEN $2 ELSE last_message_sender_id END,
+    last_interaction_sender_id = CASE WHEN last_interaction_sender_id = $1 THEN $2 ELSE last_interaction_sender_id END,
+    updated_at = now()
+WHERE contact_id = $1 OR last_message_sender_id = $1 OR last_interaction_sender_id = $1
+RETURNING uuid;
+
+-- name: transfer-merge-messages
+UPDATE conversation_messages SET sender_id = $2 WHERE sender_id = $1;
+
+-- name: transfer-merge-notes
+UPDATE contact_notes SET contact_id = $2 WHERE contact_id = $1;
+
+-- name: transfer-merge-identities
+UPDATE contact_channel_identities SET contact_id = $2 WHERE contact_id = $1;
+
+-- name: transfer-merge-participants
+INSERT INTO conversation_participants (user_id, conversation_id, created_at, updated_at)
+SELECT $2, conversation_id, created_at, updated_at FROM conversation_participants WHERE user_id = $1
+ON CONFLICT (conversation_id, user_id) DO NOTHING;
+
+-- name: delete-merge-participants
+DELETE FROM conversation_participants WHERE user_id = $1 AND user_id != $2;
+
+-- name: transfer-merge-last-seen
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
+SELECT $2, conversation_id, last_seen_at FROM conversation_last_seen WHERE user_id = $1
+ON CONFLICT (conversation_id, user_id) DO UPDATE SET last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at);
+
+-- name: delete-merge-last-seen
+DELETE FROM conversation_last_seen WHERE user_id = $1 AND user_id != $2;
+
+-- name: transfer-merge-media
+UPDATE media SET uploaded_by = $2 WHERE uploaded_by = $1;
+
+-- name: transfer-merge-campaigns
+UPDATE widget_campaign_deliveries SET contact_id = $2 WHERE contact_id = $1;
+
+-- name: redirect-contact-merges
+UPDATE users SET merged_into_id = $2 WHERE merged_into_id = $1;
+
+-- name: resolve-merged-contact-id
+SELECT COALESCE(merged_into_id, id) FROM users WHERE id = $1;
+
+-- name: log-contact-merge
+INSERT INTO activity_logs (activity_type, activity_description, actor_id, target_model_type, target_model_id, ip)
+VALUES ('contact_merged', $1, $2, 'user', $3, $4);
+
+-- name: register-merge-emails
+INSERT INTO contact_channel_identities (contact_id, channel, identifier)
+SELECT $2, 'email', email FROM users WHERE id IN ($1, $2) AND email IS NOT NULL AND email != ''
+ON CONFLICT (channel, identifier) DO NOTHING;
+
+-- name: search-merge-contacts
+SELECT id, first_name, COALESCE(last_name, '') AS last_name, email, external_user_id, type, enabled
+FROM users
+WHERE type IN ('contact', 'visitor') AND deleted_at IS NULL
+AND (concat_ws(' ', first_name, last_name) ILIKE $1 ESCAPE '\' OR email ILIKE $1 ESCAPE '\' OR external_user_id ILIKE $1 ESCAPE '\')
+ORDER BY first_name, last_name, id LIMIT 30;
+
+-- name: lock-contact-merge-reference
+SELECT id, merged_into_id FROM users WHERE id = $1 FOR KEY SHARE;

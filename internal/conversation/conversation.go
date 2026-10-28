@@ -188,6 +188,7 @@ type teamStore interface {
 }
 
 type userStore interface {
+	ResolveMergedContactIDTx(tx *sqlx.Tx, id int) (int, error)
 	Get(int, string, []string) (umodels.User, error)
 	GetAgentCachedOrLoad(int) (umodels.User, error)
 	GetSystemUser() (umodels.User, error)
@@ -465,11 +466,23 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 		since = time.Now().Add(-rateLimitWindow)
 	}
 
-	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid); err != nil {
+	tx, err := c.db.Beginx()
+	if err != nil {
+		return 0, "", err
+	}
+	defer tx.Rollback()
+	contactID, err = c.userStore.ResolveMergedContactIDTx(tx, contactID)
+	if err != nil {
+		return 0, "", err
+	}
+	if err := tx.Stmtx(c.q.InsertConversation).QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.T("globals.messages.tooManyRequests"), nil)
 		}
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
+		return 0, "", err
+	}
+	if err := tx.Commit(); err != nil {
 		return 0, "", err
 	}
 	if item, err := c.GetConversationListItem(uuid); err == nil {
@@ -831,14 +844,24 @@ func (c *Manager) ActiveUserConversationsCount(userID int) (int, error) {
 	return count, nil
 }
 
-// UpdateConversationLastMessage updates the last message details for a conversation.
-// Also conditionally updates last_interaction fields if messageType != 'activity' and !private.
+// UpdateConversationLastMessage also updates interaction details for public messages.
 func (c *Manager) UpdateConversationLastMessage(conversation int, conversationUUID, lastMessage, lastMessageSenderType, messageType string, private bool, lastMessageAt time.Time, senderID int) error {
-	if _, err := c.q.UpdateConversationLastMessage.Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt, messageType, private, senderID); err != nil {
+	tx, err := c.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if lastMessageSenderType == models.SenderTypeContact {
+		senderID, err = c.userStore.ResolveMergedContactIDTx(tx, senderID)
+		if err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Stmtx(c.q.UpdateConversationLastMessage).Exec(conversation, conversationUUID, lastMessage, lastMessageSenderType, lastMessageAt, messageType, private, senderID); err != nil {
 		c.lo.Error("error updating conversation last message", "error", err)
 		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 // StartConversationWaitingSince stamps the waiting since timestamp only if the conversation isn't already waiting.
@@ -2009,10 +2032,22 @@ func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttribut
 
 // addConversationParticipant adds a user as participant to a conversation.
 func (c *Manager) addConversationParticipant(userID int, conversationUUID string) error {
-	res, err := c.q.InsertConversationParticipant.Exec(userID, conversationUUID)
+	tx, err := c.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	userID, err = c.userStore.ResolveMergedContactIDTx(tx, userID)
+	if err != nil {
+		return err
+	}
+	res, err := tx.Stmtx(c.q.InsertConversationParticipant).Exec(userID, conversationUUID)
 	if err != nil {
 		c.lo.Error("error adding conversation participant", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
 	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
 		return nil

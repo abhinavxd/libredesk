@@ -196,9 +196,9 @@ func (u *Manager) syncContact(user *models.User) error {
 	}
 
 	if user.Email.Valid && user.Email.String != "" {
-		// An ext_id contact owns this email - reuse it; the no-ext-id upsert below can't match it and would insert a duplicate.
+		// A merged email alias keeps the profile values chosen during the merge.
 		existing, err := u.GetContactByEmail(user.Email.String)
-		if err == nil && existing.ExternalUserID.String != "" {
+		if err == nil && (existing.ExternalUserID.String != "" || existing.Email.String != user.Email.String) {
 			user.ID = existing.ID
 			return nil
 		}
@@ -247,9 +247,21 @@ func (u *Manager) GetContactIDByChannelIdentity(channel, identifier string) (int
 
 func (u *Manager) LinkChannelIdentity(contactID int, channel, identifier string) (int, error) {
 	var linkedID int
-	if err := u.q.InsertChannelIdentity.QueryRow(contactID, channel, identifier).Scan(&linkedID); err != nil {
+	tx, err := u.db.Beginx()
+	if err != nil {
+		return 0, u.mergeError(err)
+	}
+	defer tx.Rollback()
+	contactID, err = u.ResolveMergedContactIDTx(tx, contactID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Stmtx(u.q.InsertChannelIdentity).QueryRow(contactID, channel, identifier).Scan(&linkedID); err != nil {
 		u.lo.Error("error linking channel identity", "contact_id", contactID, "channel", channel, "error", err)
 		return 0, fmt.Errorf("linking channel identity: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, u.mergeError(err)
 	}
 	return linkedID, nil
 }

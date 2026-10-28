@@ -2,7 +2,7 @@
 SELECT id, campaign_id, inbox_id, browser_key, session_key, COALESCE(contact_id, 0) AS contact_id,
        snapshot, created_at, displayed, opened, dismissed, replied, COALESCE(conversation_uuid::text, '') AS conversation_uuid
 FROM widget_campaign_deliveries
-WHERE inbox_id = $1 AND (browser_key = $2 OR (contact_id = $3 AND $3 > 0))
+WHERE inbox_id = $1 AND (browser_key = $2 OR ((contact_id = $3 OR contact_id IN (SELECT id FROM users WHERE merged_into_id = $3)) AND $3 > 0))
 ORDER BY created_at DESC;
 
 -- name: reserve
@@ -15,7 +15,7 @@ SELECT id, campaign_id, inbox_id, browser_key, session_key, COALESCE(contact_id,
        snapshot, created_at, displayed, opened, dismissed, replied, COALESCE(conversation_uuid::text, '') AS conversation_uuid
 FROM widget_campaign_deliveries
 WHERE id = $1 AND inbox_id = $2
-  AND ((contact_id = $4 AND $4 > 0) OR (browser_key = $3 AND
+  AND (((contact_id = $4 OR contact_id IN (SELECT id FROM users WHERE merged_into_id = $4)) AND $4 > 0) OR (browser_key = $3 AND
        (contact_id IS NULL OR ($4 = 0 AND EXISTS (SELECT 1 FROM users WHERE users.id = contact_id AND users.type = 'visitor')))));
 
 -- name: record-event

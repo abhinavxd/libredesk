@@ -987,6 +987,11 @@ func resolveUserFromClaims(app *App, claims Claims) (umodels.User, error) {
 
 	switch {
 	case claims.UserID > 0:
+		resolvedID, resolveErr := app.user.ResolveMergedContactID(claims.UserID)
+		if resolveErr != nil {
+			return user, resolveErr
+		}
+		claims.UserID = resolvedID
 		user, err = app.user.Get(claims.UserID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 	case claims.ExternalUserID != "":
 		user, err = app.user.GetContactByExternalID(claims.ExternalUserID)

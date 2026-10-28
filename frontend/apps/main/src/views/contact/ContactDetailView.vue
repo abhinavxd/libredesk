@@ -42,7 +42,7 @@
                     <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" class="w-[200px]">
+                <DropdownMenuContent align="start" class="w-[200px]" @close-auto-focus="showMerge && $event.preventDefault()">
                   <DropdownMenuItem
                     v-if="userStore.can('contacts:block')"
                     class="cursor-pointer"
@@ -59,6 +59,10 @@
                   >
                     <DownloadIcon class="mr-2" size="15" />
                     {{ t('globals.messages.exportData') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem v-if="userStore.can('contacts:merge')" class="cursor-pointer" @click="showMerge = true">
+                    <MergeIcon class="mr-2" size="15" />
+                    {{ t('contact.merge.title') }}
                   </DropdownMenuItem>
                   <template v-if="userStore.can('contacts:delete')">
                     <DropdownMenuSeparator />
@@ -110,6 +114,7 @@
       </div>
 
       <Spinner v-if="formLoading" />
+      <ContactMergeDialog v-if="showMerge && contact" v-model:open="showMerge" :contact="contact" @merged="onMerged" />
 
       <AlertDialog :open="showBlockConfirmation" @update:open="(v) => (showBlockConfirmation = v)">
         <AlertDialogContent>
@@ -190,12 +195,14 @@ import {
   CalendarIcon,
   DownloadIcon,
   Trash2Icon,
-  MoreVerticalIcon
+  MoreVerticalIcon,
+  MergeIcon
 } from 'lucide-vue-next'
 import ContactDetail from '@/layouts/contact/ContactDetail.vue'
 import api from '@/api'
 import ContactForm from '@/features/contact/ContactForm.vue'
 import ContactNotes from '@/features/contact/ContactNotes.vue'
+import ContactMergeDialog from '@/features/contact/ContactMergeDialog.vue'
 import WhatsAppIcon from '@/components/icons/WhatsAppIcon.vue'
 import { createFormSchema } from '@/features/contact/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter'
@@ -213,6 +220,7 @@ const formLoading = ref(false)
 const contact = ref(null)
 const showBlockConfirmation = ref(false)
 const showDeleteConfirmation = ref(false)
+const showMerge = ref(false)
 const userStore = useUserStore()
 const contactStore = useContactStore()
 
@@ -224,7 +232,8 @@ const canOpenActionsMenu = computed(
   () =>
     userStore.can('contacts:block') ||
     userStore.can('contacts:export') ||
-    userStore.can('contacts:delete')
+    userStore.can('contacts:delete') ||
+    userStore.can('contacts:merge')
 )
 
 const breadcrumbLinks = [
@@ -248,6 +257,11 @@ onUnmounted(() => {
   emitter.off(EMITTER_EVENTS.CONTACT_ACTION, onPaletteAction)
   contactStore.clearCurrent()
 })
+
+async function onMerged(id) {
+  await router.replace({ name: 'contact-detail', params: { id } })
+  await fetchContact()
+}
 
 async function fetchContact() {
   formLoading.value = true

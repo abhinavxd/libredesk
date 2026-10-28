@@ -17,7 +17,7 @@ VALUES(
 RETURNING id;
 
 -- name: get-media
-SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, COALESCE((SELECT merged_into_id FROM users WHERE users.id = media.uploaded_by), uploaded_by) AS uploaded_by
 FROM media
 WHERE
    (($1 > 0 AND id = $1) OR ($2 != '' AND uuid = NULLIF($2, '')::uuid))
@@ -40,6 +40,7 @@ WHERE uuid = $1;
 UPDATE media
 SET model_type = 'messages',
     model_id = $1,
+    uploaded_by = NULLIF($4::INT, 0),
     content_id = CASE
         WHEN uuid = ANY($3::uuid[]) THEN COALESCE(NULLIF(content_id, ''), 'ldsk-' || uuid::TEXT)
         ELSE content_id
@@ -47,7 +48,8 @@ SET model_type = 'messages',
 WHERE (id = ANY($2::INT[]) OR uuid = ANY($3::uuid[]))
   AND COALESCE(model_type, 'messages') = 'messages'
   AND COALESCE(model_id, 0) = 0
-  AND uploaded_by IS NOT DISTINCT FROM NULLIF($4::INT, 0);
+  AND (uploaded_by IS NOT DISTINCT FROM NULLIF($4::INT, 0)
+       OR uploaded_by IN (SELECT id FROM users WHERE merged_into_id = $4));
 
 -- name: get-model-media
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
@@ -108,6 +110,6 @@ FROM media m
 LEFT JOIN conversation_messages cm ON cm.id = m.model_id AND m.model_type = 'messages'
 WHERE m.uuid = $1
   AND (
-    (COALESCE(m.model_id, 0) = 0 AND m.uploaded_by = $3 AND COALESCE(m.model_type, 'messages') = 'messages')
+    (COALESCE(m.model_id, 0) = 0 AND (m.uploaded_by = $3 OR m.uploaded_by IN (SELECT id FROM users WHERE merged_into_id = $3)) AND COALESCE(m.model_type, 'messages') = 'messages')
     OR cm.conversation_id = $2
   );

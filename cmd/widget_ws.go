@@ -252,6 +252,11 @@ func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, client
 		return nil, nil, "", 0, fmt.Errorf("session does not belong to this inbox")
 	}
 
+	resolvedID, err := app.user.ResolveMergedContactID(session.UserID)
+	if err != nil {
+		return nil, nil, "", 0, err
+	}
+	session.UserID = resolvedID
 	// Verify user exists and is enabled.
 	user, err := app.user.Get(session.UserID, "", []string{})
 	if err != nil || !user.Enabled {

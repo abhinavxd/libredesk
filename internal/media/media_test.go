@@ -85,13 +85,17 @@ func TestPendingMediaOwnership(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, uploader := range []int{owner, other, 0} {
+	var merged int
+	if err := db.Get(&merged, `INSERT INTO users (type, first_name, merged_into_id, deleted_at) VALUES ('contact', 'Merged', $1, NOW()) RETURNING id`, owner); err != nil {
+		t.Fatal(err)
+	}
+	for _, uploader := range []int{owner, other, 0, merged} {
 		var med models.Media
 		if err := db.Get(&med, `INSERT INTO media (store, filename, content_type, content_id, size, model_type, uploaded_by) VALUES ('fs', 'draft.png', 'image/png', '', 1, 'messages', NULLIF($1, 0)) RETURNING id, uuid`, uploader); err != nil {
 			t.Fatal(err)
 		}
 		_, err := m.GetDraftInlineMedia(med.UUID, 0 /** conversationID **/, owner)
-		if (err == nil) != (uploader == owner) {
+		if (err == nil) != (uploader == owner || uploader == merged) {
 			t.Fatalf("draft access for uploader %d: %v", uploader, err)
 		}
 		tx, err := db.Beginx()
@@ -108,7 +112,7 @@ func TestPendingMediaOwnership(t *testing.T) {
 			t.Fatal(err)
 		}
 		tx.Rollback()
-		if linked.Valid != (uploader == owner) {
+		if linked.Valid != (uploader == owner || uploader == merged) {
 			t.Fatalf("media linked for uploader %d: %v", uploader, linked)
 		}
 	}

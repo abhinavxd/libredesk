@@ -781,8 +781,18 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	return nil
 }
 
-// InsertMessageTx inserts a message inside the caller's transaction; the caller must run AfterMessageInsert once it commits.
+// InsertMessageTx inserts a message in the caller's transaction. Run AfterMessageInsert after commit.
 func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]string, error) {
+	if message.SenderType == models.SenderTypeContact {
+		senderID, err := m.userStore.ResolveMergedContactIDTx(tx, message.SenderID)
+		if err != nil {
+			return nil, err
+		}
+		if message.UploadUserID == message.SenderID {
+			message.UploadUserID = senderID
+		}
+		message.SenderID = senderID
+	}
 	if message.Private {
 		message.Status = models.MessageStatusSent
 	}

@@ -42,6 +42,9 @@ export function useActivityLogFilters () {
             }, {
                 label: t('activityLog.entryType.contactDataExported'),
                 value: 'contact_data_exported'
+            }, {
+                label: t('activityLog.entryType.contactMerged'),
+                value: 'contact_merged'
             }]
         },
     }))
