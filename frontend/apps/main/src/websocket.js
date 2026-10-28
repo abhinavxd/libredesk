@@ -3,6 +3,7 @@ import { useNotificationStore } from './stores/notification'
 import { useUsersStore } from './stores/users'
 import { useUserStore } from './stores/user'
 import { useConnectionStore } from './stores/connection'
+import { websocketURL } from '@shared-ui/utils/websocket.js'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 
@@ -39,7 +40,7 @@ export class WebSocketClient {
     if (this.socket) this.socket.close()
 
     try {
-      this.socket = new WebSocket('/ws')
+      this.socket = new WebSocket(websocketURL('/ws'))
       this.socket.addEventListener('open', this.handleOpen.bind(this))
       this.socket.addEventListener('message', this.handleMessage.bind(this))
       this.socket.addEventListener('error', this.handleError.bind(this))
