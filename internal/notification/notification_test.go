@@ -124,6 +124,21 @@ func TestSetProviderDoesNotWaitForInFlightSend(t *testing.T) {
 	}
 }
 
+// sliceProvider is a non-comparable value type: comparing two of them with == panics.
+type sliceProvider struct{ sent []string }
+
+func (sliceProvider) Send(Message) error { return nil }
+func (sliceProvider) Name() string       { return ProviderEmail }
+
+// Swapping between non-comparable value providers must not panic.
+func TestSetProviderNonComparable(t *testing.T) {
+	s := NewService(map[string]Notifier{ProviderEmail: sliceProvider{}}, 1, 1, nil)
+	s.SetProvider(sliceProvider{})
+	if err := s.SendSync(Message{Provider: ProviderEmail}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // Notification emails can be switched off and on again on a running queue.
 func TestEmailQueueSetEnabled(t *testing.T) {
 	provider := newFakeProvider()

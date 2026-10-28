@@ -3,6 +3,7 @@ package notifier
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
@@ -116,7 +117,8 @@ func (s *Service) SetProvider(n Notifier) {
 		s.providers = map[string]*provider{}
 	}
 	old := s.providers[n.Name()]
-	if old != nil && old.Notifier == n {
+	// Comparable first: == panics when both values share a non-comparable type.
+	if old != nil && reflect.ValueOf(old.Notifier).Comparable() && old.Notifier == n {
 		s.providersMu.Unlock()
 		return
 	}
