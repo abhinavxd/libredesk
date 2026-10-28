@@ -3,6 +3,7 @@
     <PopoverTrigger as-child>
       <slot name="trigger" :selected="selectedItem" :open="open">
         <Button
+          v-bind="$attrs"
           type="button"
           :disabled="disabled"
           variant="outline"
@@ -20,7 +21,24 @@
       </slot>
     </PopoverTrigger>
     <PopoverContent class="p-0" :align="align">
-      <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
+      <VirtualCommand
+        v-if="virtual"
+        v-model:search-term="searchTerm"
+        :model-value="selectedItem"
+        :items="filteredItems"
+        :placeholder="placeholder"
+        @select="selectItem"
+      >
+        <template #default="{ item }">
+          <slot name="item" :item="item">{{ item.label }}</slot>
+          <CheckIcon
+            v-if="String(value) === item.value"
+            class="ml-auto h-4 w-4 shrink-0"
+            aria-hidden="true"
+          />
+        </template>
+      </VirtualCommand>
+      <Command v-else v-model:search-term="searchTerm" :filter-function="passThroughFilter">
         <CommandInput class="h-9" :placeholder="placeholder" :loading="searching" />
         <CommandEmpty v-if="!searching">{{ $t('globals.messages.notFound') }}</CommandEmpty>
         <CommandList>
@@ -52,6 +70,7 @@ import { cn } from '@shared-ui/lib/utils'
 import { useRemoteSearch } from '@shared-ui/composables/useRemoteSearch'
 import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
+import VirtualCommand from './VirtualCommand.vue'
 import {
   CommandEmpty,
   CommandGroup,
@@ -61,6 +80,8 @@ import {
   CommandList
 } from '@shared-ui/components/ui/command'
 
+defineOptions({ inheritAttrs: false })
+
 const RENDER_CAP = 300
 const SEARCH_DEBOUNCE_MS = 250
 
@@ -69,6 +90,7 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  virtual: { type: Boolean, default: false },
   placeholder: String,
   disabled: { type: Boolean, default: false },
   defaultLabel: String,
@@ -154,13 +176,17 @@ const handleSelect = (ev) => {
   if (typeof ev.detail.value === 'string') {
     try {
       const selected = JSON.parse(ev.detail.value)
-      pickedItem.value = selected
-      value.value = selected.value
-      open.value = false
-      emit('select', selected)
+      selectItem(selected)
     } catch (e) {
       console.error('Invalid selection value')
     }
   }
+}
+
+const selectItem = (selected) => {
+  pickedItem.value = selected
+  value.value = selected.value
+  open.value = false
+  emit('select', selected)
 }
 </script>
