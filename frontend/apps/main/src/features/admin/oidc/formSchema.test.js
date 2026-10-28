@@ -71,6 +71,13 @@ describe('OIDC Form Schema', () => {
         expect(() => schema.parse({ ...validForm, client_secret: '' })).toThrow()
     })
 
+    test('client_secret optional when credentials come from config', () => {
+        const cfgSchema = createFormSchema(mockT, { credentialsFromConfig: true })
+        const { client_secret, ...form } = validForm
+        expect(() => cfgSchema.parse(form)).not.toThrow()
+        expect(() => cfgSchema.parse({ ...form, client_secret: '' })).not.toThrow()
+    })
+
     test('logo_url empty string accepted', () => {
         expect(() => schema.parse({ ...validForm, logo_url: '' })).not.toThrow()
     })
