@@ -63,7 +63,10 @@ describe('Team form', () => {
     cy.get('input[name="name"]').type(teamName)
     pickOption('conversation_assignment_type', 'Round robin')
     cy.get('input[name="max_auto_assigned_conversations"]').clear().type('7')
-    pickOption('timezone', 'UTC (UTC+00:00)')
+    cy.contains('label', /^Timezone$/).parent().find('button[role="combobox"]').click()
+    cy.get('input[role="combobox"]').type('UTC')
+    cy.contains('[role="option"]', 'UTC (UTC+00:00)').click()
+    cy.get('[role="option"]').should('not.exist')
     pickOption('business_hours_id', businessHoursName)
 
     cy.get('button[type="submit"]').click()
@@ -89,7 +92,7 @@ describe('Team form', () => {
       cy.get(`[id="${id}"]`).invoke('text').should('not.be.empty')
     })
     cy.get('select[name="conversation_assignment_type"]').should('have.value', 'Round robin')
-    cy.get('select[name="timezone"]').should('have.value', 'UTC')
+    cy.contains('label', /^Timezone$/).parent().find('button[role="combobox"]').should('contain.text', 'UTC (UTC+00:00)')
     cy.get('select[name="business_hours_id"]').should('have.value', String(businessHoursId))
   })
 

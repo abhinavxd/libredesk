@@ -49,24 +49,21 @@
           </FormItem>
         </FormField>
 
-        <FormField v-slot="{ componentField }" name="timezone">
+        <FormField v-slot="{ value, handleChange, handleBlur, meta }" name="timezone">
           <FormItem>
             <FormLabel>
               {{ t('globals.terms.timezone') }}
             </FormLabel>
             <FormControl>
-              <Select v-bind="componentField">
-                <SelectTrigger>
-                  <SelectValue :placeholder="t('admin.general.timezone.placeholder')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
-                      {{ label }}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <ComboBox
+                :model-value="value"
+                :items="timeZoneOptions"
+                virtual
+                :default-label="value"
+                :placeholder="t('admin.general.timezone.placeholder')"
+                @update:model-value="(v) => handleChange(v, meta.validated)"
+                @blur="handleBlur"
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -214,7 +211,8 @@ import { Input } from '@shared-ui/components/ui/input/index.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { timeZones } from '@main/constants/timezones.js'
+import { timeZoneOptions } from '@main/constants/timezones.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import { useI18n } from 'vue-i18n'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import api from '@main/api/index.js'

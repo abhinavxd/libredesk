@@ -19,10 +19,8 @@ describe('General settings form', () => {
 
   let original
 
-  const pickOption = (field, optionText) => {
-    cy.get(`select[name="${field}"]`).siblings('button[role="combobox"]').click()
-    cy.get('[role="option"]').contains(optionText).click()
-  }
+  const timezoneField = () =>
+    cy.contains('label', /^Timezone$/).parent().find('button[role="combobox"]')
 
   before(() => {
     cy.login()
@@ -51,7 +49,7 @@ describe('General settings form', () => {
     cy.get('input[name="site_name"]').should('have.value', original['app.site_name'])
     cy.get('input[name="root_url"]').should('have.value', original['app.root_url'])
     cy.get('input[name="favicon_url"]').should('have.value', original['app.favicon_url'])
-    cy.get('select[name="timezone"]').should('have.value', original['app.timezone'])
+    timezoneField().should('contain.text', original['app.timezone'])
   })
 
   it('saves a changed site name and reloads it', () => {
@@ -78,16 +76,19 @@ describe('General settings form', () => {
     cy.intercept('PUT', '**/api/v1/settings/general').as('saveGeneral')
 
     cy.visit(path)
-    cy.get('select[name="timezone"]').should('have.value', original['app.timezone'])
-    pickOption('timezone', 'UTC (UTC+00:00)')
+    timezoneField().should('contain.text', original['app.timezone']).click()
+    cy.get('[role="option"]').should('have.length.lessThan', 50)
+    cy.get('input[role="combobox"]').type('Amsterdam', { delay: 0 }).should('have.value', 'Amsterdam')
+    cy.contains('[role="option"]', 'Europe/Amsterdam').click()
+    cy.get('[role="option"]').should('not.exist')
     cy.get('button[type="submit"]').click()
 
     cy.wait('@saveGeneral').its('response.statusCode').should('eq', 200)
 
     cy.visit(path)
-    cy.get('select[name="timezone"]').should('have.value', 'UTC')
+    timezoneField().should('contain.text', 'Europe/Amsterdam')
     cy.api('GET', '/api/v1/settings/general').then(({ body }) => {
-      expect(body.data['app.timezone']).to.eq('UTC')
+      expect(body.data['app.timezone']).to.eq('Europe/Amsterdam')
     })
   })
 

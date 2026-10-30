@@ -1,37 +1,24 @@
-export const timeZones = {
-    "UTC (UTC+00:00)": "UTC",
-    "New York, America (UTC-05:00)": "America/New_York",
-    "Chicago, America (UTC-06:00)": "America/Chicago",
-    "Denver, America (UTC-07:00)": "America/Denver",
-    "Los Angeles, America (UTC-08:00)": "America/Los_Angeles",
-    "Toronto, America (UTC-05:00)": "America/Toronto",
-    "Mexico City, America (UTC-06:00)": "America/Mexico_City",
-    "Bogotá, America (UTC-05:00)": "America/Bogota",
-    "São Paulo, America (UTC-03:00)": "America/Sao_Paulo",
-    "Buenos Aires, America (UTC-03:00)": "America/Buenos_Aires",
-    "Santiago, America (UTC-04:00)": "America/Santiago",
-    "London, Europe (UTC+00:00)": "Europe/London",
-    "Berlin, Europe (UTC+01:00)": "Europe/Berlin",
-    "Paris, Europe (UTC+01:00)": "Europe/Paris",
-    "Rome, Europe (UTC+01:00)": "Europe/Rome",
-    "Madrid, Europe (UTC+01:00)": "Europe/Madrid",
-    "Moscow, Europe (UTC+03:00)": "Europe/Moscow",
-    "Istanbul, Europe (UTC+03:00)": "Europe/Istanbul",
-    "Dubai, Asia (UTC+04:00)": "Asia/Dubai",
-    "Kolkata, Asia (UTC+05:30)": "Asia/Kolkata",
-    "Kathmandu, Asia (UTC+05:45)": "Asia/Kathmandu",
-    "Bangkok, Asia (UTC+07:00)": "Asia/Bangkok",
-    "Singapore, Asia (UTC+08:00)": "Asia/Singapore",
-    "Shanghai, Asia (UTC+08:00)": "Asia/Shanghai",
-    "Seoul, Asia (UTC+09:00)": "Asia/Seoul",
-    "Tokyo, Asia (UTC+09:00)": "Asia/Tokyo",
-    "Sydney, Australia (UTC+10:00)": "Australia/Sydney",
-    "Melbourne, Australia (UTC+10:00)": "Australia/Melbourne",
-    "Perth, Australia (UTC+08:00)": "Australia/Perth",
-    "Auckland, Pacific (UTC+12:00)": "Pacific/Auckland",
-    "Honolulu, Pacific (UTC-10:00)": "Pacific/Honolulu",
-    "Cairo, Africa (UTC+02:00)": "Africa/Cairo",
-    "Lagos, Africa (UTC+01:00)": "Africa/Lagos",
-    "Nairobi, Africa (UTC+03:00)": "Africa/Nairobi",
-    "Johannesburg, Africa (UTC+02:00)": "Africa/Johannesburg"
+import timezones from '@shared-ui/constants/timezones.json'
+
+const now = new Date()
+
+const formatLabel = (timeZone) => {
+  try {
+    const offset = new Intl.DateTimeFormat('en', {
+      timeZone,
+      timeZoneName: 'longOffset'
+    })
+      .formatToParts(now)
+      .find((part) => part.type === 'timeZoneName').value
+    return `${timeZone} (${offset === 'GMT' ? 'UTC+00:00' : offset.replace('GMT', 'UTC')})`
+  } catch {
+    return timeZone
+  }
 }
+
+export const timeZoneOptions = [
+  { label: formatLabel('UTC'), value: 'UTC' },
+  ...timezones
+    .filter((zone) => zone !== 'UTC')
+    .map((zone) => ({ label: formatLabel(zone), value: zone }))
+]
