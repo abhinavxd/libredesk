@@ -146,6 +146,12 @@ workers = 5
 queue_size = 10000
 # HTTP timeout for webhook requests
 timeout = "15s"
+# Attempts per delivery, the first one included. Network errors and 408, 425, 429 and 5xx responses are retried;
+# every attempt carries the same body, signature and X-Libredesk-Delivery-Id, so receivers can drop duplicates.
+# Pending retries live in memory and are lost on restart. 1 turns retries off.
+max_attempts = 4
+# Delay before the first retry; it doubles for every further attempt, up to 10 minutes.
+retry_backoff = "5s"
 
 # SSRF guard for admin-configured outbound URLs (webhooks, OIDC discovery, AI provider and tool calls).
 [ssrf]
