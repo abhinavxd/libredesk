@@ -1,0 +1,1705 @@
+# LibreDesk translations.
+msgid ""
+msgstr ""
+"Project-Id-Version: LibreDesk\n"
+"PO-Revision-Date: 2026-10-20 00:00+0000\n"
+"Last-Translator: LibreDesk contributors\n"
+"Language-Team: LibreDesk contributors\n"
+"Language: mr-IN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: internal/activity_log/activity_log.go:235:17
+msgid "%[1]s (%[2]s) added permission(s) %[3]s to role %[4]s (%[5]s)"
+msgstr "%[1]s (%[2]s) ने भूमिका %[4]s (%[5]s) ला परवानगी(ा) %[3]s जोडल्या"
+
+#: internal/activity_log/activity_log.go:116:17
+msgid "%[1]s (%[2]s) changed %[3]s (%[4]s) status to away"
+msgstr "%[1]s (%[2]s) ने %[3]s (%[4]s) चा दर्जा अनुपस्थित केला"
+
+#: internal/activity_log/activity_log.go:138:17
+msgid "%[1]s (%[2]s) changed %[3]s (%[4]s) status to away and reassigning"
+msgstr "%[1]s (%[2]s) ने %[3]s (%[4]s) चा दर्जा अनुपस्थित केला आणि संभाषणे पुन्हा नियुक्त करत आहे"
+
+#: internal/activity_log/activity_log.go:160:17
+msgid "%[1]s (%[2]s) changed %[3]s (%[4]s) status to online"
+msgstr "%[1]s (%[2]s) ने %[3]s (%[4]s) चा दर्जा ऑनलाइन केला"
+
+#: internal/activity_log/activity_log.go:256:17
+msgid "%[1]s (%[2]s) deleted contact %[3]s (%[4]s)"
+msgstr ""
+
+#: internal/activity_log/activity_log.go:273:17
+msgid "%[1]s (%[2]s) exported data of contact %[3]s (%[4]s)"
+msgstr ""
+
+#: internal/activity_log/activity_log.go:122:17
+msgid "%[1]s (%[2]s) is away"
+msgstr "%[1]s (%[2]s) अनुपस्थित आहे"
+
+#: internal/activity_log/activity_log.go:144:17
+msgid "%[1]s (%[2]s) is away and reassigning"
+msgstr "%[1]s (%[2]s) अनुपस्थित आहे आणि संभाषणे पुन्हा नियुक्त करत आहे"
+
+#: internal/activity_log/activity_log.go:166:17
+msgid "%[1]s (%[2]s) is online"
+msgstr "%[1]s (%[2]s) ऑनलाइन आहे"
+
+#: internal/activity_log/activity_log.go:88:17
+msgid "%[1]s (%[2]s) logged in"
+msgstr "%[1]s (%[2]s) लॉगिन झाले"
+
+#: internal/activity_log/activity_log.go:101:17
+msgid "%[1]s (%[2]s) logged out"
+msgstr "%[1]s (%[2]s) लॉगआउट झाले"
+
+#: internal/activity_log/activity_log.go:220:17
+msgid "%[1]s (%[2]s) removed permission(s) %[3]s and added permission(s) %[4]s to role %[5]s (%[6]s)"
+msgstr "%[1]s (%[2]s) ने भूमिका %[5]s (%[6]s) मधून परवानगी(ा) %[3]s काढल्या आणि परवानगी(ा) %[4]s जोडल्या"
+
+#: internal/activity_log/activity_log.go:228:17
+msgid "%[1]s (%[2]s) removed permission(s) %[3]s from role %[4]s (%[5]s)"
+msgstr "%[1]s (%[2]s) ने भूमिका %[4]s (%[5]s) मधून परवानगी(ा) %[3]s काढल्या"
+
+#: internal/activity_log/activity_log.go:201:17
+msgid "%[1]s (%[2]s) set password for %[3]s (%[4]s)"
+msgstr "%[1]s (%[2]s) ने %[3]s (%[4]s) साठी पासवर्ड सेट केला"
+
+#: cmd/agent_import.go:20:57 cmd/chat.go:1279:67 cmd/chat.go:1291:67
+#: cmd/chat.go:1307:67 cmd/chat.go:1336:50 cmd/chat.go:204:57
+#: cmd/chat.go:344:57 cmd/chat.go:380:57 cmd/chat.go:392:57 cmd/chat.go:396:57
+#: cmd/chat.go:400:57 cmd/chat.go:568:57 cmd/chat.go:682:57
+#: cmd/conversation.go:1075:53 cmd/conversation.go:1089:54
+#: cmd/conversation.go:1094:55 cmd/conversation.go:1097:55
+#: cmd/conversation.go:1101:55 cmd/conversation.go:1106:54
+#: cmd/conversation.go:1109:54 cmd/conversation.go:1112:54
+#: cmd/inboxes.go:498:50 cmd/inboxes.go:502:50 cmd/inboxes.go:507:51
+#: cmd/inboxes.go:510:51 cmd/tag_import.go:21:57 cmd/views.go:284:49
+#: cmd/widget_middleware.go:41:58
+msgid "%[1]s Required"
+msgstr "%[1]s आवश्यक"
+
+#: cmd/macro.go:218:57
+msgid "%[1]s action not allowed"
+msgstr "%[1]s क्रिया परवानगी नाही"
+
+#: cmd/business_hours.go:55:57 cmd/contacts.go:234:57 cmd/contacts.go:357:69
+#: cmd/context_links.go:168:49 cmd/context_links.go:171:49
+#: cmd/conversation.go:634:57 cmd/conversation.go:672:57
+#: cmd/conversation.go:676:57 cmd/custom_attributes.go:131:49
+#: cmd/custom_attributes.go:134:49 cmd/custom_attributes.go:137:49
+#: cmd/custom_attributes.go:140:49 cmd/custom_attributes.go:143:49
+#: cmd/helpcenter.go:1144:57 cmd/helpcenter.go:1162:57 cmd/helpcenter.go:187:57
+#: cmd/helpcenter.go:2046:49 cmd/helpcenter.go:2049:49
+#: cmd/helpcenter.go:2052:49 cmd/helpcenter.go:2070:49
+#: cmd/helpcenter.go:2078:49 cmd/helpcenter.go:2081:49 cmd/helpcenter.go:224:57
+#: cmd/helpcenter.go:248:57 cmd/helpcenter.go:293:57 cmd/helpcenter.go:310:57
+#: cmd/helpcenter.go:327:57 cmd/helpcenter.go:344:57 cmd/helpcenter.go:362:57
+#: cmd/helpcenter.go:387:57 cmd/helpcenter.go:416:57 cmd/helpcenter.go:435:57
+#: cmd/helpcenter.go:452:57 cmd/helpcenter.go:468:57 cmd/helpcenter.go:490:57
+#: cmd/helpcenter.go:528:57 cmd/helpcenter.go:547:57 cmd/helpcenter.go:554:57
+#: cmd/helpcenter.go:572:57 cmd/helpcenter.go:594:57 cmd/helpcenter.go:601:57
+#: cmd/helpcenter.go:619:57 cmd/helpcenter.go:623:57 cmd/helpcenter.go:643:57
+#: cmd/helpcenter.go:650:57 cmd/helpcenter.go:667:57 cmd/inboxes.go:482:49
+#: cmd/inboxes.go:485:49 cmd/inboxes.go:488:49 cmd/inboxes.go:534:51
+#: cmd/inboxes.go:537:51 cmd/inboxes.go:540:51 cmd/inboxes.go:582:51
+#: cmd/inboxes.go:691:50 cmd/inboxes.go:731:50 cmd/inboxes.go:737:50
+#: cmd/inboxes.go:744:50 cmd/inboxes.go:761:50 cmd/inboxes.go:767:50
+#: cmd/macro.go:325:49 cmd/macro.go:329:49 cmd/macro.go:339:50
+#: cmd/oauth.go:57:57 cmd/sla.go:113:49 cmd/sla.go:116:49 cmd/sla.go:123:50
+#: cmd/sla.go:126:50 cmd/sla.go:129:50 cmd/sla.go:133:51 cmd/sla.go:145:50
+#: cmd/statuses.go:33:57 cmd/statuses.go:75:57 cmd/tags.go:44:57
+#: cmd/tags.go:89:57 cmd/templates.go:19:57 cmd/templates.go:55:57
+#: cmd/templates.go:59:57 cmd/templates.go:84:57 cmd/templates.go:88:57
+#: cmd/users.go:277:57 cmd/users.go:348:57 cmd/users.go:438:57
+#: cmd/users.go:492:57 cmd/users.go:657:49 cmd/users.go:665:49
+#: cmd/users.go:669:49 cmd/views.go:109:57 cmd/views.go:113:57
+#: cmd/views.go:272:49 cmd/views.go:275:49 cmd/views.go:45:57
+#: cmd/views.go:49:57 cmd/webhooks.go:185:49 cmd/webhooks.go:188:49
+#: cmd/webhooks.go:191:49 internal/ai/ai.go:418:49 internal/ai/ai.go:421:49
+#: internal/ai/knowledgebase.go:105:77 internal/ai/knowledgebase.go:109:77
+#: internal/ai/knowledgebase.go:84:77 internal/ai/knowledgebase.go:88:77
+#: internal/aiagent/aiagent.go:410:49 internal/conversation/message.go:642:61
+#: internal/conversation/status/status.go:148:49 internal/inbox/inbox.go:446:67
+#: internal/inbox/inbox.go:589:54 internal/oidc/oidc.go:193:49
+#: internal/oidc/oidc.go:196:49 internal/role/role.go:110:64
+#: internal/role/role.go:131:64
+msgid "%[1]s empty"
+msgstr "%[1]s रिक्त"
+
+#: internal/conversation/conversation.go:1538:21
+msgid "%[1]s mentioned you in #%[2]s"
+msgstr "%[1]s ने #%[2]s मध्ये तुम्हाला उल्लेख केला"
+
+#: cmd/inboxes.go:550:51 cmd/inboxes.go:561:51 cmd/inboxes.go:709:49
+msgid "%[1]s must be at least %[2]s."
+msgstr "%[1]s किमान %[2]s असावे."
+
+#: cmd/helpcenter.go:1186:58 internal/helpcenter/helpcenter.go:1345:50
+#: internal/helpcenter/helpcenter.go:1352:50
+msgid "A collection cannot be its own parent."
+msgstr ""
+
+#: cmd/helpcenter.go:2179:16
+msgid "A sample article showing how your article pages will look."
+msgstr ""
+
+#: internal/ai/agent_approval.go:204:53
+msgid "A tool request is waiting for approval. Approve or decline it before running the AI again."
+msgstr ""
+
+#: cmd/ai.go:425:17
+msgid "AI summary"
+msgstr ""
+
+#: cmd/widget_middleware.go:68:58
+msgid "Access denied"
+msgstr "प्रवेश नाकारला"
+
+#: cmd/contacts.go:350:69
+msgid "Add an email or a phone number. A contact needs at least one to be reached."
+msgstr ""
+
+#: cmd/inboxes.go:687:49
+msgid "Add up to 6 quick replies."
+msgstr ""
+
+#: cmd/users.go:349:4 internal/conversation/continuity.go:298:17
+#: internal/conversation/transcript.go:62:10
+msgid "Agent"
+msgstr "एजंट"
+
+#: internal/ai/ai.go:276:56 internal/context_link/context_link.go:111:75
+#: internal/helpcenter/helpcenter.go:315:57
+#: internal/helpcenter/helpcenter.go:371:57
+#: internal/helpcenter/helpcenter.go:476:65
+#: internal/helpcenter/helpcenter.go:534:65
+#: internal/helpcenter/helpcenter.go:712:62
+#: internal/helpcenter/helpcenter.go:773:61
+#: internal/helpcenter/helpcenter.go:777:62
+#: internal/helpcenter/helpcenter.go:833:61 internal/inbox/inbox.go:635:58
+#: internal/webhook/webhook.go:169:71
+#: internal/whatsapp/template/template.go:148:72
+msgid "Already exists"
+msgstr "आधीपासून अस्तित्वात आहे"
+
+#: internal/whatsapp/template/template.go:199:68
+msgid "An approved template's category cannot be changed. Create a new template for a different category."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:896:58
+msgid "An article cannot be its own translation."
+msgstr ""
+
+#: internal/user/contact.go:37:50 internal/user/contact.go:44:50
+#: internal/user/contact.go:65:50
+msgid "Another contact with same email already exists"
+msgstr "समान ईमेलसह दुसरा संपर्क आधीपासून अस्तित्वात आहे"
+
+#: internal/helpcenter/helpcenter.go:1573:53
+msgid "Another help center already uses this domain. Visitors on it would see that help center. Remove the domain there first or pick a different one."
+msgstr ""
+
+#: internal/conversation/transcript.go:30:11
+msgid "Article reference"
+msgid_plural "Article references"
+msgstr[0] ""
+msgstr[1] ""
+
+#: internal/helpcenter/helpcenter.go:658:58
+#: internal/helpcenter/helpcenter.go:729:58
+#: internal/helpcenter/helpcenter.go:872:58
+msgid "Article status must be draft or published."
+msgstr ""
+
+#: internal/conversation/transcript.go:51:32
+msgid "Attachment"
+msgid_plural "Attachments"
+msgstr[0] ""
+msgstr[1] ""
+
+#: internal/conversation/message.go:1682:10
+msgid "Audio"
+msgstr "ऑडिओ"
+
+#: cmd/conversation.go:682:58 cmd/inboxes.go:351:57 cmd/login.go:41:57
+#: cmd/messages.go:177:57 cmd/messages.go:230:57 cmd/settings.go:137:57
+#: cmd/settings.go:49:57 internal/inbox/inbox.go:409:66
+msgid "Bad request"
+msgstr "चुकीची विनंती"
+
+#: cmd/helpcenter.go:2170:28
+msgid "Before you begin"
+msgstr ""
+
+#: cmd/helpcenter.go:2166:36
+msgid "Body text, links and images appear here, styled with the settings you pick on the left."
+msgstr ""
+
+#: internal/csat/csat.go:86:56
+msgid "CSAT Survey not found"
+msgstr "CSAT सर्व्हे सापडला नाही"
+
+#: internal/csat/csat.go:102:49 internal/csat/csat.go:117:49
+msgid "CSAT already submitted"
+msgstr "CSAT आधीच सबमिट केला आहे"
+
+#: internal/conversation/message.go:936:13
+msgid "CSAT survey was not sent. The WhatsApp reply window is closed."
+msgstr ""
+
+#: cmd/middlewares.go:53:61
+msgid "CSRF token mismatch"
+msgstr "CSRF टोकन जुळत नाही"
+
+#: cmd/agent_import.go:40:57 cmd/tag_import.go:41:57
+msgid "CSV must contain headers and at least one data row"
+msgstr "CSV मध्ये हेडर आणि किमान एक डेटा पंक्ती असणे आवश्यक आहे"
+
+#: internal/template/template.go:122:54
+msgid "Cannot delete built-in template"
+msgstr "बिल्ट-इन टेम्पलेट हटवता येत नाही"
+
+#: internal/conversation/status/status.go:102:50
+msgid "Cannot delete status as it is in use, Please remove this status from all conversations before deleting"
+msgstr "वापरात असलेली स्थिती हटवू शकत नाही, कृपया ही स्थिती सर्व संभाषणांमधून काढा"
+
+#: internal/user/agent.go:172:49
+msgid "Cannot delete system user"
+msgstr "सिस्टम वापरकर्ता हटवू शकत नाही"
+
+#: internal/role/role.go:140:64 internal/role/role.go:93:50
+msgid "Cannot modify admin role, Please create a new role."
+msgstr "प्रशासक भूमिका बदलू शकत नाही, कृपया नवीन भूमिका तयार करा."
+
+#: internal/conversation/status/status.go:125:64
+#: internal/conversation/status/status.go:97:49
+msgid "Cannot update default conversation status"
+msgstr "डिफॉल्ट संभाषण स्थिती अपडेट करू शकत नाही"
+
+#: internal/helpcenter/helpcenter.go:1363:50
+#: internal/helpcenter/helpcenter.go:1374:49
+msgid "Collections can be nested up to 3 levels. Choose a higher-level parent."
+msgstr ""
+
+#: internal/conversation/transcript.go:24:31
+#: internal/conversation/transcript.go:64:10
+msgid "Contact"
+msgstr "संपर्क"
+
+#: internal/ai/ai.go:421:75 internal/ai/knowledgebase.go:110:4
+#: internal/ai/knowledgebase.go:89:4
+msgid "Content"
+msgstr "कंटेंट"
+
+#: cmd/chat.go:345:4 cmd/chat.go:683:4
+#: internal/conversation/transcript.go:19:30
+msgid "Conversation"
+msgstr "संभाषण"
+
+#: internal/conversation/conversation.go:1341:21
+msgid "Conversation assigned to you #%[1]s"
+msgstr "संभाषण तुम्हाला नियुक्त केले #%[1]s"
+
+#: internal/conversation/conversation.go:489:5
+#: internal/conversation/message.go:1231:67
+msgid "Conversation not found"
+msgstr "संभाषण सापडले नाही"
+
+#: internal/conversation/conversation.go:1356:128
+msgid "Conversation reopened #%[1]s"
+msgstr ""
+
+#: cmd/macro.go:236:66
+msgid "Could not apply macro"
+msgstr "मॅक्रो लागू करता आला नाही"
+
+#: cmd/chat.go:1317:6
+msgid "Country code"
+msgstr ""
+
+#: internal/conversation/transcript.go:26:30
+msgid "Created at"
+msgstr "तयार केले"
+
+#: internal/custom_attribute/custom_attribute.go:85:76
+msgid "Custom attribute already exists"
+msgstr "कस्टम अॅट्रिब्यूट आधीपासून अस्तित्वात आहे"
+
+#: internal/custom_attribute/custom_attribute.go:62:70
+msgid "Custom attribute not found"
+msgstr "कस्टम अॅट्रिब्यूट सापडला नाही"
+
+#: internal/template/template.go:83:71
+msgid "Default template already exists"
+msgstr "डिफॉल्ट टेम्पलेट आधीपासून अस्तित्वात आहे"
+
+#: cmd/conversation.go:1083:53
+msgid "Disabled"
+msgstr ""
+
+#: internal/conversation/transcript.go:27:32
+msgid "Downloaded at"
+msgstr ""
+
+#: internal/sla/sla.go:759:23
+msgid "Due in %[1]s"
+msgstr "%[1]s मध्ये देय"
+
+#: cmd/macro.go:209:58
+msgid "Duplicate actions not allowed"
+msgstr "डुप्लिकेट क्रिया परवानगी नाही"
+
+#: cmd/sla.go:141:51 cmd/sla.go:156:50 cmd/sla.go:167:50 cmd/sla.go:185:50
+msgid "Duration must be at least 1 minute."
+msgstr "कालावधी किमान 1 मिनिट असणे आवश्यक आहे."
+
+#: cmd/chat.go:1292:6 cmd/chat.go:1296:6
+msgid "Email"
+msgstr "ईमेल"
+
+#: internal/inbox/inbox.go:454:67
+msgid "Empty IMAP config"
+msgstr "रिक्त IMAP कॉन्फिग"
+
+#: internal/inbox/inbox.go:458:67
+msgid "Empty SMTP config"
+msgstr "रिक्त SMTP कॉन्फिग"
+
+#: internal/ai/toolstore.go:194:49 internal/ai/urlimport.go:29:55
+msgid "Enter a valid http or https URL."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1558:49
+msgid "Enter the domain's root URL starting with https://, with no path or trailing slash, e.g. https://help.example.com."
+msgstr ""
+
+#: cmd/ai.go:113:70 cmd/ai.go:132:70 cmd/ai.go:172:70 cmd/ai.go:188:70
+#: cmd/ai.go:225:70 cmd/ai.go:246:70 cmd/ai.go:293:70 cmd/ai.go:312:70
+#: cmd/ai.go:328:70 cmd/ai.go:356:70 cmd/ai.go:405:70 cmd/ai.go:408:70
+#: cmd/ai.go:439:70 cmd/ai.go:442:70 cmd/ai.go:467:70 cmd/ai.go:471:70
+#: cmd/ai.go:549:70 cmd/ai.go:581:70 cmd/ai.go:75:70 cmd/aiagent.go:142:70
+#: cmd/aiagent.go:171:59 cmd/aiagent.go:175:59 cmd/aiagent.go:178:59
+#: cmd/aiagent.go:240:70 cmd/aiagent.go:282:70 cmd/automation.go:116:57
+#: cmd/automation.go:133:70 cmd/automation.go:67:57 cmd/automation.go:84:57
+#: cmd/business_hours.go:51:57 cmd/business_hours.go:93:57 cmd/chat.go:200:57
+#: cmd/chat.go:564:57 cmd/chat.go:613:57 cmd/chat.go:676:66
+#: cmd/contacts.go:231:70 cmd/contacts.go:301:70 cmd/contacts.go:329:71
+#: cmd/context_links.go:54:57 cmd/context_links.go:78:57
+#: cmd/conversation.go:457:58 cmd/conversation.go:551:57
+#: cmd/conversation.go:587:57 cmd/conversation.go:629:57
+#: cmd/conversation.go:664:57 cmd/conversation.go:715:57
+#: cmd/conversation.go:727:57 cmd/conversation.go:755:66
+#: cmd/conversation.go:785:66 cmd/conversation.go:883:57
+#: cmd/custom_attributes.go:75:57 cmd/custom_attributes.go:98:57
+#: cmd/draft.go:100:57 cmd/draft.go:43:57 cmd/draft.go:50:57
+#: cmd/helpcenter.go:1115:70 cmd/helpcenter.go:1166:70 cmd/helpcenter.go:204:70
+#: cmd/helpcenter.go:228:70 cmd/helpcenter.go:252:70 cmd/helpcenter.go:366:70
+#: cmd/helpcenter.go:391:70 cmd/helpcenter.go:420:70 cmd/helpcenter.go:494:70
+#: cmd/helpcenter.go:551:70 cmd/helpcenter.go:576:70 cmd/helpcenter.go:598:70
+#: cmd/helpcenter.go:647:70 cmd/inboxes.go:189:57 cmd/inboxes.go:194:57
+#: cmd/inboxes.go:242:57 cmd/inboxes.go:247:57 cmd/inboxes.go:357:57
+#: cmd/login.go:37:57 cmd/macro.go:113:57 cmd/media.go:48:66
+#: cmd/messages.go:208:66 cmd/oidc.go:48:57 cmd/oidc.go:85:57
+#: cmd/roles.go:67:57 cmd/roles.go:86:57 cmd/sla.go:50:57 cmd/sla.go:78:57
+#: cmd/statuses.go:29:57 cmd/statuses.go:71:57 cmd/tags.go:40:57
+#: cmd/tags.go:85:57 cmd/teams.go:69:70 cmd/teams.go:92:70
+#: cmd/templates.go:110:57 cmd/templates.go:52:57 cmd/templates.go:81:57
+#: cmd/user_notifications.go:132:4 cmd/user_notifications.go:147:57
+#: cmd/user_notifications.go:164:57 cmd/users.go:120:57 cmd/users.go:182:66
+#: cmd/users.go:215:57 cmd/users.go:282:57 cmd/users.go:434:57
+#: cmd/users.go:488:70 cmd/views.go:102:57 cmd/views.go:188:57
+#: cmd/views.go:214:57 cmd/views.go:38:57 cmd/webhooks.go:106:57
+#: cmd/webhooks.go:74:57 internal/conversation/conversation.go:636:57
+msgid "Error parsing request"
+msgstr "विनंती पार्स करताना त्रुटी"
+
+#: cmd/chat.go:275:66 cmd/chat.go:292:67 cmd/chat.go:295:66 cmd/chat.go:599:66
+#: cmd/chat.go:777:66 cmd/conversation.go:1026:72
+#: cmd/widget_campaign_reply.go:64:73 cmd/widget_campaign_reply.go:85:73
+#: internal/conversation/message.go:513:51
+#: internal/conversation/proactive.go:86:50
+msgid "Error sending message"
+msgstr "संदेश पाठवताना त्रुटी"
+
+#: cmd/users.go:459:66 cmd/users.go:469:66
+msgid "Error sending password reset email"
+msgstr "पासवर्ड रीसेट ईमेल पाठवताना त्रुटी"
+
+#: internal/conversation/conversation.go:1557:51
+#: internal/conversation/conversation.go:1856:51
+msgid "Error updating conversation"
+msgstr "संभाषण अपडेट करताना त्रुटी"
+
+#: cmd/users.go:544:51 cmd/users.go:568:51 internal/media/media.go:145:59
+msgid "Error uploading file"
+msgstr "फाइल अपलोड करताना त्रुटी"
+
+#: cmd/agent_import.go:21:4 cmd/tag_import.go:22:4
+#: internal/conversation/message.go:1684:10
+msgid "File"
+msgstr "फाइल"
+
+#: cmd/chat.go:703:57
+msgid "File Upload is disabled"
+msgstr "फाइल अपलोड अक्षम आहे"
+
+#: cmd/chat.go:708:57 cmd/handlers.go:475:51 cmd/handlers.go:506:51
+#: cmd/handlers.go:522:51 cmd/handlers.go:548:51 cmd/handlers.go:575:51
+#: cmd/handlers.go:592:51 cmd/handlers.go:617:51 cmd/media.go:53:57
+msgid "File not found"
+msgstr "फाइल सापडली नाही"
+
+#: cmd/chat.go:735:4 cmd/media.go:112:4 cmd/users.go:524:4
+msgid "File size too large, please upload a file less than %[1]s"
+msgstr "फाइल आकार खूप मोठा आहे, कृपया %[1]s पेक्षा लहान फाइल अपलोड करा"
+
+#: cmd/users.go:519:49 cmd/users.go:554:49
+msgid "File type is not an image"
+msgstr "फाइल इमेज नाही"
+
+#: cmd/chat.go:744:57 cmd/media.go:120:57
+msgid "File type not allowed"
+msgstr "फाइल प्रकार परवानगी नाही"
+
+#: internal/conversation/whatsapp.go:354:50
+msgid "Fill in the %[1]s value before sending this template."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:361:51
+msgid "Fill in the header's %[1]s value before sending this template."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:374:52
+msgid "Fill in the link value for the %[1]s button before sending this template."
+msgstr ""
+
+#: cmd/sla.go:173:51
+msgid "First response time cannot be after resolution time"
+msgstr "प्रथम प्रतिसाद वेळ समाधान वेळेनंतर असू शकत नाही"
+
+#: cmd/helpcenter.go:2169:28
+msgid "Getting started"
+msgstr ""
+
+#: internal/conversation/message.go:1678:10
+#: internal/conversation/message.go:779:19
+msgid "Image"
+msgstr "इमेज"
+
+#: cmd/agent_import.go:48:55 cmd/tag_import.go:49:55
+#: internal/importer/importer.go:64:4
+msgid "Import already in progress"
+msgstr "आयात आधीच प्रगतीपथावर आहे"
+
+#: cmd/agent_import.go:221:32 cmd/tag_import.go:112:36
+msgid "Import completed: %[1]s of %[2]s successful, %[3]s failed"
+msgstr "आयात पूर्ण: %[2]s पैकी %[1]s यशस्वी, %[3]s अयशस्वी"
+
+#: internal/importer/importer.go:115:4
+msgid "Import not found"
+msgstr "आयात सापडली नाही"
+
+#: cmd/widget_middleware.go:42:5
+msgid "Inbox"
+msgstr "इनबॉक्स"
+
+#: cmd/messages.go:221:57 internal/conversation/message.go:607:67
+#: internal/inbox/inbox.go:659:49
+msgid "Inbox is disabled"
+msgstr "इनबॉक्स अक्षम आहे"
+
+#: cmd/widget_middleware.go:47:58 cmd/widget_middleware.go:53:58
+#: cmd/widget_middleware.go:56:58 internal/inbox/inbox.go:208:58
+#: internal/inbox/inbox.go:216:57 internal/inbox/inbox.go:220:58
+msgid "Inbox not found"
+msgstr "इनबॉक्स सापडला नाही"
+
+#: internal/conversation/status/status.go:159:49
+msgid "Invalid %[1]s"
+msgstr ""
+
+#: cmd/agent_import.go:36:57 cmd/tag_import.go:37:57
+msgid "Invalid CSV file"
+msgstr "अवैध CSV फाइल"
+
+#: cmd/inboxes.go:653:51
+msgid "Invalid IP address or CIDR range: %[1]s"
+msgstr "अवैध IP पत्ता किंवा CIDR श्रेणी: %[1]s"
+
+#: internal/ai/toolstore.go:203:49
+msgid "Invalid JSON. Check for a missing comma, quote, or bracket."
+msgstr ""
+
+#: cmd/inboxes.go:591:51 cmd/inboxes.go:595:52 cmd/inboxes.go:621:51
+#: cmd/inboxes.go:624:51 cmd/inboxes.go:629:50
+msgid "Invalid URL"
+msgstr "अवैध URL"
+
+#: cmd/users.go:675:49
+msgid "Invalid availability status"
+msgstr ""
+
+#: cmd/inboxes.go:585:51 cmd/inboxes.go:588:51
+msgid "Invalid color"
+msgstr "अवैध रंग"
+
+#: internal/user/user.go:466:63 internal/user/user.go:475:63
+#: internal/user/user.go:482:62
+msgid "Invalid credential"
+msgstr "अवैध क्रेडेन्शियल"
+
+#: cmd/inboxes.go:640:51 cmd/inboxes.go:645:51
+msgid "Invalid domain: %[1]s. Enter domain names only (e.g. example.com), without protocol or paths."
+msgstr "अवैध डोमेन: %[1]s. फक्त डोमेन नावे प्रविष्ट करा (उदा. example.com), प्रोटोकॉल किंवा पथ नको."
+
+#: cmd/inboxes.go:547:51 cmd/inboxes.go:558:51 cmd/inboxes.go:706:49
+#: cmd/sla.go:138:51 cmd/sla.go:153:50 cmd/sla.go:164:50 cmd/sla.go:182:50
+msgid "Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."
+msgstr "अवैध कालावधी फॉरमॅट. कृपया वैध फॉरमॅट वापरा (उदा. 30m, 1h, 48h)."
+
+#: cmd/chat.go:1300:67 cmd/contacts.go:353:69 cmd/conversation.go:1115:54
+#: cmd/conversation.go:1119:55 cmd/inboxes.go:476:52 cmd/users.go:661:49
+#: internal/conversation/message.go:1777:54 internal/inbox/inbox.go:637:58
+#: internal/inbox/inbox.go:647:49
+msgid "Invalid email address"
+msgstr "अवैध ईमेल पत्ता"
+
+#: internal/user/user.go:162:56 internal/user/user.go:168:55
+msgid "Invalid email or password."
+msgstr "अवैध ईमेल किंवा पासवर्ड."
+
+#: internal/conversation/conversation.go:2091:48
+#: internal/search/search.go:130:65 internal/search/search.go:162:65
+#: internal/search/search.go:199:58 internal/search/search.go:205:59
+msgid "Invalid filters."
+msgstr ""
+
+#: cmd/settings.go:159:57 internal/inbox/inbox.go:639:58
+msgid "Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`"
+msgstr "अवैध 'From' ईमेल पत्ता, `Name <mail@example.com>` अशा फॉरमॅटमध्ये असावा"
+
+#: internal/helpcenter/helpcenter.go:1514:50
+msgid "Invalid language code. Use a code like en or en-US."
+msgstr ""
+
+#: cmd/middlewares.go:291:53
+msgid "Invalid or expired media URL"
+msgstr "अवैध किंवा कालबाह्य मीडिया URL"
+
+#: cmd/media.go:189:56 cmd/media.go:207:55 cmd/middlewares.go:63:57
+msgid "Invalid or expired session"
+msgstr "अवैध किंवा कालबाह्य सत्र"
+
+#: cmd/middlewares.go:217:56
+msgid "Invalid or expired session. Please clear your cookies and try again."
+msgstr "अवैध किंवा कालबाह्य सत्र. कृपया तुमच्या कुकीज साफ करा आणि पुन्हा प्रयत्न करा."
+
+#: cmd/middlewares.go:161:63
+msgid "Invalid permission"
+msgstr "अवैध परवानगी"
+
+#: cmd/conversation.go:1189:53 cmd/conversation.go:1193:53
+msgid "Invalid phone number"
+msgstr ""
+
+#: cmd/inboxes.go:747:50
+msgid "Invalid port value"
+msgstr "अवैध पोर्ट मूल्य"
+
+#: internal/user/agent.go:119:65
+msgid "Invalid role"
+msgstr ""
+
+#: cmd/automation.go:137:57
+msgid "Invalid rule execution mode"
+msgstr ""
+
+#: internal/conversation/conversation.go:1078:49
+#: internal/conversation/conversation.go:1087:50
+msgid "Invalid snooze duration"
+msgstr "अवैध स्नूझ कालावधी"
+
+#: internal/user/user.go:204:64
+msgid "Invalid user"
+msgstr "अवैध वापरकर्ता"
+
+#: cmd/inboxes.go:519:50 cmd/inboxes.go:601:50 cmd/inboxes.go:606:50
+#: cmd/inboxes.go:610:50 cmd/inboxes.go:616:50 cmd/widget_campaign.go:180:56
+#: cmd/widget_campaign.go:243:48
+msgid "Invalid value"
+msgstr "अवैध मूल्य"
+
+#: internal/helpcenter/helpcenter.go:1543:50
+msgid "Language %[1]s still has collections or articles. Removing it would hide them from the public site with no way to reach them. Move or delete that content first."
+msgstr ""
+
+#: internal/ai/toolstore.go:178:49
+msgid "Letters, numbers, hyphen and underscore only, up to 64 characters."
+msgstr ""
+
+#: cmd/helpcenter.go:2167:36
+msgid "List items and other formatting are styled the same way."
+msgstr ""
+
+#: cmd/macro.go:249:14
+msgid "Macro applied"
+msgstr "मॅक्रो लागू झाला"
+
+#: internal/macro/macro.go:135:52 internal/macro/macro.go:64:60
+msgid "Macro not found"
+msgstr "मॅक्रो सापडला नाही"
+
+#: cmd/macro.go:244:15
+msgid "Macro partially applied"
+msgstr "मॅक्रो अर्धवट लागू झाला"
+
+#: internal/media/media.go:178:60 internal/media/media.go:247:60
+msgid "Media not found"
+msgstr "मीडिया सापडला नाही"
+
+#: cmd/chat.go:205:4 cmd/chat.go:569:4
+msgid "Message"
+msgstr "संदेश"
+
+#: internal/conversation/whatsapp.go:287:59
+msgid "Meta has not approved this template yet (status: %[1]s). Wait for approval or pick another template."
+msgstr ""
+
+#: cmd/inboxes.go:166:49
+msgid "Meta rejected these credentials: %[1]s"
+msgstr ""
+
+#: cmd/chat.go:208:57 cmd/chat.go:572:57 cmd/inboxes.go:694:50
+msgid "Must be at most %[1]s characters"
+msgstr "जास्तीत जास्त %[1]s अक्षरे असणे आवश्यक आहे"
+
+#: cmd/inboxes.go:568:51
+msgid "Must be between %[1]s and %[2]s"
+msgstr "%[1]s ते %[2]s दरम्यान असावे"
+
+#: cmd/chat.go:1280:6 cmd/chat.go:1284:6 cmd/chat.go:405:4
+#: internal/aiagent/aiagent.go:410:75
+msgid "Name"
+msgstr "नाव"
+
+#: internal/conversation/conversation.go:1353:104
+#: internal/conversation/conversation.go:1370:16
+msgid "New reply on #%[1]s"
+msgstr ""
+
+#: cmd/helpcenter.go:2171:28
+msgid "Next steps"
+msgstr ""
+
+#: internal/ai/urlimport.go:44:55
+msgid "No readable content was found at that URL."
+msgstr ""
+
+#: internal/ai/copilot.go:110:54
+msgid "No tags exist yet. Tag suggestions need an existing tag list to choose from. Ask an admin to create tags first."
+msgstr ""
+
+#: internal/aiagent/worker.go:374:53
+msgid "No, I need more help"
+msgstr ""
+
+#: cmd/helpcenter.go:950:55 cmd/helpcenter.go:957:55 cmd/media.go:325:69
+#: cmd/users.go:295:55 cmd/users.go:602:55 cmd/users.go:640:55
+#: cmd/widget_campaign_reply.go:29:73 cmd/widget_help.go:92:73
+#: internal/ai/ai.go:259:56 internal/ai/ai.go:291:56
+#: internal/ai/knowledgebase.go:115:59 internal/ai/knowledgebase.go:74:59
+#: internal/ai/toolstore.go:112:62 internal/ai/toolstore.go:37:59
+#: internal/ai/toolstore.go:99:56 internal/aiagent/aiagent.go:390:56
+#: internal/aiagent/faq.go:303:56 internal/context_link/context_link.go:81:59
+#: internal/conversation/conversation.go:641:57
+#: internal/conversation/conversation.go:654:57
+#: internal/conversation/message_delete.go:19:57
+#: internal/helpcenter/helpcenter.go:1026:62
+#: internal/helpcenter/helpcenter.go:1327:66
+#: internal/helpcenter/helpcenter.go:1394:53
+#: internal/helpcenter/helpcenter.go:1407:53
+#: internal/helpcenter/helpcenter.go:271:57
+#: internal/helpcenter/helpcenter.go:285:57
+#: internal/helpcenter/helpcenter.go:433:65
+#: internal/helpcenter/helpcenter.go:637:62
+#: internal/helpcenter/helpcenter.go:807:62
+#: internal/helpcenter/helpcenter.go:951:62
+#: internal/inbox/channel/livechat/proactive/proactive.go:88:58
+#: internal/user/agent.go:180:52 internal/webhook/webhook.go:143:62
+#: internal/webhook/webhook.go:241:52
+#: internal/whatsapp/template/template.go:96:56
+msgid "Not found"
+msgstr "सापडले नाही"
+
+#: internal/oidc/oidc.go:75:59
+msgid "OIDC Provider not found"
+msgstr "OIDC प्रदाता सापडला नाही"
+
+#: internal/sla/sla.go:757:23
+msgid "Overdue by %[1]s"
+msgstr "%[1]s ने विलंबित"
+
+#: cmd/csat.go:123:21 cmd/csat.go:37:21 cmd/csat.go:55:21
+#: cmd/helpcenter.go:2002:19
+msgid "Page not found"
+msgstr "पृष्ठ सापडले नाही"
+
+#: cmd/users.go:493:4
+msgid "Password"
+msgstr "पासवर्ड"
+
+#: cmd/login.go:30:57
+msgid "Password login is disabled. Sign in with your SSO provider."
+msgstr ""
+
+#: internal/role/role.go:111:4 internal/role/role.go:132:4
+msgid "Permission"
+msgid_plural "Permissions"
+msgstr[0] ""
+msgstr[1] ""
+
+#: cmd/chat.go:837:81 cmd/conversation.go:234:56 cmd/conversation.go:911:77
+#: cmd/macro.go:190:75 cmd/media.go:217:52 cmd/media.go:240:55
+#: cmd/media.go:306:60 cmd/media.go:90:57 cmd/messages.go:212:56
+#: cmd/messages.go:246:57 cmd/middlewares.go:170:53 cmd/views.go:264:54
+#: cmd/widget_transcript.go:23:75 internal/authz/authz.go:72:63
+msgid "Permission denied"
+msgstr "परवानगी नाकारली"
+
+#: cmd/macro.go:223:57
+msgid "Permission denied for some macro actions"
+msgstr "काही मॅक्रो क्रियांसाठी परवानगी नाकारली"
+
+#: cmd/chat.go:1308:6 cmd/chat.go:1312:6 cmd/chat.go:410:4
+msgid "Phone number"
+msgstr "फोन नंबर"
+
+#: cmd/conversation.go:1159:52
+msgid "Pick a valid country for the phone number."
+msgstr ""
+
+#: cmd/search.go:138:64
+msgid "Please enter at least %[1]s characters to search."
+msgstr "कृपया शोधण्यासाठी किमान %[1]s अक्षरे प्रविष्ट करा."
+
+#: cmd/csat.go:192:22
+msgid "Please provide a rating or feedback."
+msgstr "कृपया रेटिंग किंवा अभिप्राय द्या."
+
+#: internal/conversation/conversation.go:1951:13
+msgid "Please rate this conversation:"
+msgstr "कृपया या संभाषणाला रेट करा:"
+
+#: internal/aiagent/worker.go:497:41
+msgid "Please share these details before I connect you with a human."
+msgstr ""
+
+#: cmd/widget_campaign.go:265:50
+msgid "Proactive message `%[1]s` is invalid: %[2]s"
+msgstr ""
+
+#: internal/auth/auth.go:209:53
+msgid "Provider not found"
+msgstr "प्रदाता सापडला नाही"
+
+#: cmd/csat.go:62:13
+msgid "Rate your interaction with us"
+msgstr "आमच्याशी असलेल्या तुमच्या संवादाला रेट करा"
+
+#: internal/conversation/continuity.go:337:16
+msgid "Reply directly to this email to continue the conversation."
+msgstr "संभाषण सुरू ठेवण्यासाठी या ईमेलला थेट उत्तर द्या."
+
+#: internal/conversation/continuity.go:339:16
+msgid "Reply to this email or %[1]sgo to chat%[2]s to continue the conversation."
+msgstr "या ईमेलला उत्तर द्या किंवा संभाषण सुरू ठेवण्यासाठी %[1]sचॅटवर जा%[2]s."
+
+#: internal/role/role.go:116:65
+msgid "Role already exists"
+msgstr "भूमिका आधीपासून अस्तित्वात आहे"
+
+#: internal/role/role.go:76:59
+msgid "Role not found"
+msgstr "भूमिका सापडली नाही"
+
+#: cmd/settings.go:63:57
+msgid "Root URL should be a valid URL"
+msgstr "रूट URL वैध असावा"
+
+#: cmd/agent_import.go:150:34
+msgid "Row %[1]s (%[2]s): Error - at least one role required"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - किमान एक भूमिका आवश्यक"
+
+#: cmd/agent_import.go:183:34
+msgid "Row %[1]s (%[2]s): Error - email already exists"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - ईमेल आधीपासून अस्तित्वात आहे"
+
+#: cmd/agent_import.go:193:34
+msgid "Row %[1]s (%[2]s): Error - failed to create agent: %[3]s"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - एजंट तयार करण्यात अयशस्वी: %[3]s"
+
+#: cmd/tag_import.go:99:39
+msgid "Row %[1]s (%[2]s): Error - failed to create tag: %[3]s"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - टॅग तयार करता आला नाही: %[3]s"
+
+#: cmd/agent_import.go:159:34
+msgid "Row %[1]s (%[2]s): Error - invalid role(s): %[3]s"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - अवैध भूमिका: %[3]s"
+
+#: cmd/agent_import.go:172:35
+msgid "Row %[1]s (%[2]s): Error - invalid team(s): %[3]s"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - अवैध संघ: %[3]s"
+
+#: cmd/agent_import.go:204:35
+msgid "Row %[1]s (%[2]s): Error - team assignment failed: %[3]s"
+msgstr "पंक्ती %[1]s (%[2]s): त्रुटी - संघ नियुक्ती अयशस्वी: %[3]s"
+
+#: cmd/agent_import.go:213:33
+msgid "Row %[1]s: Created agent %[2]s (%[3]s)"
+msgstr "पंक्ती %[1]s: एजंट %[2]s (%[3]s) तयार केला"
+
+#: cmd/tag_import.go:108:37
+msgid "Row %[1]s: Created tag \"%[2]s\""
+msgstr "पंक्ती %[1]s: \"%[2]s\" टॅग तयार केला"
+
+#: cmd/agent_import.go:142:34
+msgid "Row %[1]s: Error - invalid email format: %[2]s"
+msgstr "पंक्ती %[1]s: त्रुटी - अवैध ईमेल फॉरमॅट: %[2]s"
+
+#: cmd/agent_import.go:133:34 cmd/tag_import.go:84:38
+msgid "Row %[1]s: Error - missing required fields: %[2]s"
+msgstr "पंक्ती %[1]s: त्रुटी - आवश्यक फील्ड गहाळ आहेत: %[2]s"
+
+#: cmd/tag_import.go:95:39
+msgid "Row %[1]s: Error - tag already exists: \"%[2]s\""
+msgstr "पंक्ती %[1]s: त्रुटी - टॅग आधीच अस्तित्वात आहे: \"%[2]s\""
+
+#: internal/automation/automation.go:206:56
+msgid "Rule not found"
+msgstr "नियम सापडला नाही"
+
+#: internal/sla/sla.go:750:24
+msgid "SLA %[1]s: %[2]s for #%[3]s"
+msgstr "SLA %[1]s: %[2]s #%[3]s साठी"
+
+#: internal/sla/sla.go:187:58
+msgid "SLA not found"
+msgstr "SLA सापडला नाही"
+
+#: cmd/helpcenter.go:2178:16
+msgid "Sample article"
+msgstr ""
+
+#: cmd/helpcenter.go:2173:13
+msgid "Sample author"
+msgstr ""
+
+#: cmd/helpcenter.go:2189:10
+msgid "Sample collection"
+msgstr ""
+
+#: internal/inbox/inbox.go:655:49
+msgid "Save the inbox first to verify this alias."
+msgstr ""
+
+#: cmd/helpcenter.go:931:42
+msgid "Search"
+msgstr "शोधा"
+
+#: cmd/context_links.go:174:49
+msgid "Secret must be exactly 32 characters."
+msgstr "गुपित नेमके ३२ अक्षरांचे असणे आवश्यक आहे."
+
+#: cmd/helpcenter.go:2061:50
+msgid "Select a live chat inbox."
+msgstr ""
+
+#: internal/aiagent/worker.go:252:30
+msgid "Someone other than the contact replied on this conversation, so the AI assistant handed it off to a human."
+msgstr ""
+
+#: cmd/agent_import.go:27:66 cmd/ai.go:129:57 cmd/ai.go:145:57 cmd/ai.go:210:57
+#: cmd/ai.go:243:57 cmd/ai.go:269:57 cmd/ai.go:309:57 cmd/ai.go:341:57
+#: cmd/ai.go:98:57 cmd/aiagent.go:119:57 cmd/aiagent.go:139:57
+#: cmd/aiagent.go:155:57 cmd/aiagent.go:237:57 cmd/aiagent.go:254:57
+#: cmd/aiagent.go:52:57 cmd/aiagent.go:91:57 cmd/automation.go:101:57
+#: cmd/automation.go:63:57 cmd/business_hours.go:32:57
+#: cmd/business_hours.go:39:66 cmd/business_hours.go:74:57
+#: cmd/business_hours.go:90:57 cmd/business_hours.go:96:57 cmd/chat.go:1472:51
+#: cmd/chat.go:215:66 cmd/chat.go:220:66 cmd/chat.go:306:66 cmd/chat.go:368:66
+#: cmd/chat.go:373:66 cmd/chat.go:422:66 cmd/chat.go:460:66 cmd/chat.go:476:66
+#: cmd/chat.go:520:66 cmd/chat.go:526:66 cmd/chat.go:533:66 cmd/chat.go:621:72
+#: cmd/chat.go:699:66 cmd/chat.go:715:66 cmd/chat.go:750:66 cmd/chat.go:789:66
+#: cmd/chat.go:820:78 cmd/chat.go:826:78 cmd/chat.go:931:76 cmd/chat.go:937:76
+#: cmd/config.go:27:72 cmd/contacts.go:145:57 cmd/contacts.go:181:57
+#: cmd/contacts.go:213:57 cmd/contacts.go:257:57 cmd/contacts.go:260:57
+#: cmd/contacts.go:297:57 cmd/contacts.go:78:57 cmd/contacts.go:97:57
+#: cmd/context_links.go:112:57 cmd/context_links.go:141:57
+#: cmd/context_links.go:35:57 cmd/context_links.go:75:57
+#: cmd/context_links.go:98:57 cmd/conversation.go:1015:57
+#: cmd/conversation.go:1050:57 cmd/conversation.go:1123:54
+#: cmd/conversation.go:1126:53 cmd/conversation.go:213:57
+#: cmd/conversation.go:296:57 cmd/conversation.go:335:57
+#: cmd/conversation.go:908:74 cmd/conversation.go:929:73
+#: cmd/conversation.go:936:73 cmd/conversation.go:988:72 cmd/csat.go:185:23
+#: cmd/csat.go:93:10 cmd/custom_attributes.go:117:57
+#: cmd/custom_attributes.go:181:51 cmd/custom_attributes.go:45:57
+#: cmd/custom_attributes.go:95:57 cmd/draft.go:54:57 cmd/draft.go:59:57
+#: cmd/handlers.go:483:72 cmd/handlers.go:683:4 cmd/helpcenter.go:2004:19
+#: cmd/inboxes.go:212:66 cmd/inboxes.go:222:72 cmd/inboxes.go:238:4
+#: cmd/inboxes.go:277:66 cmd/inboxes.go:287:72 cmd/inboxes.go:302:4
+#: cmd/inboxes.go:312:66 cmd/inboxes.go:318:72 cmd/inboxes.go:338:66
+#: cmd/inboxes.go:48:73 cmd/inboxes.go:662:51 cmd/inboxes.go:666:51
+#: cmd/inboxes.go:670:51 cmd/inboxes.go:69:73 cmd/inboxes.go:720:49
+#: cmd/inboxes.go:725:49 cmd/inboxes.go:734:50 cmd/inboxes.go:74:73
+#: cmd/inboxes.go:753:51 cmd/inboxes.go:764:50 cmd/inboxes.go:772:50
+#: cmd/inboxes.go:79:72 cmd/login.go:100:72 cmd/login.go:62:72
+#: cmd/login.go:67:72 cmd/macro.go:162:57 cmd/macro.go:201:57
+#: cmd/macro.go:26:67 cmd/macro.go:335:49 cmd/macro.go:46:67 cmd/macro.go:63:57
+#: cmd/macro.go:76:67 cmd/macro.go:89:57 cmd/macro.go:99:66 cmd/media.go:60:66
+#: cmd/messages.go:225:57 cmd/messages.go:238:71 cmd/messages.go:243:71
+#: cmd/middlewares.go:167:63 cmd/middlewares.go:192:56
+#: cmd/middlewares.go:280:54 cmd/oauth.go:136:57 cmd/oauth.go:145:4
+#: cmd/oauth.go:163:57 cmd/oauth.go:196:66 cmd/oauth.go:46:4 cmd/oauth.go:52:4
+#: cmd/oauth.go:72:66 cmd/oauth.go:93:66 cmd/oauth.go:99:66 cmd/oidc.go:104:66
+#: cmd/oidc.go:118:57 cmd/oidc.go:126:66 cmd/oidc.go:31:57 cmd/oidc.go:64:66
+#: cmd/oidc.go:81:57 cmd/settings.go:120:72 cmd/settings.go:154:72
+#: cmd/settings.go:30:72 cmd/settings.go:77:72 cmd/settings.go:88:73
+#: cmd/settings.go:96:72 cmd/sla.go:100:57 cmd/sla.go:32:57 cmd/sla.go:74:57
+#: cmd/statuses.go:51:57 cmd/statuses.go:67:57 cmd/tag_import.go:28:66
+#: cmd/tags.go:63:57 cmd/tags.go:81:57 cmd/teams.go:117:57 cmd/teams.go:52:57
+#: cmd/teams.go:88:57 cmd/templates.go:36:57 cmd/user_notifications.go:54:4
+#: cmd/user_notifications.go:82:4 cmd/users.go:101:57 cmd/users.go:593:57
+#: cmd/users.go:631:57 cmd/users.go:79:57 cmd/views.go:168:57
+#: cmd/views.go:211:57 cmd/views.go:243:57 cmd/views.go:281:49
+#: cmd/views.go:70:57 cmd/views.go:99:57 cmd/webhooks.go:102:57
+#: cmd/webhooks.go:132:57 cmd/webhooks.go:150:57 cmd/webhooks.go:172:57
+#: cmd/webhooks.go:51:57 cmd/whatsapp_template.go:204:57
+#: cmd/widget_middleware.go:62:67 cmd/widget_middleware.go:86:67
+#: cmd/widget_middleware.go:90:67 internal/activity_log/activity_log.go:292:51
+#: internal/activity_log/activity_log.go:64:56
+#: internal/activity_log/activity_log.go:73:56
+#: internal/activity_log/activity_log.go:81:56 internal/ai/ai.go:249:56
+#: internal/ai/ai.go:262:54 internal/ai/ai.go:279:54 internal/ai/ai.go:294:54
+#: internal/ai/ai.go:302:51 internal/ai/ai.go:333:49 internal/ai/ai.go:353:52
+#: internal/ai/ai.go:364:51 internal/ai/ai.go:368:51 internal/ai/ai.go:383:49
+#: internal/ai/ai.go:433:55 internal/ai/ai.go:443:76 internal/ai/ai.go:449:77
+#: internal/ai/ai.go:464:77 internal/ai/copilot.go:107:56
+#: internal/ai/copilot.go:182:56 internal/ai/copilot.go:191:51
+#: internal/ai/copilot.go:200:51 internal/ai/knowledgebase.go:118:57
+#: internal/ai/knowledgebase.go:136:51 internal/ai/knowledgebase.go:144:51
+#: internal/ai/knowledgebase.go:148:51 internal/ai/knowledgebase.go:152:51
+#: internal/ai/knowledgebase.go:65:56 internal/ai/knowledgebase.go:77:57
+#: internal/ai/knowledgebase.go:97:57 internal/ai/toolstore.go:102:54
+#: internal/ai/toolstore.go:115:60 internal/ai/toolstore.go:124:51
+#: internal/ai/toolstore.go:137:54 internal/ai/toolstore.go:163:58
+#: internal/ai/toolstore.go:184:49 internal/ai/toolstore.go:24:56
+#: internal/ai/toolstore.go:40:57 internal/ai/toolstore.go:60:56
+#: internal/ai/toolstore.go:69:56 internal/ai/toolstore.go:86:60
+#: internal/aiagent/aiagent.go:152:56 internal/aiagent/aiagent.go:176:56
+#: internal/aiagent/aiagent.go:228:54 internal/aiagent/aiagent.go:272:71
+#: internal/aiagent/aiagent.go:279:71 internal/aiagent/aiagent.go:285:71
+#: internal/aiagent/aiagent.go:290:71 internal/aiagent/aiagent.go:295:71
+#: internal/aiagent/aiagent.go:316:71 internal/aiagent/aiagent.go:322:71
+#: internal/aiagent/aiagent.go:326:71 internal/aiagent/aiagent.go:330:71
+#: internal/aiagent/aiagent.go:334:71 internal/aiagent/aiagent.go:339:71
+#: internal/aiagent/aiagent.go:357:54 internal/aiagent/aiagent.go:363:54
+#: internal/aiagent/aiagent.go:367:54 internal/aiagent/aiagent.go:373:54
+#: internal/aiagent/aiagent.go:378:54 internal/aiagent/aiagent.go:393:54
+#: internal/aiagent/aiagent.go:402:56 internal/aiagent/aiagent.go:419:49
+#: internal/aiagent/faq.go:109:51 internal/aiagent/faq.go:306:54
+#: internal/aiagent/faq.go:61:56 internal/aiagent/faq.go:89:51
+#: internal/auth/auth.go:214:55 internal/auth/auth.go:449:51
+#: internal/automation/automation.go:196:58
+#: internal/automation/automation.go:209:57
+#: internal/automation/automation.go:219:72
+#: internal/automation/automation.go:234:72
+#: internal/automation/automation.go:249:72
+#: internal/automation/automation.go:260:51
+#: internal/automation/automation.go:272:52
+#: internal/automation/automation.go:284:51
+#: internal/business_hours/business_hours.go:109:75
+#: internal/business_hours/business_hours.go:77:56
+#: internal/business_hours/business_hours.go:87:75
+#: internal/business_hours/business_hours.go:96:52
+#: internal/business_hours/business_hours.go:99:51
+#: internal/context_link/context_link.go:106:73
+#: internal/context_link/context_link.go:114:73
+#: internal/context_link/context_link.go:131:74
+#: internal/context_link/context_link.go:138:74
+#: internal/context_link/context_link.go:144:73
+#: internal/context_link/context_link.go:156:51
+#: internal/context_link/context_link.go:165:73
+#: internal/context_link/context_link.go:195:56
+#: internal/context_link/context_link.go:217:56
+#: internal/context_link/context_link.go:223:56
+#: internal/context_link/context_link.go:71:56
+#: internal/context_link/context_link.go:84:57
+#: internal/context_link/context_link.go:87:57
+#: internal/context_link/context_link.go:96:56
+#: internal/conversation/conversation.go:1050:51
+#: internal/conversation/conversation.go:1060:51
+#: internal/conversation/conversation.go:1095:51
+#: internal/conversation/conversation.go:1108:51
+#: internal/conversation/conversation.go:1138:51
+#: internal/conversation/conversation.go:1193:51
+#: internal/conversation/conversation.go:1203:52
+#: internal/conversation/conversation.go:1211:52
+#: internal/conversation/conversation.go:1219:52
+#: internal/conversation/conversation.go:1226:51
+#: internal/conversation/conversation.go:1254:52
+#: internal/conversation/conversation.go:1265:52
+#: internal/conversation/conversation.go:1567:51
+#: internal/conversation/conversation.go:1898:51
+#: internal/conversation/conversation.go:1910:51
+#: internal/conversation/conversation.go:1916:52
+#: internal/conversation/conversation.go:1934:52
+#: internal/conversation/conversation.go:1939:52
+#: internal/conversation/conversation.go:1946:52
+#: internal/conversation/conversation.go:1956:51
+#: internal/conversation/conversation.go:1966:51
+#: internal/conversation/conversation.go:1978:51
+#: internal/conversation/conversation.go:1982:51
+#: internal/conversation/conversation.go:1994:51
+#: internal/conversation/conversation.go:2028:57
+#: internal/conversation/conversation.go:492:65
+#: internal/conversation/conversation.go:513:66
+#: internal/conversation/conversation.go:523:66
+#: internal/conversation/conversation.go:533:66
+#: internal/conversation/conversation.go:543:66
+#: internal/conversation/conversation.go:562:56
+#: internal/conversation/conversation.go:598:65
+#: internal/conversation/conversation.go:644:58
+#: internal/conversation/conversation.go:657:58
+#: internal/conversation/conversation.go:670:51
+#: internal/conversation/conversation.go:683:57
+#: internal/conversation/conversation.go:772:66
+#: internal/conversation/conversation.go:781:66
+#: internal/conversation/conversation.go:786:66
+#: internal/conversation/conversation.go:799:58
+#: internal/conversation/conversation.go:824:58
+#: internal/conversation/conversation.go:867:51
+#: internal/conversation/conversation.go:883:51
+#: internal/conversation/conversation.go:888:51
+#: internal/conversation/conversation.go:921:51
+#: internal/conversation/conversation.go:961:51
+#: internal/conversation/drafts.go:19:58 internal/conversation/drafts.go:30:56
+#: internal/conversation/drafts.go:47:51
+#: internal/conversation/message.go:1234:65
+#: internal/conversation/message.go:1771:55
+#: internal/conversation/message.go:1785:55
+#: internal/conversation/message.go:341:71
+#: internal/conversation/message.go:350:71
+#: internal/conversation/message.go:355:71
+#: internal/conversation/message.go:390:60
+#: internal/conversation/message.go:489:58
+#: internal/conversation/message.go:505:58
+#: internal/conversation/message.go:647:70
+#: internal/conversation/message.go:675:69
+#: internal/conversation/message.go:705:51
+#: internal/conversation/message.go:716:51
+#: internal/conversation/message.go:752:56
+#: internal/conversation/message.go:756:56
+#: internal/conversation/message.go:874:51
+#: internal/conversation/message.go:894:51
+#: internal/conversation/message_delete.go:22:55
+#: internal/conversation/priority/priority.go:58:56
+#: internal/conversation/priority/priority.go:68:61
+#: internal/conversation/proactive.go:16:69
+#: internal/conversation/sidebar_counts.go:110:56
+#: internal/conversation/sidebar_counts.go:119:56
+#: internal/conversation/sidebar_counts.go:82:51
+#: internal/conversation/status/status.go:105:51
+#: internal/conversation/status/status.go:121:66
+#: internal/conversation/status/status.go:130:66
+#: internal/conversation/status/status.go:140:59
+#: internal/conversation/status/status.go:67:56
+#: internal/conversation/status/status.go:83:59
+#: internal/conversation/status/status.go:93:51
+#: internal/conversation/whatsapp.go:166:53
+#: internal/conversation/whatsapp.go:182:52
+#: internal/conversation/whatsapp.go:225:60
+#: internal/conversation/whatsapp.go:228:58 internal/csat/csat.go:112:51
+#: internal/csat/csat.go:75:56
+#: internal/custom_attribute/custom_attribute.go:107:51
+#: internal/custom_attribute/custom_attribute.go:65:68
+#: internal/custom_attribute/custom_attribute.go:75:56
+#: internal/custom_attribute/custom_attribute.go:88:77
+#: internal/custom_attribute/custom_attribute.go:98:77
+#: internal/helpcenter/helpcenter.go:1016:56
+#: internal/helpcenter/helpcenter.go:1029:60
+#: internal/helpcenter/helpcenter.go:1038:56
+#: internal/helpcenter/helpcenter.go:1048:56
+#: internal/helpcenter/helpcenter.go:1058:56
+#: internal/helpcenter/helpcenter.go:1068:56
+#: internal/helpcenter/helpcenter.go:1084:56
+#: internal/helpcenter/helpcenter.go:1106:51
+#: internal/helpcenter/helpcenter.go:1130:61
+#: internal/helpcenter/helpcenter.go:1134:61
+#: internal/helpcenter/helpcenter.go:1170:57
+#: internal/helpcenter/helpcenter.go:1241:56
+#: internal/helpcenter/helpcenter.go:1330:64
+#: internal/helpcenter/helpcenter.go:1384:54
+#: internal/helpcenter/helpcenter.go:1397:51
+#: internal/helpcenter/helpcenter.go:1410:51
+#: internal/helpcenter/helpcenter.go:1435:51
+#: internal/helpcenter/helpcenter.go:1450:56
+#: internal/helpcenter/helpcenter.go:1466:56
+#: internal/helpcenter/helpcenter.go:1539:51
+#: internal/helpcenter/helpcenter.go:245:56
+#: internal/helpcenter/helpcenter.go:258:56
+#: internal/helpcenter/helpcenter.go:274:55
+#: internal/helpcenter/helpcenter.go:288:55
+#: internal/helpcenter/helpcenter.go:318:55
+#: internal/helpcenter/helpcenter.go:374:55
+#: internal/helpcenter/helpcenter.go:384:55
+#: internal/helpcenter/helpcenter.go:412:51
+#: internal/helpcenter/helpcenter.go:423:56
+#: internal/helpcenter/helpcenter.go:436:63
+#: internal/helpcenter/helpcenter.go:458:63
+#: internal/helpcenter/helpcenter.go:479:63
+#: internal/helpcenter/helpcenter.go:483:63
+#: internal/helpcenter/helpcenter.go:502:63
+#: internal/helpcenter/helpcenter.go:521:64
+#: internal/helpcenter/helpcenter.go:537:63
+#: internal/helpcenter/helpcenter.go:541:63
+#: internal/helpcenter/helpcenter.go:554:51
+#: internal/helpcenter/helpcenter.go:560:52
+#: internal/helpcenter/helpcenter.go:565:51
+#: internal/helpcenter/helpcenter.go:575:63
+#: internal/helpcenter/helpcenter.go:603:51
+#: internal/helpcenter/helpcenter.go:640:60
+#: internal/helpcenter/helpcenter.go:649:56
+#: internal/helpcenter/helpcenter.go:697:60
+#: internal/helpcenter/helpcenter.go:715:60
+#: internal/helpcenter/helpcenter.go:719:60
+#: internal/helpcenter/helpcenter.go:761:60
+#: internal/helpcenter/helpcenter.go:770:60
+#: internal/helpcenter/helpcenter.go:780:60
+#: internal/helpcenter/helpcenter.go:784:60
+#: internal/helpcenter/helpcenter.go:798:60
+#: internal/helpcenter/helpcenter.go:810:60
+#: internal/helpcenter/helpcenter.go:830:60
+#: internal/helpcenter/helpcenter.go:837:60
+#: internal/helpcenter/helpcenter.go:841:60
+#: internal/helpcenter/helpcenter.go:852:51
+#: internal/helpcenter/helpcenter.go:858:52
+#: internal/helpcenter/helpcenter.go:863:51
+#: internal/helpcenter/helpcenter.go:876:60
+#: internal/helpcenter/helpcenter.go:887:61
+#: internal/helpcenter/helpcenter.go:920:60
+#: internal/helpcenter/helpcenter.go:928:60
+#: internal/helpcenter/helpcenter.go:941:60
+#: internal/helpcenter/helpcenter.go:954:60
+#: internal/helpcenter/helpcenter.go:963:51
+#: internal/helpcenter/helpcenter.go:982:74
+#: internal/helpcenter/helpcenter.go:998:74
+#: internal/inbox/channel/livechat/proactive/proactive.go:112:50
+#: internal/inbox/inbox.go:211:59 internal/inbox/inbox.go:223:59
+#: internal/inbox/inbox.go:230:68 internal/inbox/inbox.go:244:56
+#: internal/inbox/inbox.go:252:57 internal/inbox/inbox.go:296:68
+#: internal/inbox/inbox.go:443:69 internal/inbox/inbox.go:450:69
+#: internal/inbox/inbox.go:517:68 internal/inbox/inbox.go:586:56
+#: internal/inbox/inbox.go:593:56 internal/inbox/inbox.go:615:68
+#: internal/inbox/inbox.go:624:51 internal/inbox/inbox.go:664:51
+#: internal/inbox/inbox.go:669:51 internal/inbox/inbox.go:723:50
+#: internal/macro/macro.go:100:56 internal/macro/macro.go:111:56
+#: internal/macro/macro.go:122:56 internal/macro/macro.go:132:51
+#: internal/macro/macro.go:144:51 internal/macro/macro.go:67:58
+#: internal/macro/macro.go:78:67 internal/macro/macro.go:89:67
+#: internal/media/media.go:155:67 internal/media/media.go:181:58
+#: internal/media/media.go:250:58 internal/media/media.go:334:52
+#: internal/media/media.go:346:51 internal/notification/preferences.go:122:51
+#: internal/notification/preferences.go:128:52
+#: internal/notification/preferences.go:133:51
+#: internal/notification/preferences.go:85:56
+#: internal/notification/push.go:105:56 internal/notification/push.go:120:51
+#: internal/notification/push.go:131:51
+#: internal/notification/user_notification.go:109:51
+#: internal/notification/user_notification.go:118:51
+#: internal/notification/user_notification.go:127:51
+#: internal/notification/user_notification.go:136:51
+#: internal/notification/user_notification.go:145:51
+#: internal/notification/user_notification.go:155:51
+#: internal/notification/user_notification.go:72:66
+#: internal/notification/user_notification.go:82:58
+#: internal/notification/user_notification.go:96:65
+#: internal/oidc/oidc.go:107:57 internal/oidc/oidc.go:135:66
+#: internal/oidc/oidc.go:141:66 internal/oidc/oidc.go:167:66
+#: internal/oidc/oidc.go:173:66 internal/oidc/oidc.go:185:51
+#: internal/oidc/oidc.go:79:57 internal/report/report.go:100:56
+#: internal/report/report.go:109:56 internal/report/report.go:114:56
+#: internal/report/report.go:120:56 internal/report/report.go:135:56
+#: internal/report/report.go:142:56 internal/report/report.go:156:56
+#: internal/report/report.go:163:56 internal/report/report.go:177:56
+#: internal/report/report.go:184:56 internal/report/report.go:198:56
+#: internal/report/report.go:205:56 internal/report/report.go:75:56
+#: internal/report/report.go:81:56 internal/report/report.go:86:56
+#: internal/role/role.go:119:66 internal/role/role.go:146:66
+#: internal/role/role.go:66:58 internal/role/role.go:79:57
+#: internal/role/role.go:98:51 internal/search/search.go:117:56
+#: internal/search/search.go:139:67 internal/search/search.go:153:67
+#: internal/search/search.go:175:67 internal/search/search.go:188:67
+#: internal/sla/sla.go:190:56 internal/sla/sla.go:200:56
+#: internal/sla/sla.go:210:71 internal/sla/sla.go:220:71
+#: internal/sla/sla.go:229:51 internal/sla/sla.go:305:56
+#: internal/tag/tag.go:105:56 internal/tag/tag.go:63:56
+#: internal/tag/tag.go:73:56 internal/tag/tag.go:86:56
+#: internal/tag/tag.go:95:51 internal/team/team.go:101:58
+#: internal/team/team.go:115:57 internal/team/team.go:128:57
+#: internal/team/team.go:138:57 internal/team/team.go:151:56
+#: internal/team/team.go:168:58 internal/team/team.go:177:51
+#: internal/team/team.go:187:58 internal/team/team.go:75:58
+#: internal/team/team.go:88:58 internal/template/template.go:109:62
+#: internal/template/template.go:119:51 internal/template/template.go:126:51
+#: internal/template/template.go:70:70 internal/template/template.go:86:70
+#: internal/template/template.go:96:62 internal/user/agent.go:107:66
+#: internal/user/agent.go:122:66 internal/user/agent.go:142:52
+#: internal/user/agent.go:159:51 internal/user/agent.go:177:51
+#: internal/user/agent.go:87:58 internal/user/agent.go:97:58
+#: internal/user/contact.go:243:54 internal/user/contact.go:32:51
+#: internal/user/contact.go:47:51 internal/user/contact.go:68:51
+#: internal/user/contact.go:78:51 internal/user/contact.go:91:56
+#: internal/user/notes.go:13:58 internal/user/notes.go:23:57
+#: internal/user/notes.go:33:64 internal/user/notes.go:42:51
+#: internal/user/user.go:165:57 internal/user/user.go:178:56
+#: internal/user/user.go:187:56 internal/user/user.go:195:56
+#: internal/user/user.go:213:57 internal/user/user.go:235:57
+#: internal/user/user.go:248:57 internal/user/user.go:261:57
+#: internal/user/user.go:284:57 internal/user/user.go:316:51
+#: internal/user/user.go:325:51 internal/user/user.go:335:55
+#: internal/user/user.go:339:55 internal/user/user.go:352:54
+#: internal/user/user.go:360:54 internal/user/user.go:369:51
+#: internal/user/user.go:410:51 internal/user/user.go:420:51
+#: internal/user/user.go:429:51 internal/user/user.go:440:59
+#: internal/user/user.go:447:59 internal/user/user.go:453:59
+#: internal/user/user.go:468:57 internal/user/user.go:497:51
+#: internal/view/view.go:107:66 internal/view/view.go:117:66
+#: internal/view/view.go:127:66 internal/view/view.go:137:66
+#: internal/view/view.go:146:51 internal/view/view.go:67:57
+#: internal/view/view.go:77:56 internal/view/view.go:87:56
+#: internal/view/view.go:97:56 internal/webhook/webhook.go:119:56
+#: internal/webhook/webhook.go:129:56 internal/webhook/webhook.go:146:60
+#: internal/webhook/webhook.go:151:60 internal/webhook/webhook.go:164:69
+#: internal/webhook/webhook.go:172:69 internal/webhook/webhook.go:193:70
+#: internal/webhook/webhook.go:201:70 internal/webhook/webhook.go:207:69
+#: internal/webhook/webhook.go:222:51 internal/webhook/webhook.go:232:69
+#: internal/whatsapp/template/template.go:150:70
+#: internal/whatsapp/template/template.go:238:70
+#: internal/whatsapp/template/template.go:243:70
+#: internal/whatsapp/template/template.go:285:70
+#: internal/whatsapp/template/template.go:310:52
+#: internal/whatsapp/template/template.go:315:52
+#: internal/whatsapp/template/template.go:324:51
+#: internal/whatsapp/template/template.go:87:56
+#: internal/whatsapp/template/template.go:99:54
+msgid "Something went wrong"
+msgstr "काहीतरी चुकले"
+
+#: cmd/agent_import.go:103:32 cmd/tag_import.go:76:36
+msgid "Starting import of %[1]s %[2]s"
+msgstr "%[1]s %[2]s चा आयात सुरू होत आहे"
+
+#: internal/conversation/status/status.go:151:49
+msgid "Status is too long, should be at most %[1]s characters"
+msgstr "स्थिती खूप लांब आहे, जास्तीत जास्त %[1]s अक्षरे असावीत"
+
+#: internal/conversation/transcript.go:21:31
+msgid "Subject"
+msgstr "विषय"
+
+#: internal/tag/tag.go:83:58
+msgid "Tag already exists"
+msgstr "टॅग आधीपासून अस्तित्वात आहे"
+
+#: internal/team/team.go:125:58
+msgid "Team already exists"
+msgstr "संघ आधीपासून अस्तित्वात आहे"
+
+#: internal/team/team.go:112:56
+msgid "Team not found"
+msgstr "संघ सापडला नाही"
+
+#: internal/ai/ai.go:430:54 internal/template/template.go:106:64
+msgid "Template not found"
+msgstr "टेम्पलेट सापडला नाही"
+
+#: internal/conversation/whatsapp.go:291:59
+msgid "Templates with a %[1]s header can't be sent from libredesk yet. Pick a template with a text header or none."
+msgstr ""
+
+#: cmd/csat.go:106:15 cmd/csat.go:45:16
+msgid "Thank you!"
+msgstr "धन्यवाद!"
+
+#: internal/ai/urlimport.go:39:55
+msgid "That URL doesn't return a web page, so it can't be imported. Enter a link to an HTML page, or add the content manually as a snippet."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:923:61
+#: internal/helpcenter/helpcenter.go:935:62
+msgid "That article is already part of another set of translations. Unlink it there first."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:687:59
+#: internal/helpcenter/helpcenter.go:822:58
+#: internal/helpcenter/helpcenter.go:915:58
+msgid "That collection belongs to another help center. Pick a collection in this help center."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:284:59
+msgid "That template belongs to another inbox. Pick one from this inbox's templates."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:319:59
+msgid "The 24-hour reply window has closed. Send an approved template instead."
+msgstr ""
+
+#: internal/aiagent/worker.go:157:30 internal/aiagent/worker.go:260:30
+#: internal/aiagent/worker.go:348:13 internal/aiagent/worker.go:368:31
+#: internal/aiagent/worker.go:379:31 internal/aiagent/worker.go:97:30
+msgid "The AI assistant could not respond and handed this conversation off to a human."
+msgstr ""
+
+#: internal/aiagent/worker.go:397:30
+msgid "The AI assistant did not have an answer and handed this conversation off to a human."
+msgstr ""
+
+#: internal/aiagent/worker.go:508:10
+msgid "The AI assistant handed this conversation off to a human."
+msgstr ""
+
+#: internal/aiagent/worker.go:264:30
+msgid "The AI assistant reached its response limit for this conversation and handed it off to a human."
+msgstr ""
+
+#: internal/ai/agent_approval.go:158:76
+msgid "The AI hit its step limit before answering. Try a simpler request, or ask an admin to raise the limit."
+msgstr ""
+
+#: internal/ai/ai.go:485:49 internal/ai/ai.go:506:49
+msgid "The AI provider API key is not set. Ask your administrator to add it in AI settings."
+msgstr ""
+
+#: internal/ai/ai.go:497:51
+msgid "The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."
+msgstr ""
+
+#: internal/ai/ai.go:489:53
+msgid "The AI provider is rate limiting requests. Wait a minute and try again."
+msgstr ""
+
+#: internal/ai/ai.go:482:49
+msgid "The AI provider rejected the API key. AI features won't work until your administrator updates it in AI settings."
+msgstr ""
+
+#: internal/ai/ai.go:493:51
+msgid "The AI provider took too long to respond. Try again, or with a shorter request."
+msgstr ""
+
+#: cmd/ai.go:390:72 cmd/ai.go:422:72 cmd/ai.go:514:72 cmd/ai.go:639:78
+msgid "The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1422:49
+#: internal/helpcenter/helpcenter.go:825:58
+msgid "The collection is in a different language than the article. Pick a collection in the article's language."
+msgstr ""
+
+#: internal/whatsapp/template/template.go:189:68
+msgid "The inbox, name, and language cannot be changed. Create a new template to use different values."
+msgstr ""
+
+#: internal/ai/urlimport.go:35:55
+msgid "The page could not be fetched. Check the URL is reachable and try again."
+msgstr ""
+
+#: cmd/helpcenter.go:2004:52
+msgid "The page couldn't be loaded due to a temporary problem. Try again in a moment, or go back to the help center home."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1355:50
+msgid "The parent collection is in a different language. Pick a parent in the same language as this collection."
+msgstr ""
+
+#: cmd/custom_attributes.go:146:49
+msgid "The provided key is not allowed as it conflicts with default attributes. Please use a different key."
+msgstr "प्रदान केलेली की परवानगी नाही कारण ती डिफॉल्ट अॅट्रिब्यूटांशी संघर्ष करते. कृपया वेगळी की वापरा."
+
+#: internal/ai/ai.go:409:49
+msgid "The provider returned %[1]s-dimension vectors but Dimensions is set to %[2]s. Set Dimensions to %[1]s, or search will not work."
+msgstr ""
+
+#: cmd/ai.go:487:71
+msgid "The selected assistant is unavailable. It may have been removed or disabled. Pick another assistant or use the default Copilot."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1438:49
+msgid "The selected author is not an agent or AI assistant. Pick a different author."
+msgstr ""
+
+#: internal/ai/agent_approval.go:72:17
+msgid "The tool request finished, but the AI could not complete its response. Check the external system before running it again."
+msgstr ""
+
+#: internal/ai/agent_approval.go:70:17
+msgid "The tool was declined, but the AI could not complete its response. Run the AI action again if you still need a reply."
+msgstr ""
+
+#: internal/ai/ai.go:348:49 internal/ai/toolstore.go:158:55
+msgid "The value can't start with \"enc:\". That prefix is reserved for encrypted secrets."
+msgstr ""
+
+#: cmd/ai.go:450:70
+msgid "There are no messages to suggest tags from yet."
+msgstr ""
+
+#: cmd/ai.go:415:70
+msgid "There are no messages to summarize yet."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1626:54
+msgid "These appearance settings could not be read. Reload the page and try again."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:931:61
+#: internal/helpcenter/helpcenter.go:938:62
+msgid "This article already has a translation in that language."
+msgstr ""
+
+#: internal/notification/push.go:116:49 internal/notification/push.go:127:49
+msgid "This browser subscription is invalid. Disable and enable browser notifications, then try again."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:524:62
+msgid "This collection contains articles or sub-collections in its current language. Changing the language would hide them from the help center. Move them out first."
+msgstr ""
+
+#: cmd/conversation.go:957:18
+msgid "This contact already has an open conversation in this inbox that you cannot access. Ask an agent with access to send the template."
+msgstr ""
+
+#: cmd/conversation.go:960:18
+msgid "This contact already has an open conversation in this inbox. Open it to send a template."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:242:59
+#: internal/conversation/whatsapp.go:254:59
+msgid "This contact has no phone number. Add one to message them on WhatsApp."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:246:59
+#: internal/conversation/whatsapp.go:251:59
+msgid "This contact's phone number has no valid country code. Fix it on the contact to message them on WhatsApp."
+msgstr ""
+
+#: cmd/chat.go:1479:54
+msgid "This conversation has been closed"
+msgstr "हे संभाषण बंद करण्यात आले आहे"
+
+#: cmd/chat.go:726:57 cmd/media.go:103:57
+msgid "This file is 0 bytes, so it will not be attached."
+msgstr "ही फाइल 0 bytes आहे, त्यामुळे ती जोडली जाणार नाही."
+
+#: cmd/chat.go:625:55 cmd/chat.go:664:55
+msgid "This handoff is no longer pending. Send a new message if you still need a human."
+msgstr ""
+
+#: internal/ai/toolstore.go:153:56
+msgid "This header has no saved value. Renaming a header does not carry over its stored secret. Enter the value again."
+msgstr ""
+
+#: cmd/inboxes.go:163:49 cmd/inboxes.go:495:50
+msgid "This inbox's WhatsApp settings could not be read. Re-enter the credentials and save again."
+msgstr ""
+
+#: cmd/widget_campaign.go:139:74 cmd/widget_campaign_reply.go:32:73
+msgid "This invitation is no longer available. Start a new chat to contact us."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1586:49
+msgid "This language is not one of the help center's supported languages. Content saved in it will not appear on the public site. Add the language to the help center first."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:344:49
+msgid "This message is longer than WhatsApp's limit of %[1]s characters. Shorten it and send again."
+msgstr ""
+
+#: internal/ai/toolstore.go:181:49
+msgid "This name is reserved for a built-in tool. Choose a different name."
+msgstr ""
+
+#: internal/conversation/message_delete.go:16:20
+msgid "This note was deleted"
+msgstr ""
+
+#: cmd/conversation.go:1186:53
+msgid "This number does not match the country you picked. Fix one of them."
+msgstr ""
+
+#: cmd/helpcenter.go:2002:46
+msgid "This page doesn't exist or may have moved. Search above, or go back to the help center home."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:262:62
+msgid "This phone number already belongs to another contact on WhatsApp. Merge or correct the contacts first."
+msgstr ""
+
+#: internal/helpcenter/helpcenter.go:1478:49
+#: internal/helpcenter/helpcenter.go:1486:49
+msgid "This slug is not allowed. Use a different slug."
+msgstr ""
+
+#: internal/aiagent/faq.go:112:52 internal/aiagent/faq.go:74:52
+#: internal/aiagent/faq.go:92:52
+msgid "This suggestion has already been reviewed."
+msgstr ""
+
+#: internal/whatsapp/template/template.go:196:68
+#: internal/whatsapp/template/template.go:203:68
+msgid "This template cannot be edited here in its current state or format. Sync templates from Meta, or edit it in WhatsApp Manager."
+msgstr ""
+
+#: internal/whatsapp/template/template.go:305:49
+msgid "This template is reserved for CSAT surveys and can't be deleted. Edit it in the inbox's CSAT settings."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:295:59
+msgid "This template needs content libredesk cannot send. Choose a text template or sync templates from Meta."
+msgstr ""
+
+#: internal/ai/agent_approval.go:230:52 internal/ai/agent_approval.go:233:52
+#: internal/ai/agent_approval.go:236:52
+msgid "This tool changed after approval was requested and was not run. Run the AI action again to review the current tool."
+msgstr ""
+
+#: cmd/ai.go:631:82 internal/ai/agent_approval.go:221:59
+#: internal/ai/agent_approval.go:88:71
+msgid "This tool request cannot be approved for this conversation. Run the AI action again to create a new request."
+msgstr ""
+
+#: internal/ai/agent_approval.go:218:57 internal/ai/agent_approval.go:85:69
+msgid "This tool request is no longer available. Run the AI action again to create a new request."
+msgstr ""
+
+#: internal/ai/ai.go:418:75 internal/ai/knowledgebase.go:106:4
+#: internal/ai/knowledgebase.go:85:4
+msgid "Title"
+msgstr "शीर्षक"
+
+#: internal/user/user.go:357:53
+msgid "Token is invalid or expired, Please try again by requesting a new password reset link"
+msgstr "टोकन अवैध किंवा कालबाह्य, कृपया नवीन पासवर्ड रीसेट लिंक विनंती करून पुन्हा प्रयत्न करा"
+
+#: internal/conversation/conversation.go:2088:49
+msgid "Too many filter groups. A view can have at most %[1]s. Remove the extra groups and save again."
+msgstr ""
+
+#: internal/conversation/conversation.go:465:61
+#: internal/conversation/proactive.go:46:72
+msgid "Too many requests."
+msgstr "खूप जास्त विनंत्या."
+
+#: internal/conversation/whatsapp.go:337:49
+msgid "Type a message or attach a file before sending."
+msgstr ""
+
+#: cmd/chat.go:388:59 cmd/chat.go:471:59 cmd/widget_middleware.go:101:60
+#: cmd/widget_middleware.go:107:60 cmd/widget_middleware.go:112:60
+#: cmd/widget_middleware.go:118:60
+msgid "Unauthorized"
+msgstr "अनधिकृत"
+
+#: internal/notification/preferences.go:115:50
+msgid "Unknown notification type or channel. The preference was not saved."
+msgstr ""
+
+#: cmd/users.go:429:57 cmd/users.go:484:57
+msgid "User already logged in"
+msgstr "वापरकर्ता आधीच लॉग इन आहे"
+
+#: internal/user/contact.go:240:56 internal/user/contact.go:81:52
+#: internal/user/user.go:210:59 internal/user/user.go:232:59
+#: internal/user/user.go:245:59 internal/user/user.go:258:59
+#: internal/user/user.go:281:59
+msgid "User not found"
+msgstr "वापरकर्ता सापडला नाही"
+
+#: internal/user/agent.go:115:67 internal/user/agent.go:156:52
+msgid "User with same email already exists"
+msgstr "समान ईमेलसह वापरकर्ता अस्तित्वात आहे"
+
+#: internal/conversation/message.go:1680:10
+msgid "Video"
+msgstr "व्हिडिओ"
+
+#: cmd/views.go:176:55 cmd/views.go:223:55 cmd/views.go:252:55
+#: internal/view/view.go:64:59
+msgid "View not found"
+msgstr "दृश्य सापडले नाही"
+
+#: cmd/csat.go:107:15 cmd/csat.go:46:16
+msgid "We appreciate you taking the time to submit your feedback."
+msgstr "तुमचा अभिप्राय सबमिट केल्याबद्दल आम्ही कृतज्ञ आहोत."
+
+#: cmd/users.go:250:21
+msgid "Welcome to Libredesk"
+msgstr "Libredesk मध्ये आपले स्वागत आहे"
+
+#: internal/conversation/message.go:652:68
+msgid "WhatsApp takes one file per message. Send the files one at a time."
+msgstr ""
+
+#: internal/conversation/whatsapp.go:277:61
+msgid "WhatsApp templates are unavailable right now. Try again in a moment."
+msgstr ""
+
+#: internal/aiagent/worker.go:374:34
+msgid "Yes"
+msgstr "होय"
+
+#: cmd/contacts.go:275:57
+msgid "You can only delete your own note"
+msgstr "तुम्ही फक्त तुमची स्वतःची टीप हटवू शकता"
+
+#: cmd/widget_campaign_reply.go:44:77 cmd/widget_campaign_reply.go:51:77
+msgid "You cannot access this conversation. Sign in with the account that started it."
+msgstr ""
+
+#: cmd/users.go:354:57
+msgid "You cannot delete yourself"
+msgstr "तुम्ही स्वतःला हटवू शकत नाही"
+
+#: cmd/conversation.go:228:56 cmd/conversation.go:310:56
+msgid "You do not have access to this view"
+msgstr "तुम्हाला हे दृश्य पाहण्याची परवानगी नाही"
+
+#: cmd/conversation.go:345:75
+msgid "You're not a member of this team, Please refresh the page and try again"
+msgstr "तुम्ही या संघाचे सदस्य नाही, कृपया पृष्ठ रिफ्रेश करून पुन्हा प्रयत्न करा"
+
+#: cmd/login.go:52:72 cmd/middlewares.go:77:60
+msgid "Your account is disabled, Please contact administrator"
+msgstr "तुमचे खाते अक्षम केले आहे, कृपया प्रशासकाशी संपर्क साधा"
+
+#: internal/conversation/whatsapp.go:173:14
+msgid "Your conversation has been resolved. How did we do? Rate your experience: %[1]s"
+msgstr ""
+
+#: internal/aiagent/tools.go:268:14 internal/aiagent/tools.go:274:21
+msgid "Your verification code"
+msgstr ""
+
+#: internal/aiagent/tools.go:259:10
+msgid "Your verification code is %[1]s. It expires in 10 minutes. If you did not request this, you can ignore this email."
+msgstr ""
+
+#: cmd/chat.go:1283:67 cmd/chat.go:1295:67 cmd/chat.go:1311:67
+#: cmd/chat.go:1316:67 cmd/chat.go:404:57 cmd/chat.go:409:57
+#: internal/helpcenter/helpcenter.go:1502:50
+msgid "`%[1]s` must be at most %[2]s characters."
+msgstr ""
+

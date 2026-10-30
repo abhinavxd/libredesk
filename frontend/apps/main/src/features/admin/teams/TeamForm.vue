@@ -2,7 +2,7 @@
   <form @submit="onSubmit" novalidate class="team-form space-y-6">
     <FormField name="emoji" v-slot="{ componentField }">
       <FormItem ref="emojiPickerContainer" class="relative w-20">
-        <FormLabel>{{ $t('admin.team.emoji') }}</FormLabel>
+        <FormLabel>{{ i18n._('Emoji') }}</FormLabel>
         <FormControl>
           <Button
             type="button"
@@ -22,7 +22,7 @@
     <FormGrid class="team-settings-grid">
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.name', 1) }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
@@ -31,11 +31,11 @@
       </FormField>
       <FormField name="conversation_assignment_type" v-slot="{ componentField }">
         <FormItem>
-          <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
+          <FormLabel>{{ i18n._('Auto assignment type') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
+                <SelectValue :placeholder="i18n._('Select an assignment type')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -46,28 +46,28 @@
               </SelectContent>
             </Select>
           </FormControl>
-          <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('Round robin: Conversations are assigned to team members in a round-robin fashion. Manual: Conversations are to be picked by team members.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
         <FormItem>
-          <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
+          <FormLabel>{{ i18n._('Maximum auto-assigned conversations') }}</FormLabel>
           <FormControl>
             <Input type="number" placeholder="0" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the \u0022Open\u0022 category count toward this limit. Set to 0 for unlimited.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
       <FormField v-slot="{ componentField }" name="timezone">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Timezone', 'Timezones', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.general.timezone.placeholder')" />
+                <SelectValue :placeholder="i18n._('Select timezone')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -78,22 +78,22 @@
               </SelectContent>
             </Select>
           </FormControl>
-          <FormDescription>{{ $t('admin.team.timezone.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('Team\'\'s timezone will be used to calculate SLA.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="business_hours_id">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.businessHour', 2) }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Business hour', 'Business hours', 2) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.general.businessHours.placeholder')" />
+                <SelectValue :placeholder="i18n._('Select business hours')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
+                  <SelectItem :value="0">{{ i18n.pgettext('No business hours', 'None') }}</SelectItem>
                   <SelectItem v-for="bh in businessHours" :key="bh.id" :value="bh.id">
                     {{ bh.name }}
                   </SelectItem>
@@ -101,22 +101,22 @@
               </SelectContent>
             </Select>
           </FormControl>
-          <FormDescription>{{ $t('admin.team.businessHours.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('Default business hours for the team, will be used to calculate SLA.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="sla_policy_id">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.slaPolicy') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('SLA policy', 'SLA policies', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.team.slaPolicy.placeholder')" />
+                <SelectValue :placeholder="i18n._('Select policy')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
+                  <SelectItem :value="0">{{ i18n.pgettext('No SLA policy', 'None') }}</SelectItem>
                   <SelectItem
                     v-for="sla in slaStore.options"
                     :key="sla.value"
@@ -128,7 +128,7 @@
               </SelectContent>
             </Select>
           </FormControl>
-          <FormDescription>{{ $t('admin.team.slaPolicy.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('SLA policy to be auto applied to conversations, when conversations are assigned to this team.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -169,19 +169,19 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useSlaStore } from '@main/stores/sla.js'
 import { timeZones } from '@main/constants/timezones.js'
 import api from '@main/api/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const EmojiPicker = defineAsyncComponent(async () => {
   const [mod] = await Promise.all([import('vue3-emoji-picker'), import('vue3-emoji-picker/css')])
   return mod.default
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const slaStore = useSlaStore()
 const assignmentTypes = computed(() => [
-  { value: 'Round robin', label: t('admin.team.assignmentType.roundRobin') },
-  { value: 'Manual', label: t('admin.team.assignmentType.manual') }
+  { value: 'Round robin', label: i18n._('Round robin') },
+  { value: 'Manual', label: i18n._('Manual') }
 ])
 const businessHours = ref([])
 
@@ -196,7 +196,7 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 
@@ -204,7 +204,7 @@ const DEFAULT_TEAM_EMOJI = '👥'
 
 const form = useForm({
   initialValues: { emoji: DEFAULT_TEAM_EMOJI },
-  validationSchema: toTypedSchema(createTeamFormSchema(t))
+  validationSchema: toTypedSchema(createTeamFormSchema(i18n))
 })
 
 const isEmojiPickerVisible = ref(false)
@@ -225,12 +225,12 @@ const fetchBusinessHours = async () => {
     const toastPayload =
       error.response.status === 403
         ? {
-            title: t('globals.terms.unAuthorized'),
+            title: i18n._('Unauthorized'),
             variant: 'destructive',
-            description: t('admin.team.noPermissionBusinessHours')
+            description: i18n._('You do not have permission to view business hours.')
           }
         : {
-            title: t('admin.team.couldNotFetchBusinessHours'),
+            title: i18n._('Could not fetch business hours'),
             variant: 'destructive',
             description: handleHTTPError(error).message
           }

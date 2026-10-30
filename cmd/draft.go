@@ -40,23 +40,23 @@ func handleUpsertConversationDraft(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Debug("error decoding draft request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if req.Type == "" {
 		req.Type = "reply"
 	}
 	if !isValidDraftType(req.Type) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if len(req.Meta) > maxMetaSize {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Validate content is not empty
 	if strings.TrimSpace(req.Content) == "" && (len(req.Meta) == 0 || string(req.Meta) == "{}") {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	draft, err := app.conversation.UpsertConversationDraft(conv.ID, user.ID, req.Type, req.Content, req.Meta)
@@ -97,7 +97,7 @@ func handleDeleteConversationDraft(r *fastglue.Request) error {
 	)
 
 	if draftType != "" && !isValidDraftType(draftType) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)

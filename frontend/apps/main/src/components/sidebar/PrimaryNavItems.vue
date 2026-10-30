@@ -23,7 +23,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useStorage } from '@vueuse/core'
 import { Inbox, Shield, FileLineChart, BookUser } from 'lucide-vue-next'
 import { SidebarMenuButton, SidebarMenuItem } from '@shared-ui/components/ui/sidebar'
@@ -37,7 +37,7 @@ defineProps({
 })
 
 const route = useRoute()
-const { t } = useI18n()
+const i18n = useI18n()
 const userStore = useUserStore()
 const isMobile = useIsMobile()
 
@@ -54,7 +54,7 @@ const items = computed(() =>
     {
       key: 'inboxes',
       icon: Inbox,
-      label: t('globals.terms.inbox', 2),
+      label: i18n._('{count, plural, one {Inbox} other {Inboxes}}', 2),
       to: inboxTarget.value,
       isActive: route.path.startsWith('/inboxes'),
       show: true
@@ -62,7 +62,7 @@ const items = computed(() =>
     {
       key: 'contacts',
       icon: BookUser,
-      label: t('globals.terms.contact', 2),
+      label: i18n._('{count, plural, one {Contact} other {Contacts}}', 2),
       to: { name: 'contacts' },
       isActive: route.path.startsWith('/contacts'),
       show: userStore.can('contacts:read_all')
@@ -70,7 +70,7 @@ const items = computed(() =>
     {
       key: 'reports',
       icon: FileLineChart,
-      label: t('globals.terms.report', 2),
+      label: i18n._('{count, plural, one {Report} other {Reports}}', 2),
       to: { name: 'reports' },
       isActive: route.path.startsWith('/reports'),
       show: userStore.hasReportTabPermissions
@@ -78,7 +78,7 @@ const items = computed(() =>
     {
       key: 'admin',
       icon: Shield,
-      label: t('globals.terms.admin'),
+      label: i18n._('{count, plural, one {Admin} other {Admins}}'),
       to: { name: userStore.can('general_settings:manage') ? 'general' : 'admin' },
       isActive: route.path.startsWith('/admin'),
       show: userStore.hasAdminTabPermissions

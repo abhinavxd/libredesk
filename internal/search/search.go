@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	models "github.com/abhinavxd/libredesk/internal/search/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -51,7 +51,7 @@ type Manager struct {
 	q               queries
 	db              *sqlx.DB
 	lo              *logf.Logger
-	i18n            *i18n.I18n
+	i18n            *gotext.Locale
 	filterFields    dbutil.AllowedFields
 	filterRenderers dbutil.FieldRenderers
 	filterLocation  func() string
@@ -61,7 +61,7 @@ type Manager struct {
 type Opts struct {
 	DB              *sqlx.DB
 	Lo              *logf.Logger
-	I18n            *i18n.I18n
+	I18n            *gotext.Locale
 	FilterFields    dbutil.AllowedFields
 	FilterRenderers dbutil.FieldRenderers
 	FilterLocation  func() string
@@ -114,7 +114,7 @@ func (s *Manager) Contacts(query string, limit int) ([]models.ContactResult, err
 	var results = make([]models.ContactResult, 0)
 	if err := s.q.SearchContacts.Select(&results, dbutil.ContainsPattern(query), limit); err != nil {
 		s.lo.Error("error searching contacts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, s.i18n.Get("Something went wrong"), nil)
 	}
 	return results, nil
 }
@@ -127,7 +127,7 @@ func (s *Manager) searchConversations(query models.Query, scope models.ReadScope
 	query = normalizeQuery(query, pageSizeLimit)
 	orderBy, err := conversationResultOrder(query.Sort)
 	if err != nil {
-		return nil, false, "", envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
+		return nil, false, "", envelope.NewError(envelope.InputError, s.i18n.Get("Invalid filters."), nil)
 	}
 	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, orderBy, s.filterFields, conversationCursorCondition)
 	if err != nil {
@@ -136,7 +136,7 @@ func (s *Manager) searchConversations(query models.Query, scope models.ReadScope
 	var results = make([]models.ConversationResult, 0)
 	if err := s.db.Select(&results, sql, args...); err != nil {
 		s.lo.Error("error searching conversations", "error", err)
-		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.Get("Something went wrong"), nil)
 	}
 	results, hasMore := trimResults(results, query.PageSize)
 	if !hasMore {
@@ -150,7 +150,7 @@ func (s *Manager) searchConversations(query models.Query, scope models.ReadScope
 	})
 	if err != nil {
 		s.lo.Error("error encoding conversation search cursor", "error", err)
-		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.Get("Something went wrong"), nil)
 	}
 	return results, true, nextCursor, nil
 }
@@ -159,7 +159,7 @@ func (s *Manager) searchMessages(query models.Query, scope models.ReadScope, pag
 	query = normalizeQuery(query, pageSizeLimit)
 	orderBy, err := messageResultOrder(query.Sort)
 	if err != nil {
-		return nil, false, "", envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
+		return nil, false, "", envelope.NewError(envelope.InputError, s.i18n.Get("Invalid filters."), nil)
 	}
 	fields := dbutil.AllowedFields{"conversation_messages": messageAllowedFields}
 	for model, f := range s.filterFields {
@@ -172,7 +172,7 @@ func (s *Manager) searchMessages(query models.Query, scope models.ReadScope, pag
 	var results = make([]models.MessageResult, 0)
 	if err := s.db.Select(&results, sql, args...); err != nil {
 		s.lo.Error("error searching messages", "error", err)
-		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.Get("Something went wrong"), nil)
 	}
 	results, hasMore := trimResults(results, query.PageSize)
 	if !hasMore {
@@ -185,7 +185,7 @@ func (s *Manager) searchMessages(query models.Query, scope models.ReadScope, pag
 	})
 	if err != nil {
 		s.lo.Error("error encoding message search cursor", "error", err)
-		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, false, "", envelope.NewError(envelope.GeneralError, s.i18n.Get("Something went wrong"), nil)
 	}
 	return results, true, nextCursor, nil
 }
@@ -196,13 +196,13 @@ func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadS
 	sql, args, err := dbutil.BuildFilterQuery(base, baseArgs, query.Filters, fields, s.filterRenderers, s.filterLocation())
 	if err != nil {
 		s.lo.Debug("error building search query", "error", err)
-		return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
+		return "", nil, envelope.NewError(envelope.InputError, s.i18n.Get("Invalid filters."), nil)
 	}
 	if query.Cursor != "" {
 		condition, cursorArgs, err := cursorWhere(query.Cursor, query.Sort, len(args)+1)
 		if err != nil {
 			s.lo.Debug("error decoding search cursor", "error", err)
-			return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
+			return "", nil, envelope.NewError(envelope.InputError, s.i18n.Get("Invalid filters."), nil)
 		}
 		sql += " AND " + condition
 		args = append(args, cursorArgs...)

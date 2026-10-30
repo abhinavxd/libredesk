@@ -5,11 +5,11 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox
-              :aria-label="$t('globals.terms.enabled')"
+              :aria-label="i18n._('Enabled')"
               :checked="value"
               @update:checked="handleChange"
             />
-            <Label>{{ $t('globals.terms.enabled') }}</Label>
+            <Label>{{ i18n._('Enabled') }}</Label>
           </div>
         </FormControl>
         <FormMessage />
@@ -19,7 +19,7 @@
     <FormGrid compact>
       <FormField v-slot="{ componentField }" name="host">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.smtpHost') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('SMTP Host', 'SMTP Hosts', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="smtp.gmail.com" v-bind="componentField" />
           </FormControl>
@@ -29,7 +29,7 @@
 
       <FormField v-slot="{ componentField }" name="port">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.smtpPort') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('SMTP Port', 'SMTP Ports', 1) }}</FormLabel>
           <FormControl>
             <Input type="number" placeholder="587" v-bind="componentField" />
           </FormControl>
@@ -43,7 +43,7 @@
           <FormControl>
             <Select v-bind="componentField" v-model="componentField.modelValue">
               <SelectTrigger>
-                <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+                <SelectValue :placeholder="i18n._('Select TLS type')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -61,7 +61,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="username">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Username', 'Usernames', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="admin@yourcompany.com" v-bind="componentField" />
           </FormControl>
@@ -71,7 +71,7 @@
 
       <FormField v-slot="{ componentField }" name="password">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Password', 'Passwords', 1) }}</FormLabel>
           <FormControl>
             <Input type="password" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -81,11 +81,11 @@
 
       <FormField v-slot="{ componentField }" name="auth_protocol">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.authProtocol') }}</FormLabel>
+          <FormLabel>{{ i18n._('Authentication Protocol') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField" v-model="componentField.modelValue">
               <SelectTrigger>
-                <SelectValue :placeholder="t('admin.inbox.authProtocol.description')" />
+                <SelectValue :placeholder="i18n._('Authentication protocol to use.')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -104,27 +104,27 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="email_address">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.fromEmailAddress') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('From email address', 'From email addresses', 1) }}</FormLabel>
           <FormControl>
             <Input
               type="text"
-              :placeholder="t('admin.inbox.fromEmailAddress.placeholder')"
+              :placeholder="i18n._('My inbox \u003csupport@example.com\u003e')"
               v-bind="componentField"
             />
           </FormControl>
           <FormMessage />
-          <FormDescription> {{ $t('admin.inbox.fromEmailAddress.description') }}</FormDescription>
+          <FormDescription> {{ i18n._('From email address for your inbox. e.g. My inbox \u003csupport@example.com\u003e') }}</FormDescription>
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="hello_hostname">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.heloHostname') }}</FormLabel>
+          <FormLabel>{{ i18n._('HELO Hostname') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
           <FormDescription>
-            {{ $t('admin.inbox.heloHostname.description') }}
+            {{ i18n._('The hostname to use in the HELO/EHLO command. If not set, defaults to localhost.') }}
           </FormDescription>
           <FormMessage />
         </FormItem>
@@ -133,48 +133,48 @@
     <FormGrid compact>
       <FormField v-slot="{ componentField }" name="max_conns">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.maxConnections') }}</FormLabel>
+          <FormLabel>{{ i18n._('Max Connections') }}</FormLabel>
           <FormControl>
             <Input type="number" placeholder="2" v-bind="componentField" />
           </FormControl>
           <FormMessage />
-          <FormDescription>{{ $t('admin.inbox.maxConnections.description') }} </FormDescription>
+          <FormDescription>{{ i18n._('Maximum number of concurrent connections to the server.') }} </FormDescription>
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="max_msg_retries">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.maxRetries') }}</FormLabel>
+          <FormLabel>{{ i18n._('Max Retries') }}</FormLabel>
           <FormControl>
             <Input type="number" placeholder="3" v-bind="componentField" />
           </FormControl>
           <FormMessage />
-          <FormDescription> {{ $t('admin.inbox.maxRetries.description') }} </FormDescription>
+          <FormDescription> {{ i18n._('Number of times to retry when a message fails.') }} </FormDescription>
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="idle_timeout">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.idleTimeout') }}</FormLabel>
+          <FormLabel>{{ i18n._('Idle Timeout') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="15s" v-bind="componentField" />
           </FormControl>
           <FormMessage />
           <FormDescription>
-            {{ $t('admin.inbox.idleTimeout.description') }}
+            {{ i18n._('Maximum time an inactive connection must be kept alive before closing it and removing it from the pool.') }}
           </FormDescription>
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="wait_timeout">
         <FormItem>
-          <FormLabel>{{ $t('admin.inbox.waitTimeout') }}</FormLabel>
+          <FormLabel>{{ i18n._('Wait Timeout') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="5s" v-bind="componentField" />
           </FormControl>
           <FormMessage />
           <FormDescription>
-            {{ $t('admin.inbox.waitTimeout.description') }}
+            {{ i18n._('Maximum time to wait to obtain a connection before timing out. Timeouts may occur when all open connections are busy sending e-mails and they\'\'re not returning to the pool fast enough. This is also the timeout used when creating new SMTP connections.') }}
           </FormDescription>
         </FormItem>
       </FormField>
@@ -183,8 +183,8 @@
     <FormField v-slot="{ componentField, handleChange }" name="tls_skip_verify">
       <FormItem>
         <SwitchField
-          :title="$t('admin.inbox.skipTLSVerification')"
-          :description="$t('admin.inbox.skipTLSVerification.description')"
+          :title="i18n._('Skip TLS Verification')"
+          :description="i18n._('Skip hostname check on the TLS certificate.')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -222,10 +222,10 @@ import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const isLoading = ref(false)
-const { t } = useI18n()
+const i18n = useI18n()
 const props = defineProps({
   initialValues: {
     type: Object,
@@ -246,11 +246,11 @@ const submitLabel = computed(() => {
   if (props.submitLabel) {
     return props.submitLabel
   }
-  return t('globals.messages.save')
+  return i18n._('Save')
 })
 
 const smtpForm = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const onSmtpSubmit = smtpForm.handleSubmit(async (values) => {

@@ -1,12 +1,14 @@
+
+
 import { h } from 'vue'
 import dataTableDropdown from '@/features/admin/custom-attributes/dataTableDropdown.vue'
 import TableDate from '@main/components/table/TableDate.vue'
 
-export const createColumns = (t, { onEdit } = {}) => [
+export const createColumns = (i18n, { onEdit } = {}) => [
     {
         accessorKey: 'name',
         header: function () {
-            return h('div', null, t('globals.terms.name'))
+            return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
         },
         cell: function ({ row }) {
             return h('div', null,
@@ -22,7 +24,7 @@ export const createColumns = (t, { onEdit } = {}) => [
     {
         accessorKey: 'key',
         header: function () {
-            return h('div', null, t('globals.terms.key'))
+            return h('div', null, i18n._('{count, plural, one {Key} other {Keys}}'))
         },
         cell: function ({ row }) {
             return h('div', null, row.getValue('key'))
@@ -32,7 +34,7 @@ export const createColumns = (t, { onEdit } = {}) => [
         accessorKey: 'data_type',
         meta: { compact: true },
         header: function () {
-            return h('div', null, t('globals.terms.type'))
+            return h('div', null, i18n._('{count, plural, one {Type} other {Types}}'))
         },
         cell: function ({ row }) {
             return h('div', null, row.getValue('data_type'))
@@ -42,7 +44,7 @@ export const createColumns = (t, { onEdit } = {}) => [
         accessorKey: 'applies_to',
         meta: { compact: true },
         header: function () {
-            return h('div', null, t('globals.terms.appliesTo'))
+            return h('div', null, i18n._('Applies to'))
         },
         cell: function ({ row }) {
             return h('div', null, row.getValue('applies_to'))
@@ -53,7 +55,7 @@ export const createColumns = (t, { onEdit } = {}) => [
         meta: { compact: true },
         enableGlobalFilter: false,
         header: function () {
-            return h('div', null, t('globals.terms.createdAt'))
+            return h('div', null, i18n._('Created at'))
         },
         cell: function ({ row }) {
             return h(TableDate, { value: row.getValue('created_at') })
@@ -64,7 +66,7 @@ export const createColumns = (t, { onEdit } = {}) => [
         meta: { compact: true },
         enableGlobalFilter: false,
         header: function () {
-            return h('div', null, t('globals.terms.updatedAt'))
+            return h('div', null, i18n._('Updated at'))
         },
         cell: function ({ row }) {
             return h(TableDate, { value: row.getValue('updated_at') })

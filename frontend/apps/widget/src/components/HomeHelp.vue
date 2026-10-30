@@ -26,7 +26,7 @@ const open = (article) => {
       class="h-10 w-full justify-between px-2"
       @click="open()"
     >
-      {{ $t('widget.searchArticles') }}
+      {{ i18n._('Search for help') }}
       <Search class="size-4" aria-hidden="true" />
     </Button>
     <Button

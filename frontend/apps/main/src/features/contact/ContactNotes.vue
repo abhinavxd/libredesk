@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center mb-4" :class="compact ? 'justify-end' : 'justify-between'">
       <span v-if="!compact" class="ui-heading">
-        {{ $t('globals.terms.note', 2) }}
+        {{ i18n.ngettext('Note', 'Notes', 2) }}
       </span>
       <Button
         type="button"
@@ -14,7 +14,7 @@
         :class="compact ? 'gap-1 text-xs [&_svg]:size-3.5' : 'hover:bg-primary/10 hover:border-primary/30'"
       >
         <PlusIcon size="18" />
-        {{ $t('contact.newNote') }}
+        {{ i18n._('New note') }}
       </Button>
     </div>
 
@@ -34,15 +34,15 @@
             <Editor
               v-model:htmlContent="newNote"
               @update:htmlContent="(value) => (newNote = value)"
-              :placeholder="t('editor.hint.newLineSend')"
+              :placeholder="i18n._('Shift + Enter to add a new line. Ctrl + Enter to send.')"
             />
           </div>
           <div class="flex justify-end space-x-3 pt-2">
             <Button type="button" variant="outline" @click="cancelAddNote">
-              {{ $t('globals.messages.cancel') }}
+              {{ i18n._('Cancel') }}
             </Button>
             <Button type="submit" :disabled="!newNote.trim() || isSaving" :isLoading="isSaving">
-              {{ $t('contact.saveNote') }}
+              {{ i18n._('Save note') }}
             </Button>
           </div>
         </div>
@@ -100,7 +100,7 @@
                   :class="compact ? 'h-6 w-6 -mr-1' : 'h-8 w-8'"
                 >
                   <MoreVerticalIcon :class="compact ? 'h-3.5 w-3.5' : 'h-4 w-4'" />
-                  <span class="sr-only">{{ $t('globals.terms.openMenu') }}</span>
+                  <span class="sr-only">{{ i18n._('Open menu') }}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-[180px]">
@@ -110,7 +110,7 @@
                 >
                   <TrashIcon class="mr-2" size="15" />
                   {{
-                    $t('contact.deleteNote')
+                    i18n._('Delete note')
                   }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -130,7 +130,7 @@
       <!-- Load more notes -->
       <div v-if="compact && notes.length > NOTES_LIMIT && !showAll" class="flex justify-center pt-2">
        <Button variant="ghost" size="sm" @click="showAll = true">
-         {{ $t('globals.terms.loadMore') }} ({{ notes.length - NOTES_LIMIT }})
+         {{ i18n._('Load more') }} ({{ notes.length - NOTES_LIMIT }})
        </Button>
       </div>
     </div>
@@ -138,13 +138,13 @@
     <AlertDialog :open="deleteDialogOpen" @update:open="(v) => (deleteDialogOpen = v)">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
-          <AlertDialogDescription>{{ $t('contact.deleteNoteConfirmation') }}</AlertDialogDescription>
+          <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ i18n._('This will permanently delete the note.') }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" @click="confirmDeleteNote">
-            {{ $t('globals.messages.delete') }}
+            {{ i18n._('Delete') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -153,15 +153,15 @@
     <!-- No notes message -->
     <template v-if="showEmpty">
       <div v-if="compact" class="text-center text-sm text-muted-foreground py-4">
-        {{ $t('contact.notes.empty') }}
+        {{ i18n._('No notes yet') }}
       </div>
       <div v-else class="box border-dashed p-10 text-center bg-muted/50 mt-6">
         <div class="flex flex-col items-center">
           <h3 class="ui-heading mt-2">
-            {{ $t('contact.notes.empty') }}
+            {{ i18n._('No notes yet') }}
           </h3>
           <p class="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
-            {{ $t('contact.notes.help') }}
+            {{ i18n._('Add note for this contact to keep track of important information and conversations.') }}
           </p>
           <Button
             v-if="userStore.can('contact_notes:write')"
@@ -170,7 +170,7 @@
             @click="startAddingNote"
           >
             <PlusIcon size="15" />
-            {{ $t('contact.addNote') }}
+            {{ i18n._('Add note') }}
           </Button>
         </div>
       </div>
@@ -207,7 +207,7 @@ import {
 } from '@shared-ui/components/ui/alert-dialog'
 import { PlusIcon, MoreVerticalIcon, TrashIcon, ClockIcon } from 'lucide-vue-next'
 import Editor from '@main/components/editor/ConversationEditor.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS, CONTACT_ACTIONS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -218,7 +218,7 @@ import api from '@main/api'
 
 const props = defineProps({ contactId: Number, compact: { type: Boolean, default: false } })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const userStore = useUserStore()
 

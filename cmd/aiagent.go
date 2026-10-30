@@ -49,7 +49,7 @@ func handleGetAIAssistant(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	assistant, err := app.aiAgent.GetAssistant(id)
 	if err != nil {
@@ -88,7 +88,7 @@ func handleUpdateAIAssistant(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	req, files, err := decodeAssistantForm(r)
 	if err != nil {
@@ -116,7 +116,7 @@ func handleDeleteAIAssistant(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	userID, err := app.aiAgent.DeleteAssistant(id)
 	if err != nil {
@@ -136,10 +136,10 @@ func handleAIAssistantPreview(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	reply, sources, err := app.aiAgent.PreviewReply(r.RequestCtx, id, req.Message)
 	if err != nil {
@@ -152,7 +152,7 @@ func handleGetAIAssistantStats(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	rangeDays, _ := strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("range")))
 	stats, err := app.aiAgent.GetAssistantStats(id, rangeDays)
@@ -168,14 +168,14 @@ func decodeAssistantForm(r *fastglue.Request) (amodels.Assistant, []*multipart.F
 	var req amodels.Assistant
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
-		return req, nil, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil)
+		return req, nil, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil)
 	}
 	data := form.Value["data"]
 	if len(data) == 0 {
-		return req, nil, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil)
+		return req, nil, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil)
 	}
 	if err := json.Unmarshal([]byte(data[0]), &req); err != nil {
-		return req, nil, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil)
+		return req, nil, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil)
 	}
 	return req, form.File["files"], nil
 }
@@ -234,10 +234,10 @@ func handleApproveAIFaqSuggestion(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	auser := r.RequestCtx.UserValue("user").(authmodels.User)
 	if err := app.aiAgent.ApproveFAQSuggestion(id, req.Question, req.Answer, auser.ID); err != nil {
@@ -251,7 +251,7 @@ func handleRejectAIFaqSuggestion(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	auser := r.RequestCtx.UserValue("user").(authmodels.User)
 	if err := app.aiAgent.RejectFAQSuggestion(id, auser.ID); err != nil {
@@ -279,7 +279,7 @@ func handleUpdateAIFaqLearning(r *fastglue.Request) error {
 		req faqLearningReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if err := app.setting.Update(map[string]any{"ai_agent.faq_learning_enabled": req.Enabled}); err != nil {
 		return sendErrorEnvelope(r, err)

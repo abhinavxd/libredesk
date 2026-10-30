@@ -1,9 +1,11 @@
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { usePreferredReducedMotion } from '@vueuse/core'
 const HINT_CLASS = 'text-xs text-muted-foreground'
 
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 import { useUsersStore } from '@/stores/users'
 import { Button } from '@shared-ui/components/ui/button'
@@ -62,25 +64,24 @@ import {
 
 const MAX_CAMPAIGNS = 50
 const STAT_KEYS = ['displayed', 'opened', 'dismissed', 'replied']
-const STAT_TRANSLATION_KEYS = {
-  displayed: 'globals.terms.displayed',
-  opened: 'globals.terms.opened',
-  dismissed: 'globals.terms.dismissed',
-  replied: 'globals.terms.replied'
+const STAT_MESSAGES = {
+  displayed: msg({ message: 'Displayed' }),
+  opened: msg({ message: 'Opened' }),
+  dismissed: msg({ message: 'Dismissed' }),
+  replied: msg({ message: 'Replied' })
 }
-const AUDIENCE_TRANSLATION_KEYS = {
-  all: 'globals.terms.everyone',
-  visitors: 'admin.inbox.livechat.userSettings.visitors',
-  users: 'globals.terms.signedInUser'
+const AUDIENCE_MESSAGES = {
+  all: msg({ message: 'Everyone' }),
+  visitors: msg({ message: 'Visitors' }),
+  users: msg({ message: '{count, plural, one {Signed-in user} other {Signed-in users}}' })
 }
 const SELECT_FIELDS = [
   {
     key: 'audience',
-    labelKey: 'globals.terms.audience',
+    labelMessage: msg({ message: 'Audience' }),
     values: ['all', 'visitors', 'users']
   }
 ]
-const DEVICES = ['desktop', 'mobile']
 
 const reducedMotion = usePreferredReducedMotion()
 
@@ -92,7 +93,25 @@ const props = defineProps({
   showErrors: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue', 'update:cooldown', 'update:preview'])
-const { t } = useI18n()
+const i18n = useI18n()
+const devices = computed(() => ({
+  desktop: i18n._('Desktop'),
+  mobile: i18n._('Mobile')
+}))
+const urlFields = computed(() => ({
+  include_urls: i18n._('Include pages'),
+  exclude_urls: i18n._('Exclude pages')
+}))
+const businessHoursOptions = computed(() => ({
+  any: i18n._('Any time'),
+  inside: i18n._('During business hours'),
+  outside: i18n._('Outside business hours')
+}))
+const repeatOptions = computed(() => ({
+  once: i18n._('Once per person'),
+  session: i18n._('Once per session'),
+  interval: i18n._('After an interval')
+}))
 const usersStore = useUsersStore()
 
 const root = ref(null)
@@ -104,7 +123,7 @@ const pendingDelete = ref(null)
 const stats = ref([])
 const from = ref(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
 const to = ref(new Date().toISOString().slice(0, 10))
-const brandSenderName = computed(() => props.brandName.trim() || t('widget.brandBot'))
+const brandSenderName = computed(() => props.brandName.trim() || i18n._('Brand bot'))
 const campaignEventExample = computed(
   () => `window.Libredesk.trackEvent(${JSON.stringify(campaign.value?.event || 'pricing_viewed')})`
 )
@@ -115,7 +134,7 @@ const senderName = (id) => {
 
 const campaignErrors = computed(() => {
   if (!props.showErrors || !campaign.value) return []
-  const result = createCampaignSchema(t).safeParse(campaign.value)
+  const result = createCampaignSchema(i18n).safeParse(campaign.value)
   if (result.success) return []
   return result.error.issues.map((issue) => ({
     field: issue.path.join('.'),
@@ -129,15 +148,15 @@ const campaignSectionError = (field) =>
     ?.message || ''
 const cooldownError = computed(() => {
   if (!props.showErrors) return ''
-  return isGoDuration(props.cooldown) ? '' : t('validation.invalidDuration')
+  return isGoDuration(props.cooldown) ? '' : i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
 })
 
-const audienceLabel = (audience) => t(AUDIENCE_TRANSLATION_KEYS[audience], 2)
+const audienceLabel = (audience) => i18n._(AUDIENCE_MESSAGES[audience], 2)
 
 const pagesLabel = (item) =>
   item.include_urls.filter(Boolean).length
     ? item.include_urls.filter(Boolean).join(', ')
-    : t('globals.messages.all')
+    : i18n._('All')
 
 // The rail preview mirrors what widget.js renders above the launcher for this campaign.
 watch(
@@ -206,7 +225,7 @@ const add = (source) => {
         ...JSON.parse(JSON.stringify(source)),
         id: newCampaignId(),
         enabled: false,
-        name: `${source.name} (${t('globals.terms.copy')})`
+        name: `${source.name} (${i18n._('Copy')})`
       }
     : defaultCampaign()
   emit('update:modelValue', [...props.modelValue, item])
@@ -230,7 +249,7 @@ const showInvalidField = async (field) => {
     return
   }
   const firstInvalid = props.modelValue
-    .map((item) => ({ item, result: createCampaignSchema(t).safeParse(item) }))
+    .map((item) => ({ item, result: createCampaignSchema(i18n).safeParse(item) }))
     .find(({ result }) => !result.success)
   if (!firstInvalid) return
   selected.value = firstInvalid.item.id
@@ -302,10 +321,10 @@ onMounted(async () => {
 
     <!-- Campaign list -->
     <template v-if="!campaign">
-      <p class="ui-description">{{ t('widget.campaignsHint') }}</p>
+      <p class="ui-description">{{ i18n._('Show a message on matching pages before the chat is opened. A conversation is created only when someone replies to it.') }}</p>
 
       <div class="space-y-2 max-w-md">
-        <Label for="campaign-cooldown">{{ t('widget.campaignCooldown') }}</Label>
+        <Label for="campaign-cooldown">{{ i18n._('Minimum time between proactive messages') }}</Label>
         <Input
           id="campaign-cooldown"
           type="text"
@@ -316,7 +335,7 @@ onMounted(async () => {
           :aria-invalid="!!cooldownError"
         />
         <p id="campaign-cooldown-hint" :class="HINT_CLASS">
-          {{ t('globals.messages.golangDurationHoursMinutes') }}
+          {{ i18n._('Duration in hours or minutes. Example: 1h, 30m, 1h30m') }}
         </p>
         <p v-if="cooldownError" role="alert" class="text-sm text-destructive">
           {{ cooldownError }}
@@ -325,10 +344,10 @@ onMounted(async () => {
 
       <div class="space-y-4">
         <h4 class="ui-heading">
-          {{ t('globals.terms.proactiveMessage', 2) }}
+          {{ i18n.ngettext('Proactive message', 'Proactive messages', 2) }}
         </h4>
         <p v-if="modelValue.length > 1" class="text-sm text-muted-foreground">
-          {{ t('widget.campaignPriorityHint') }}
+          {{ i18n._('Messages are checked from top to bottom. The first match is shown.') }}
         </p>
 
         <Draggable
@@ -362,7 +381,7 @@ onMounted(async () => {
               <Switch
                 :class="modelValue.length > 1 ? '' : 'ml-3'"
                 :checked="item.enabled"
-                :aria-label="t('globals.terms.enabled')"
+                :aria-label="i18n._('Enabled')"
                 @update:checked="toggleEnabled(item.id, $event)"
               />
               <button
@@ -373,11 +392,11 @@ onMounted(async () => {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-sm font-medium text-foreground truncate">
-                      {{ item.name || t('widget.newCampaign') }}
+                      {{ item.name || i18n._('New proactive message') }}
                     </span>
                     <Badge variant="secondary" class="gap-1 shrink-0">
                       <component :is="item.enabled ? CircleCheck : CircleSlash" class="size-3" />
-                      {{ item.enabled ? t('globals.terms.enabled') : t('globals.terms.paused') }}
+                      {{ item.enabled ? i18n._('Enabled') : i18n._('Paused') }}
                     </Badge>
                   </div>
                   <p class="text-xs text-muted-foreground truncate mt-0.5">
@@ -398,10 +417,10 @@ onMounted(async () => {
           @click="add()"
         >
           <Plus class="size-4" />
-          {{ t('widget.addCampaign') }}
+          {{ i18n._('Add proactive message') }}
         </Button>
         <p v-if="modelValue.length >= MAX_CAMPAIGNS" :class="HINT_CLASS">
-          {{ t('widget.campaignLimitReached') }}
+          {{ i18n._('You have reached the limit of 50 proactive messages. Delete one to add another.') }}
         </p>
       </div>
 
@@ -412,28 +431,28 @@ onMounted(async () => {
           class="flex items-center gap-2 text-base font-semibold text-foreground group"
         >
           <ChevronDown class="size-4 transition-transform group-data-[state=closed]:-rotate-90" />
-          {{ t('widget.campaignStats') }}
+          {{ i18n._('Proactive message results') }}
         </CollapsibleTrigger>
         <CollapsibleContent class="space-y-4">
           <div class="flex flex-wrap gap-3 items-end">
             <div class="space-y-2">
-              <Label for="campaign-stats-from">{{ t('globals.terms.from') }}</Label>
+              <Label for="campaign-stats-from">{{ i18n.pgettext('Date range', 'From') }}</Label>
               <Input id="campaign-stats-from" v-model="from" type="date" />
             </div>
             <div class="space-y-2">
-              <Label for="campaign-stats-to">{{ t('globals.terms.to') }}</Label>
+              <Label for="campaign-stats-to">{{ i18n.pgettext('Date range', 'To') }}</Label>
               <Input id="campaign-stats-to" v-model="to" type="date" />
             </div>
             <Button type="button" variant="outline" @click="refreshStats">
-              {{ t('globals.terms.refresh') }}
+              {{ i18n._('Refresh') }}
             </Button>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{{ t('globals.terms.name') }}</TableHead>
+                <TableHead>{{ i18n.ngettext('Name', 'Names', 1) }}</TableHead>
                 <TableHead v-for="key in STAT_KEYS" :key="key" class="text-right">
-                  {{ t(STAT_TRANSLATION_KEYS[key]) }}
+                  {{ i18n._(STAT_MESSAGES[key]) }}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -442,7 +461,7 @@ onMounted(async () => {
                 <TableCell>
                   {{
                     modelValue.find((item) => item.id === row.campaign_id)?.name ||
-                    t('widget.deletedCampaign')
+                    i18n._('Deleted message')
                   }}
                 </TableCell>
                 <TableCell v-for="key in STAT_KEYS" :key="key" class="text-right tabular-nums">
@@ -451,7 +470,7 @@ onMounted(async () => {
               </TableRow>
               <TableRow v-if="!visibleStats.length">
                 <TableCell :colspan="STAT_KEYS.length + 1" class="text-muted-foreground">
-                  {{ t('globals.messages.noResultsFound') }}
+                  {{ i18n._('No results found') }}
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -465,7 +484,7 @@ onMounted(async () => {
       <div data-campaign-editor class="flex items-center justify-between gap-2">
         <Button type="button" variant="ghost" size="sm" class="-ml-2" @click="selected = ''">
           <ChevronRight class="size-4 rotate-180" />
-          {{ t('widget.backToCampaigns') }}
+          {{ i18n._('Back to proactive messages') }}
         </Button>
         <div class="flex gap-2">
           <Button
@@ -475,7 +494,7 @@ onMounted(async () => {
             :disabled="modelValue.length >= MAX_CAMPAIGNS"
             @click="add(campaign)"
           >
-            {{ t('globals.terms.duplicate') }}
+            {{ i18n._('Duplicate') }}
           </Button>
           <Button
             type="button"
@@ -483,23 +502,23 @@ onMounted(async () => {
             size="sm"
             @click="pendingDelete = campaign.id"
           >
-            {{ t('globals.messages.delete') }}
+            {{ i18n._('Delete') }}
           </Button>
         </div>
       </div>
 
       <SwitchField
-        :title="t('globals.terms.enabled')"
+        :title="i18n._('Enabled')"
         :checked="campaign.enabled"
         @update:checked="update('enabled', $event)"
       />
 
       <!-- Message -->
       <div class="space-y-4">
-        <h4 class="ui-heading">{{ t('globals.terms.message', 1) }}</h4>
+        <h4 class="ui-heading">{{ i18n.ngettext('Message', 'Messages', 1) }}</h4>
 
         <div class="space-y-2">
-          <Label for="campaign-name">{{ t('globals.terms.name') }}</Label>
+          <Label for="campaign-name">{{ i18n.ngettext('Name', 'Names', 1) }}</Label>
           <Input
             id="campaign-name"
             :model-value="campaign.name"
@@ -513,7 +532,7 @@ onMounted(async () => {
         </div>
 
         <div class="space-y-2">
-          <Label for="campaign-message">{{ t('globals.terms.message', 1) }}</Label>
+          <Label for="campaign-message">{{ i18n.ngettext('Message', 'Messages', 1) }}</Label>
           <Textarea
             id="campaign-message"
             :model-value="campaign.message"
@@ -529,7 +548,7 @@ onMounted(async () => {
 
         <div class="grid sm:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="campaign-sender">{{ t('globals.terms.sender') }}</Label>
+            <Label for="campaign-sender">{{ i18n._('Sender') }}</Label>
             <SelectAgentCombobox
               id="campaign-sender"
               :model-value="campaign.sender_id === 0 ? 'brand' : String(campaign.sender_id)"
@@ -539,7 +558,7 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="campaign-team">{{ t('widget.replyTeam') }}</Label>
+            <Label for="campaign-team">{{ i18n._('Route replies to team') }}</Label>
             <SelectTeamCombobox
               id="campaign-team"
               :model-value="campaign.team_id === 0 ? 'none' : String(campaign.team_id)"
@@ -549,7 +568,7 @@ onMounted(async () => {
           </div>
 
           <div v-for="field in SELECT_FIELDS" :key="field.key" class="space-y-2">
-            <Label :for="`campaign-${field.key}`">{{ t(field.labelKey) }}</Label>
+            <Label :for="`campaign-${field.key}`">{{ i18n._(field.labelMessage) }}</Label>
             <Select
               :model-value="campaign[field.key]"
               @update:model-value="update(field.key, $event)"
@@ -568,15 +587,15 @@ onMounted(async () => {
       <!-- Who sees it -->
       <div class="space-y-4">
         <h4 class="ui-heading">
-          {{ t('widget.campaign.section.audience') }}
+          {{ i18n._('Who sees it') }}
         </h4>
 
         <div data-campaign-devices class="space-y-3">
-          <p class="text-sm font-medium text-foreground">{{ t('globals.terms.device', 2) }}</p>
+          <p class="text-sm font-medium text-foreground">{{ i18n.ngettext('Device', 'Devices', 2) }}</p>
           <SwitchField
-            v-for="device in DEVICES"
+            v-for="(label, device) in devices"
             :key="device"
-            :title="t(`globals.terms.${device}`)"
+            :title="label"
             :checked="campaign[device]"
             @update:checked="update(device, $event)"
           />
@@ -586,7 +605,7 @@ onMounted(async () => {
         </div>
 
         <div data-campaign-conditions class="space-y-2">
-          <p class="text-sm font-medium text-foreground">{{ t('globals.messages.visibleWhen') }}</p>
+          <p class="text-sm font-medium text-foreground">{{ i18n._('Visible when') }}</p>
           <WidgetConditions
             :model-value="campaign.conditions"
             @update:model-value="update('conditions', $event)"
@@ -604,11 +623,11 @@ onMounted(async () => {
       <!-- Where and when -->
       <div class="space-y-4">
         <h4 class="ui-heading">
-          {{ t('widget.campaign.section.placement') }}
+          {{ i18n._('Where and when') }}
         </h4>
 
-        <div v-for="key in ['include_urls', 'exclude_urls']" :key="key" class="space-y-2">
-          <Label :for="`campaign-${key}`">{{ t(`widget.campaign.${key}`) }}</Label>
+        <div v-for="(label, key) in urlFields" :key="key" class="space-y-2">
+          <Label :for="`campaign-${key}`">{{ label }}</Label>
           <Textarea
             :id="`campaign-${key}`"
             :model-value="campaign[key].join('\n')"
@@ -619,7 +638,7 @@ onMounted(async () => {
             @update:model-value="update(key, $event.split('\n'))"
             :aria-invalid="!!campaignFieldError(key)"
           />
-          <p :class="HINT_CLASS">{{ t('widget.urlPatternsHint') }}</p>
+          <p :class="HINT_CLASS">{{ i18n._('One URL or path per line. Use * to match any characters. Empty includes match every page.') }}</p>
           <p v-if="campaignFieldError(key)" role="alert" class="text-sm text-destructive">
             {{ campaignFieldError(key) }}
           </p>
@@ -627,7 +646,7 @@ onMounted(async () => {
 
         <div class="grid sm:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="campaign-delay_seconds">{{ t('widget.campaign.delay_seconds') }}</Label>
+            <Label for="campaign-delay_seconds">{{ i18n._('Active time on page (seconds)') }}</Label>
             <Input
               id="campaign-delay_seconds"
               type="number"
@@ -647,7 +666,7 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="campaign-event">{{ t('widget.campaign.event') }}</Label>
+            <Label for="campaign-event">{{ i18n._('Optional event name') }}</Label>
             <Input
               id="campaign-event"
               :model-value="campaign.event"
@@ -657,7 +676,7 @@ onMounted(async () => {
               @update:model-value="update('event', $event)"
             />
             <p id="campaign-event-hint" :class="HINT_CLASS">
-              {{ t('widget.campaignEventHint') }}
+              {{ i18n._('Show this message only after your website tracks this event.') }}
             </p>
             <code
               id="campaign-event-example"
@@ -667,7 +686,7 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-2">
-            <Label for="campaign-business_hours">{{ t('widget.campaign.business_hours') }}</Label>
+            <Label for="campaign-business_hours">{{ i18n._('Business hours rule') }}</Label>
             <Select
               :model-value="campaign.business_hours"
               @update:model-value="update('business_hours', $event)"
@@ -675,11 +694,11 @@ onMounted(async () => {
               <SelectTrigger id="campaign-business_hours"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="value in ['any', 'inside', 'outside']"
+                  v-for="(label, value) in businessHoursOptions"
                   :key="value"
                   :value="value"
                 >
-                  {{ t(`widget.campaign.${value}`) }}
+                  {{ label }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -690,7 +709,7 @@ onMounted(async () => {
             data-campaign-business-hours
             class="space-y-2"
           >
-            <Label for="campaign-hours">{{ t('globals.terms.businessHour', 2) }}</Label>
+            <Label for="campaign-hours">{{ i18n.ngettext('Business hour', 'Business hours', 2) }}</Label>
             <Select
               :model-value="String(campaign.business_hours_id)"
               @update:model-value="update('business_hours_id', Number($event))"
@@ -716,23 +735,23 @@ onMounted(async () => {
       <div class="space-y-4">
         <div class="grid sm:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <Label for="campaign-repeat">{{ t('globals.terms.repeat') }}</Label>
+            <Label for="campaign-repeat">{{ i18n._('Repeat') }}</Label>
             <Select :model-value="campaign.repeat" @update:model-value="update('repeat', $event)">
               <SelectTrigger id="campaign-repeat"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="value in ['once', 'session', 'interval']"
+                  v-for="(label, value) in repeatOptions"
                   :key="value"
                   :value="value"
                 >
-                  {{ t(`widget.campaign.${value}`) }}
+                  {{ label }}
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div v-if="campaign.repeat === 'interval'" class="space-y-2">
-            <Label for="campaign-repeat_hours">{{ t('widget.campaign.repeat_hours') }}</Label>
+            <Label for="campaign-repeat_hours">{{ i18n._('Repeat after (hours)') }}</Label>
             <Input
               id="campaign-repeat_hours"
               type="number"
@@ -760,13 +779,13 @@ onMounted(async () => {
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
-          <AlertDialogDescription>{{ t('confirm.deleteCampaign') }}</AlertDialogDescription>
+          <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ i18n._('This proactive message will be removed when you save the inbox.') }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel type="button">{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel type="button">{{ i18n._('Cancel') }}</AlertDialogCancel>
           <AlertDialogAction type="button" variant="destructive" @click="remove">
-            {{ t('globals.messages.delete') }}
+            {{ i18n._('Delete') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

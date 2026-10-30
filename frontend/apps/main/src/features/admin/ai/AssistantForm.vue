@@ -3,7 +3,7 @@
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
         <SwitchField
-          :title="t('globals.terms.enabled')"
+          :title="i18n._('Enabled')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -12,21 +12,21 @@
 
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
         <FormControl>
           <Input type="text" v-bind="componentField" />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.nameHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('The display name customers see when they chat with this assistant.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <div class="space-y-2">
-      <div class="text-sm font-medium leading-none">{{ t('admin.ai.assistant.avatar') }}</div>
+      <div class="text-sm font-medium leading-none">{{ i18n._('Avatar') }}</div>
       <AvatarUpload
         :src="avatarPreview"
         :initials="avatarInitials"
-        :label="t('globals.messages.upload')"
+        :label="i18n._('Upload')"
         @upload="onAvatarUpload"
         @remove="onAvatarRemove"
       />
@@ -34,30 +34,30 @@
 
     <FormField v-slot="{ componentField }" name="description">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Description', 'Descriptions', 1) }}</FormLabel>
         <FormControl>
           <Textarea
             rows="3"
-            :placeholder="t('admin.ai.assistant.descriptionPlaceholder')"
+            :placeholder="i18n._('Handles order status and returns questions')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.descriptionHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('For your own reference only; customers never see this.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="expectation">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.assistant.expectation') }}</FormLabel>
+        <FormLabel>{{ i18n._('Expectation message') }}</FormLabel>
         <FormControl>
           <Textarea
             rows="2"
-            :placeholder="t('admin.ai.assistant.expectationPlaceholder')"
+            :placeholder="i18n._('I\'\'m an AI assistant. A human agent can join if you need one.')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.expectationHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Shown to the customer while this assistant handles the chat. It disappears on handoff to a human.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -65,7 +65,7 @@
     <FormGrid compact>
       <FormField v-slot="{ componentField }" name="tone">
         <FormItem>
-          <FormLabel>{{ t('admin.ai.assistant.tone') }}</FormLabel>
+          <FormLabel>{{ i18n._('Tone') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
@@ -73,8 +73,8 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem v-for="tone in tones" :key="tone" :value="tone">
-                    {{ t(`admin.ai.assistant.toneOption.${tone}`) }}
+                  <SelectItem v-for="(label, tone) in tones" :key="tone" :value="tone">
+                    {{ label }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -86,7 +86,7 @@
 
       <FormField v-slot="{ componentField }" name="response_length">
         <FormItem>
-          <FormLabel>{{ t('admin.ai.assistant.responseLength') }}</FormLabel>
+          <FormLabel>{{ i18n._('Response length') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
@@ -94,8 +94,8 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem v-for="length in responseLengths" :key="length" :value="length">
-                    {{ t(`admin.ai.assistant.responseLengthOption.${length}`) }}
+                  <SelectItem v-for="(label, length) in responseLengths" :key="length" :value="length">
+                    {{ label }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -107,11 +107,11 @@
 
       <FormField v-slot="{ componentField }" name="max_turns">
         <FormItem>
-          <FormLabel>{{ t('admin.ai.assistant.maxTurns') }}</FormLabel>
+          <FormLabel>{{ i18n._('Max turns') }}</FormLabel>
           <FormControl>
             <Input type="number" min="1" max="20" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ t('admin.ai.assistant.maxTurnsHint') }}</FormDescription>
+          <FormDescription>{{ i18n._('Number of back-and-forth replies before the assistant hands off. Between 1 and 20.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -119,17 +119,17 @@
 
     <FormField v-slot="{ componentField, handleChange }" name="languages">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.language', 2) }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Language', 'Languages', 2) }}</FormLabel>
         <FormControl>
           <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
             <TagsInputItem v-for="item in componentField.modelValue" :key="item" :value="item">
               <TagsInputItemText />
               <TagsInputItemDelete />
             </TagsInputItem>
-            <TagsInputInput :placeholder="t('admin.ai.assistant.languagesPlaceholder')" />
+            <TagsInputInput :placeholder="i18n._('Type a language and press Enter')" />
           </TagsInput>
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.languagesHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Languages the assistant is allowed to reply in. It uses the customer\'\'s language when it is one of these; otherwise it replies in the first one. Leave empty to always match the customer\'\'s language.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -137,8 +137,8 @@
     <FormField v-slot="{ componentField, handleChange, meta }" name="citations_enabled">
       <FormItem>
         <SwitchField
-          :title="t('admin.ai.assistant.includeArticleReferences')"
-          :description="t('admin.ai.assistant.includeArticleReferencesHint')"
+          :title="i18n._('Include article references')"
+          :description="i18n._('Link to public help center articles used in chat and email replies. Private knowledge snippets are never listed.')"
           :checked="componentField.modelValue"
           @update:checked="(value) => handleChange(value, meta.validated)"
         />
@@ -148,8 +148,8 @@
     <FormField v-slot="{ componentField, handleChange }" name="handoff_enabled">
       <FormItem>
         <SwitchField
-          :title="t('admin.ai.assistant.offerHandoff')"
-          :description="t('admin.ai.assistant.offerHandoffHint')"
+          :title="i18n._('Offer handoff to a human')"
+          :description="i18n._('When off, the assistant never offers to connect the customer with a human agent and tells them it cannot help with questions outside its knowledge.')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -158,7 +158,7 @@
 
     <FormField v-slot="{ componentField }" name="fallback_team_id">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.assistant.fallbackTeam') }}</FormLabel>
+        <FormLabel>{{ i18n._('Fallback team') }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger>
@@ -166,7 +166,7 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="none">{{ t('globals.terms.none') }}</SelectItem>
+                <SelectItem value="none">{{ i18n.pgettext('No assigned team', 'None') }}</SelectItem>
                 <SelectItem v-for="team in teams" :key="team.id" :value="String(team.id)">
                   {{ team.name }}
                 </SelectItem>
@@ -174,44 +174,44 @@
             </SelectContent>
           </Select>
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.fallbackTeamHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Team the conversation is handed off to when the assistant cannot help.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="instructions">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.assistant.instructions') }}</FormLabel>
+        <FormLabel>{{ i18n._('Instructions') }}</FormLabel>
         <FormControl>
           <Textarea
             rows="6"
-            :placeholder="t('admin.ai.assistant.instructionsPlaceholder')"
+            :placeholder="i18n._('Always confirm the order ID before looking anything up. Keep replies under 3 sentences.')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.instructionsHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Custom system prompt that guides how this assistant responds.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="guardrails">
       <FormItem>
-        <FormLabel>{{ t('admin.ai.assistant.guardrails') }}</FormLabel>
+        <FormLabel>{{ i18n._('Guardrails') }}</FormLabel>
         <FormControl>
           <Textarea
             rows="6"
-            :placeholder="t('admin.ai.assistant.guardrailsPlaceholder')"
+            :placeholder="i18n._('Never issue a refund without a human agent\'\'s approval. Never share other customers\'\' order details.')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.assistant.guardrailsHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Rules the assistant must never break.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <div class="space-y-2">
-      <div class="text-sm font-medium leading-none">{{ t('admin.ai.assistant.tools') }}</div>
-      <p class="ui-description">{{ t('admin.ai.assistant.toolsHint') }}</p>
+      <div class="text-sm font-medium leading-none">{{ i18n._('Tools') }}</div>
+      <p class="ui-description">{{ i18n._('Tools this assistant is allowed to call. It can only use the ones you grant here. Knowledge snippets are shared across all assistants automatically.') }}</p>
       <div class="space-y-3 mt-3">
         <div v-for="tool in tools" :key="tool.id" class="flex items-center space-x-2">
           <Checkbox
@@ -224,14 +224,14 @@
           </label>
         </div>
         <p v-if="!tools.length" class="ui-description">
-          {{ t('admin.ai.assistant.toolsEmpty') }}
+          {{ i18n._('No tools yet. Create tools under AI to grant them here.') }}
         </p>
       </div>
     </div>
 
     <div class="flex justify-end mt-10">
       <Button type="submit" :isLoading="formLoading">
-        {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
+        {{ isEditing ? i18n._('Save') : i18n._('Create') }}
       </Button>
     </div>
   </form>
@@ -275,11 +275,20 @@ import {
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
-const tones = ['friendly', 'professional', 'neutral', 'casual']
-const responseLengths = ['concise', 'balanced', 'detailed']
+const tones = computed(() => ({
+  friendly: i18n._('Friendly'),
+  professional: i18n._('Professional'),
+  neutral: i18n._('Neutral'),
+  casual: i18n._('Casual')
+}))
+const responseLengths = computed(() => ({
+  concise: i18n._('Concise'),
+  balanced: i18n._('Balanced'),
+  detailed: i18n._('Detailed')
+}))
 
 const props = defineProps({
   initialValues: { type: Object, default: () => ({}) },
@@ -287,7 +296,7 @@ const props = defineProps({
   submitForm: { type: Function, required: true }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const formLoading = ref(false)
 const tools = ref([])
@@ -318,8 +327,8 @@ const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
       name: z
-        .string({ required_error: t('globals.messages.required') })
-        .min(1, { message: t('globals.messages.required') }),
+        .string({ required_error: i18n._('{name} Required') })
+        .min(1, { message: i18n._('{name} Required') }),
       description: z.string().optional(),
       expectation: z.string().optional(),
       tone: z.string().optional(),
@@ -327,8 +336,8 @@ const form = useForm({
       max_turns: z.coerce
         .number()
         .int()
-        .min(1, { message: t('admin.ai.assistant.maxTurnsHint') })
-        .max(20, { message: t('admin.ai.assistant.maxTurnsHint') }),
+        .min(1, { message: i18n._('Number of back-and-forth replies before the assistant hands off. Between 1 and 20.') })
+        .max(20, { message: i18n._('Number of back-and-forth replies before the assistant hands off. Between 1 and 20.') }),
       fallback_team_id: z.string().optional(),
       handoff_enabled: z.boolean().optional(),
       citations_enabled: z.boolean().optional(),

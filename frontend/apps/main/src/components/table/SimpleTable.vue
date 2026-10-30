@@ -37,7 +37,7 @@
             <td :colspan="headers.length + (showDelete ? 1 : 0)" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center space-y-4">
                 <span class="text-md text-muted-foreground">
-                  {{ $t('globals.messages.noResultsFound') }}
+                  {{ i18n._('No results found') }}
                 </span>
               </div>
             </td>

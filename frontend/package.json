@@ -22,6 +22,8 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@lingui/core": "6.10.1",
+    "@lingui/message-utils": "6.10.1",
     "@codemirror/lang-html": "^6.4.9",
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/state": "^6.5.2",
@@ -70,7 +72,6 @@
     "vee-validate": "^4.15.0",
     "vue": "^3.5.44",
     "vue-easy-lightbox": "^1.19.0",
-    "vue-i18n": "^9.14.5",
     "vue-letter": "^0.2.1",
     "vue-picture-cropper": "^0.7.0",
     "vue-router": "^4.5.0",
@@ -80,6 +81,13 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@lingui/babel-plugin-lingui-macro": "6.10.1",
+    "@lingui/cli": "6.10.1",
+    "@lingui/conf": "6.10.1",
+    "@lingui/extractor-vue": "6.10.1",
+    "@lingui/format-po-gettext": "6.10.1",
+    "pofile": "^1.1.4",
     "@rushstack/eslint-patch": "^1.10.5",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/eslint-config-prettier": "^8.0.0",
@@ -101,6 +109,6 @@
   },
   "packageManager": "pnpm@11.28.8",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.0.0"
   }
 }

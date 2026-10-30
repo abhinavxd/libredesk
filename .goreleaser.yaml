@@ -8,6 +8,7 @@ before:
   hooks:
     - go mod tidy
     - make frontend-build
+    - make i18n-compile
 
 builds:
   - id: "universal"

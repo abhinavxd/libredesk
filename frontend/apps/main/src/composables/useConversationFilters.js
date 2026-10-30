@@ -1,17 +1,19 @@
+
+
 import { computed } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useInboxStore } from '@/stores/inbox'
 import { useSlaStore } from '@/stores/sla'
 import { useCustomAttributeStore } from '@/stores/customAttributes'
 import { FIELD_TYPE, FIELD_OPERATORS } from '@/constants/filterConfig'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 export function useConversationFilters () {
     const cStore = useConversationStore()
     const iStore = useInboxStore()
     const slaStore = useSlaStore()
     const customAttributeStore = useCustomAttributeStore()
-    const { t } = useI18n()
+    const i18n = useI18n()
 
     const customAttributeDataTypeToFieldType = {
         'text': FIELD_TYPE.TEXT,
@@ -33,105 +35,105 @@ export function useConversationFilters () {
 
     const conversationsListFilters = computed(() => ({
         status_id: {
-            label: t('globals.terms.status'),
+            label: i18n._('{count, plural, one {Status} other {Statuses}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.statusOptions
         },
         priority_id: {
-            label: t('globals.terms.priority'),
+            label: i18n._('{count, plural, one {Priority} other {Priorities}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.priorityOptions
         },
         assigned_team_id: {
-            label: t('actions.assignTeam'),
+            label: i18n._('Assign team'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'team'
         },
         assigned_user_id: {
-            label: t('actions.assignAgent'),
+            label: i18n._('Assign agent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
         inbox_id: {
-            label: t('globals.terms.inbox'),
+            label: i18n._('{count, plural, one {Inbox} other {Inboxes}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
         },
         tags: {
-            label: t('globals.terms.tag', 2),
+            label: i18n._('{count, plural, one {Tag} other {Tags}}', 2),
             type: FIELD_TYPE.MULTI_SELECT,
             operators: FIELD_OPERATORS.MULTI_SELECT,
             entity: 'tag'
         },
         created_at: {
-            label: t('globals.terms.createdAt'),
+            label: i18n._('Created at'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         waiting_since: {
-            label: t('globals.terms.waitingSince'),
+            label: i18n._('Waiting since'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         snoozed_until: {
-            label: t('globals.terms.snoozedUntil'),
+            label: i18n._('Snoozed until'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         last_message_at: {
-            label: t('globals.terms.lastMessageAt'),
+            label: i18n._('Last message at'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         last_interaction_at: {
-            label: t('globals.terms.lastInteractionAt'),
+            label: i18n._('Last interaction at'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         next_sla_deadline_at: {
-            label: t('globals.terms.nextSlaDeadline'),
+            label: i18n._('Next SLA deadline'),
             type: FIELD_TYPE.DATE,
             operators: FIELD_OPERATORS.DATE
         },
         email: {
-            label: t('globals.terms.contactEmail'),
+            label: i18n._('Contact email'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT,
             model: 'users'
         },
         external_user_id: {
-            label: t('globals.terms.contactExternalId'),
+            label: i18n._('Contact external ID'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT_EXACT,
             model: 'users'
         },
         last_interaction_sender: {
-            label: t('globals.terms.lastInteractionBy'),
+            label: i18n._('Last interaction by'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [
-                { label: t('globals.terms.contact'), value: 'contact' },
-                { label: t('globals.terms.agent'), value: 'agent' }
+                { label: i18n._('{count, plural, one {Contact} other {Contacts}}'), value: 'contact' },
+                { label: i18n._('{count, plural, one {Agent} other {Agents}}'), value: 'agent' }
             ]
         },
         sla_policy_id: {
-            label: t('globals.terms.slaPolicy'),
+            label: i18n._('{count, plural, one {SLA policy} other {SLA policies}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: slaStore.options
         },
         channel: {
-            label: t('globals.terms.channel'),
+            label: i18n._('Channel'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [
-                { label: t('globals.terms.email'), value: 'email' },
-                { label: t('globals.terms.liveChat'), value: 'livechat' }
+                { label: i18n.ngettext('Email', 'Emails', 1, {}, 'Communication channel'), value: 'email' },
+                { label: i18n._('Live Chat'), value: 'livechat' }
             ],
             model: 'inboxes'
         }
@@ -157,53 +159,53 @@ export function useConversationFilters () {
 
     const newConversationFilters = computed(() => ({
         contact_email: {
-            label: t('globals.terms.email'),
+            label: i18n._('{count, plural, one {Email} other {Emails}}'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT_AUTOMATION
         },
         to: {
-            label: t('globals.terms.toEmailAddress'),
+            label: i18n._('{count, plural, one {To email address} other {To email addresses}}'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT
         },
         content: {
-            label: t('globals.terms.content'),
+            label: i18n._('{count, plural, one {Content} other {Contents}}'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT_AUTOMATION,
             allowCaseSensitive: true
         },
         subject: {
-            label: t('globals.terms.subject'),
+            label: i18n._('{count, plural, one {Subject} other {Subjects}}'),
             type: FIELD_TYPE.TEXT,
             operators: FIELD_OPERATORS.TEXT_AUTOMATION,
             allowCaseSensitive: true
         },
         status: {
-            label: t('globals.terms.status'),
+            label: i18n._('{count, plural, one {Status} other {Statuses}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.statusOptions
         },
         priority: {
-            label: t('globals.terms.priority'),
+            label: i18n._('{count, plural, one {Priority} other {Priorities}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.priorityOptions
         },
         assigned_team: {
-            label: t('actions.assignTeam'),
+            label: i18n._('Assign team'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'team'
         },
         assigned_user: {
-            label: t('actions.assignAgent'),
+            label: i18n._('Assign agent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
         inbox: {
-            label: t('globals.terms.inbox'),
+            label: i18n._('{count, plural, one {Inbox} other {Inboxes}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
@@ -212,80 +214,80 @@ export function useConversationFilters () {
 
     const conversationFilters = computed(() => ({
         status: {
-            label: t('globals.terms.status'),
+            label: i18n._('{count, plural, one {Status} other {Statuses}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.statusOptions
         },
         priority: {
-            label: t('globals.terms.priority'),
+            label: i18n._('{count, plural, one {Priority} other {Priorities}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.priorityOptions
         },
         assigned_team: {
-            label: t('actions.assignTeam'),
+            label: i18n._('Assign team'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'team'
         },
         assigned_user: {
-            label: t('actions.assignAgent'),
+            label: i18n._('Assign agent'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
         hours_since_created: {
-            label: t('globals.messages.hoursSinceCreated'),
+            label: i18n._('Hours since created'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
         hours_since_first_reply: {
-            label: t('globals.messages.hoursSinceFirstReply'),
+            label: i18n._('Hours since first reply'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
         hours_since_last_reply: {
-            label: t('globals.messages.hoursSinceLastReply'),
+            label: i18n._('Hours since last reply'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
         hours_since_resolved: {
-            label: t('globals.messages.hoursSinceResolved'),
+            label: i18n._('Hours since resolved'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
         hours_since_last_resolved: {
-            label: t('globals.messages.hoursSinceLastResolved'),
+            label: i18n._('Hours since last resolved'),
             type: FIELD_TYPE.NUMBER,
             operators: FIELD_OPERATORS.NUMBER
         },
         inbox: {
-            label: t('globals.terms.inbox'),
+            label: i18n._('{count, plural, one {Inbox} other {Inboxes}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: iStore.options
         },
         previous_status: {
-            label: t('admin.automation.previousStatus'),
+            label: i18n._('Previous status'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.statusOptions
         },
         previous_priority: {
-            label: t('admin.automation.previousPriority'),
+            label: i18n._('Previous priority'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: cStore.priorityOptions
         },
         previous_assigned_user: {
-            label: t('admin.automation.previousAssignedUser'),
+            label: i18n._('Previous assigned user'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
         previous_assigned_team: {
-            label: t('admin.automation.previousAssignedTeam'),
+            label: i18n._('Previous assigned team'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'team'
@@ -294,98 +296,98 @@ export function useConversationFilters () {
 
     const conversationActions = computed(() => ({
         assign_team: {
-            label: t('actions.assignTeam'),
+            label: i18n._('Assign team'),
             type: FIELD_TYPE.SELECT,
             entity: 'team'
         },
         assign_user: {
-            label: t('actions.assignAgent'),
+            label: i18n._('Assign agent'),
             type: FIELD_TYPE.SELECT,
             entity: 'agent'
         },
         set_status: {
-            label: t('actions.setStatus'),
+            label: i18n._('Set status'),
             type: FIELD_TYPE.SELECT,
             options: cStore.statusOptionsNoSnooze
         },
         set_priority: {
-            label: t('actions.setPriority'),
+            label: i18n._('Set priority'),
             type: FIELD_TYPE.SELECT,
             options: cStore.priorityOptions
         },
         send_private_note: {
-            label: t('actions.addPrivateNote'),
+            label: i18n._('Add private note'),
             type: FIELD_TYPE.RICHTEXT
         },
         send_reply: {
-            label: t('actions.sendReply'),
+            label: i18n._('Send reply'),
             type: FIELD_TYPE.RICHTEXT
         },
         send_csat: {
-            label: t('actions.sendCsat'),
+            label: i18n._('Send CSAT'),
         },
         set_sla: {
-            label: t('actions.setSla'),
+            label: i18n._('Set SLA'),
             type: FIELD_TYPE.SELECT,
             options: slaStore.options
         },
         add_tags: {
-            label: t('actions.addTags'),
+            label: i18n._('Add tags'),
             type: FIELD_TYPE.TAG
         },
         set_tags: {
-            label: t('actions.setTags'),
+            label: i18n._('Set tags'),
             type: FIELD_TYPE.TAG
         },
         remove_tags: {
-            label: t('actions.removeTags'),
+            label: i18n._('Remove tags'),
             type: FIELD_TYPE.TAG
         },
         notify: {
-            label: t('actions.notify'),
+            label: i18n._('Notify agents'),
             type: FIELD_TYPE.RECIPIENTS
         },
         snooze: {
-            label: t('globals.terms.snooze'),
+            label: i18n._('Snooze'),
             type: FIELD_TYPE.TEXT
         },
         trigger_webhook: {
-            label: t('actions.triggerWebhook'),
+            label: i18n._('Trigger webhook'),
             type: FIELD_TYPE.WEBHOOK
         }
     }))
 
     const macroActions = computed(() => ({
         assign_team: {
-            label: t('actions.assignTeam'),
+            label: i18n._('Assign team'),
             type: FIELD_TYPE.SELECT,
             entity: 'team'
         },
         assign_user: {
-            label: t('actions.assignAgent'),
+            label: i18n._('Assign agent'),
             type: FIELD_TYPE.SELECT,
             entity: 'agent'
         },
         set_status: {
-            label: t('actions.setStatus'),
+            label: i18n._('Set status'),
             type: FIELD_TYPE.SELECT,
             options: cStore.statusOptionsNoSnooze
         },
         set_priority: {
-            label: t('actions.setPriority'),
+            label: i18n._('Set priority'),
             type: FIELD_TYPE.SELECT,
             options: cStore.priorityOptions
         },
         add_tags: {
-            label: t('actions.addTags'),
+            label: i18n._('Add tags'),
             type: FIELD_TYPE.TAG
         },
         set_tags: {
-            label: t('actions.setTags'),
+            label: i18n._('Set tags'),
             type: FIELD_TYPE.TAG
         },
         remove_tags: {
-            label: t('actions.removeTags'),
+            label: i18n._('Remove tags'),
             type: FIELD_TYPE.TAG
         }
     }))

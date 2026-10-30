@@ -18,15 +18,15 @@ import (
 func TestProviderErrorKeepsTransportDetailsPrivate(t *testing.T) {
 	translations := testutil.NewI18n(t)
 	for _, tc := range []struct {
-		name string
-		err  error
-		key  string
-		logs bool
+		name    string
+		err     error
+		message string
+		logs    bool
 	}{
-		{name: "canceled", err: context.Canceled, key: "ai.providerUnavailable"},
-		{name: "wrapped cancellation", err: fmt.Errorf("%w: POST https://private-provider.example: %w", ErrProviderUnavailable, context.Canceled), key: "ai.providerUnavailable"},
-		{name: "unavailable", err: fmt.Errorf("%w: private transport details", ErrProviderUnavailable), key: "ai.providerUnavailable", logs: true},
-		{name: "timeout", err: fmt.Errorf("%w: %w", ErrProviderUnavailable, context.DeadlineExceeded), key: "ai.providerTimeout", logs: true},
+		{name: "canceled", err: context.Canceled, message: "The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."},
+		{name: "wrapped cancellation", err: fmt.Errorf("%w: POST https://private-provider.example: %w", ErrProviderUnavailable, context.Canceled), message: "The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."},
+		{name: "unavailable", err: fmt.Errorf("%w: private transport details", ErrProviderUnavailable), message: "The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings.", logs: true},
+		{name: "timeout", err: fmt.Errorf("%w: %w", ErrProviderUnavailable, context.DeadlineExceeded), message: "The AI provider took too long to respond. Try again, or with a shorter request.", logs: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var logs bytes.Buffer
@@ -34,7 +34,7 @@ func TestProviderErrorKeepsTransportDetailsPrivate(t *testing.T) {
 			manager := &Manager{i18n: translations, lo: &logger}
 			err := manager.providerError(tc.err)
 			response, ok := err.(envelope.Error)
-			if !ok || response.Message != translations.T(tc.key) || response.ErrorType != envelope.GeneralError {
+			if !ok || response.Message != tc.message || response.ErrorType != envelope.GeneralError {
 				t.Fatalf("unexpected provider error response: %v", err)
 			}
 			if got := strings.Contains(logs.String(), "level=error"); got != tc.logs {

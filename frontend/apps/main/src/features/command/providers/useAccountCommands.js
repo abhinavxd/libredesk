@@ -1,5 +1,9 @@
+const awayMessage = msg({ message: "Away", context: "Conversation navigation" })
+import { defineMessage as msg } from '@lingui/core/macro'
+
+
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useColorMode } from '@vueuse/core'
 import {
   CircleCheck,
@@ -18,7 +22,7 @@ import { SECTIONS } from '@main/features/command/sections'
 const AWAY_STATUSES = ['away_manual', 'away_and_reassigning']
 
 export function useAccountCommands() {
-  const { t } = useI18n()
+  const i18n = useI18n()
   const mode = useColorMode()
   const userStore = useUserStore()
   const shortcutsDialog = useKeyboardShortcutsDialog()
@@ -33,8 +37,8 @@ export function useAccountCommands() {
     return [
       {
         id: 'account.theme',
-        label: t(isDark ? 'command.switchToLightMode' : 'command.switchToDarkMode'),
-        keywords: [t('navigation.darkMode'), 'theme'],
+        label: isDark ? i18n._('Switch to light mode') : i18n._('Switch to dark mode'),
+        keywords: [i18n._('Dark Mode'), 'theme'],
         section: SECTIONS.ACCOUNT,
         icon: isDark ? Sun : Moon,
         run: () => {
@@ -43,16 +47,16 @@ export function useAccountCommands() {
       },
       {
         id: 'account.availability',
-        label: t(isAway ? 'command.setOnline' : 'command.setAway'),
-        keywords: [t('navigation.away'), t('globals.terms.online'), t('globals.terms.status')],
+        label: isAway ? i18n._('Set status to online') : i18n._('Set status to away'),
+        keywords: [i18n._(awayMessage), i18n._('{count, plural, one {Online} other {Online}}'), i18n._('{count, plural, one {Status} other {Statuses}}')],
         section: SECTIONS.ACCOUNT,
         icon: isAway ? CircleCheck : Clock,
         run: () => userStore.updateUserAvailability(isAway ? 'online' : 'away_manual')
       },
       {
         id: 'account.reassign',
-        label: t(isReassigning ? 'command.disableReassignReplies' : 'command.enableReassignReplies'),
-        keywords: [t('navigation.reassignReplies'), t('navigation.away')],
+        label: isReassigning ? i18n._('Disable reassign replies') : i18n._('Enable reassign replies'),
+        keywords: [i18n._('Reassign replies'), i18n._(awayMessage)],
         section: SECTIONS.ACCOUNT,
         icon: UserRoundCog,
         run: () =>
@@ -60,7 +64,7 @@ export function useAccountCommands() {
       },
       {
         id: 'account.shortcuts',
-        label: t('navigation.keyboardShortcuts'),
+        label: i18n._('Keyboard shortcuts'),
         section: SECTIONS.ACCOUNT,
         icon: Keyboard,
         shortcut: ['Ctrl', '/'],
@@ -68,7 +72,7 @@ export function useAccountCommands() {
       },
       {
         id: 'account.logout',
-        label: t('navigation.logout'),
+        label: i18n._('Logout'),
         keywords: ['sign out'],
         section: SECTIONS.ACCOUNT,
         icon: LogOut,

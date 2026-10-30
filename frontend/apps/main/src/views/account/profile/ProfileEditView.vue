@@ -2,13 +2,13 @@
   <div class="h-full">
     <div class="flex flex-col space-y-5">
       <div class="space-y-1">
-        <span class="sub-title">{{ $t('account.publicAvatar') }}</span>
-        <p class="text-muted-foreground text-xs">{{ $t('account.changeAvatar') }}</p>
+        <span class="sub-title">{{ i18n._('Public avatar') }}</span>
+        <p class="text-muted-foreground text-xs">{{ i18n._('Change your avatar here.') }}</p>
       </div>
       <AvatarUpload
         :src="userStore.avatar"
         :initials="userStore.getInitials"
-        :label="$t('globals.messages.upload')"
+        :label="i18n._('Upload')"
         :disabled="isSaving"
         @upload="onCropped"
         @remove="removeAvatar"
@@ -20,7 +20,7 @@
         :isLoading="isSaving"
         :disabled="!pendingFile"
       >
-        {{ $t('globals.messages.saveChanges') }}
+        {{ i18n._('Save changes') }}
       </Button>
     </div>
   </div>
@@ -34,11 +34,11 @@ import { ref } from 'vue'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '../../../api'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const isSaving = ref(false)
 const userStore = useUserStore()
 const pendingFile = ref(null)
@@ -58,7 +58,7 @@ const saveUser = async () => {
     await api.updateCurrentUser(formData)
     pendingFile.value = null
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -77,7 +77,7 @@ const removeAvatar = async () => {
     pendingFile.value = null
     userStore.clearAvatar()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('account.avatarRemoved')
+      description: i18n._('Avatar removed')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

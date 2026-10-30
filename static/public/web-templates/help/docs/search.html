@@ -3,12 +3,12 @@
 
 <form class="hcd-page-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search">
     {{ template "hc-search-icon" "hc-search-icon" }}
-    <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
-    <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+    <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ .L.GetD "templates" "Search articles..." }}" aria-label="{{ .L.GetD "templates" "Search articles..." }}" autocomplete="off" />
+    <button type="submit" class="hc-sr-only">{{ .L.GetD "templates" "Search" }}</button>
 </form>
 
 {{ if .Data.Query }}
-<h1 class="hcd-page-title">{{ .L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
+<h1 class="hcd-page-title">{{ .L.GetD "templates" "Results for" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
 {{ if .Data.Results }}
 <ul class="hcd-results">
     {{ range .Data.Results }}
@@ -19,11 +19,11 @@
     {{ end }}
 </ul>
 {{ else }}
-<p class="hcd-empty">{{ .L.T "helpCenter.noResults" }}</p>
+<p class="hcd-empty">{{ .L.GetD "templates" "No articles matched your search. Try fewer or different words." }}</p>
 {{ end }}
 {{ else }}
-<h1 class="hcd-page-title">{{ .L.T "globals.terms.search" }}</h1>
-<p class="hcd-empty">{{ .L.T "globals.messages.startTypingToSearch" }}</p>
+<h1 class="hcd-page-title">{{ .L.GetD "templates" "Search" }}</h1>
+<p class="hcd-empty">{{ .L.GetD "templates" "Start typing to search..." }}</p>
 {{ end }}
 
 {{ template "docs-footer" . }}

@@ -10,7 +10,7 @@
       </LoadingOverlay>
     </template>
     <template #help>
-      <p>{{ $t('admin.general.help') }}</p>
+      <p>{{ i18n._('These are your desk-wide defaults. Team-level settings will override these where configured.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>

@@ -1,6 +1,10 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
+
+
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   CalendarClock,
   CheckCircle2,
@@ -40,14 +44,14 @@ export const SNOOZE_COMMAND = 'conv.snooze'
 export const SNOOZE_CUSTOM_COMMAND = 'conv.snooze.custom'
 
 const SNOOZE_PRESETS = [
-  { minutes: 60, unitKey: 'globals.terms.hour', count: 1 },
-  { minutes: 180, unitKey: 'globals.terms.hour', count: 3 },
-  { minutes: 360, unitKey: 'globals.terms.hour', count: 6 },
-  { minutes: 720, unitKey: 'globals.terms.hour', count: 12 },
-  { minutes: 1440, unitKey: 'globals.terms.day', count: 1 },
-  { minutes: 2880, unitKey: 'globals.terms.day', count: 2 },
-  { minutes: 4320, unitKey: 'globals.terms.day', count: 3 },
-  { minutes: 10080, unitKey: 'globals.terms.week', count: 1 }
+  { minutes: 60, unitMessage: msg({ message: '{count, plural, one {Hour} other {Hours}}' }), count: 1 },
+  { minutes: 180, unitMessage: msg({ message: '{count, plural, one {Hour} other {Hours}}' }), count: 3 },
+  { minutes: 360, unitMessage: msg({ message: '{count, plural, one {Hour} other {Hours}}' }), count: 6 },
+  { minutes: 720, unitMessage: msg({ message: '{count, plural, one {Hour} other {Hours}}' }), count: 12 },
+  { minutes: 1440, unitMessage: msg({ message: '{count, plural, one {Day} other {Days}}' }), count: 1 },
+  { minutes: 2880, unitMessage: msg({ message: '{count, plural, one {Day} other {Days}}' }), count: 2 },
+  { minutes: 4320, unitMessage: msg({ message: '{count, plural, one {Day} other {Days}}' }), count: 3 },
+  { minutes: 10080, unitMessage: msg({ message: '{count, plural, one {Week} other {Weeks}}' }), count: 1 }
 ]
 
 const REOPENABLE_STATUSES = [
@@ -61,7 +65,7 @@ export const formatSnoozeDuration = (minutes) =>
 
 export function useConversationCommands({ openSnoozeDatePicker }) {
   const router = useRouter()
-  const { t } = useI18n()
+  const i18n = useI18n()
   const emitter = useEmitter()
   const conversationStore = useConversationStore()
   const userStore = useUserStore()
@@ -74,24 +78,24 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
   const snoozeCommands = () => [
     {
       id: SNOOZE_COMMAND,
-      label: t('globals.terms.snooze'),
+      label: i18n._('Snooze'),
       section,
       icon: CalendarClock,
       permission: perms.CONVERSATIONS_UPDATE_STATUS,
       group: true,
       shortcut: ['Alt', 'Z'],
-      placeholder: t('command.snoozeFor')
+      placeholder: i18n._('Snooze for')
     },
-    ...SNOOZE_PRESETS.map(({ minutes, unitKey, count }) => ({
+    ...SNOOZE_PRESETS.map(({ minutes, unitMessage, count }) => ({
       id: `conv.snooze.${minutes}`,
-      label: `${count} ${t(unitKey, count)}`,
+      label: `${count} ${i18n._(unitMessage, count)}`,
       parent: SNOOZE_COMMAND,
       icon: CalendarClock,
       run: () => conversationStore.snoozeConversation(formatSnoozeDuration(minutes))
     })),
     {
       id: SNOOZE_CUSTOM_COMMAND,
-      label: t('globals.messages.pickDateAndTime'),
+      label: i18n._('Pick date and time'),
       parent: SNOOZE_COMMAND,
       icon: CalendarClock,
       run: openSnoozeDatePicker
@@ -104,7 +108,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     if (current !== CONVERSATION_DEFAULT_STATUSES.RESOLVED) {
       commands.push({
         id: 'conv.resolve',
-        label: t('globals.terms.resolve'),
+        label: i18n._('Resolve'),
         keywords: ['close', 'done'],
         section,
         icon: CheckCircle2,
@@ -116,8 +120,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     if (REOPENABLE_STATUSES.includes(current)) {
       commands.push({
         id: 'conv.reopen',
-        label: t('globals.terms.reopen'),
-        keywords: [t('globals.terms.open')],
+        label: i18n._('Reopen'),
+        keywords: [i18n._('Open')],
         section,
         icon: RotateCcw,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
@@ -128,8 +132,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     commands.push(...snoozeCommands())
     commands.push({
       id: 'conv.status',
-      label: t('actions.setStatus'),
-      keywords: [t('globals.terms.status')],
+      label: i18n._('Set status'),
+      keywords: [i18n._('{count, plural, one {Status} other {Statuses}}')],
       section,
       icon: CircleDot,
       permission: perms.CONVERSATIONS_UPDATE_STATUS,
@@ -153,8 +157,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
   const priorityCommands = (conv) => [
     {
       id: 'conv.priority',
-      label: t('actions.setPriority'),
-      keywords: [t('globals.terms.priority')],
+      label: i18n._('Set priority'),
+      keywords: [i18n._('{count, plural, one {Priority} other {Priorities}}')],
       section,
       icon: Flag,
       permission: perms.CONVERSATIONS_UPDATE_PRIORITY,
@@ -186,7 +190,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     if (conv.assigned_user_id !== userStore.userID) {
       commands.push({
         id: 'conv.assign-me',
-        label: t('conversation.assignSelfAction'),
+        label: i18n._('Assign to me'),
         keywords: ['self', 'me'],
         section,
         icon: UserCheck,
@@ -196,14 +200,14 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     }
     commands.push({
       id: 'conv.assign-agent',
-      label: t('actions.assignAgent'),
-      keywords: [t('globals.terms.agent')],
+      label: i18n._('Assign agent'),
+      keywords: [i18n._('{count, plural, one {Agent} other {Agents}}')],
       section,
       icon: UserPlus,
       permission: perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE,
       group: true,
       shortcut: ['Alt', 'A'],
-      placeholder: t('command.searchAgents'),
+      placeholder: i18n._('Search agents...'),
       search: async (term) =>
         (await usersStore.searchUsers(term))
           .filter((agent) => String(agent.value) !== String(conv.assigned_user_id))
@@ -218,8 +222,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     if (conv.assigned_user_id) {
       commands.push({
         id: 'conv.unassign-agent',
-        label: t('command.unassignAgent'),
-        keywords: [t('globals.terms.agent'), 'remove'],
+        label: i18n._('Unassign agent'),
+        keywords: [i18n._('{count, plural, one {Agent} other {Agents}}'), 'remove'],
         section,
         icon: UserX,
         permission: perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE,
@@ -233,13 +237,13 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     const commands = [
       {
         id: 'conv.assign-team',
-        label: t('actions.assignTeam'),
-        keywords: [t('globals.terms.team')],
+        label: i18n._('Assign team'),
+        keywords: [i18n._('{count, plural, one {Team} other {Teams}}')],
         section,
         icon: Users,
         permission: perms.CONVERSATIONS_UPDATE_TEAM_ASSIGNEE,
         group: true,
-        placeholder: t('command.searchTeams'),
+        placeholder: i18n._('Search teams...'),
         search: async (term) =>
           (await teamStore.searchTeams(term))
             .filter((team) => String(team.value) !== String(conv.assigned_team_id))
@@ -254,8 +258,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       },
       {
         id: 'conv.suggest-tags',
-        label: t('conversation.sidebar.suggestTags'),
-        keywords: ['ai', t('globals.terms.tag')],
+        label: i18n._('Suggest tags'),
+        keywords: ['ai', i18n._('{count, plural, one {Tag} other {Tags}}')],
         section,
         icon: Sparkles,
         permission: perms.CONVERSATIONS_UPDATE_TAGS,
@@ -266,8 +270,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     if (conv.assigned_team_id) {
       commands.push({
         id: 'conv.unassign-team',
-        label: t('command.unassignTeam'),
-        keywords: [t('globals.terms.team'), 'remove'],
+        label: i18n._('Unassign team'),
+        keywords: [i18n._('{count, plural, one {Team} other {Teams}}'), 'remove'],
         section,
         icon: UserX,
         permission: perms.CONVERSATIONS_UPDATE_TEAM_ASSIGNEE,
@@ -282,13 +286,13 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     const commands = [
       {
         id: 'conv.add-tag',
-        label: t('actions.addTags'),
-        keywords: [t('globals.terms.tag')],
+        label: i18n._('Add tags'),
+        keywords: [i18n._('{count, plural, one {Tag} other {Tags}}')],
         section,
         icon: Tag,
         permission: perms.CONVERSATIONS_UPDATE_TAGS,
         group: true,
-        placeholder: t('command.searchTags'),
+        placeholder: i18n._('Search tags...'),
         search: async (term) =>
           (await tagStore.searchTagNames(term))
             .filter((tag) => !currentTags.includes(tag.value))
@@ -306,8 +310,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       commands.push(
         {
           id: 'conv.remove-tag',
-          label: t('actions.removeTags'),
-          keywords: [t('globals.terms.tag')],
+          label: i18n._('Remove tags'),
+          keywords: [i18n._('{count, plural, one {Tag} other {Tags}}')],
           section,
           icon: Tag,
           permission: perms.CONVERSATIONS_UPDATE_TAGS,
@@ -328,8 +332,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
   const composeCommands = () => [
     {
       id: 'conv.reply',
-      label: t('command.switchToReply'),
-      keywords: [t('globals.terms.reply')],
+      label: i18n._('Switch to reply'),
+      keywords: [i18n._('{count, plural, one {Reply} other {Replies}}')],
       section,
       icon: MessageSquare,
       permission: perms.MESSAGES_WRITE,
@@ -338,8 +342,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     },
     {
       id: 'conv.private-note',
-      label: t('command.switchToPrivateNote'),
-      keywords: [t('globals.terms.privateNote'), t('globals.terms.note')],
+      label: i18n._('Switch to private note'),
+      keywords: [i18n._('{count, plural, one {Private note} other {Private notes}}'), i18n._('{count, plural, one {Note} other {Notes}}')],
       section,
       icon: StickyNote,
       permission: perms.MESSAGES_WRITE_PRIVATE,
@@ -348,8 +352,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     },
     {
       id: 'conv.focus-reply',
-      label: t('command.focusReplyBox'),
-      keywords: [t('globals.terms.reply'), 'editor', 'compose'],
+      label: i18n._('Focus reply box'),
+      keywords: [i18n._('{count, plural, one {Reply} other {Replies}}'), 'editor', 'compose'],
       section,
       icon: PenLine,
       permission: [perms.MESSAGES_WRITE, perms.MESSAGES_WRITE_PRIVATE],
@@ -359,14 +363,14 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(window.location.href)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.copied') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: i18n._('Copied to clipboard') })
   }
 
   const miscCommands = (conv) => [
     {
       id: 'conv.macro',
-      label: t('actions.applyMacro'),
-      keywords: [t('globals.terms.macro')],
+      label: i18n._('Apply macro'),
+      keywords: [i18n._('{count, plural, one {Macro} other {Macros}}')],
       section,
       icon: Zap,
       shortcut: ['Ctrl', 'M'],
@@ -374,7 +378,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     },
     {
       id: 'conv.mark-unread',
-      label: t('globals.messages.markAsUnread'),
+      label: i18n._('Mark as unread'),
       keywords: ['unread'],
       section,
       icon: MailOpen,
@@ -382,15 +386,15 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     },
     {
       id: 'conv.copy-link',
-      label: t('globals.messages.copyLink'),
-      keywords: [t('globals.terms.copy'), t('globals.terms.link'), 'url'],
+      label: i18n._('Copy link'),
+      keywords: [i18n._('Copy'), i18n._('{count, plural, one {Link} other {Links}}'), 'url'],
       section,
       icon: Link2,
       run: copyLink
     },
     {
       id: 'conv.transcript',
-      label: t('conversation.downloadTranscript'),
+      label: i18n._('Download transcript'),
       keywords: ['export'],
       section,
       icon: Download,
@@ -399,8 +403,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
     },
     {
       id: 'conv.summarize',
-      label: t('conversation.summarize'),
-      keywords: ['ai', t('globals.terms.summary')],
+      label: i18n._('Summarize with AI'),
+      keywords: ['ai', i18n._('Summary')],
       section,
       icon: Sparkles,
       permission: perms.MESSAGES_WRITE_PRIVATE,
@@ -410,8 +414,8 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       ? [
           {
             id: 'conv.open-contact',
-            label: t('command.openContact'),
-            keywords: [t('globals.terms.contact')],
+            label: i18n._('Open contact'),
+            keywords: [i18n._('{count, plural, one {Contact} other {Contacts}}')],
             section,
             icon: Contact,
             permission: perms.CONTACTS_READ,

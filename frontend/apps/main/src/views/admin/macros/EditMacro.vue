@@ -20,20 +20,20 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import MacroForm from '@main/features/admin/macros/MacroForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useMacroStore } from '@main/stores/macro'
 
 const macro = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
 const macroStore = useMacroStore()
 
 const breadcrumbLinks = [
-  { path: 'macro-list', label: t('globals.terms.macro', 2) },
-  { path: '', label: t('macro.editMacro') }
+  { path: 'macro-list', label: i18n._('{count, plural, one {Macro} other {Macros}}', 2) },
+  { path: '', label: i18n._('Edit macro') }
 ]
 
 const submitForm = (values) => {
@@ -48,7 +48,7 @@ const updateMacro = async (payload) => {
     macroStore.clearCache()
 
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

@@ -6,10 +6,10 @@
     >
       <div class="flex items-start gap-2 text-sm">
         <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
-        <p class="font-medium">{{ $t('conversation.whatsapp.windowClosed.title') }}</p>
+        <p class="font-medium">{{ i18n._('24-hour reply window closed') }}</p>
       </div>
       <Button size="sm" variant="outline" @click="openTemplatePicker">
-        {{ $t('globals.messages.sendTemplate') }}
+        {{ i18n._('Send template') }}
       </Button>
     </div>
     <div
@@ -17,7 +17,7 @@
       class="mx-2 mt-2 box px-3 py-2 flex items-center gap-2 text-sm border-border"
     >
       <Lightbulb class="size-4 text-muted-foreground shrink-0" />
-      <span>{{ $t('conversation.whatsapp.windowClosing', { time: windowExpiresIn }) }}</span>
+      <span>{{ i18n._('Reply window closes in {time}. After that, only template messages can be sent.', { time: windowExpiresIn }) }}</span>
     </div>
 
     <ReplyBox v-model:messageType="messageType" />
@@ -25,7 +25,7 @@
     <Dialog v-model:open="pickerOpen">
       <DialogContent class="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('globals.messages.sendTemplate') }}</DialogTitle>
+          <DialogTitle>{{ i18n._('Send template') }}</DialogTitle>
         </DialogHeader>
 
         <WhatsAppTemplatePicker
@@ -44,10 +44,10 @@
 
         <DialogFooter v-if="selectedTemplate">
           <Button variant="outline" @click="pickerOpen = false" :disabled="isSending">
-            {{ $t('globals.messages.cancel') }}
+            {{ i18n._('Cancel') }}
           </Button>
           <Button :is-loading="isSending" :disabled="isSending || !allParamsFilled" @click="sendTemplate">
-            {{ $t('globals.messages.send') }}
+            {{ i18n._('Send') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -57,7 +57,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Lightbulb, TriangleAlert } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -79,7 +79,7 @@ import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker.js'
 
 const CLOSING_SOON_MS = 4 * 60 * 60 * 1000
 
-const { t } = useI18n()
+const i18n = useI18n()
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const messageType = ref('reply')
@@ -173,7 +173,7 @@ const sendTemplate = async () => {
       whatsapp_template_params: { ...templateParams }
     })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('conversation.whatsapp.templateSent')
+      description: i18n._('Template queued for delivery.')
     })
     pickerOpen.value = false
   } catch (error) {

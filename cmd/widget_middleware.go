@@ -38,33 +38,34 @@ func validateWidgetInbox(next func(*fastglue.Request) error) func(*fastglue.Requ
 			inboxUUID = string(r.RequestCtx.QueryArgs().Peek("inbox_id"))
 		}
 		if inboxUUID == "" {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.inbox}"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+				app.i18n.Get("Inbox")), nil, envelope.InputError)
 		}
 
 		// Require a UUID here so widget callers cannot enumerate inboxes by numeric ID.
 		if _, err := uuid.Parse(inboxUUID); err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundInbox"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Inbox not found"), nil, envelope.InputError)
 		}
 
 		inbox, err := app.inbox.GetDBRecord(inboxUUID)
 		if err != nil {
 			app.lo.Debug("error fetching inbox", "inbox_uuid", inboxUUID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundInbox"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Inbox not found"), nil, envelope.InputError)
 		}
 		if !inbox.Enabled || inbox.Channel != livechat.ChannelLiveChat {
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundInbox"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Inbox not found"), nil, envelope.InputError)
 		}
 
 		var config livechat.Config
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
 			app.lo.Error("error parsing live chat config", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 
 		if len(config.BlockedIPs) > 0 {
 			clientIP := realip.FromRequest(r.RequestCtx)
 			if httputil.IsIPBlocked(clientIP, config.BlockedIPs) {
-				return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("widget.ipBlocked"), nil, envelope.PermissionError)
+				return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Access denied"), nil, envelope.PermissionError)
 			}
 		}
 
@@ -82,11 +83,11 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 		app := r.Context.(*App)
 		inbox, err := getWidgetInbox(r)
 		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 		config, err := getWidgetConfig(r)
 		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 
 		authHeader := string(r.RequestCtx.Request.Header.Peek("Authorization"))
@@ -97,24 +98,24 @@ func widgetAuth(next func(*fastglue.Request) error) func(*fastglue.Request) erro
 		}
 
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 
 		session, err := loadSession(app, token, config)
 		if err != nil {
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 		}
 
 		// Verify session belongs to this inbox.
 		if session.InboxID != inbox.ID {
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 		}
 
 		// Verify user exists, is enabled, and is a contact or visitor.
 		u, err := app.user.Get(session.UserID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 		if err != nil || !u.Enabled {
-			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+			return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 		}
 
 		r.RequestCtx.SetUserValue(ctxWidgetContactID, session.UserID)

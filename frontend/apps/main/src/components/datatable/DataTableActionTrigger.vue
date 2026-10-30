@@ -5,7 +5,7 @@
       variant="ghost"
       size="icon"
       class="size-8 max-md:size-11"
-      :aria-label="$t('globals.messages.moreActions')"
+      :aria-label="i18n._('More actions')"
     >
       <MoreVertical class="size-4" aria-hidden="true" />
     </Button>

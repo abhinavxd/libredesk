@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
-	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 	"golang.org/x/text/language"
@@ -141,14 +140,15 @@ func FuzzResolveQueryLocale(f *testing.F) {
 func TestMatchLangFile(t *testing.T) {
 	dir := t.TempDir()
 	for _, code := range []string{"en-US", "de-DE", "pt-BR", "pt-PT", "es-ES", "zh-CN"} {
-		if err := os.WriteFile(filepath.Join(dir, code+".json"), []byte("{}"), 0o600); err != nil {
+		catalogDir := filepath.Join(dir, code, "LC_MESSAGES")
+		if err := os.MkdirAll(catalogDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(catalogDir, "frontend.json"), []byte("{}"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	fs, err := stuffbin.NewLocalFS("/", dir+":i18n")
-	if err != nil {
-		t.Fatalf("creating test filesystem: %v", err)
-	}
+	fs := os.DirFS(dir)
 	for _, tt := range []struct {
 		requested string
 		want      string

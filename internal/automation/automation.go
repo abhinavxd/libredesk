@@ -17,7 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -52,7 +52,7 @@ type Engine struct {
 	rulesMu                 sync.RWMutex
 	q                       queries
 	lo                      *logf.Logger
-	i18n                    *i18n.I18n
+	i18n                    *gotext.Locale
 	conversationStore       conversationStore
 	systemUserID            int
 	taskQueue               chan ConversationTask
@@ -68,7 +68,7 @@ type Engine struct {
 type Opts struct {
 	DB                      *sqlx.DB
 	Lo                      *logf.Logger
-	I18n                    *i18n.I18n
+	I18n                    *gotext.Locale
 	TimeTriggerLookbackDays int
 }
 
@@ -193,7 +193,7 @@ func (e *Engine) GetAllRules(typ []byte) ([]models.RuleRecord, error) {
 	var rules = make([]models.RuleRecord, 0)
 	if err := e.q.GetAll.Select(&rules, typ); err != nil {
 		e.lo.Error("error fetching rules", "error", err)
-		return rules, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return rules, envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	return rules, nil
 }
@@ -203,10 +203,10 @@ func (e *Engine) GetRule(id int) (models.RuleRecord, error) {
 	var rule models.RuleRecord
 	if err := e.q.GetRule.Get(&rule, id); err != nil {
 		if err == sql.ErrNoRows {
-			return rule, envelope.NewError(envelope.InputError, e.i18n.T("validation.notFoundRule"), nil)
+			return rule, envelope.NewError(envelope.InputError, e.i18n.Get("Rule not found"), nil)
 		}
 		e.lo.Error("error fetching rule", "error", err)
-		return rule, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return rule, envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	return rule, nil
 }
@@ -216,7 +216,7 @@ func (e *Engine) ToggleRule(id int) (models.RuleRecord, error) {
 	var result models.RuleRecord
 	if err := e.q.ToggleRule.Get(&result, id); err != nil {
 		e.lo.Error("error toggling rule", "error", err)
-		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	// Reload rules.
 	e.ReloadRules()
@@ -231,7 +231,7 @@ func (e *Engine) UpdateRule(id int, rule models.RuleRecord) (models.RuleRecord, 
 	var result models.RuleRecord
 	if err := e.q.UpdateRule.Get(&result, id, rule.Name, rule.Description, rule.Type, rule.Events, rule.Rules, rule.Enabled); err != nil {
 		e.lo.Error("error updating rule", "error", err)
-		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	// Reload rules.
 	e.ReloadRules()
@@ -246,7 +246,7 @@ func (e *Engine) CreateRule(rule models.RuleRecord) (models.RuleRecord, error) {
 	var result models.RuleRecord
 	if err := e.q.InsertRule.Get(&result, rule.Name, rule.Description, rule.Type, rule.Events, rule.Rules); err != nil {
 		e.lo.Error("error creating rule", "error", err)
-		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.RuleRecord{}, envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	// Reload rules.
 	e.ReloadRules()
@@ -257,7 +257,7 @@ func (e *Engine) CreateRule(rule models.RuleRecord) (models.RuleRecord, error) {
 func (e *Engine) DeleteRule(id int) error {
 	if _, err := e.q.DeleteRule.Exec(id); err != nil {
 		e.lo.Error("error deleting rule", "error", err)
-		return envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	// Reload rules.
 	e.ReloadRules()
@@ -269,7 +269,7 @@ func (e *Engine) UpdateRuleWeights(weights map[int]int) error {
 	for id, weight := range weights {
 		if _, err := e.q.UpdateRuleWeight.Exec(id, weight); err != nil {
 			e.lo.Error("error updating rule weight", "error", err)
-			return envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 		}
 	}
 	// Reload rules.
@@ -281,7 +281,7 @@ func (e *Engine) UpdateRuleWeights(weights map[int]int) error {
 func (e *Engine) UpdateRuleExecutionMode(ruleType, mode string) error {
 	if _, err := e.q.UpdateRuleExecutionMode.Exec(ruleType, mode); err != nil {
 		e.lo.Error("error updating rule execution mode", "error", err)
-		return envelope.NewError(envelope.GeneralError, e.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, e.i18n.Get("Something went wrong"), nil)
 	}
 	// Reload rules.
 	e.ReloadRules()

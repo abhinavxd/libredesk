@@ -13,13 +13,13 @@ func (m *Manager) DeletePrivateMessage(conversationUUID, messageUUID string, sen
 	m.lo.Info("deleting private note", "conversation_uuid", conversationUUID, "message_uuid", messageUUID)
 
 	var previewUpdated bool
-	deletedPreview := m.i18n.T("conversation.privateNoteDeleted")
+	deletedPreview := m.i18n.Get("This note was deleted")
 	if err := m.q.DeletePrivateMessage.Get(&previewUpdated, messageUUID, conversationUUID, deletedPreview, senderID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", envelope.NewError(envelope.NotFoundError, m.i18n.Ts("globals.messages.notFound", "name", m.i18n.Ts("globals.terms.message")), nil)
+			return "", envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error deleting private note", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	m.BroadcastMessageUpdate(conversationUUID, messageUUID, map[string]any{

@@ -2,14 +2,14 @@
   <div class="h-full relative">
     <div class="flex flex-col space-y-5 max-w-2xl">
       <div class="space-y-1">
-        <span class="sub-title">{{ $t('globals.terms.notification', 2) }}</span>
+        <span class="sub-title">{{ i18n.ngettext('Notification', 'Notifications', 2) }}</span>
       </div>
 
       <Spinner v-if="isLoading" />
 
       <template v-else>
         <p v-if="!emailEnabled" class="text-muted-foreground text-xs">
-          {{ $t('notification.emailChannelDisabled') }}
+          {{ i18n._('Email notifications are turned off for this workspace. Contact your administrator to enable them.') }}
         </p>
 
         <div
@@ -17,7 +17,7 @@
         >
           <div class="space-y-1">
             <p class="text-sm text-foreground">
-              {{ $t('globals.terms.browserNotification', 2) }}
+              {{ i18n.ngettext('Browser notification', 'Browser notifications', 2) }}
             </p>
             <p v-if="browserPushDescription" class="text-xs text-muted-foreground">
               {{ browserPushDescription }}
@@ -26,7 +26,7 @@
           <DotLoader
             v-if="isUpdatingBrowserPush"
             role="status"
-            :aria-label="$t('globals.terms.loading')"
+            :aria-label="i18n._('Loading')"
           />
           <Switch
             v-else
@@ -36,7 +36,7 @@
               pushNotifications.permission.value === 'denied' ||
               !vapidPublicKey
             "
-            :aria-label="$t('globals.terms.browserNotification', 2)"
+            :aria-label="i18n.ngettext('Browser notification', 'Browser notifications', 2)"
             @update:checked="updateBrowserPush"
           />
         </div>
@@ -47,7 +47,7 @@
           >
             <div class="hidden sm:block" />
             <div v-for="channel in channels" :key="channel.key" class="text-center">
-              {{ $t(channel.labelKey) }}
+              {{ i18n._(channel.labelMessage) }}
             </div>
           </div>
 
@@ -67,8 +67,8 @@
                   pendingUpdates.has(preferenceKey(row.type, channel.key))
                 "
                 :aria-label="
-                  $t('notification.channelToggleLabel', {
-                    channel: $t(channel.labelKey),
+                  i18n._('{channel} notifications for {type}', {
+                    channel: i18n._(channel.labelMessage),
                     type: typeLabel(row.type)
                   })
                 "
@@ -83,8 +83,10 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { computed, ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Switch } from '@shared-ui/components/ui/switch'
 import { DotLoader } from '@shared-ui/components/ui/loader'
 import { Spinner } from '@shared-ui/components/ui/spinner'
@@ -94,7 +96,7 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import api from '@/api'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const rows = ref([])
 const isLoading = ref(true)
@@ -105,26 +107,26 @@ const isUpdatingBrowserPush = ref(false)
 const pushNotifications = usePushNotifications()
 
 const channels = [
-  { key: 'in_app', labelKey: 'globals.terms.inApp' },
-  { key: 'email', labelKey: 'globals.terms.email' },
-  { key: 'push', labelKey: 'globals.terms.browser' }
+  { key: 'in_app', labelMessage: msg({ message: 'In-app' }) },
+  { key: 'email', labelMessage: msg({ message: '{count, plural, one {Email} other {Emails}}', context: 'Communication channel' }) },
+  { key: 'push', labelMessage: msg({ message: 'Browser' }) }
 ]
 
 const typeLabels = {
-  assignment: 'notification.type.assignment',
-  mention: 'notification.type.mention',
-  conversation_reopened: 'notification.type.conversationReopened',
-  new_reply: 'notification.type.newReply',
-  new_reply_participating: 'notification.type.newReplyParticipating',
-  sla_first_response_warning: 'notification.type.slaFirstResponseWarning',
-  sla_first_response_breach: 'notification.type.slaFirstResponseBreach',
-  sla_next_response_warning: 'notification.type.slaNextResponseWarning',
-  sla_next_response_breach: 'notification.type.slaNextResponseBreach',
-  sla_resolution_warning: 'notification.type.slaResolutionWarning',
-  sla_resolution_breach: 'notification.type.slaResolutionBreach'
+  assignment: msg({ message: 'Conversation assigned to me' }),
+  mention: msg({ message: 'Mentioned in a conversation' }),
+  conversation_reopened: msg({ message: 'Conversation assigned to me is reopened by a reply' }),
+  new_reply: msg({ message: 'New reply on a conversation assigned to me' }),
+  new_reply_participating: msg({ message: 'New reply on a conversation I\'\'m participating in' }),
+  sla_first_response_warning: msg({ message: 'First response SLA breach warning' }),
+  sla_first_response_breach: msg({ message: 'First response SLA breached' }),
+  sla_next_response_warning: msg({ message: 'Next response SLA breach warning' }),
+  sla_next_response_breach: msg({ message: 'Next response SLA breached' }),
+  sla_resolution_warning: msg({ message: 'Resolution SLA breach warning' }),
+  sla_resolution_breach: msg({ message: 'Resolution SLA breached' })
 }
 
-const typeLabel = (type) => (typeLabels[type] ? t(typeLabels[type]) : type)
+const typeLabel = (type) => (typeLabels[type] ? i18n._(typeLabels[type]) : type)
 const preferenceKey = (type, channel) => `${type}:${channel}`
 
 const fetchPreferences = async () => {
@@ -150,9 +152,9 @@ const fetchPreferences = async () => {
 }
 
 const browserPushDescription = computed(() => {
-  if (!pushNotifications.supported.value) return t('notification.browserPush.unsupported')
-  if (pushNotifications.permission.value === 'denied') return t('notification.browserPush.blocked')
-  if (!vapidPublicKey.value) return t('notification.browserPush.unavailable')
+  if (!pushNotifications.supported.value) return i18n._('This browser does not support push notifications. Use a supported browser to receive notifications when libredesk is closed.')
+  if (pushNotifications.permission.value === 'denied') return i18n._('Browser notifications are blocked. Allow them in your browser settings to receive notifications on this device.')
+  if (!vapidPublicKey.value) return i18n._('Browser notifications are unavailable because push is not configured. Ask an administrator to configure push notifications.')
   return ''
 })
 
@@ -166,7 +168,7 @@ const updateBrowserPush = async (value) => {
       if (!granted) {
         emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
           variant: 'destructive',
-          description: t('notification.browserPush.blocked')
+          description: i18n._('Browser notifications are blocked. Allow them in your browser settings to receive notifications on this device.')
         })
       }
     } else {
@@ -194,7 +196,7 @@ const update = async (row, channel, value) => {
       { notification_type: row.type, channel, enabled: value }
     ])
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     row[channel] = previous

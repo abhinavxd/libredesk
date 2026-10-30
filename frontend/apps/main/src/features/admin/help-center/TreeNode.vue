@@ -19,7 +19,7 @@
           <button
             type="button"
             class="-m-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-            :aria-label="isOpen ? t('globals.terms.collapse') : t('globals.terms.expand')"
+            :aria-label="isOpen ? i18n._('Collapse') : i18n._('Expand')"
           >
             <ChevronRight class="h-4 w-4 transition-transform" :class="{ 'rotate-90': isOpen }" />
           </button>
@@ -37,7 +37,7 @@
               {{ item.name }}
             </button>
             <Badge v-if="!item.is_published" variant="secondary" class="flex-shrink-0 font-normal">
-              {{ $t('globals.terms.draft') }}
+              {{ i18n._('Draft') }}
             </Badge>
           </div>
           <p v-if="item.description" class="truncate text-xs text-muted-foreground">
@@ -46,7 +46,7 @@
         </div>
 
         <span v-if="item.article_count" class="flex-shrink-0 text-xs text-muted-foreground">
-          {{ item.article_count }} {{ $t('globals.terms.article', item.article_count) }}
+          {{ item.article_count }} {{ i18n.ngettext('Article', 'Articles', item.article_count) }}
         </span>
 
         <span class="hover-actions flex-shrink-0">
@@ -91,7 +91,7 @@
               class="px-4 py-2.5 ui-description"
               :style="childIndentStyle"
             >
-              {{ $t('globals.messages.empty', { name: $t('globals.terms.collection') }) }}
+              {{ i18n._('{name} empty', { name: i18n.ngettext('Collection', 'Collections', 1) }) }}
             </p>
           </template>
 
@@ -175,7 +175,7 @@
     </div>
 
     <Badge v-if="item.status !== 'published'" variant="secondary" class="flex-shrink-0 font-normal">
-      {{ t('globals.terms.draft') }}
+      {{ i18n._('Draft') }}
     </Badge>
 
     <span class="hover-actions flex-shrink-0">
@@ -198,7 +198,7 @@ const DRAG_HANDLE_CLASS = 'drag-handle -m-1 h-4 w-4 flex-shrink-0 cursor-grab p-
 import { ref, computed, watch, inject } from 'vue'
 import Draggable from 'vuedraggable'
 import { usePreferredReducedMotion } from '@vueuse/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Badge } from '@shared-ui/components/ui/badge'
 import {
   Collapsible,
@@ -209,7 +209,7 @@ import { ChevronRight, FileText, Folder, GripVertical } from 'lucide-vue-next'
 import TreeDropdown from './TreeDropdown.vue'
 import { moveWithin } from './treeReorder.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const reducedMotion = usePreferredReducedMotion()
 

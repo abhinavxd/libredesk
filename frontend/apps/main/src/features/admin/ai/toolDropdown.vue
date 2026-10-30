@@ -4,11 +4,11 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTool">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="toggleEnabled">
         <component :is="tool.enabled ? PowerOff : Power" class="mr-2 h-4 w-4" />
-        {{ tool.enabled ? t('globals.messages.disable') : t('globals.messages.enable') }}
+        {{ tool.enabled ? i18n._('Disable') : i18n._('Enable') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -16,7 +16,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -24,15 +24,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ t('admin.ai.tool.deleteConfirmation') }}
+          {{ i18n._('This will permanently delete the tool.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="deleteTool">{{
-          t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -62,10 +62,10 @@ import {
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const alertOpen = ref(false)
 const emitter = useEmitter()
 

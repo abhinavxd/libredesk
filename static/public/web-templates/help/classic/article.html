@@ -1,7 +1,7 @@
 {{ define "classic-help-article" }}
 {{ template "classic-header" . }}
 
-{{ if not .Data.HelpCenter.Embed }}<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+{{ if not .Data.HelpCenter.Embed }}<nav class="hc-breadcrumb" aria-label="{{ .L.GetD "templates" "Breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
         {{ if .Data.Collection.Name }}
@@ -19,7 +19,7 @@
         {{ if $showAuthor }}
         {{ if .Data.Article.AuthorAvatar }}<img class="hc-avatar hc-byline-avatar" src="{{ .Data.Article.AuthorAvatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial hc-byline-avatar">{{ .Data.AuthorInitial }}</span>{{ end }}
         {{ end }}
-        <span>{{ if $showAuthor }}<span class="hc-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ $.L.T "globals.terms.lastUpdated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
+        <span>{{ if $showAuthor }}<span class="hc-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ $.L.GetD "templates" "Last updated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
     </div>
     <div class="hc-article-body">
         {{ template "hc-article-toc" . }}
@@ -32,7 +32,7 @@
 
 {{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
 <aside class="hc-related">
-    <h2>{{ $.L.T "helpCenter.relatedArticles" }}</h2>
+    <h2>{{ $.L.GetD "templates" "Related articles" }}</h2>
     <ul class="hc-article-list">
         {{ range .Data.Related }}
         <li><a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}</a></li>

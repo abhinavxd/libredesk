@@ -1,11 +1,11 @@
 import { format, isToday, isTomorrow, addDays, setHours, setMinutes } from 'date-fns'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 /**
  * Business hours composable providing generic business hours utilities.
  */
 export function useBusinessHours () {
-  const { t } = useI18n()
+  const i18n = useI18n()
 
   function getBusinessHoursById (businessHoursId, businessHoursList) {
     if (!businessHoursId || !businessHoursList) {
@@ -141,11 +141,11 @@ export function useBusinessHours () {
     }
 
     if (isToday(nextWorkingTime)) {
-      return t('globals.messages.backTodayAt', { time: format(nextWorkingTime, 'h:mm a') })
+      return i18n._('today at {time}', { time: format(nextWorkingTime, 'h:mm a') })
     } else if (isTomorrow(nextWorkingTime)) {
-      return t('globals.messages.backTomorrowAt', { time: format(nextWorkingTime, 'h:mm a') })
+      return i18n._('tomorrow at {time}', { time: format(nextWorkingTime, 'h:mm a') })
     } else {
-      return t('globals.messages.backOnDayAt', {
+      return i18n._('on {day} at {time}', {
         day: format(nextWorkingTime, 'EEEE'),
         time: format(nextWorkingTime, 'h:mm a')
       })
@@ -166,9 +166,9 @@ export function useBusinessHours () {
     } else {
       const nextWorkingTime = getNextWorkingTime(businessHours, now, utcOffset)
       if (nextWorkingTime) {
-        status = t('globals.messages.wellBeBack', { when: formatNextWorkingTime(nextWorkingTime) })
+        status = i18n._('We\'\'ll be back {when}', { when: formatNextWorkingTime(nextWorkingTime) })
       } else {
-        status = t('globals.messages.currentlyOffline')
+        status = i18n._('We are currently offline')
       }
     }
 

@@ -22,7 +22,7 @@
           variant="ghost"
           size="icon"
           class="h-11 w-11 text-muted-foreground hover:text-foreground focus-visible:text-foreground lg:h-7 lg:w-7 [&_svg]:size-3.5"
-          :aria-label="t('globals.terms.collapse')"
+          :aria-label="i18n._('Collapse')"
           @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
         >
           <ViewVerticalIcon aria-hidden="true" />
@@ -53,7 +53,7 @@
           <ShieldQuestion v-else size="14" class="flex-shrink-0 text-warning-600" />
         </TooltipTrigger>
         <TooltipContent>{{
-          isVerified ? t('contact.identityVerified') : t('contact.identityNotVerified')
+          isVerified ? i18n._('Identity verified') : i18n._('Identity not verified')
         }}</TooltipContent>
       </Tooltip>
       <template v-if="conversation?.contact?.email">
@@ -66,7 +66,7 @@
         />
       </template>
       <span v-else class="sidebar-label">
-        {{ t('conversation.sidebar.notAvailable') }}
+        {{ i18n._('Not available') }}
       </span>
     </div>
     <div class="flex gap-2 items-center">
@@ -157,17 +157,17 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useConversationStore } from '@/stores/conversation'
 import { useUserStore } from '@/stores/user'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 const conversationStore = useConversationStore()
 const emitter = useEmitter()
 const conversation = computed(() => conversationStore.current)
-const { t } = useI18n()
+const i18n = useI18n()
 const userStore = useUserStore()
 
 const phoneNumber = computed(() => {
   const countryCodeValue = conversation.value?.contact?.phone_number_country_code || ''
-  const number = conversation.value?.contact?.phone_number || t('conversation.sidebar.notAvailable')
+  const number = conversation.value?.contact?.phone_number || i18n._('Not available')
   if (!countryCodeValue) return number
 
   const country = countries.find((c) => c.iso_2 === countryCodeValue)

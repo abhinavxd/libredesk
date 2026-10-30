@@ -58,9 +58,9 @@ import (
 	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp/template"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
+	"github.com/leonelquinteros/gotext"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastcache/v4"
 	"github.com/zerodha/fastglue"
@@ -105,7 +105,7 @@ type App struct {
 	auth               *auth_.Auth
 	sessionsMu         sync.RWMutex
 	authz              *authz.Enforcer
-	i18n               *i18n.I18n
+	i18n               *gotext.Locale
 	lo                 *logf.Logger
 	oidc               *oidc.Manager
 	media              *media.Manager

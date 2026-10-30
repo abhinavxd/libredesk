@@ -18,7 +18,7 @@
                   <Checkbox :checked="value" @update:checked="handleChange" />
                 </FormControl>
                 <div class="space-y-1 leading-none">
-                  <FormLabel class="text-foreground"> {{ $t('globals.terms.enabled') }} </FormLabel>
+                  <FormLabel class="text-foreground"> {{ i18n._('Enabled') }} </FormLabel>
                   <FormMessage />
                 </div>
               </FormItem>
@@ -27,7 +27,7 @@
             <FormGrid>
               <FormField v-slot="{ field }" name="name">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
                   <FormControl>
                     <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                   </FormControl>
@@ -37,7 +37,7 @@
 
               <FormField v-slot="{ field }" name="description">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Description', 'Descriptions', 1) }}</FormLabel>
                   <FormControl>
                     <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
                   </FormControl>
@@ -48,22 +48,22 @@
 
             <FormField v-slot="{ componentField, handleInput }" name="type">
               <FormItem class="max-w-xl">
-                <FormLabel>{{ $t('globals.terms.type') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Type', 'Types', 1) }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField" @update:modelValue="handleInput">
                     <SelectTrigger>
-                      <SelectValue :placeholder="t('placeholders.selectType')" />
+                      <SelectValue :placeholder="i18n._('Select type')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
                         <SelectItem value="new_conversation">
-                          {{ $t('conversation.newConversation') }}
+                          {{ i18n._('New conversation') }}
                         </SelectItem>
                         <SelectItem value="conversation_update">
-                          {{ $t('admin.automation.conversationUpdate') }}
+                          {{ i18n._('Conversation update') }}
                         </SelectItem>
                         <SelectItem value="time_trigger">
-                          {{ $t('admin.automation.timeTriggers') }}
+                          {{ i18n._('Time triggers') }}
                         </SelectItem>
                       </SelectGroup>
                     </SelectContent>
@@ -76,18 +76,18 @@
             <div :class="{ hidden: form.values.type !== 'conversation_update' }">
               <FormField v-slot="{ componentField, handleChange }" name="events">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.event', 2) }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Event', 'Events', 2) }}</FormLabel>
                   <FormControl>
                     <SelectTag
                       v-model="componentField.modelValue"
                       @update:modelValue="handleChange"
                       :items="conversationEventOptions"
-                      :placeholder="t('placeholders.selectEvents')"
+                      :placeholder="i18n._('Select events')"
                     >
                     </SelectTag>
                   </FormControl>
                   <FormDescription>{{
-                    $t('admin.automation.evaluateRuleOnTheseEvents')
+                    i18n._('Evaluate rule on these events.')
                   }}</FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -96,7 +96,7 @@
           </div>
 
           <h4 class="ui-heading">
-            {{ $t('admin.automation.matchTheseRules') }}
+            {{ i18n._('Match these rules') }}
           </h4>
 
           <RuleBox
@@ -116,14 +116,14 @@
                 :variant="groupOperator === 'AND' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('AND')"
               >
-                {{ $t('admin.automation.and') }}
+                {{ i18n._('AND') }}
               </Button>
               <Button
                 type="button"
                 :variant="groupOperator === 'OR' ? 'default' : 'outline'"
                 @click.prevent="toggleGroupOperator('OR')"
               >
-                {{ $t('admin.automation.or') }}
+                {{ i18n._('OR') }}
               </Button>
             </div>
           </div>
@@ -138,7 +138,7 @@
             :groupIndex="1"
           />
           <h4 class="ui-heading mt-2">
-            {{ $t('admin.automation.performTheseActions') }}
+            {{ i18n._('Perform these actions') }}
           </h4>
 
           <ActionBox
@@ -148,7 +148,7 @@
             @remove-action="handleRemoveAction"
           />
           <Button type="submit" :isLoading="isLoading">{{
-            isNewForm ? $t('globals.messages.create') : $t('globals.messages.save')
+            isNewForm ? i18n._('Create') : i18n._('Save')
           }}</Button>
         </div>
       </form>
@@ -173,7 +173,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { SelectTag } from '@shared-ui/components/ui/select'
 import { OPERATOR } from '@main/constants/filterConfig'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   Select,
   SelectContent,
@@ -196,7 +196,7 @@ import { useRoute } from 'vue-router'
 import { useRouter } from 'vue-router'
 
 const isLoading = ref(false)
-const { t } = useI18n()
+const i18n = useI18n()
 const route = useRoute()
 const router = useRouter()
 const emitter = useEmitter()
@@ -225,17 +225,17 @@ const rule = ref({
 
 const conversationEventOptions = [
   {
-    label: t('conversation.agentAssigned'),
+    label: i18n._('Agent assigned'),
     value: 'conversation.user.assigned'
   },
   {
-    label: t('conversation.teamAssigned'),
+    label: i18n._('Team assigned'),
     value: 'conversation.team.assigned'
   },
-  { label: t('admin.automation.event.priority.change'), value: 'conversation.priority.change' },
-  { label: t('admin.automation.event.status.change'), value: 'conversation.status.change' },
-  { label: t('admin.automation.event.message.outgoing'), value: 'conversation.message.outgoing' },
-  { label: t('admin.automation.event.message.incoming'), value: 'conversation.message.incoming' }
+  { label: i18n._('Priority change'), value: 'conversation.priority.change' },
+  { label: i18n._('Status change'), value: 'conversation.status.change' },
+  { label: i18n._('Outgoing message'), value: 'conversation.message.outgoing' },
+  { label: i18n._('Incoming message'), value: 'conversation.message.incoming' }
 ]
 
 const props = defineProps({
@@ -246,8 +246,8 @@ const props = defineProps({
 })
 
 const breadcrumbPageLabel = () => {
-  if (props.id > 0) return t('automation.editRule')
-  return t('automation.newRule')
+  if (props.id > 0) return i18n._('Edit rule')
+  return i18n._('New rule')
 }
 
 const isNewForm = computed(() => {
@@ -255,7 +255,7 @@ const isNewForm = computed(() => {
 })
 
 const breadcrumbLinks = [
-  { path: 'automation-list', label: t('globals.terms.automation') },
+  { path: 'automation-list', label: i18n._('{count, plural, one {Automation} other {Automations}}') },
   { path: '', label: breadcrumbPageLabel() }
 ]
 
@@ -323,7 +323,7 @@ const handleRemoveAction = (index) => {
 }
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const onSubmit = form.handleSubmit(async (values) => {
@@ -353,7 +353,7 @@ const handleSave = async (values) => {
       router.push({ name: 'automation-list' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -369,41 +369,41 @@ const handleSave = async (values) => {
 const getRulesValidationError = () => {
   // Must have groups.
   if (rule.value.rules[0].groups.length == 0) {
-    return t('admin.automation.validation.addCondition')
+    return i18n._('Please add at least one condition.')
   }
 
   // At least one group should have at least one rule.
   const group1HasRules = rule.value.rules[0].groups[0].rules.length > 0
   const group2HasRules = rule.value.rules[0].groups[1].rules.length > 0
   if (!group1HasRules && !group2HasRules) {
-    return t('admin.automation.validation.addCondition')
+    return i18n._('Please add at least one condition.')
   }
 
   // For both groups, each rule should have field, operator, and value.
   for (const group of rule.value.rules[0].groups) {
     for (const rule of group.rules) {
       if (!rule.field) {
-        return t('admin.automation.validation.selectField')
+        return i18n._('Please select a field for all conditions.')
       }
       if (!rule.operator) {
-        return t('admin.automation.validation.selectOperator')
+        return i18n._('Please select an operator for all conditions.')
       }
       // For 'set' and 'not set' operator, value is not required.
       if (rule.operator !== OPERATOR.SET && rule.operator !== OPERATOR.NOT_SET && !rule.value) {
-        return t('admin.automation.validation.setConditionValue')
+        return i18n._('Please set a value for all conditions.')
       }
     }
   }
 
   // Must have at least one action.
   if (rule.value.rules[0].actions.length == 0) {
-    return t('admin.automation.validation.addAction')
+    return i18n._('Please add at least one action.')
   }
 
   // Make sure each action has a type and value.
   for (const action of rule.value.rules[0].actions) {
     if (!action.type) {
-      return t('admin.automation.validation.selectActionType')
+      return i18n._('Please select a type for all actions.')
     }
 
     // CSAT action does not require value, set dummy value.
@@ -414,20 +414,20 @@ const getRulesValidationError = () => {
     // Notify uses its own fields instead of value.
     if (action.type === 'notify') {
       if (!action.subject?.trim() || !action.message?.trim() || !action.recipients?.length) {
-        return t('admin.automation.validation.setActionValue')
+        return i18n._('Please set a value for all actions.')
       }
       continue
     }
 
     // Empty array, no value selected.
     if (action.value.length === 0) {
-      return t('admin.automation.validation.setActionValue')
+      return i18n._('Please set a value for all actions.')
     }
 
     // Check if all values are present.
     for (const key in action.value) {
       if (!action.value[key]) {
-        return t('admin.automation.validation.setActionValue')
+        return i18n._('Please set a value for all actions.')
       }
     }
   }

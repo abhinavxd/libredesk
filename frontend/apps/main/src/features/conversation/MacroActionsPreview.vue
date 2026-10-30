@@ -40,7 +40,7 @@
 <script setup>
 import { X, Users, User, MessageSquare, Tags, Flag } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 defineProps({
   actions: {
@@ -53,7 +53,7 @@ defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const getIcon = (type) =>
   ({
     assign_team: Users,
@@ -74,13 +74,13 @@ const getDisplayValue = (action) => {
 
 const getTooltip = (action) => {
   const prefixes = {
-    assign_team: t('actions.assignTeam'),
-    assign_user: t('actions.assignAgent'),
-    set_status: t('actions.setStatus'),
-    set_priority: t('actions.setPriority'),
-    add_tags: t('actions.addTags'),
-    set_tags: t('actions.setTags'),
-    remove_tags: t('actions.removeTags')
+    assign_team: i18n._('Assign team'),
+    assign_user: i18n._('Assign agent'),
+    set_status: i18n._('Set status'),
+    set_priority: i18n._('Set priority'),
+    add_tags: i18n._('Add tags'),
+    set_tags: i18n._('Set tags'),
+    remove_tags: i18n._('Remove tags')
   }
   const prefix = prefixes[action.type] || action.type
   return `${prefix}: ${getDisplayValue(action)}`

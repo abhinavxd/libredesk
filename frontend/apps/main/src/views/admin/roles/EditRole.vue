@@ -20,11 +20,11 @@ import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import api from '@/api'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const role = ref({})
 const isLoading = ref(false)
 const formLoading = ref(false)
@@ -51,8 +51,8 @@ onMounted(async () => {
 })
 
 const breadcrumbLinks = [
-  { path: 'role-list', label: t('globals.terms.role', 2) },
-  { path: '', label: t('role.edit') }
+  { path: 'role-list', label: i18n._('{count, plural, one {Role} other {Roles}}', 2) },
+  { path: '', label: i18n._('Edit role') }
 ]
 
 const submitForm = async (values) => {
@@ -60,7 +60,7 @@ const submitForm = async (values) => {
     formLoading.value = true
     await api.updateRole(props.id, values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

@@ -13,7 +13,7 @@
           "
         >
           <CalendarIcon class="mr-2 h-4 w-4" aria-hidden="true" />
-          {{ rangeLabel || placeholder || t('globals.terms.pickDate') }}
+          {{ rangeLabel || placeholder || i18n._('Pick a date') }}
         </Button>
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
@@ -37,7 +37,7 @@
           "
         >
           <CalendarIcon class="mr-2 h-4 w-4" aria-hidden="true" />
-          {{ modelValue ? formatDisplay(modelValue) : placeholder || t('globals.terms.pickDate') }}
+          {{ modelValue ? formatDisplay(modelValue) : placeholder || i18n._('Pick a date') }}
         </Button>
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
@@ -55,14 +55,14 @@ import { ref, computed } from 'vue'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
 import { parseDate } from '@internationalized/date'
 import { format } from 'date-fns'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { cn } from '@shared-ui/lib/utils.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { Calendar } from '@shared-ui/components/ui/calendar'
 import { RangeCalendar } from '@shared-ui/components/ui/range-calendar'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const modelValue = defineModel({ type: String, default: '' })
 
 defineProps({

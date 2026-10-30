@@ -51,7 +51,7 @@ func handleMarkNotificationAsRead(r *fastglue.Request) error {
 	)
 	if id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.userNotification.MarkAsRead(id, auser.ID); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -79,7 +79,7 @@ func handleDeleteNotification(r *fastglue.Request) error {
 	)
 	if id <= 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := app.userNotification.Delete(id, auser.ID); err != nil {
@@ -129,7 +129,7 @@ func handleUpdateNotificationPreferences(r *fastglue.Request) error {
 	)
 	if err := r.Decode(&prefs, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+			app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 	if err := app.notificationPref.Update(auser.ID, prefs); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -144,7 +144,7 @@ func handleCreatePushSubscription(r *fastglue.Request) error {
 		subscription notifier.PushSubscriptionInput
 	)
 	if err := r.Decode(&subscription, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 	if err := app.pushNotification.Upsert(auser.ID, subscription); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -161,7 +161,7 @@ func handleDeletePushSubscription(r *fastglue.Request) error {
 		}
 	)
 	if err := r.Decode(&request, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 	if err := app.pushNotification.Delete(auser.ID, request.Endpoint); err != nil {
 		return sendErrorEnvelope(r, err)

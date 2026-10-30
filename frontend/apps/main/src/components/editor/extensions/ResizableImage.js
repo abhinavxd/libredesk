@@ -49,7 +49,7 @@ export const ResizableImage = Image.extend({
   },
   addNodeView () {
     return ({ node, getPos, editor: nodeEditor }) => {
-      const t = getI18n().global.t
+      const i18n = getI18n().global
 
       const wrapper = document.createElement('div')
       wrapper.classList.add('image-resizer')
@@ -95,8 +95,8 @@ export const ResizableImage = Image.extend({
 
       const clampToNatural = (w) => (naturalWidth ? Math.min(w, naturalWidth) : w)
       const sizes = [
-        { label: t('globals.terms.small'), getWidth: () => clampToNatural(400) },
-        { label: t('globals.messages.bestFit'), getWidth: () => clampToNatural(nodeEditor.view.dom.clientWidth) }
+        { label: i18n._('Small'), getWidth: () => clampToNatural(400) },
+        { label: i18n._('Best fit'), getWidth: () => clampToNatural(nodeEditor.view.dom.clientWidth) }
       ]
       // Toolbar buttons use pointerdown so touch + pen + mouse all work.
       // preventDefault avoids stealing focus from the editor.
@@ -119,7 +119,7 @@ export const ResizableImage = Image.extend({
       toolbar.appendChild(sep)
 
       const removeBtn = document.createElement('button')
-      removeBtn.textContent = t('globals.terms.remove')
+      removeBtn.textContent = i18n._('Remove')
       removeBtn.type = 'button'
       removeBtn.classList.add('image-toolbar-remove')
       removeBtn.addEventListener('pointerdown', (e) => {

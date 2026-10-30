@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -29,14 +29,14 @@ const (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -66,7 +66,7 @@ func (m *Manager) GetAll() ([]models.Status, error) {
 	var statuses = make([]models.Status, 0)
 	if err := m.q.GetAllStatuses.Select(&statuses); err != nil {
 		m.lo.Error("error fetching statuses", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return statuses, nil
 }
@@ -82,7 +82,7 @@ func (m *Manager) Create(name, category string) (models.Status, error) {
 	}
 	if err := m.q.InsertStatus.Get(&status, name, category); err != nil {
 		m.lo.Error("error inserting status", "error", err)
-		return status, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return status, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return status, nil
 }
@@ -92,19 +92,19 @@ func (m *Manager) Delete(id int) error {
 	// Disallow deletion of default statuses.
 	status, err := m.Get(id)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if slices.Contains(models.DefaultStatuses, status.Name) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.cannotUpdateDefault"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Cannot update default conversation status"), nil)
 	}
 
 	if _, err := m.q.DeleteStatus.Exec(id); err != nil {
 		if dbutil.IsForeignKeyError(err) {
-			return envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.alreadyInUse"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Cannot delete status as it is in use, Please remove this status from all conversations before deleting"), nil)
 		}
 		m.lo.Error("error deleting status", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -120,16 +120,16 @@ func (m *Manager) Update(id int, name, category string) (models.Status, error) {
 	}
 	status, err := m.Get(id)
 	if err != nil {
-		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if slices.Contains(models.DefaultStatuses, status.Name) {
-		return updatedStatus, envelope.NewError(envelope.InputError, m.i18n.T("conversationStatus.cannotUpdateDefault"), nil)
+		return updatedStatus, envelope.NewError(envelope.InputError, m.i18n.Get("Cannot update default conversation status"), nil)
 	}
 
 	if err := m.q.UpdateStatus.Get(&updatedStatus, id, name, category); err != nil {
 		m.lo.Error("error updating status", "error", err)
-		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return updatedStatus, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return updatedStatus, nil
 }
@@ -141,7 +141,7 @@ func (m *Manager) Get(id int) (models.Status, error) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			m.lo.Error("error fetching status", "error", err)
 		}
-		return status, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return status, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return status, nil
 }
@@ -149,17 +149,18 @@ func (m *Manager) Get(id int) (models.Status, error) {
 // validateStatusName checks if the status name is valid.
 func (m *Manager) validateStatusName(name string) error {
 	if len(name) == 0 {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 	if len(name) > maxStatusNameLength {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.tooLongStatus", "max", fmt.Sprintf("%d", maxStatusNameLength)), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Status is too long, should be at most %[1]s characters",
+			fmt.Sprintf("%d", maxStatusNameLength)), nil)
 	}
 	return nil
 }
 
 func (m *Manager) validateCategory(category string) error {
 	if !slices.Contains(models.ValidCategories, category) {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("validation.invalidFields", "name", "`category`"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Invalid %[1]s", "`category`"), nil)
 	}
 	return nil
 }

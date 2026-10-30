@@ -5,14 +5,14 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.role.help') }}</p>
+      <p>{{ i18n._('Manage roles and their permissions for fine-grained control over your support desk.') }}</p>
       <a
         href="https://docs.libredesk.io/roles/overview"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ $t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>

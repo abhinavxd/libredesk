@@ -16,18 +16,18 @@ const (
 
 func (m *Manager) BuildTranscript(conversation models.Conversation, messages []models.Message, downloadedAt time.Time) []byte {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s #%s\n", m.i18n.T("globals.terms.conversation"), conversation.ReferenceNumber)
+	fmt.Fprintf(&b, "%s #%s\n", m.i18n.Get("Conversation"), conversation.ReferenceNumber)
 	if subject := conversation.Subject.String; subject != "" {
-		fmt.Fprintf(&b, "%s: %s\n", m.i18n.T("globals.terms.subject"), subject)
+		fmt.Fprintf(&b, "%s: %s\n", m.i18n.Get("Subject"), subject)
 	}
 	if contact := conversation.Contact.FullName(); contact != "" {
-		fmt.Fprintf(&b, "%s: %s\n", m.i18n.T("globals.terms.contact"), contact)
+		fmt.Fprintf(&b, "%s: %s\n", m.i18n.Get("Contact"), contact)
 	}
-	fmt.Fprintf(&b, "%s: %s\n", m.i18n.T("globals.terms.createdAt"), conversation.CreatedAt.UTC().Format(transcriptTimeFormat))
-	fmt.Fprintf(&b, "%s: %s\n\n", m.i18n.T("globals.terms.downloadedAt"), downloadedAt.UTC().Format(transcriptTimeFormat))
+	fmt.Fprintf(&b, "%s: %s\n", m.i18n.Get("Created at"), conversation.CreatedAt.UTC().Format(transcriptTimeFormat))
+	fmt.Fprintf(&b, "%s: %s\n\n", m.i18n.Get("Downloaded at"), downloadedAt.UTC().Format(transcriptTimeFormat))
 	b.WriteString(transcriptSeparator + "\n")
 
-	label := m.i18n.Tc("globals.terms.articleReference", 2 /* n */)
+	label := m.i18n.GetN("Article reference", "Article references", 2 /* n */)
 	references := m.lookupArticleReferences(messageMetas(messages)...)
 	for i, message := range messages {
 		content := message.TextContent
@@ -48,7 +48,9 @@ func (m *Manager) BuildTranscript(conversation models.Conversation, messages []m
 			for _, attachment := range message.Attachments {
 				names = append(names, attachment.Name)
 			}
-			fmt.Fprintf(&b, "%s: %s\n", m.i18n.Tc("globals.terms.attachment", len(message.Attachments)), strings.Join(names, ", "))
+			fmt.Fprintf(&b, "%s: %s\n", m.i18n.GetN("Attachment",
+				"Attachments",
+				len(message.Attachments)), strings.Join(names, ", "))
 		}
 	}
 	return []byte(b.String())
@@ -57,9 +59,9 @@ func (m *Manager) BuildTranscript(conversation models.Conversation, messages []m
 func (m *Manager) senderTypeLabel(senderType string) string {
 	switch senderType {
 	case models.SenderTypeAgent:
-		return m.i18n.T("globals.terms.agent")
+		return m.i18n.Get("Agent")
 	case models.SenderTypeContact:
-		return m.i18n.T("globals.terms.contact")
+		return m.i18n.Get("Contact")
 	}
 	return senderType
 }

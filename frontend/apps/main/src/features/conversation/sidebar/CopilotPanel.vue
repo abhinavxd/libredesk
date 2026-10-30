@@ -33,7 +33,7 @@
             variant="ghost"
             size="icon"
             class="group h-7 w-7 shrink-0 text-muted-foreground [&_svg]:size-3.5"
-            :aria-label="$t('copilot.clearChat')"
+            :aria-label="i18n._('Clear chat')"
             @click="clearChat"
           >
             <Eraser
@@ -42,13 +42,13 @@
             />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('copilot.clearChat') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Clear chat') }}</TooltipContent>
       </Tooltip>
     </div>
     <div ref="scrollRef" class="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
       <div v-if="isHydrating" class="h-full flex items-center justify-center text-muted-foreground">
         <DotLoader />
-        <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
+        <span class="sr-only">{{ i18n._('Loading') }}</span>
       </div>
       <div
         v-else-if="messages.length === 0"
@@ -60,7 +60,7 @@
         <div class="space-y-1">
           <p class="ui-heading">{{ COPILOT_NAME }}</p>
           <p class="ui-description">
-            {{ $t('copilot.emptyState', { name: COPILOT_NAME }) }}
+            {{ i18n._('Ask {name} anything. It can search your knowledge base to answer.', { name: COPILOT_NAME }) }}
           </p>
         </div>
         <div class="flex w-full flex-col gap-2">
@@ -95,9 +95,9 @@
             class="w-full space-y-3 rounded-lg border border-border bg-card p-3 text-card-foreground"
             role="group"
             aria-live="polite"
-            :aria-label="$t('ai.toolApprovalTitle')"
+            :aria-label="i18n._('Review tool request')"
           >
-            <p class="ui-subheading">{{ $t('ai.toolApprovalTitle') }}</p>
+            <p class="ui-subheading">{{ i18n._('Review tool request') }}</p>
             <ToolApprovalDetails :approval="msg.approval" />
             <div class="flex flex-wrap justify-end gap-2">
               <Button
@@ -107,7 +107,7 @@
                 :disabled="isThinking"
                 @click="resolveToolApproval(msg.approval, false)"
               >
-                {{ $t('globals.messages.reject') }}
+                {{ i18n._('Reject') }}
               </Button>
               <Button
                 type="button"
@@ -115,7 +115,7 @@
                 :disabled="isThinking"
                 @click="resolveToolApproval(msg.approval, true)"
               >
-                {{ $t('globals.messages.approveAndRun') }}
+                {{ i18n._('Approve and run') }}
               </Button>
             </div>
           </div>
@@ -144,7 +144,7 @@
                   <Copy class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{{ $t('globals.terms.copy') }}</TooltipContent>
+              <TooltipContent>{{ i18n._('Copy') }}</TooltipContent>
             </Tooltip>
             <Tooltip v-if="canSendReply">
               <TooltipTrigger as-child>
@@ -158,7 +158,7 @@
                   <Reply class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{{ $t('copilot.insertIntoReply') }}</TooltipContent>
+              <TooltipContent>{{ i18n._('Insert into reply') }}</TooltipContent>
             </Tooltip>
             <Tooltip v-if="canSendPrivateNote">
               <TooltipTrigger as-child>
@@ -172,7 +172,7 @@
                   <StickyNote class="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>{{ $t('copilot.addAsPrivateNote') }}</TooltipContent>
+              <TooltipContent>{{ i18n._('Add as private note') }}</TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -189,7 +189,7 @@
             :class="width"
           />
         </div>
-        <span class="sr-only">{{ $t('copilot.thinking') }}</span>
+        <span class="sr-only">{{ i18n._('Thinking…') }}</span>
       </div>
     </div>
 
@@ -199,7 +199,7 @@
       >
         <Textarea
           v-model="input"
-          :placeholder="$t('copilot.placeholder')"
+          :placeholder="i18n._('Ask anything…')"
           rows="2"
           class="min-h-[44px] resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
           @keydown.enter.exact.prevent="send"
@@ -242,7 +242,7 @@ import { getTextFromHTML } from '@shared-ui/utils/string.js'
 import { UserTypeAgent } from '@/constants/user'
 import { COPILOT_NAME } from '@/constants/copilot'
 import { permissions as perms } from '@/constants/permissions.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const conversationStore = useConversationStore()
@@ -250,11 +250,11 @@ const copilotStore = useCopilotStore()
 const aiAssistantStore = useAIAssistantStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const canSendReply = computed(() => userStore.can(perms.MESSAGES_WRITE))
 const canSendPrivateNote = computed(() => userStore.can(perms.MESSAGES_WRITE_PRIVATE))
 
-const presets = computed(() => [t('copilot.preset.summarize'), t('copilot.preset.nextStep')])
+const presets = computed(() => [i18n._('Summarize this conversation'), i18n._('Suggest the next step')])
 
 // Chat history lives in the store keyed by conversation uuid so it survives tab
 // switches (this panel unmounts) and never leaks across conversations.
@@ -450,11 +450,11 @@ const resolveToolApproval = async (approval, approved) => {
 const copyAnswer = async (content) => {
   try {
     await navigator.clipboard.writeText(getTextFromHTML(content))
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.copied') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: i18n._('Copied to clipboard') })
   } catch {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('copilot.copyFailed')
+      description: i18n._('Could not copy to clipboard.')
     })
   }
 }
@@ -482,7 +482,7 @@ const addAsPrivateNote = async (content) => {
       echo_id: ''
     })
     if (rev !== revision(uuid)) return
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('copilot.noteAdded') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: i18n._('Added as a private note.') })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

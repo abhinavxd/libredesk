@@ -4,7 +4,7 @@
     @click="closeWidget"
     variant="ghost"
     size="sm"
-    :aria-label="$t('globals.messages.closeChat')"
+    :aria-label="i18n._('Close chat')"
   >
     <X class="w-4 h-4" />
   </Button>

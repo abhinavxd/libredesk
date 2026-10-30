@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vitest'
 import { createTeamFormSchema } from './teamFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createTeamFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createTeamFormSchema(mockI18n)
 
 const validForm = {
     name: 'Billing',

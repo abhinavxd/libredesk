@@ -4,13 +4,13 @@
       <AdminToolbar>
         <template #left>
           <TabsList class="w-max justify-start">
-            <TabsTrigger value="general">{{ $t('globals.terms.general') }}</TabsTrigger>
-            <TabsTrigger value="appearance">{{ $t('globals.terms.appearance') }}</TabsTrigger>
-            <TabsTrigger value="content">{{ $t('globals.terms.content', 1) }}</TabsTrigger>
+            <TabsTrigger value="general">{{ i18n._('General') }}</TabsTrigger>
+            <TabsTrigger value="appearance">{{ i18n._('Appearance') }}</TabsTrigger>
+            <TabsTrigger value="content">{{ i18n.ngettext('Content', 'Contents', 1) }}</TabsTrigger>
             <TabsTrigger value="conversations">{{
-              $t('globals.terms.conversation', 2)
+              i18n.ngettext('Conversation', 'Conversations', 2)
             }}</TabsTrigger>
-            <TabsTrigger value="setup">{{ $t('globals.terms.setup') }}</TabsTrigger>
+            <TabsTrigger value="setup">{{ i18n._('Setup') }}</TabsTrigger>
           </TabsList>
         </template>
       </AdminToolbar>
@@ -20,14 +20,14 @@
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="basics" data-section="basics">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.general')
+                i18n._('General')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField, handleChange }" name="enabled">
                   <FormItem>
                     <SwitchField
                       :checked="componentField.modelValue"
-                      :title="$t('globals.terms.enabled')"
+                      :title="i18n._('Enabled')"
                       @update:checked="handleChange"
                     />
                   </FormItem>
@@ -36,23 +36,23 @@
                 <FormField v-slot="{ componentField, handleChange }" name="csat_enabled">
                   <FormItem>
                     <SwitchField
-                      :title="$t('admin.inbox.csatSurveys')"
-                      :description="$t('admin.inbox.csatSurveys.description_1')"
+                      :title="i18n._('CSAT Surveys')"
+                      :description="i18n._('Send customer satisfaction surveys when a conversation is marked as resolved.')"
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
                   </FormItem>
                   <p :class="HINT_CLASS">
                     <Lightbulb class="size-4" />
-                    <span>{{ $t('admin.inbox.csatSurveys.description_3') }}</span>
+                    <span>{{ i18n._('CSAT surveys are only sent once per conversation.') }}</span>
                   </p>
                 </FormField>
 
                 <FormField v-slot="{ componentField, handleChange }" name="prompt_tags_on_reply">
                   <FormItem>
                     <SwitchField
-                      :title="$t('admin.inbox.promptTagsOnReply')"
-                      :description="$t('admin.inbox.promptTagsOnReply.description')"
+                      :title="i18n._('Prompt to tag before replying')"
+                      :description="i18n._('Warn agents before they send a reply on a conversation that has no tags. Agents can still send without tagging by confirming the prompt.')"
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -62,7 +62,7 @@
                 <FormGrid>
                   <FormField v-slot="{ componentField }" name="name">
                     <FormItem>
-                      <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+                      <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
                       <FormControl>
                         <Input type="text" placeholder="" v-bind="componentField" />
                       </FormControl>
@@ -72,7 +72,7 @@
 
                   <FormField v-slot="{ componentField }" name="config.brand_name">
                     <FormItem>
-                      <FormLabel>{{ $t('globals.terms.brandName') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Brand name') }}</FormLabel>
                       <FormControl>
                         <Input type="text" placeholder="" v-bind="componentField" />
                       </FormControl>
@@ -82,7 +82,7 @@
 
                   <FormField v-slot="{ componentField }" name="config.website_url">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.websiteUrl') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Website URL') }}</FormLabel>
                       <FormControl>
                         <Input
                           type="url"
@@ -91,7 +91,7 @@
                         />
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.websiteUrl.description')
+                        i18n._('URL where the chat widget is installed. Used in continuity emails to link back to chat.')
                       }}</FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -101,15 +101,15 @@
                 <FormGrid compact>
                   <FormField v-slot="{ componentField }" name="config.language">
                     <FormItem>
-                      <FormLabel>{{ $t('globals.terms.language') }}</FormLabel>
+                      <FormLabel>{{ i18n.ngettext('Language', 'Languages', 1) }}</FormLabel>
                       <FormControl>
                         <Select v-bind="componentField">
                           <SelectTrigger>
-                            <SelectValue :placeholder="$t('admin.general.language.placeholder')" />
+                            <SelectValue :placeholder="i18n.pgettext('Application language setting', 'Select language')" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="auto">{{
-                              $t('admin.inbox.livechat.language.auto')
+                              i18n._('Auto-detect (browser language)')
                             }}</SelectItem>
                             <SelectItem
                               v-for="lang in availableLanguages"
@@ -130,11 +130,11 @@
                     name="config.fallback_language"
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.fallbackLanguage') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Fallback language') }}</FormLabel>
                       <FormControl>
                         <Select v-bind="componentField">
                           <SelectTrigger>
-                            <SelectValue :placeholder="$t('admin.general.language.placeholder')" />
+                            <SelectValue :placeholder="i18n.pgettext('Application language setting', 'Select language')" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem
@@ -148,7 +148,7 @@
                         </Select>
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.fallbackLanguage.description')
+                        i18n._('Language to use when visitor\'\'s browser language is not available.')
                       }}</FormDescription>
                     </FormItem>
                   </FormField>
@@ -157,20 +157,20 @@
             </AccordionItem>
             <AccordionItem value="continuity" data-section="continuity">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.conversationContinuity')
+                i18n._('Conversation continuity email inbox')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormGrid compact>
                   <FormField v-slot="{ componentField }" name="linked_email_inbox_id">
                     <FormItem class="col-span-full">
-                      <FormLabel>{{ $t('admin.inbox.livechat.conversationContinuity') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Conversation continuity email inbox') }}</FormLabel>
                       <FormControl>
                         <Select v-bind="componentField">
                           <SelectTrigger>
-                            <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+                            <SelectValue :placeholder="i18n._('Select inbox')" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem :value="0">{{ $t('globals.terms.none') }}</SelectItem>
+                            <SelectItem :value="0">{{ i18n.pgettext('No linked inbox', 'None') }}</SelectItem>
                             <SelectItem
                               v-for="inbox in emailInboxes"
                               :key="inbox.id"
@@ -182,7 +182,7 @@
                         </Select>
                       </FormControl>
                       <FormDescription>
-                        {{ $t('admin.inbox.livechat.conversationContinuity.description') }}
+                        {{ i18n._('When a contact goes offline, replies are sent via this email inbox. They can continue the conversation by replying to the email or returning to the chat widget.') }}
                       </FormDescription>
                     </FormItem>
                   </FormField>
@@ -194,13 +194,13 @@
                     >
                       <FormItem>
                         <FormLabel>{{
-                          $t('admin.inbox.livechat.continuity.offlineThreshold')
+                          i18n._('Offline threshold')
                         }}</FormLabel>
                         <FormControl>
                           <Input type="text" placeholder="10m" v-bind="componentField" />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.continuity.offlineThreshold.description')
+                          i18n._('How long to wait after a contact goes offline before sending email. Min 1m.')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -212,7 +212,7 @@
                     >
                       <FormItem>
                         <FormLabel>{{
-                          $t('admin.inbox.livechat.continuity.maxMessagesPerEmail')
+                          i18n._('Max messages per email')
                         }}</FormLabel>
                         <FormControl>
                           <Input
@@ -224,7 +224,7 @@
                           />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.continuity.maxMessagesPerEmail.description')
+                          i18n._('Maximum number of messages to include in a single continuity email. Max 100.')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -236,13 +236,13 @@
                     >
                       <FormItem>
                         <FormLabel>{{
-                          $t('admin.inbox.livechat.continuity.minEmailInterval')
+                          i18n._('Min email interval')
                         }}</FormLabel>
                         <FormControl>
                           <Input type="text" placeholder="15m" v-bind="componentField" />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.continuity.minEmailInterval.description')
+                          i18n._('Minimum time between continuity emails to the same contact. Min 1m.')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -257,28 +257,28 @@
         <div v-show="activeTab === 'appearance'">
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="appearance" data-section="appearance">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.theme') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{ i18n._('Theme') }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField }" name="config.theme">
                   <FormItem>
-                    <FormLabel>{{ $t('globals.terms.theme') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Theme') }}</FormLabel>
                     <FormControl>
                       <RadioGroup v-bind="componentField" class="flex gap-4">
                         <div class="flex items-center space-x-2">
                           <RadioGroupItem id="theme-system" value="system" />
-                          <Label for="theme-system">{{ $t('globals.terms.matchSystem') }}</Label>
+                          <Label for="theme-system">{{ i18n._('Match system') }}</Label>
                         </div>
                         <div class="flex items-center space-x-2">
                           <RadioGroupItem id="theme-light" value="light" />
-                          <Label for="theme-light">{{ $t('globals.terms.light') }}</Label>
+                          <Label for="theme-light">{{ i18n._('Light') }}</Label>
                         </div>
                         <div class="flex items-center space-x-2">
                           <RadioGroupItem id="theme-dark" value="dark" />
-                          <Label for="theme-dark">{{ $t('globals.terms.dark') }}</Label>
+                          <Label for="theme-dark">{{ i18n._('Dark') }}</Label>
                         </div>
                       </RadioGroup>
                     </FormControl>
-                    <FormDescription>{{ $t('globals.messages.matchSystemHint') }}</FormDescription>
+                    <FormDescription>{{ i18n._('Match system follows the visitor\'\'s own color scheme.') }}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 </FormField>
@@ -286,8 +286,8 @@
                 <FormField v-slot="{ componentField, handleChange }" name="config.show_powered_by">
                   <FormItem>
                     <SwitchField
-                      :title="$t('admin.inbox.livechat.showPoweredBy')"
-                      :description="$t('admin.inbox.livechat.showPoweredBy.description')"
+                      :title="i18n._('Show powered by')"
+                      :description="i18n._('Show \u0022Powered by Libredesk\u0022 when a conversation is open in the widget')"
                       :checked="componentField.modelValue"
                       @update:checked="handleChange"
                     />
@@ -297,7 +297,7 @@
             </AccordionItem>
             <AccordionItem value="branding" data-section="branding">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.branding')
+                i18n._('Branding')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -307,11 +307,11 @@
                         <TabsList class="w-max justify-start">
                           <TabsTrigger value="light" class="gap-2 h-8">
                             <Sun class="size-4" />
-                            {{ $t('globals.terms.light') }}
+                            {{ i18n._('Light') }}
                           </TabsTrigger>
                           <TabsTrigger value="dark" class="gap-2 h-8">
                             <Moon class="size-4" />
-                            {{ $t('globals.terms.dark') }}
+                            {{ i18n._('Dark') }}
                           </TabsTrigger>
                         </TabsList>
                       </template>
@@ -324,7 +324,7 @@
                     keep-value
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('globals.terms.logoUrl') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Logo URL') }}</FormLabel>
                       <FormControl>
                         <Input
                           type="url"
@@ -343,7 +343,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('globals.terms.primaryColor', 1) }}</FormLabel>
+                        <FormLabel>{{ i18n.ngettext('Primary color', 'Primary colors', 1) }}</FormLabel>
                         <FormControl>
                           <Input type="color" class="h-9 w-24 p-1" v-bind="componentField" />
                         </FormControl>
@@ -354,7 +354,7 @@
                         >
                           <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                           <span>{{
-                            $t('admin.inbox.livechat.colors.primary.contrastWarning')
+                            i18n._('The primary color is nearly the same as the widget background. Buttons and message bubbles may be hard to see. Pick a color with more contrast.')
                           }}</span>
                         </p>
                       </FormItem>
@@ -362,7 +362,7 @@
                   </div>
 
                   <h5 class="ui-subheading pt-2">
-                    {{ $t('globals.terms.homeScreen') }}
+                    {{ i18n._('Home screen') }}
                   </h5>
 
                   <FormField
@@ -371,21 +371,21 @@
                     keep-value
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('globals.messages.headerTextColor') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Header text color') }}</FormLabel>
                       <FormControl>
                         <RadioGroup v-bind="componentField" class="flex gap-4">
                           <div class="flex items-center space-x-2">
                             <RadioGroupItem id="text-black" value="black" />
-                            <Label for="text-black">{{ $t('globals.terms.black') }}</Label>
+                            <Label for="text-black">{{ i18n._('Black') }}</Label>
                           </div>
                           <div class="flex items-center space-x-2">
                             <RadioGroupItem id="text-white" value="white" />
-                            <Label for="text-white">{{ $t('globals.terms.white') }}</Label>
+                            <Label for="text-white">{{ i18n._('White') }}</Label>
                           </div>
                         </RadioGroup>
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.homeScreen.headerTextColor.description')
+                        i18n._('Color of the greeting and introduction text on the home screen')
                       }}</FormDescription>
                       <p
                         v-if="lowHeaderContrast"
@@ -393,7 +393,7 @@
                       >
                         <TriangleAlert class="size-4 shrink-0 mt-0.5" />
                         <span>{{
-                          $t('admin.inbox.livechat.homeScreen.headerTextColor.contrastWarning')
+                          i18n._('Header text and background colors are too similar. The greeting text may be hard to read. Switch the text color or adjust the background.')
                         }}</span>
                       </p>
                     </FormItem>
@@ -405,7 +405,7 @@
                     keep-value
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('globals.terms.background') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Background') }}</FormLabel>
                       <FormControl>
                         <RadioGroup
                           v-bind="componentField"
@@ -414,15 +414,15 @@
                         >
                           <div class="flex items-center space-x-2">
                             <RadioGroupItem id="bg-solid" value="solid" />
-                            <Label for="bg-solid">{{ $t('globals.terms.solid') }}</Label>
+                            <Label for="bg-solid">{{ i18n._('Solid') }}</Label>
                           </div>
                           <div class="flex items-center space-x-2">
                             <RadioGroupItem id="bg-gradient" value="gradient" />
-                            <Label for="bg-gradient">{{ $t('globals.terms.gradient') }}</Label>
+                            <Label for="bg-gradient">{{ i18n._('Gradient') }}</Label>
                           </div>
                           <div class="flex items-center space-x-2">
                             <RadioGroupItem id="bg-image" value="image" />
-                            <Label for="bg-image">{{ $t('globals.terms.image', 1) }}</Label>
+                            <Label for="bg-image">{{ i18n.ngettext('Image', 'Images', 1) }}</Label>
                           </div>
                         </RadioGroup>
                       </FormControl>
@@ -436,7 +436,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('globals.messages.backgroundColor') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Background color') }}</FormLabel>
                         <FormControl>
                           <Input type="color" class="h-9 w-24 p-1" v-bind="componentField" />
                         </FormControl>
@@ -452,7 +452,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('globals.messages.gradientStart') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Gradient start') }}</FormLabel>
                         <FormControl>
                           <Input type="color" class="h-9 w-24 p-1" v-bind="componentField" />
                         </FormControl>
@@ -465,7 +465,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('globals.messages.gradientEnd') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Gradient end') }}</FormLabel>
                         <FormControl>
                           <Input type="color" class="h-9 w-24 p-1" v-bind="componentField" />
                         </FormControl>
@@ -481,7 +481,7 @@
                     keep-value
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('globals.messages.backgroundImageUrl') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Background image URL') }}</FormLabel>
                       <FormControl>
                         <Input
                           type="url"
@@ -500,9 +500,9 @@
                   >
                     <FormItem>
                       <SwitchField
-                        :title="$t('admin.inbox.livechat.homeScreen.fadeBackground')"
+                        :title="i18n._('Fade background')"
                         :description="
-                          $t('admin.inbox.livechat.homeScreen.fadeBackground.description')
+                          i18n._('Blend the header background into the content area below')
                         "
                         :checked="componentField.modelValue"
                         @update:checked="handleChange"
@@ -514,7 +514,7 @@
             </AccordionItem>
             <AccordionItem value="launcher" data-section="launcher">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.launcher')
+                i18n._('Launcher')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -524,11 +524,11 @@
                         <TabsList class="w-max justify-start">
                           <TabsTrigger value="light" class="gap-2 h-8">
                             <Sun class="size-4" />
-                            {{ $t('globals.terms.light') }}
+                            {{ i18n._('Light') }}
                           </TabsTrigger>
                           <TabsTrigger value="dark" class="gap-2 h-8">
                             <Moon class="size-4" />
-                            {{ $t('globals.terms.dark') }}
+                            {{ i18n._('Dark') }}
                           </TabsTrigger>
                         </TabsList>
                       </template>
@@ -542,7 +542,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.logo') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Launcher logo') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="url"
@@ -560,7 +560,7 @@
                       keep-value
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.livechat.launcher.color') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Launcher color') }}</FormLabel>
                         <FormControl>
                           <Input type="color" class="h-9 w-24 p-1" v-bind="componentField" />
                         </FormControl>
@@ -571,18 +571,18 @@
 
                   <FormField v-slot="{ componentField }" name="config.launcher.position">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.launcher.position') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Position') }}</FormLabel>
                       <FormControl>
                         <Select v-bind="componentField">
                           <SelectTrigger>
-                            <SelectValue :placeholder="$t('placeholders.selectPosition')" />
+                            <SelectValue :placeholder="i18n._('Select position')" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="left">{{
-                              $t('admin.inbox.livechat.launcher.position.left')
+                              i18n._('Left')
                             }}</SelectItem>
                             <SelectItem value="right">{{
-                              $t('admin.inbox.livechat.launcher.position.right')
+                              i18n._('Right')
                             }}</SelectItem>
                           </SelectContent>
                         </Select>
@@ -594,7 +594,7 @@
                   <FormGrid compact>
                     <FormField v-slot="{ componentField }" name="config.launcher.icon_scale">
                       <FormItem>
-                        <FormLabel>{{ $t('globals.terms.iconSize') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Icon size') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -605,7 +605,7 @@
                           />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.launcher.iconScale.description')
+                          i18n._('How much of the launcher the logo fills, as a percentage. Lower it to inset a logo that has no padding of its own.')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -614,7 +614,7 @@
                     <FormField v-slot="{ componentField }" name="config.launcher.spacing.side">
                       <FormItem>
                         <FormLabel>{{
-                          $t('admin.inbox.livechat.launcher.spacing.side')
+                          i18n._('Side spacing')
                         }}</FormLabel>
                         <FormControl>
                           <Input
@@ -626,7 +626,7 @@
                           />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.launcher.spacing.side.description')
+                          i18n._('Distance from the side of the screen in pixels')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -635,7 +635,7 @@
                     <FormField v-slot="{ componentField }" name="config.launcher.spacing.bottom">
                       <FormItem>
                         <FormLabel>{{
-                          $t('admin.inbox.livechat.launcher.spacing.bottom')
+                          i18n._('Bottom spacing')
                         }}</FormLabel>
                         <FormControl>
                           <Input
@@ -647,7 +647,7 @@
                           />
                         </FormControl>
                         <FormDescription>{{
-                          $t('admin.inbox.livechat.launcher.spacing.bottom.description')
+                          i18n._('Distance from the bottom of the screen in pixels')
                         }}</FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -663,21 +663,21 @@
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="messages" data-section="messages">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.tabs.messages')
+                i18n._('Messages')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormField v-slot="{ componentField }" name="config.greeting_message">
                   <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.greetingMessage') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Greeting message') }}</FormLabel>
                     <FormControl>
                       <Textarea
                         v-bind="componentField"
-                        :placeholder="$t('placeholders.greetingMessage')"
+                        :placeholder="i18n._('Welcome! How can we help you today?')"
                         rows="2"
                       />
                     </FormControl>
                     <FormDescription>{{
-                      $t('admin.inbox.livechat.greetingMessage.variables')
+                      i18n._(literalExampleMessage1)
                     }}</FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -685,16 +685,16 @@
 
                 <FormField v-slot="{ componentField }" name="config.introduction_message">
                   <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.introductionMessage') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Introduction message') }}</FormLabel>
                     <FormControl>
                       <Textarea
                         v-bind="componentField"
-                        :placeholder="$t('placeholders.introductionMessage')"
+                        :placeholder="i18n._('We\'\'re here to help!')"
                         rows="2"
                       />
                     </FormControl>
                     <FormDescription>{{
-                      $t('admin.inbox.livechat.greetingMessage.variables')
+                      i18n._(literalExampleMessage2)
                     }}</FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -702,11 +702,11 @@
 
                 <FormField v-slot="{ componentField }" name="config.chat_introduction">
                   <FormItem>
-                    <FormLabel>{{ $t('admin.inbox.livechat.chatIntroduction') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Chat introduction') }}</FormLabel>
                     <FormControl>
                       <Textarea
                         v-bind="componentField"
-                        :placeholder="$t('placeholders.chatIntroduction')"
+                        :placeholder="i18n._('Ask us anything, or share your feedback.')"
                         rows="2"
                       />
                     </FormControl>
@@ -717,7 +717,7 @@
             </AccordionItem>
             <AccordionItem value="noticeBanner" data-section="noticeBanner">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.noticeBanner')
+                i18n._('Notice banner')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -727,7 +727,7 @@
                   >
                     <FormItem>
                       <SwitchField
-                        :title="$t('admin.inbox.livechat.noticeBanner.enabled')"
+                        :title="i18n._('Enable notice banner')"
                         :checked="componentField.modelValue"
                         @update:checked="handleChange"
                       />
@@ -740,11 +740,11 @@
                     v-if="form.values.config?.notice_banner?.enabled"
                   >
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.noticeBanner.text') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Notice banner text') }}</FormLabel>
                       <FormControl>
                         <Textarea
                           v-bind="componentField"
-                          :placeholder="$t('placeholders.noticeBannerText')"
+                          :placeholder="i18n._('Our response times are slower than usual. We\'\'re working hard to get to your message.')"
                           rows="2"
                         />
                       </FormControl>
@@ -756,7 +756,7 @@
             </AccordionItem>
             <AccordionItem value="homeApps" data-section="homeApps">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.homeScreenApp', 2)
+                i18n.ngettext('Home screen app', 'Home screen apps', 2)
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -790,7 +790,7 @@
                                   v-if="item.type === 'help'"
                                   class="ui-description"
                                 >
-                                  {{ $t('widget.helpHomeAppHint') }}
+                                  {{ i18n._('Shows a search button and the featured articles set under Help center.') }}
                                 </p>
                                 <div
                                   v-else-if="item.type === 'announcement'"
@@ -798,12 +798,12 @@
                                 >
                                   <Input
                                     v-model="item.title"
-                                    :placeholder="$t('globals.terms.title')"
+                                    :placeholder="i18n.ngettext('Title', 'Titles', 1)"
                                     @change="updateHomeApps"
                                   />
                                   <Textarea
                                     v-model="item.description"
-                                    :placeholder="$t('globals.terms.description')"
+                                    :placeholder="i18n.ngettext('Description', 'Descriptions', 1)"
                                     rows="6"
                                     @change="updateHomeApps"
                                   />
@@ -811,13 +811,13 @@
                                     <Input
                                       v-model="item.image_url"
                                       type="url"
-                                      :placeholder="$t('globals.messages.coverImageUrl')"
+                                      :placeholder="i18n._('Cover image URL')"
                                       @change="updateHomeApps"
                                     />
                                     <Input
                                       v-model="item.url"
                                       type="url"
-                                      :placeholder="$t('globals.messages.linkUrl')"
+                                      :placeholder="i18n._('Link URL')"
                                       @change="updateHomeApps"
                                     />
                                   </FormGrid>
@@ -829,7 +829,7 @@
                                 >
                                   <Input
                                     v-model="item.text"
-                                    :placeholder="$t('placeholders.linkText')"
+                                    :placeholder="i18n._('Link Text')"
                                     @change="updateHomeApps"
                                   />
                                   <Input
@@ -844,7 +844,7 @@
                                 variant="ghost"
                                 size="icon"
                                 class="shrink-0"
-                                :aria-label="$t('globals.terms.remove')"
+                                :aria-label="i18n._('Remove')"
                                 @click="removeHomeApp(index)"
                               >
                                 <X class="w-4 h-4" aria-hidden="true" />
@@ -861,7 +861,7 @@
                             @click="addHomeApp('announcement')"
                           >
                             <Plus class="w-4 h-4" />
-                            {{ $t('globals.messages.addAnnouncement') }}
+                            {{ i18n._('Add announcement') }}
                           </Button>
                           <Button
                             type="button"
@@ -870,7 +870,7 @@
                             @click="addHomeApp('external_link')"
                           >
                             <Plus class="w-4 h-4" />
-                            {{ $t('globals.messages.addExternalLink') }}
+                            {{ i18n._('Add external link') }}
                           </Button>
                           <Button
                             type="button"
@@ -880,21 +880,21 @@
                             @click="addHomeApp('help')"
                           >
                             <Plus class="w-4 h-4" />
-                            {{ $t('widget.addHelpHomeApp') }}
+                            {{ i18n._('Add help articles') }}
                           </Button>
                         </div>
                         <p
                           v-if="!form.values.config.help?.help_center_id"
                           class="text-xs text-muted-foreground"
                         >
-                          {{ $t('widget.helpHomeAppRequiresCenter') }}
+                          {{ i18n._('Choose a help center under Help center before adding this card.') }}
                         </p>
                         <p
                           v-if="showHomeAppsError && incompleteHomeApps"
                           class="text-sm text-destructive flex items-start gap-1.5"
                         >
                           <TriangleAlert class="size-4 shrink-0 mt-0.5" />
-                          <span>{{ $t('admin.inbox.livechat.homeApps.incomplete') }}</span>
+                          <span>{{ i18n._('Fill in or remove the incomplete home screen app.') }}</span>
                         </p>
                       </div>
                       <FormMessage />
@@ -905,7 +905,7 @@
             </AccordionItem>
             <AccordionItem value="help" data-section="help">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.helpCenter', 1)
+                i18n.ngettext('Help center', 'Help centers', 1)
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <WidgetHelpConfig
@@ -920,13 +920,13 @@
                   role="alert"
                   class="text-sm text-destructive"
                 >
-                  {{ $t('validation.invalidValue') }}
+                  {{ i18n._('Invalid value') }}
                 </p>
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="campaigns" data-section="campaigns">
               <AccordionTrigger class="text-base">
-                {{ $t('globals.terms.proactiveMessage', 2) }}
+                {{ i18n.ngettext('Proactive message', 'Proactive messages', 2) }}
               </AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <WidgetCampaigns
@@ -949,7 +949,7 @@
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="features" data-section="features">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.features')
+                i18n._('Features')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -960,8 +960,8 @@
                     >
                       <FormItem>
                         <SwitchField
-                          :title="$t('admin.inbox.livechat.features.fileUpload')"
-                          :description="$t('admin.inbox.livechat.features.fileUpload.description')"
+                          :title="i18n._('File upload')"
+                          :description="i18n._('Allow users to upload files in chat')"
                           :checked="componentField.modelValue"
                           @update:checked="handleChange"
                         />
@@ -974,8 +974,8 @@
                     >
                       <FormItem>
                         <SwitchField
-                          :title="$t('admin.inbox.livechat.features.emoji')"
-                          :description="$t('admin.inbox.livechat.features.emoji.description')"
+                          :title="i18n._('Emoji support')"
+                          :description="i18n._('Allow users to use emojis in chat')"
                           :checked="componentField.modelValue"
                           @update:checked="handleChange"
                         />
@@ -988,7 +988,7 @@
                     >
                       <FormItem>
                         <SwitchField
-                          :title="$t('conversation.downloadTranscript')"
+                          :title="i18n._('Download transcript')"
                           :checked="componentField.modelValue"
                           @update:checked="handleChange"
                         />
@@ -1000,7 +1000,7 @@
             </AccordionItem>
             <AccordionItem value="officeHours" data-section="officeHours">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.officeHours')
+                i18n._('Office hours')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
@@ -1010,8 +1010,8 @@
                   >
                     <FormItem>
                       <SwitchField
-                        :title="$t('admin.inbox.livechat.showOfficeHoursInChat')"
-                        :description="$t('admin.inbox.livechat.showOfficeHoursInChat.description')"
+                        :title="i18n._('Show office hours in chat')"
+                        :description="i18n._('Show when the team will be next available')"
                         :checked="componentField.modelValue"
                         @update:checked="handleChange"
                       />
@@ -1024,9 +1024,9 @@
                   >
                     <FormItem>
                       <SwitchField
-                        :title="$t('admin.inbox.livechat.showOfficeHoursAfterAssignment')"
+                        :title="i18n._('Show office hours after team assignment')"
                         :description="
-                          $t('admin.inbox.livechat.showOfficeHoursAfterAssignment.description')
+                          i18n._('Show office hours after conversation is assigned to a team')
                         "
                         :checked="componentField.modelValue"
                         :disabled="!form.values.config.show_office_hours_in_chat"
@@ -1042,13 +1042,13 @@
                   >
                     <FormItem>
                       <FormLabel>{{
-                        $t('admin.inbox.livechat.chatReplyExpectationMessage')
+                        i18n._('Chat reply expectation message')
                       }}</FormLabel>
                       <FormControl>
                         <Input type="text" v-bind="componentField" />
                       </FormControl>
                       <FormDescription>
-                        {{ $t('admin.inbox.livechat.chatReplyExpectationMessage.description') }}
+                        {{ i18n._('Message shown to during business hours about expected reply times.') }}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -1058,24 +1058,24 @@
             </AccordionItem>
             <AccordionItem value="prechat" data-section="prechat">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.tabs.prechat')
+                i18n._('Pre-chat form')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <PreChatFormConfig v-model="prechatConfig" />
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="users" data-section="users">
-              <AccordionTrigger class="text-base">{{ $t('globals.terms.users') }}</AccordionTrigger>
+              <AccordionTrigger class="text-base">{{ i18n._('Users') }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <Tabs :model-value="selectedUserTab" @update:model-value="selectedUserTab = $event">
                   <AdminToolbar>
                     <template #left>
                       <TabsList class="w-max justify-start">
                         <TabsTrigger value="visitors">
-                          {{ $t('admin.inbox.livechat.userSettings.visitors') }}
+                          {{ i18n._('Visitors') }}
                         </TabsTrigger>
                         <TabsTrigger value="users">
-                          {{ $t('globals.terms.users') }}
+                          {{ i18n._('Users') }}
                         </TabsTrigger>
                       </TabsList>
                     </template>
@@ -1093,12 +1093,12 @@
                       >
                         <FormItem>
                           <FormLabel>{{
-                            $t('admin.inbox.livechat.startConversationButtonText')
+                            i18n._('Start conversation button text')
                           }}</FormLabel>
                           <FormControl>
                             <Input
                               v-bind="componentField"
-                              :placeholder="$t('placeholders.startConversation')"
+                              :placeholder="i18n._('Start conversation')"
                             />
                           </FormControl>
                           <FormMessage />
@@ -1107,16 +1107,16 @@
 
                       <FormField v-slot="{ componentField }" name="config.visitors.quick_replies">
                         <FormItem>
-                          <FormLabel>{{ $t('globals.terms.quickReply', 2) }}</FormLabel>
+                          <FormLabel>{{ i18n.ngettext('Quick reply', 'Quick replies', 2) }}</FormLabel>
                           <FormControl>
                             <Textarea
                               v-bind="componentField"
-                              :placeholder="$t('admin.inbox.livechat.quickReplies.placeholder')"
+                              :placeholder="i18n._('I have a question about billing\nHow do I reset my password?')"
                               rows="6"
                             />
                           </FormControl>
                           <FormDescription>{{
-                            $t('admin.inbox.livechat.quickReplies.description')
+                            i18n._('One reply per line, up to 6. Shown when someone starts a new conversation.')
                           }}</FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -1128,9 +1128,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.directToConversation')"
+                            :title="i18n._('Launch directly into conversation')"
                             :description="
-                              $t('admin.inbox.livechat.directToConversation.description')
+                              i18n._('Skip the home screen and open directly into the user\'\'s latest conversation, or a new conversation if none exists')
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1144,9 +1144,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.allowStartConversation')"
+                            :title="i18n._('Allow start conversation')"
                             :description="
-                              $t('admin.inbox.livechat.allowStartConversation.visitors.description')
+                              i18n._('Allow visitors to start new conversations')
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1160,10 +1160,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.preventMultipleConversations')"
+                            :title="i18n._('Prevent multiple conversations')"
                             :description="
-                              $t(
-                                'admin.inbox.livechat.preventMultipleConversations.visitors.description'
+                              i18n._('Prevent visitors from starting multiple conversations simultaneously'
                               )
                             "
                             :checked="componentField.modelValue"
@@ -1178,10 +1177,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
+                            :title="i18n._('Prevent replying to closed conversations')"
                             :description="
-                              $t(
-                                'admin.inbox.livechat.preventReplyToClosedConversation.description'
+                              i18n._('When enabled, users cannot reply to closed conversations'
                               )
                             "
                             :checked="componentField.modelValue"
@@ -1202,12 +1200,12 @@
                       >
                         <FormItem>
                           <FormLabel>{{
-                            $t('admin.inbox.livechat.startConversationButtonText')
+                            i18n._('Start conversation button text')
                           }}</FormLabel>
                           <FormControl>
                             <Input
                               v-bind="componentField"
-                              :placeholder="$t('placeholders.startConversation')"
+                              :placeholder="i18n._('Start conversation')"
                             />
                           </FormControl>
                           <FormMessage />
@@ -1216,16 +1214,16 @@
 
                       <FormField v-slot="{ componentField }" name="config.users.quick_replies">
                         <FormItem>
-                          <FormLabel>{{ $t('globals.terms.quickReply', 2) }}</FormLabel>
+                          <FormLabel>{{ i18n.ngettext('Quick reply', 'Quick replies', 2) }}</FormLabel>
                           <FormControl>
                             <Textarea
                               v-bind="componentField"
-                              :placeholder="$t('admin.inbox.livechat.quickReplies.placeholder')"
+                              :placeholder="i18n._('I have a question about billing\nHow do I reset my password?')"
                               rows="6"
                             />
                           </FormControl>
                           <FormDescription>{{
-                            $t('admin.inbox.livechat.quickReplies.description')
+                            i18n._('One reply per line, up to 6. Shown when someone starts a new conversation.')
                           }}</FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -1237,9 +1235,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.directToConversation')"
+                            :title="i18n._('Launch directly into conversation')"
                             :description="
-                              $t('admin.inbox.livechat.directToConversation.description')
+                              i18n._('Skip the home screen and open directly into the user\'\'s latest conversation, or a new conversation if none exists')
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1253,9 +1251,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.allowStartConversation')"
+                            :title="i18n._('Allow start conversation')"
                             :description="
-                              $t('admin.inbox.livechat.allowStartConversation.users.description')
+                              i18n._('Allow users to start new conversations')
                             "
                             :checked="componentField.modelValue"
                             @update:checked="handleChange"
@@ -1269,10 +1267,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.preventMultipleConversations')"
+                            :title="i18n._('Prevent multiple conversations')"
                             :description="
-                              $t(
-                                'admin.inbox.livechat.preventMultipleConversations.users.description'
+                              i18n._('Prevent users from starting multiple conversations simultaneously'
                               )
                             "
                             :checked="componentField.modelValue"
@@ -1287,10 +1284,9 @@
                       >
                         <FormItem>
                           <SwitchField
-                            :title="$t('admin.inbox.livechat.preventReplyToClosedConversation')"
+                            :title="i18n._('Prevent replying to closed conversations')"
                             :description="
-                              $t(
-                                'admin.inbox.livechat.preventReplyToClosedConversation.description'
+                              i18n._('When enabled, users cannot reply to closed conversations'
                               )
                             "
                             :checked="componentField.modelValue"
@@ -1310,13 +1306,13 @@
           <Accordion type="single" collapsible v-model="activeSection" class="w-full">
             <AccordionItem value="installation" data-section="installation">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.tabs.installation')
+                i18n._('Installation')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <ol class="text-sm space-y-2 list-decimal list-inside text-muted-foreground">
-                    <li>{{ $t('admin.inbox.livechat.installation.instructions.step1') }}</li>
-                    <li>{{ $t('admin.inbox.livechat.installation.instructions.step2') }}</li>
+                    <li>{{ i18n._('Copy the code snippet below') }}</li>
+                    <li>{{ i18n._('Paste it just before the closing `body` tag on every page where you want the live chat widget to appear') }}</li>
                   </ol>
                 </div>
 
@@ -1328,16 +1324,16 @@
             </AccordionItem>
             <AccordionItem value="identity" data-section="identity">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.installation.identity.title')
+                i18n._('Identity verification')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <div class="space-y-1">
                     <p class="ui-description">
-                      {{ $t('admin.inbox.livechat.installation.identity.description') }}
+                      {{ i18n._('Verify logged-in users so conversations are linked to their real accounts and users cannot impersonate each other.') }}
                     </p>
                     <p class="ui-description">
-                      {{ $t('admin.inbox.livechat.installation.identity.howItWorks') }}
+                      {{ i18n._('Your server generates a signed JWT containing the user\'\'s details. Use the secret key from the Security tab to sign it with the HS256 algorithm.') }}
                     </p>
                   </div>
 
@@ -1351,7 +1347,7 @@
                   </div>
 
                   <p class="ui-description">
-                    {{ $t('admin.inbox.livechat.installation.identity.addJwt') }}
+                    {{ i18n._('Add the signed JWT to LibredeskSettings:') }}
                   </p>
 
                   <div class="relative">
@@ -1368,19 +1364,19 @@
 
                   <p class="text-sm text-destructive flex items-center gap-1.5">
                     <TriangleAlert class="size-4 shrink-0" />
-                    {{ $t('admin.inbox.livechat.installation.identity.secretWarning') }}
+                    {{ i18n._('Never expose the secret key in client-side code. Always generate the JWT on your server.') }}
                   </p>
                 </div>
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="jsApi" data-section="jsApi">
               <AccordionTrigger class="text-base">{{
-                $t('admin.inbox.livechat.installation.jsApi.title')
+                i18n._('JavaScript API')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <div class="space-y-4">
                   <p class="ui-description">
-                    {{ $t('admin.inbox.livechat.installation.jsApi.description') }}
+                    {{ i18n._('Control the widget programmatically from your application.') }}
                   </p>
 
                   <div class="relative">
@@ -1392,18 +1388,18 @@
             </AccordionItem>
             <AccordionItem value="security" data-section="security">
               <AccordionTrigger class="text-base">{{
-                $t('globals.terms.security')
+                i18n._('Security')
               }}</AccordionTrigger>
               <AccordionContent force-mount class="space-y-8 pt-2">
                 <FormGrid>
                   <FormField v-slot="{ componentField }" name="secret">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.secretKey') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Secret key') }}</FormLabel>
                       <FormControl>
                         <Input type="password" v-bind="componentField" />
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.secretKey.description')
+                        i18n._('Set a secret key to secure the chat widget.')
                       }}</FormDescription>
                       <FormMessage />
                       <p
@@ -1411,19 +1407,19 @@
                         :class="HINT_CLASS"
                       >
                         <TriangleAlert class="size-4 shrink-0 mt-0.5" />
-                        <span>{{ $t('admin.inbox.livechat.secretKey.weak') }}</span>
+                        <span>{{ i18n._('This secret is short, which weakens JWT signing. Use at least 32 random characters.') }}</span>
                       </p>
                     </FormItem>
                   </FormField>
 
                   <FormField v-slot="{ componentField }" name="config.session_duration">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.sessionDuration.label') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Authenticated user session duration') }}</FormLabel>
                       <FormControl>
                         <Input type="text" placeholder="10h" v-bind="componentField" />
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.sessionDuration.description')
+                        i18n._('How long authenticated user sessions stay active. Sessions auto-extend on activity. Minimum 1 hour. Example: 24h, 168h, 720h, 2160h.')
                       }}</FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -1433,7 +1429,7 @@
                 <FormGrid>
                   <FormField v-slot="{ componentField }" name="config.trusted_domains">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.trustedDomains.list') }}</FormLabel>
+                      <FormLabel>{{ i18n._('Domain list') }}</FormLabel>
                       <FormControl>
                         <Textarea
                           v-bind="componentField"
@@ -1442,7 +1438,7 @@
                         />
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.trustedDomains.description')
+                        i18n._('One domain per line. *.example.com matches subdomains only, add the bare domain example.com separately. Leave empty to allow any domain.')
                       }}</FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -1450,7 +1446,7 @@
 
                   <FormField v-slot="{ componentField }" name="config.blocked_ips">
                     <FormItem>
-                      <FormLabel>{{ $t('admin.inbox.livechat.blockedIPs.list') }}</FormLabel>
+                      <FormLabel>{{ i18n._('IP block list') }}</FormLabel>
                       <FormControl>
                         <Textarea
                           v-bind="componentField"
@@ -1459,7 +1455,7 @@
                         />
                       </FormControl>
                       <FormDescription>{{
-                        $t('admin.inbox.livechat.blockedIPs.description')
+                        i18n._('Enter IP addresses or CIDR ranges to block, one per line. Blocked IPs will be denied access to the widget.')
                       }}</FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -1479,6 +1475,11 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
+const literalExampleMessage1 = msg({ message: 'Available variables: \'{{.FirstName}}\', \'{{.LastName}}\'. Use | for fallback, e.g. Hi \'{{.FirstName | there}}\'' })
+const literalExampleMessage2 = msg({ message: 'Available variables: \'{{.FirstName}}\', \'{{.LastName}}\'. Use | for fallback, e.g. Hi \'{{.FirstName | there}}\'' })
+
 const HINT_CLASS = '!mt-2 text-muted-foreground text-xs flex items-start gap-1.5'
 
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
@@ -1528,7 +1529,7 @@ import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group
 import { Label } from '@shared-ui/components/ui/label'
 import { Plus, X, TriangleAlert, GripVertical, Lightbulb, Sun, Moon } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PreChatFormConfig, { getDefaultPrechatFields } from './PreChatFormConfig.vue'
 import { useAppSettingsStore } from '@/stores/appSettings'
@@ -1641,7 +1642,7 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const route = useRoute()
 const router = useRouter()
 const legacySection = LEGACY_TAB_SECTION[route.query.tab]
@@ -1765,7 +1766,7 @@ function defaultBranding(theme) {
 }
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     name: '',
     enabled: true,
@@ -1859,7 +1860,7 @@ const form = useForm({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 
@@ -2000,11 +2001,11 @@ const addHomeApp = (type) => {
 }
 
 const HOME_APP_LABELS = {
-  announcement: 'globals.terms.announcement',
-  external_link: 'admin.inbox.livechat.externalLinks',
-  help: 'globals.terms.helpCenter'
+  announcement: msg({ message: '{count, plural, one {Announcement} other {Announcements}}' }),
+  external_link: msg({ message: 'External links' }),
+  help: msg({ message: '{count, plural, one {Help center} other {Help centers}}' })
 }
-const homeAppLabel = (type) => t(HOME_APP_LABELS[type], 1)
+const homeAppLabel = (type) => i18n._(HOME_APP_LABELS[type], 1)
 
 const hasHelpHomeApp = computed(() => homeApps.value.some((item) => item.type === 'help'))
 
@@ -2070,7 +2071,7 @@ const onSubmit = form.handleSubmit(
       openSection('homeApps')
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('admin.inbox.livechat.homeApps.incomplete')
+        description: i18n._('Fill in or remove the incomplete home screen app.')
       })
       return
     }

@@ -5,18 +5,18 @@
       <DropdownMenuItem :as-child="true">
         <RouterLink :to="{ name: 'edit-webhook', params: { id: props.webhook.id } }">
           <Pencil class="mr-2 h-4 w-4" />
-          {{ $t('globals.messages.edit') }}
+          {{ i18n._('Edit') }}
         </RouterLink>
       </DropdownMenuItem>
       <DropdownMenuItem @click="handleToggle">
         <component :is="props.webhook.is_active ? PowerOff : Power" class="mr-2 h-4 w-4" />
         {{
-          props.webhook.is_active ? $t('globals.messages.disable') : $t('globals.messages.enable')
+          props.webhook.is_active ? i18n._('Disable') : i18n._('Enable')
         }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="handleTest">
         <Send class="mr-2 h-4 w-4" />
-        {{ $t('webhook.sendTest') }}
+        {{ i18n._('Send test') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -24,7 +24,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -32,15 +32,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('confirm.deleteWebhook') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this webhook.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">
-          {{ $t('globals.messages.delete') }}
+          {{ i18n._('Delete') }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -71,10 +71,10 @@ import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const emit = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const alertOpen = ref(false)
 
 const props = defineProps({
@@ -97,7 +97,7 @@ async function handleDelete() {
       model: 'webhook'
     })
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.deletedSuccessfully')
+      description: i18n._('Deleted successfully')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -115,7 +115,7 @@ async function handleToggle() {
     })
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -130,7 +130,7 @@ async function handleTest() {
     await api.testWebhook(props.webhook.id)
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('webhook.sentSuccessfully')
+      description: i18n._('Webhook sent successfully')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {

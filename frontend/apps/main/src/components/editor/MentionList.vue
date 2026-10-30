@@ -20,16 +20,16 @@
     </button>
   </div>
   <div v-else-if="query" class="mention-list bg-background border rounded-lg shadow-lg p-3">
-    <span class="text-sm text-muted-foreground">{{ $t('globals.messages.noResultsFound') }}</span>
+    <span class="text-sm text-muted-foreground">{{ i18n._('No results found') }}</span>
   </div>
 </template>
 
 <script setup>
 import { ref, watch, nextTick } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const props = defineProps({
   items: {
@@ -58,8 +58,8 @@ const getInitials = (name) => {
 }
 
 const getTypeLabel = (type) => {
-  if (type === 'agent') return t('globals.terms.agent')
-  if (type === 'team') return t('globals.terms.team')
+  if (type === 'agent') return i18n._('{count, plural, one {Agent} other {Agents}}')
+  if (type === 'team') return i18n._('{count, plural, one {Team} other {Teams}}')
   return type
 }
 

@@ -1,11 +1,11 @@
 import { createPinia } from 'pinia'
-import { createI18n } from 'vue-i18n'
+import { createI18n } from '@shared-ui/i18n'
 import WhatsAppConversationForm from '@main/features/conversation/WhatsAppConversationForm.vue'
 
 describe('WhatsAppConversationForm', () => {
   it('starts with the supplied contact selected', () => {
     const pinia = createPinia()
-    const i18n = createI18n({ legacy: false, missingWarn: false, fallbackWarn: false })
+    const i18n = createI18n({ locale: 'en-US', messages: {}, english: {} })
     const contact = {
       id: 42,
       first_name: 'E2E',

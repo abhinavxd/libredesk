@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -25,14 +25,14 @@ var queriesFS embed.FS
 
 type UserNotificationManager struct {
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 	q    queries
 }
 
 type UserNotificationOpts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 type queries struct {
@@ -69,7 +69,7 @@ func (m *UserNotificationManager) GetAll(userID, limit, offset int) ([]models.Us
 			return notifications, nil
 		}
 		m.lo.Error("error fetching notifications", "user_id", userID, "error", err)
-		return notifications, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return notifications, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return notifications, nil
 }
@@ -79,7 +79,7 @@ func (m *UserNotificationManager) GetStats(userID int) (models.NotificationStats
 	var stats models.NotificationStats
 	if err := m.q.GetNotificationStats.Get(&stats, userID, pq.Array(models.ReplyTypes)); err != nil {
 		m.lo.Error("error fetching notification stats", "user_id", userID, "error", err)
-		return stats, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return stats, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return stats, nil
 }
@@ -93,7 +93,7 @@ func (m *UserNotificationManager) Create(userID int, notificationType models.Not
 	body.String = pushPreview(body.String, notificationBodyRunes)
 	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta, pq.Array(models.ReplyTypes)); err != nil {
 		m.lo.Error("error creating notification", "user_id", userID, "type", notificationType, "conversation_id", conversationID.Int, "message_id", messageID.Int, "error", err)
-		return notification, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return notification, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return notification, nil
 }
@@ -106,7 +106,7 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 			return nil
 		}
 		m.lo.Error("error marking notification as read", "id", id, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (m *UserNotificationManager) MarkAsRead(id, userID int) error {
 func (m *UserNotificationManager) MarkAssignmentAsRead(conversationID, userID int) error {
 	if _, err := m.q.MarkAssignmentAsRead.Exec(conversationID, userID); err != nil {
 		m.lo.Error("error marking assignment notification as read", "conversation_id", conversationID, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (m *UserNotificationManager) MarkAssignmentAsRead(conversationID, userID in
 func (m *UserNotificationManager) MarkAllAsRead(userID int) error {
 	if _, err := m.q.MarkAllAsRead.Exec(userID); err != nil {
 		m.lo.Error("error marking all notifications as read", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -133,7 +133,7 @@ func (m *UserNotificationManager) MarkAllAsRead(userID int) error {
 func (m *UserNotificationManager) Delete(id, userID int) error {
 	if _, err := m.q.DeleteNotification.Exec(id, userID); err != nil {
 		m.lo.Error("error deleting notification", "id", id, "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -142,7 +142,7 @@ func (m *UserNotificationManager) Delete(id, userID int) error {
 func (m *UserNotificationManager) DeleteAll(userID int) error {
 	if _, err := m.q.DeleteAllNotifications.Exec(userID); err != nil {
 		m.lo.Error("error deleting all notifications", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) er
 		if !errors.Is(err, context.Canceled) {
 			m.lo.Error("error deleting old notifications", "error", err)
 		}
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
 		m.lo.Info("deleted old notifications", "rows_affected", rowsAffected)

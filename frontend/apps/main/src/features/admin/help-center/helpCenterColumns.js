@@ -1,12 +1,14 @@
+
+
 import { h } from 'vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import HelpCenterDropdown from './HelpCenterDropdown.vue'
 
-export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle } = {}) => [
+export const createHelpCenterColumns = (i18n, { onOpen, onEdit, onDelete, onToggle } = {}) => [
   {
     accessorKey: 'name',
-    header: () => h('div', null, t('globals.terms.name')),
+    header: () => h('div', null, i18n._('{count, plural, one {Name} other {Names}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -24,7 +26,7 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
   },
   {
     accessorKey: 'slug',
-    header: () => h('div', null, t('globals.terms.slug')),
+    header: () => h('div', null, i18n._('{count, plural, one {Slug} other {Slugs}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -36,13 +38,13 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
     accessorKey: 'is_active',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) =>
       h(
         'div',
         null,
         h(Badge, { variant: row.getValue('is_active') ? 'success' : 'secondary' }, () =>
-          row.getValue('is_active') ? t('globals.terms.active') : t('globals.terms.paused')
+          row.getValue('is_active') ? i18n._('Active') : i18n._('Paused')
         )
       )
   },
@@ -50,7 +52,7 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
     accessorKey: 'updated_at',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.updatedAt')),
+    header: () => h('div', null, i18n._('Updated at')),
     cell: ({ row }) =>
       h(TableDate, { value: row.getValue('updated_at') })
   },

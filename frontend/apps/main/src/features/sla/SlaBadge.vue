@@ -5,7 +5,7 @@
       <span class="sla-text">
         <span v-if="compact">{{ label ? `${label} ${sla.value}` : sla.value }}</span>
         <span v-else-if="!showExtra">{{ label }}</span>
-        <span v-else>{{ label }} {{ $t('sla.overdueBy') }} {{ sla.value }} </span>
+        <span v-else>{{ label }} {{ i18n._('Overdue by') }} {{ sla.value }} </span>
       </span>
     </span>
 
@@ -13,10 +13,10 @@
       <TooltipTrigger as-child>
         <span class="inline-flex items-center text-success rounded-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" tabindex="0">
           <CheckCircle size="14" aria-hidden="true" stroke-width="2" />
-          <span class="sr-only">{{ label }} {{ $t('sla.met') }}</span>
+          <span class="sr-only">{{ label }} {{ i18n._('SLA met') }}</span>
         </span>
       </TooltipTrigger>
-      <TooltipContent>{{ label }} {{ $t('sla.met') }}</TooltipContent>
+      <TooltipContent>{{ label }} {{ i18n._('SLA met') }}</TooltipContent>
     </Tooltip>
 
     <span v-else-if="sla?.status === 'remaining'" key="remaining" :class="compact ? 'sla-compact text-warning-600' : 'sla-badge sla-remaining'">

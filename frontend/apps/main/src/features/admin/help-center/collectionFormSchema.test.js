@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vitest'
 import { createCollectionFormSchema } from './collectionFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createCollectionFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createCollectionFormSchema(mockI18n)
 
 const validForm = {
   name: 'Getting started'

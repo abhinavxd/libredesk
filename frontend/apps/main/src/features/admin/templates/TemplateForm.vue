@@ -3,7 +3,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="name">
         <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" :disabled="!isOutgoingTemplate" />
           </FormControl>
@@ -13,7 +13,7 @@
 
       <FormField v-slot="{ componentField }" name="subject" v-if="!hideSubject">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Subject', 'Subjects', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -24,13 +24,13 @@
 
     <FormField v-slot="{ componentField, handleChange }" name="body">
       <FormItem>
-        <FormLabel>{{ $t('globals.terms.body') }}</FormLabel>
+        <FormLabel>{{ i18n._('Body') }}</FormLabel>
         <FormControl>
           <CodeEditor v-model="componentField.modelValue" @update:modelValue="handleChange" />
         </FormControl>
         <FormDescription v-if="isOutgoingTemplate">
           {{
-            $t('admin.template.makeSureTemplateHasContent', {
+            i18n._('Make sure the template has {content} only once.', {
               content: '\u007b\u007b template "content" . \u007d\u007d'
             })
           }}
@@ -44,10 +44,10 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox :checked="value" @update:checked="handleChange" />
-            <Label>{{ $t('globals.terms.isDefault') }}</Label>
+            <Label>{{ i18n._('Is default') }}</Label>
           </div>
         </FormControl>
-        <FormDescription>{{ $t('admin.template.onlyOneDefaultOutgoingTemplate') }}</FormDescription>
+        <FormDescription>{{ i18n._('You can have only one default outgoing email template.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -61,7 +61,7 @@
         :disabled="isLoading"
         @click="resetToDefault"
       >
-        {{ $t('globals.messages.resetToDefault') }}
+        {{ i18n._('Reset to default') }}
       </Button>
     </div>
   </form>
@@ -87,7 +87,7 @@ import { Input } from '@shared-ui/components/ui/input/index.js'
 import CodeEditor from '@main/components/editor/CodeEditor.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { BUILT_IN_TEMPLATE_BODIES, DEFAULT_OUTGOING_TEMPLATE_BODY } from './defaults.js'
 
 const props = defineProps({
@@ -109,14 +109,14 @@ const props = defineProps({
     required: false
   }
 })
-const { t } = useI18n()
+const i18n = useI18n()
 
 const submitLabel = computed(() => {
-  return props.submitLabel || t('globals.messages.save')
+  return props.submitLabel || i18n._('Save')
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: props.initialValues
 })
 

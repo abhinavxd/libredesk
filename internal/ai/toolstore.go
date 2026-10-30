@@ -21,7 +21,7 @@ func (m *Manager) GetTools() ([]models.Tool, error) {
 	tools := make([]models.Tool, 0)
 	if err := m.q.GetTools.Select(&tools); err != nil {
 		m.lo.Error("error fetching tools", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	for i := range tools {
 		tools[i].Auth = maskToolAuth(tools[i].Auth)
@@ -34,10 +34,10 @@ func (m *Manager) GetTool(id int) (models.Tool, error) {
 	var tool models.Tool
 	if err := m.q.GetTool.Get(&tool, id); err != nil {
 		if err == sql.ErrNoRows {
-			return tool, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return tool, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching tool", "error", err)
-		return tool, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return tool, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	tool.Auth = maskToolAuth(tool.Auth)
 	return tool, nil
@@ -57,7 +57,7 @@ func (m *Manager) GetEnabledCopilotToolIDs() ([]int, error) {
 	ids := make([]int, 0)
 	if err := m.q.GetEnabledCopilotToolIDs.Select(&ids); err != nil {
 		m.lo.Error("error fetching Copilot tool ids", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return ids, nil
 }
@@ -66,7 +66,7 @@ func (m *Manager) GetEnabledGenerateReplyToolIDs() ([]int, error) {
 	ids := make([]int, 0)
 	if err := m.q.GetEnabledGenerateToolIDs.Select(&ids); err != nil {
 		m.lo.Error("error fetching Generate Reply tool ids", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return ids, nil
 }
@@ -83,7 +83,7 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	var created models.Tool
 	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		m.lo.Error("error creating tool", "error", err)
-		return created, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return created, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	created.Auth = maskToolAuth(created.Auth)
 	return created, nil
@@ -96,10 +96,10 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	var existing types.JSONText
 	if err := m.q.GetToolAuth.Get(&existing, id); err != nil {
 		if err == sql.ErrNoRows {
-			return t, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return t, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching existing tool auth", "error", err)
-		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return t, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	auth, err := m.prepareToolAuth(t.Auth, existing)
 	if err != nil {
@@ -109,10 +109,10 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	var updated models.Tool
 	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		if err == sql.ErrNoRows {
-			return updated, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return updated, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error updating tool", "error", err)
-		return updated, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return updated, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	updated.Auth = maskToolAuth(updated.Auth)
 	return updated, nil
@@ -121,7 +121,7 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 func (m *Manager) DeleteTool(id int) error {
 	if _, err := m.q.DeleteTool.Exec(id); err != nil {
 		m.lo.Error("error deleting tool", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -134,7 +134,7 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 	}
 	var auth models.ToolAuth
 	if err := json.Unmarshal(raw, &auth); err != nil {
-		return raw, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return raw, envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 	existingHeaders := toolAuthHeaders(existing)
 	for i, h := range auth.Headers {
@@ -150,17 +150,17 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 				}
 			}
 			if existingValue == "" {
-				return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.headerSecretMissing"), nil)
+				return raw, envelope.NewError(envelope.InputError, m.i18n.Get("This header has no saved value. Renaming a header does not carry over its stored secret. Enter the value again."), nil)
 			}
 			auth.Headers[i].Value = existingValue
 		case crypto.IsEncrypted(h.Value):
 			// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail at call time.
-			return raw, envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+			return raw, envelope.NewError(envelope.InputError, m.i18n.Get("The value can't start with \"enc:\". That prefix is reserved for encrypted secrets."), nil)
 		default:
 			enc, err := crypto.Encrypt(h.Value, m.encryptionKey)
 			if err != nil {
 				m.lo.Error("error encrypting tool auth", "error", err)
-				return raw, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return raw, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 			}
 			auth.Headers[i].Value = enc
 		}
@@ -175,13 +175,13 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 // validateToolInput runs the shared create/update checks: name format, reserved name, allowed HTTP method, valid definition.
 func (m *Manager) validateToolInput(t *models.Tool) error {
 	if !toolNameFormat.MatchString(t.Name) || len(t.Name) > maxToolNameLen {
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.nameHint"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Letters, numbers, hyphen and underscore only, up to 64 characters."), nil)
 	}
 	if reservedToolNames[t.Name] {
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This name is reserved for a built-in tool. Choose a different name."), nil)
 	}
 	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return m.validateToolDefinition(t)
 }
@@ -191,7 +191,7 @@ func (m *Manager) validateToolDefinition(t *models.Tool) error {
 	t.URL = strings.TrimSpace(t.URL)
 	u, err := neturl.Parse(t.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.invalidUrl"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Enter a valid http or https URL."), nil)
 	}
 	params := strings.TrimSpace(string(t.Parameters))
 	if params == "" || params == "null" {
@@ -200,7 +200,7 @@ func (m *Manager) validateToolDefinition(t *models.Tool) error {
 	}
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(params), &obj); err != nil {
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.parametersInvalid"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Invalid JSON. Check for a missing comma, quote, or bracket."), nil)
 	}
 	return nil
 }

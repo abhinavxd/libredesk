@@ -59,7 +59,7 @@ func (m *Manager) GetFAQSuggestions(status string) ([]models.FAQSuggestion, erro
 	items := []models.FAQSuggestion{}
 	if err := m.q.GetFAQSuggestions.Select(&items, status); err != nil {
 		m.lo.Error("error fetching faq suggestions", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return items, nil
 }
@@ -72,7 +72,7 @@ func (m *Manager) ApproveFAQSuggestion(id int, question, answer string, reviewer
 		return err
 	}
 	if s.Status != models.FAQStatusPending {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.faqAlreadyReviewed"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This suggestion has already been reviewed."), nil)
 	}
 	question = strings.TrimSpace(question)
 	answer = strings.TrimSpace(answer)
@@ -87,10 +87,10 @@ func (m *Manager) ApproveFAQSuggestion(id int, question, answer string, reviewer
 	res, err := m.q.ApproveFAQSuggestionIfPending.Exec(id, reviewerID)
 	if err != nil {
 		m.lo.Error("error approving faq suggestion", "id", id, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.faqAlreadyReviewed"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This suggestion has already been reviewed."), nil)
 	}
 	if _, err := m.ai.CreateKnowledgeBaseItem(question, answer, aimodels.KnowledgeSourceConversation, "", true); err != nil {
 		m.lo.Error("faq suggestion approved but snippet creation failed", "id", id, "error", err)
@@ -107,10 +107,10 @@ func (m *Manager) RejectFAQSuggestion(id, reviewerID int) error {
 	res, err := m.q.RejectFAQSuggestionIfPending.Exec(id, reviewerID)
 	if err != nil {
 		m.lo.Error("error rejecting faq suggestion", "id", id, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.faqAlreadyReviewed"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This suggestion has already been reviewed."), nil)
 	}
 	return nil
 }
@@ -301,10 +301,10 @@ func (m *Manager) getFAQSuggestion(id int) (models.FAQSuggestion, error) {
 	var s models.FAQSuggestion
 	if err := m.q.GetFAQSuggestion.Get(&s, id); err != nil {
 		if err == sql.ErrNoRows {
-			return s, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return s, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching faq suggestion", "id", id, "error", err)
-		return s, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return s, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return s, nil
 }

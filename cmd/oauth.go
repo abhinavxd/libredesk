@@ -43,18 +43,19 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 
 	if provider != string(oauth.ProviderGoogle) && provider != string(oauth.ProviderMicrosoft) {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Parse request body
 	if err := json.Unmarshal(r.RequestCtx.PostBody(), &req); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Validate credentials
 	if req.ClientID == "" || req.ClientSecret == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "credentials"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s empty",
+			"credentials"), nil, envelope.InputError)
 	}
 
 	if req.FlowType != FlowTypeNewInbox && req.FlowType != FlowTypeReconnect {
@@ -68,7 +69,7 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 	state, err := stringutil.RandomAlphanumeric(32)
 	if err != nil {
 		app.lo.Error("Failed to generate OAuth state", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Store OAuth data in Redis with 15 min expiry
@@ -89,13 +90,13 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 
 	if err := app.redis.HSet(ctx, redisKey, oauthData).Err(); err != nil {
 		app.lo.Error("Failed to store OAuth state in Redis", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Set 15 min expiry (auto-cleanup)
 	if err := app.redis.Expire(ctx, redisKey, 15*time.Minute).Err(); err != nil {
 		app.lo.Error("Failed to set expiry for OAuth state in Redis", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Build authorization URL with scopes
@@ -132,7 +133,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	}
 
 	if state == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Retrieve OAuth data from Redis
@@ -141,12 +142,12 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	if err != nil {
 		app.lo.Error("error loading inbox OAuth state", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError,
-			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	if len(oauthData) == 0 {
 		app.lo.Warn("inbox OAuth callback rejected: state is invalid or expired")
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Delete key after retrieval (one-time use)
@@ -164,7 +165,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	// Validate provider matches URL parameter
 	if storedProvider != provider {
 		app.lo.Error("Provider mismatch", "stored", storedProvider, "url", provider)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Exchange authorization code for tokens
@@ -197,7 +198,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	// Check if inbox with this email already exists
 	existingInboxes, err := app.inbox.GetAll()
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Extract email address for comparison (handles "Name <email>" format)

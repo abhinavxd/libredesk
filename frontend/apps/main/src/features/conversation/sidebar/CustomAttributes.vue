@@ -44,13 +44,13 @@
               ]"
               :aria-label="
                 getLinkUrl(attribute)
-                  ? `${t('globals.messages.edit')}: ${attribute.name}`
-                  : `${t('globals.messages.edit')}: ${attribute.name}: ${customAttributes?.[attribute.key] ?? t('globals.messages.set')}`
+                  ? i18n._('Edit: {name}', { name: attribute.name })
+                  : i18n._('Edit: {name}: {value}', { name: attribute.name, value: customAttributes?.[attribute.key] ?? i18n._('Set') })
               "
             >
               <Pencil v-if="getLinkUrl(attribute)" aria-hidden="true" />
               <span v-else class="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{{
-                customAttributes?.[attribute.key] ?? t('globals.messages.set')
+                customAttributes?.[attribute.key] ?? i18n._('Set')
               }}</span>
             </Button>
           </PopoverTrigger>
@@ -83,7 +83,7 @@
                 :aria-invalid="!!errorMessage"
                 :aria-describedby="errorMessage ? `${editorId}-${attribute.key}-error` : undefined"
               >
-                <SelectValue :placeholder="t('placeholders.selectValue')" />
+                <SelectValue :placeholder="i18n._('Select value')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="option in attribute.values" :key="option" :value="option">
@@ -118,13 +118,13 @@
                 class="text-muted-foreground"
                 @click="deleteAttribute(attribute)"
               >
-                {{ t('globals.terms.remove') }}
+                {{ i18n._('Remove') }}
               </Button>
               <div class="ml-auto flex items-center gap-2">
                 <Button type="button" variant="outline" size="sm" @click="cancelEditing">
-                  {{ t('globals.messages.cancel') }}
+                  {{ i18n._('Cancel') }}
                 </Button>
-                <Button type="submit" size="sm">{{ t('globals.messages.save') }}</Button>
+                <Button type="submit" size="sm">{{ i18n._('Save') }}</Button>
               </div>
             </div>
           </form>
@@ -151,7 +151,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { Label } from '@shared-ui/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   attributes: {
@@ -168,7 +168,7 @@ const props = defineProps({
   }
 })
 const emit = defineEmits(['update:setattributes'])
-const { t } = useI18n()
+const i18n = useI18n()
 const editorId = useId()
 const INPUT_TYPES = { text: 'text', number: 'number', date: 'date', link: 'url' }
 const errorMessage = ref('')
@@ -201,7 +201,7 @@ const cancelEditing = () => {
 const getValidationSchema = (attribute) => {
   switch (attribute.data_type) {
     case 'text': {
-      let schema = z.string().min(1, t('globals.messages.required'))
+      let schema = z.string().min(1, i18n._('{name} Required'))
       // If regex is provided and valid, add it to the schema validation along with the hint
       if (attribute.regex) {
         try {
@@ -220,7 +220,7 @@ const getValidationSchema = (attribute) => {
         (val) => Number(val),
         z
           .number({
-            invalid_type_error: t('validation.invalidValue')
+            invalid_type_error: i18n._('Invalid value')
           })
           .nullable()
       )
@@ -229,15 +229,15 @@ const getValidationSchema = (attribute) => {
     case 'date':
       return z
         .string()
-        .refine((val) => !isNaN(Date.parse(val)), t('validation.invalidValue'))
+        .refine((val) => !isNaN(Date.parse(val)), i18n._('Invalid value'))
         .nullable()
     case 'link':
-      return z.string().url(t('validation.invalidUrl')).nullable()
+      return z.string().url(i18n._('Invalid URL')).nullable()
     case 'list':
       return z
         .string()
         .refine((val) => attribute.values.includes(val), {
-          message: t('validation.invalidValue')
+          message: i18n._('Invalid value')
         })
         .nullable()
     default:

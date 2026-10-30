@@ -9,7 +9,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -22,14 +22,14 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -59,10 +59,10 @@ func (m *Manager) Get(id int) (models.CustomAttribute, error) {
 	var customAttribute models.CustomAttribute
 	if err := m.q.GetCustomAttribute.Get(&customAttribute, id); err != nil {
 		if err == sql.ErrNoRows {
-			return customAttribute, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundCustomAttribute"), nil)
+			return customAttribute, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Custom attribute not found"), nil)
 		}
 		m.lo.Error("error fetching custom attribute", "error", err)
-		return customAttribute, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return customAttribute, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return customAttribute, nil
 }
@@ -72,7 +72,7 @@ func (m *Manager) GetAll(appliesTo string) ([]models.CustomAttribute, error) {
 	var customAttributes = make([]models.CustomAttribute, 0)
 	if err := m.q.GetAllCustomAttributes.Select(&customAttributes, appliesTo); err != nil {
 		m.lo.Error("error fetching custom attributes", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return customAttributes, nil
 }
@@ -82,10 +82,10 @@ func (m *Manager) Create(attr models.CustomAttribute) (models.CustomAttribute, e
 	var createdAttr models.CustomAttribute
 	if err := m.q.InsertCustomAttribute.Get(&createdAttr, attr.AppliesTo, attr.Name, attr.Description, attr.Key, pq.Array(attr.Values), attr.DataType, attr.Regex, attr.RegexHint); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.CustomAttribute{}, envelope.NewError(envelope.InputError, m.i18n.T("errors.alreadyExistsCustomAttribute"), nil)
+			return models.CustomAttribute{}, envelope.NewError(envelope.InputError, m.i18n.Get("Custom attribute already exists"), nil)
 		}
 		m.lo.Error("error inserting custom attribute", "error", err)
-		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return createdAttr, nil
 }
@@ -95,7 +95,7 @@ func (m *Manager) Update(id int, attr models.CustomAttribute) (models.CustomAttr
 	var updatedAttr models.CustomAttribute
 	if err := m.q.UpdateCustomAttribute.Get(&updatedAttr, id, attr.AppliesTo, attr.Name, attr.Description, pq.Array(attr.Values), attr.Regex, attr.RegexHint); err != nil {
 		m.lo.Error("error updating custom attribute", "error", err)
-		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.CustomAttribute{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return updatedAttr, nil
 }
@@ -104,7 +104,7 @@ func (m *Manager) Update(id int, attr models.CustomAttribute) (models.CustomAttr
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteCustomAttribute.Exec(id); err != nil {
 		m.lo.Error("error deleting custom attribute", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

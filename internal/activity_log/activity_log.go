@@ -13,7 +13,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -25,7 +25,7 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 	db   *sqlx.DB
 }
 
@@ -33,7 +33,7 @@ type Manager struct {
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -61,7 +61,7 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int,
 	query, qArgs, err := m.makeQuery(page, pageSize, order, orderBy, filtersJSON, location)
 	if err != nil {
 		m.lo.Error("error creating activity log list query", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Start a read-only txn.
@@ -70,7 +70,7 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int,
 	})
 	if err != nil {
 		m.lo.Error("error starting read-only transaction", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -78,16 +78,14 @@ func (m *Manager) GetAll(order, orderBy, filtersJSON string, page, pageSize int,
 	var activityLogs = make([]models.ActivityLog, 0)
 	if err := tx.Select(&activityLogs, query, qArgs...); err != nil {
 		m.lo.Error("error fetching activity logs", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return activityLogs, nil
 }
 
 // Login records a login event for the given user.
 func (al *Manager) Login(userID int, email, ip string) error {
-	description := al.i18n.Ts("activityLog.agentLogin",
-		"email", email,
-		"userId", fmt.Sprintf("#%d", userID))
+	description := al.i18n.Get("%[1]s (%[2]s) logged in", email, fmt.Sprintf("#%d", userID))
 	return al.create(
 		models.AgentLogin,
 		description,
@@ -100,9 +98,7 @@ func (al *Manager) Login(userID int, email, ip string) error {
 
 // Logout records a logout event for the given user.
 func (al *Manager) Logout(userID int, email, ip string) error {
-	description := al.i18n.Ts("activityLog.agentLogout",
-		"email", email,
-		"userId", fmt.Sprintf("#%d", userID))
+	description := al.i18n.Get("%[1]s (%[2]s) logged out", email, fmt.Sprintf("#%d", userID))
 	return al.create(
 		models.AgentLogout,
 		description,
@@ -117,15 +113,13 @@ func (al *Manager) Logout(userID int, email, ip string) error {
 func (al *Manager) Away(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = al.i18n.Ts("activityLog.agentAway",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"targetEmail", targetEmail,
-			"targetId", fmt.Sprintf("#%d", targetID))
+		description = al.i18n.Get("%[1]s (%[2]s) changed %[3]s (%[4]s) status to away",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			targetEmail,
+			fmt.Sprintf("#%d", targetID))
 	} else {
-		description = al.i18n.Ts("activityLog.agentAwaySelf",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID))
+		description = al.i18n.Get("%[1]s (%[2]s) is away", actorEmail, fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentAway, /* activity type*/
@@ -141,15 +135,13 @@ func (al *Manager) Away(actorID int, actorEmail, ip string, targetID int, target
 func (al *Manager) AwayReassigned(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = al.i18n.Ts("activityLog.agentAwayReassign",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"targetEmail", targetEmail,
-			"targetId", fmt.Sprintf("#%d", targetID))
+		description = al.i18n.Get("%[1]s (%[2]s) changed %[3]s (%[4]s) status to away and reassigning",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			targetEmail,
+			fmt.Sprintf("#%d", targetID))
 	} else {
-		description = al.i18n.Ts("activityLog.agentAwayReassignSelf",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID))
+		description = al.i18n.Get("%[1]s (%[2]s) is away and reassigning", actorEmail, fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentAwayReassigned, /* activity type*/
@@ -165,15 +157,13 @@ func (al *Manager) AwayReassigned(actorID int, actorEmail, ip string, targetID i
 func (al *Manager) Online(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
 	var description string
 	if targetID != 0 && targetEmail != "" && (targetID != actorID || targetEmail != actorEmail) {
-		description = al.i18n.Ts("activityLog.agentOnline",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"targetEmail", targetEmail,
-			"targetId", fmt.Sprintf("#%d", targetID))
+		description = al.i18n.Get("%[1]s (%[2]s) changed %[3]s (%[4]s) status to online",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			targetEmail,
+			fmt.Sprintf("#%d", targetID))
 	} else {
-		description = al.i18n.Ts("activityLog.agentOnlineSelf",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID))
+		description = al.i18n.Get("%[1]s (%[2]s) is online", actorEmail, fmt.Sprintf("#%d", actorID))
 	}
 	return al.create(
 		models.AgentOnline, /* activity type*/
@@ -206,11 +196,11 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 
 // PasswordSet records a password set event.
 func (al *Manager) PasswordSet(actorID int, actorEmail, ip string, targetID int, targetEmail string) error {
-	description := al.i18n.Ts("activityLog.agentPasswordSet",
-		"actorEmail", actorEmail,
-		"actorId", fmt.Sprintf("#%d", actorID),
-		"targetEmail", targetEmail,
-		"targetId", fmt.Sprintf("#%d", targetID))
+	description := al.i18n.Get("%[1]s (%[2]s) set password for %[3]s (%[4]s)",
+		actorEmail,
+		fmt.Sprintf("#%d", actorID),
+		targetEmail,
+		fmt.Sprintf("#%d", targetID))
 	return al.create(
 		models.AgentPasswordSet,
 		description,
@@ -225,27 +215,27 @@ func (al *Manager) PasswordSet(actorID int, actorEmail, ip string, targetID int,
 func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, roleID int, roleName string, added, removed []string) error {
 	var description string
 	if len(removed) > 0 && len(added) > 0 {
-		description = al.i18n.Ts("activityLog.rolePermissionsChanged",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"removed", strings.Join(removed, ", "),
-			"added", strings.Join(added, ", "),
-			"roleName", roleName,
-			"roleId", fmt.Sprintf("#%d", roleID))
+		description = al.i18n.Get("%[1]s (%[2]s) removed permission(s) %[3]s and added permission(s) %[4]s to role %[5]s (%[6]s)",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			strings.Join(removed, ", "),
+			strings.Join(added, ", "),
+			roleName,
+			fmt.Sprintf("#%d", roleID))
 	} else if len(removed) > 0 {
-		description = al.i18n.Ts("activityLog.rolePermissionsRemoved",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"permissions", strings.Join(removed, ", "),
-			"roleName", roleName,
-			"roleId", fmt.Sprintf("#%d", roleID))
+		description = al.i18n.Get("%[1]s (%[2]s) removed permission(s) %[3]s from role %[4]s (%[5]s)",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			strings.Join(removed, ", "),
+			roleName,
+			fmt.Sprintf("#%d", roleID))
 	} else if len(added) > 0 {
-		description = al.i18n.Ts("activityLog.rolePermissionsAdded",
-			"actorEmail", actorEmail,
-			"actorId", fmt.Sprintf("#%d", actorID),
-			"permissions", strings.Join(added, ", "),
-			"roleName", roleName,
-			"roleId", fmt.Sprintf("#%d", roleID))
+		description = al.i18n.Get("%[1]s (%[2]s) added permission(s) %[3]s to role %[4]s (%[5]s)",
+			actorEmail,
+			fmt.Sprintf("#%d", actorID),
+			strings.Join(added, ", "),
+			roleName,
+			fmt.Sprintf("#%d", roleID))
 	} else {
 		return nil // No changes
 	}
@@ -261,11 +251,11 @@ func (al *Manager) RolePermissionsChanged(actorID int, actorEmail, ip string, ro
 
 // ContactDeleted records permanent deletion of a contact and their data.
 func (al *Manager) ContactDeleted(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
-	description := al.i18n.Ts("activityLog.contactDeleted",
-		"actorEmail", actorEmail,
-		"actorId", fmt.Sprintf("#%d", actorID),
-		"contactEmail", contactEmail,
-		"contactId", fmt.Sprintf("#%d", contactID))
+	description := al.i18n.Get("%[1]s (%[2]s) deleted contact %[3]s (%[4]s)",
+		actorEmail,
+		fmt.Sprintf("#%d", actorID),
+		contactEmail,
+		fmt.Sprintf("#%d", contactID))
 	return al.create(
 		models.ContactDeleted,
 		description,
@@ -278,11 +268,11 @@ func (al *Manager) ContactDeleted(actorID int, actorEmail, ip string, contactID 
 
 // ContactDataExported records an export of a contact's stored data.
 func (al *Manager) ContactDataExported(actorID int, actorEmail, ip string, contactID int, contactEmail string) error {
-	description := al.i18n.Ts("activityLog.contactDataExported",
-		"actorEmail", actorEmail,
-		"actorId", fmt.Sprintf("#%d", actorID),
-		"contactEmail", contactEmail,
-		"contactId", fmt.Sprintf("#%d", contactID))
+	description := al.i18n.Get("%[1]s (%[2]s) exported data of contact %[3]s (%[4]s)",
+		actorEmail,
+		fmt.Sprintf("#%d", actorID),
+		contactEmail,
+		fmt.Sprintf("#%d", contactID))
 	return al.create(
 		models.ContactDataExported,
 		description,
@@ -297,7 +287,7 @@ func (al *Manager) ContactDataExported(actorID int, actorEmail, ip string, conta
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
 	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
 		m.lo.Error("error inserting activity log", "actor_id", actorID, "target_model", targetModelType, "target_id", targetModelID, "activity_type", activityType, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

@@ -2,9 +2,9 @@
   <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <FormField v-slot="{ componentField }" name="title">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.title') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Title', 'Titles', 1) }}</FormLabel>
         <FormControl>
-          <Input type="text" :placeholder="t('admin.ai.snippet.titlePlaceholder')" v-bind="componentField" />
+          <Input type="text" :placeholder="i18n._('Refund policy')" v-bind="componentField" />
         </FormControl>
         <FormMessage />
       </FormItem>
@@ -12,15 +12,15 @@
 
     <FormField v-slot="{ componentField }" name="content">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.content') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Content', 'Contents', 1) }}</FormLabel>
         <FormControl>
           <Textarea
             class="min-h-[420px] max-h-[60vh]"
-            :placeholder="t('admin.ai.snippet.contentPlaceholder')"
+            :placeholder="i18n._('We offer refunds within 30 days of purchase. To request one, ...')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.snippet.contentHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('The assistant searches this text to answer customer questions, so write it as a self-contained answer rather than a fragment.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -28,7 +28,7 @@
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
         <SwitchField
-          :title="t('globals.terms.enabled')"
+          :title="i18n._('Enabled')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -37,7 +37,7 @@
 
     <DialogFooter class="mt-10">
       <Button type="submit" :isLoading="formLoading">
-        {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
+        {{ isEditing ? i18n._('Save') : i18n._('Create') }}
       </Button>
     </DialogFooter>
   </form>
@@ -61,7 +61,7 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   initialValues: { type: Object, default: () => ({}) },
@@ -69,17 +69,17 @@ const props = defineProps({
   submitForm: { type: Function, required: true }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
-      title: z.string({ required_error: t('globals.messages.required') }).min(1, {
-        message: t('globals.messages.required')
+      title: z.string({ required_error: i18n._('{name} Required') }).min(1, {
+        message: i18n._('{name} Required')
       }),
-      content: z.string({ required_error: t('globals.messages.required') }).min(1, {
-        message: t('globals.messages.required')
+      content: z.string({ required_error: i18n._('{name} Required') }).min(1, {
+        message: i18n._('{name} Required')
       }),
       enabled: z.boolean().optional()
     })

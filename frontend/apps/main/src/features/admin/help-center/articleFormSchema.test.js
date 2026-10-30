@@ -1,8 +1,8 @@
 import { describe, test, expect } from 'vitest'
 import { createArticleFormSchema } from './articleFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createArticleFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createArticleFormSchema(mockI18n)
 
 const validForm = {
   title: 'How to reset your password',

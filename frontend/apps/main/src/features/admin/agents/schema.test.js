@@ -1,8 +1,11 @@
 import { describe, test, expect } from 'vitest'
 import { createFormSchema } from './formSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createFormSchema(mockT)
+const mockI18n = {
+    _: (key, params) => `${key} ${JSON.stringify(params || {})}`,
+    ngettext: (singular) => singular,
+}
+const schema = createFormSchema(mockI18n)
 
 const validForm = {
     first_name: 'John',
@@ -183,6 +186,22 @@ describe('Form Schema', () => {
 
     test('empty object', () => {
         expect(() => schema.parse({})).toThrow()
+    })
+
+    test('missing fields use translated messages with field names', () => {
+        const result = schema.safeParse({})
+        expect(result.error.flatten().fieldErrors).toEqual({
+            first_name: ['{name} Required {"name":"First name"}'],
+            email: ['{name} Required {"name":"Email"}'],
+            roles: ['Please select at least one role {}'],
+        })
+    })
+
+    test('missing and empty roles use the same translated message', () => {
+        const missing = schema.safeParse({ ...validForm, roles: undefined })
+        const empty = schema.safeParse({ ...validForm, roles: [] })
+        expect(missing.error.flatten().fieldErrors.roles)
+            .toEqual(empty.error.flatten().fieldErrors.roles)
     })
 
     test('extra unknown fields ignored', () => {

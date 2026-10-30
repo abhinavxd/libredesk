@@ -3,12 +3,12 @@
 {{ define "docs-site-header" }}
 {{ template "hc-head" . }}
 <body class="hcd">
-    <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
+    <a class="hc-skip-link" href="#hc-main">{{ .L.GetD "templates" "Skip to main content" }}</a>
     {{ template "hc-announcement" . }}
     <header class="hcd-topbar">
         <div class="hcd-topbar-inner">
             <div class="hcd-topbar-start">
-                <button type="button" class="hcd-sidebar-toggle" data-hcd-sidebar-toggle aria-expanded="false" aria-controls="hcd-sidebar" aria-label="{{ .L.T "globals.terms.menu" }}">
+                <button type="button" class="hcd-sidebar-toggle" data-hcd-sidebar-toggle aria-expanded="false" aria-controls="hcd-sidebar" aria-label="{{ .L.GetD "templates" "Menu" }}">
                     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
                 </button>
                 <a class="hcd-brand" href="{{ .Data.HelpCenter.BasePath }}">
@@ -17,12 +17,12 @@
             </div>
             <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
                 {{ template "hc-search-icon" }}
-                <span class="hcd-search-btn-label">{{ .L.T "globals.terms.search" }}</span>
+                <span class="hcd-search-btn-label">{{ .L.GetD "templates" "Search" }}</span>
                 <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
             </a>
             <div class="hcd-topbar-end">
                 {{ if .Data.HelpCenter.NavLinks }}
-                <nav class="hcd-topnav" aria-label="{{ .L.T "globals.terms.main" }}">
+                <nav class="hcd-topnav" aria-label="{{ .L.GetD "templates" "Main" }}">
                     {{ range .Data.HelpCenter.NavLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
                 </nav>
                 {{ end }}
@@ -36,16 +36,16 @@
 
     <div class="hcd-search-layer" data-hcd-search hidden>
         <div class="hcd-search-backdrop" data-hcd-search-close></div>
-        <div class="hcd-search-panel" role="dialog" aria-modal="true" aria-label="{{ .L.T "globals.terms.search" }}">
-            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ .L.T "helpCenter.noResults" }}" data-hc-results-one="{{ .L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ .L.Tc "helpCenter.resultsCount" 2 }}">
+        <div class="hcd-search-panel" role="dialog" aria-modal="true" aria-label="{{ .L.GetD "templates" "Search" }}">
+            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ .L.GetD "templates" "No articles matched your search. Try fewer or different words." }}" data-hc-results="{{ HelpSearchLabels .L }}">
                 {{ template "hc-search-icon" "hc-search-icon" }}
-                <input type="search" name="q" value="" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
-                <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+                <input type="search" name="q" value="" placeholder="{{ .L.GetD "templates" "Search articles..." }}" aria-label="{{ .L.GetD "templates" "Search articles..." }}" autocomplete="off" />
+                <button type="submit" class="hc-sr-only">{{ .L.GetD "templates" "Search" }}</button>
             </form>
             <div class="hcd-search-hints">
-                <span><kbd class="hcd-kbd">↑</kbd><kbd class="hcd-kbd">↓</kbd> {{ .L.T "command.navigate" }}</span>
-                <span><kbd class="hcd-kbd">↵</kbd> {{ .L.T "globals.terms.select" }}</span>
-                <span><kbd class="hcd-kbd">esc</kbd> {{ .L.T "globals.messages.close" }}</span>
+                <span><kbd class="hcd-kbd">↑</kbd><kbd class="hcd-kbd">↓</kbd> {{ .L.GetD "templates" "Navigate" }}</span>
+                <span><kbd class="hcd-kbd">↵</kbd> {{ .L.GetD "templates" "Select" }}</span>
+                <span><kbd class="hcd-kbd">esc</kbd> {{ .L.GetD "templates" "Close" }}</span>
             </div>
         </div>
     </div>
@@ -54,7 +54,7 @@
         <div class="hcd-sidebar-backdrop" data-hcd-sidebar-close></div>
         <aside class="hcd-sidebar" id="hcd-sidebar">
             {{ if .Data.Tree }}
-            <nav class="hcd-nav" aria-label="{{ .L.Tc "globals.terms.collection" 2 }}">
+            <nav class="hcd-nav" aria-label="{{ .L.GetND "templates" "Collection" "Collections" 2 }}">
                 {{ range .Data.Tree }}
                 {{ template "docs-nav-group" (map "Node" . "Root" true "Base" $.Data.HelpCenter.BasePath "ActiveCollection" $.Data.ActiveCollection "ActiveArticle" $.Data.ActiveArticle) }}
                 {{ end }}
@@ -99,7 +99,7 @@
         <div class="hcd-footer-inner">
             {{ if .Data.HelpCenter.FooterTaglineHTML }}<p class="hcd-footer-tagline">{{ .Data.HelpCenter.FooterTaglineHTML }}</p>{{ end }}
             {{ if .Data.HelpCenter.Theme.FooterLinks }}
-            <nav class="hcd-footer-links" aria-label="{{ .L.T "globals.terms.footer" }}">
+            <nav class="hcd-footer-links" aria-label="{{ .L.GetD "templates" "Footer" }}">
                 {{ range .Data.HelpCenter.Theme.FooterLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
             </nav>
             {{ end }}
@@ -108,7 +108,7 @@
                 {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
             </div>
             {{ end }}
-            <p class="hcd-footer-powered">{{ .L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+            <p class="hcd-footer-powered">{{ .L.GetD "templates" "Powered by" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
         </div>
     </footer>
     {{ template "hc-shared-behavior" }}
@@ -233,7 +233,7 @@
 {{ end }}
 
 {{ define "docs-breadcrumb" }}
-<nav class="hcd-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+<nav class="hcd-breadcrumb" aria-label="{{ .L.GetD "templates" "Breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
         {{ if .Collection }}{{ if .Collection.Name }}

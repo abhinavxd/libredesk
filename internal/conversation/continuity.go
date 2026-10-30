@@ -301,7 +301,7 @@ func (m *Manager) buildContinuityEmailContent(unreadMessages []models.Continuity
 	var content strings.Builder
 
 	for i, msg := range unreadMessages {
-		senderName := m.i18n.T("globals.terms.agent")
+		senderName := m.i18n.Get("Agent")
 		if msg.SenderFirstName.Valid || msg.SenderLastName.Valid {
 			firstName := strings.TrimSpace(msg.SenderFirstName.String)
 			lastName := strings.TrimSpace(msg.SenderLastName.String)
@@ -340,11 +340,11 @@ func (m *Manager) buildContinuityEmailContent(unreadMessages []models.Continuity
 		content.WriteString("</div>\n")
 	}
 
-	footerText := m.i18n.T("admin.inbox.livechat.continuityEmailFooter")
+	footerText := m.i18n.Get("Reply directly to this email to continue the conversation.")
 	if websiteURL != "" {
-		footerText = m.i18n.Ts("admin.inbox.livechat.continuityEmailFooterWithLink",
-			"link", fmt.Sprintf(`<a href="%s" style="color:#2563eb">`, html.EscapeString(websiteURL)),
-			"endlink", "</a>")
+		footerText = m.i18n.Get("Reply to this email or %[1]sgo to chat%[2]s to continue the conversation.",
+			fmt.Sprintf(`<a href="%s" style="color:#2563eb">`, html.EscapeString(websiteURL)),
+			"</a>")
 	}
 	fmt.Fprintf(&content, `<div style="border-top:1px solid #e0e0e0;margin-top:12px;padding-top:8px">`+
 		`<div style="font-size:12px;color:#999">%s</div></div>`, footerText)

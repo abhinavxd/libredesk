@@ -4,7 +4,7 @@
       <router-view></router-view>
     </template>
     <template #help>
-      <p>{{ $t('admin.sharedView.help') }}</p>
+      <p>{{ i18n._('Create shared views visible to all agents or specific teams.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>

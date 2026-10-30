@@ -3,7 +3,7 @@
     <div v-if="selectedTab">
       <AutomationTabs v-model:automationsTab="selectedTab">
         <template #actions>
-          <Button type="button" @click="newRule">{{ $t('automation.newRule') }}</Button>
+          <Button type="button" @click="newRule">{{ i18n._('New rule') }}</Button>
         </template>
       </AutomationTabs>
     </div>

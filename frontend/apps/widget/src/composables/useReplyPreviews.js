@@ -1,5 +1,7 @@
+
+
 import { watch, nextTick } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
@@ -11,7 +13,8 @@ export function useReplyPreviews() {
   const widget = useWidgetStore()
   const chat = useChatStore()
   const user = useUserStore()
-  const { t, locale } = useI18n()
+  const i18n = useI18n()
+  const { locale } = i18n
   watch(
     () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen, locale.value],
     async () => {
@@ -41,7 +44,7 @@ export function useReplyPreviews() {
             avatar: author.avatar_url || '',
             text:
               getTextFromHTML(message.text_content || message.content || '').slice(0, 240) ||
-              t('globals.terms.attachment'),
+              i18n._('{count, plural, one {Attachment} other {Attachments}}'),
             image:
               message.attachments?.find((attachment) =>
                 attachment.content_type?.startsWith('image/')
@@ -56,11 +59,11 @@ export function useReplyPreviews() {
           identity: String(user.userID || 'visitor'),
           previews,
           labels: {
-            openChat: t('globals.messages.openChat'),
-            closeChat: t('globals.messages.closeChat'),
-            dismiss: t('globals.terms.dismiss'),
-            dismissAll: t('widget.dismissPreviews'),
-            open: t('globals.messages.openConversation')
+            openChat: i18n._('Open chat'),
+            closeChat: i18n._('Close chat'),
+            dismiss: i18n._('Dismiss'),
+            dismissAll: i18n._('Dismiss all previews'),
+            open: i18n._('Open conversation')
           },
           theme: {
             background: style.backgroundColor,

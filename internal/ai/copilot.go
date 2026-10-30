@@ -104,10 +104,10 @@ func (m *Manager) Summarize(ctx context.Context, transcript string) (string, err
 func (m *Manager) SuggestTags(ctx context.Context, transcript string) ([]string, error) {
 	tags, err := m.getTags()
 	if err != nil {
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if len(tags) == 0 {
-		return nil, envelope.NewError(envelope.InputError, m.i18n.T("ai.noTagsConfigured"), nil)
+		return nil, envelope.NewError(envelope.InputError, m.i18n.Get("No tags exist yet. Tag suggestions need an existing tag list to choose from. Ask an admin to create tags first."), nil)
 	}
 
 	allowed := m.tagShortlist(ctx, transcript, tags)
@@ -179,7 +179,7 @@ func (m *Manager) GetCopilotMessages(conversationID, userID, limit int) ([]model
 	msgs := []models.CopilotMessage{}
 	if err := m.q.GetCopilotMessages.Select(&msgs, conversationID, userID, limit); err != nil {
 		m.lo.Error("error fetching copilot messages", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return msgs, nil
 }
@@ -188,7 +188,7 @@ func (m *Manager) GetCopilotMessages(conversationID, userID, limit int) ([]model
 func (m *Manager) SaveCopilotMessage(conversationID, userID int, role, content string) error {
 	if _, err := m.q.InsertCopilotMessage.Exec(conversationID, userID, role, content); err != nil {
 		m.lo.Error("error saving copilot message", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -197,7 +197,7 @@ func (m *Manager) SaveCopilotMessage(conversationID, userID int, role, content s
 func (m *Manager) ClearCopilotMessages(conversationID, userID int) error {
 	if _, err := m.q.DeleteCopilotMessages.Exec(conversationID, userID); err != nil {
 		m.lo.Error("error clearing copilot messages", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

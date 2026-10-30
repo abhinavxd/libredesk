@@ -5,11 +5,11 @@ import { extractEmailAddress } from '@main/utils/email-sender'
 
 export const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
-export const createFormSchema = (t) => z.object({
-  name: z.string().min(1, t('globals.messages.required')),
-  from: z.string().min(1, t('globals.messages.required')),
+export const createFormSchema = (i18n) => z.object({
+  name: z.string().min(1, i18n._('{name} Required')),
+  from: z.string().min(1, i18n._('{name} Required')),
   aliases: z.array(z.object({
-    email: z.string().refine(validateEmail, { message: t('validation.invalidEmail') }),
+    email: z.string().refine(validateEmail, { message: i18n._('Invalid email address') }),
     verification_status: z.string().optional()
   })).optional().default([]),
   from_name_template: z
@@ -17,13 +17,13 @@ export const createFormSchema = (t) => z.object({
     .optional()
     .default('')
     .refine((val) => isValidTemplate(val, FROM_NAME_TEMPLATE_VARS), {
-      message: t('admin.inbox.fromNameTemplate.invalidTemplate')
+      message: i18n._('Invalid template. Use only the supported variables and balanced braces.')
     }),
   reply_to: z
     .string()
     .optional()
     .refine((v) => !v || validateEmail(v), {
-      message: t('validation.invalidEmail')
+      message: i18n._('Invalid email address')
     }),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
@@ -39,32 +39,32 @@ export const createFormSchema = (t) => z.object({
     refresh_token: z.string().optional()
   }).optional(),
   imap: z.object({
-    host: z.string().min(1, t('globals.messages.required')),
+    host: z.string().min(1, i18n._('{name} Required')),
     port: z.number().min(1).max(65535),
-    mailbox: z.string().min(1, t('globals.messages.required')),
-    username: z.string().min(1, t('globals.messages.required')),
-    password: z.string().min(1, t('globals.messages.required')),
+    mailbox: z.string().min(1, i18n._('{name} Required')),
+    username: z.string().min(1, i18n._('{name} Required')),
+    password: z.string().min(1, i18n._('{name} Required')),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
-    scan_inbox_since: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('validation.invalidDuration')
+    scan_inbox_since: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
     }),
-    read_interval: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('validation.invalidDuration')
+    read_interval: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
     })
   }),
   smtp: z.object({
-    host: z.string().min(1, t('globals.messages.required')),
+    host: z.string().min(1, i18n._('{name} Required')),
     port: z.number().min(1).max(65535),
     username: z.string().default(''),
     password: z.string().default(''),
     max_conns: z.number().min(1),
     max_msg_retries: z.number().min(0).max(100),
-    idle_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('validation.invalidDuration')
+    idle_timeout: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
     }),
-    pool_wait_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
-      message: t('validation.invalidDuration')
+    pool_wait_timeout: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
     }),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
@@ -74,7 +74,7 @@ export const createFormSchema = (t) => z.object({
     if (smtp.auth_protocol === 'none') return
     for (const field of ['username', 'password']) {
       if (!smtp[field]) {
-        ctx.addIssue({ code: 'custom', path: [field], message: t('globals.messages.required') })
+        ctx.addIssue({ code: 'custom', path: [field], message: i18n._('{name} Required') })
       }
     }
   })
@@ -84,7 +84,7 @@ export const createFormSchema = (t) => z.object({
   for (const [index, value] of (values.aliases || []).entries()) {
     const alias = value.email.trim().toLowerCase()
     if (seen.has(alias)) {
-      ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: t('globals.messages.errorAlreadyExists') })
+      ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: i18n._('Already exists') })
     }
     seen.add(alias)
   }

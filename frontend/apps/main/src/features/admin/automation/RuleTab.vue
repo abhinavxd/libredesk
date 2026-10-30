@@ -14,16 +14,16 @@
             <Settings size="16" />
             <SelectValue>{{
               executionMode === 'first_match'
-                ? $t('admin.automation.executeFirstMatchingRule')
-                : $t('admin.automation.executeAllMatchingRules')
+                ? i18n._('Execute first matching rule')
+                : i18n._('Execute all matching rules')
             }}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="first_match">{{
-              $t('admin.automation.executeFirstMatchingRule')
+              i18n._('Execute first matching rule')
             }}</SelectItem>
             <SelectItem value="all">{{
-              $t('admin.automation.executeAllMatchingRules')
+              i18n._('Execute all matching rules')
             }}</SelectItem>
           </SelectContent>
         </Select>
@@ -35,7 +35,7 @@
       >
         <div class="text-center space-y-2">
           <p class="text-muted-foreground">
-            {{ $t('admin.automation.noRulesFound') }}
+            {{ i18n._('No rules found') }}
           </p>
         </div>
       </div>
@@ -77,7 +77,7 @@
 <script setup>
 import { usePreferredReducedMotion } from '@vueuse/core'
 import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import RuleList from './RuleList.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import {
@@ -96,7 +96,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 
 const reducedMotion = usePreferredReducedMotion()
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 
 const isLoading = ref(false)
@@ -146,7 +146,7 @@ const onDragEnd = async () => {
     })
     await api.updateAutomationRuleWeights(weights)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -162,7 +162,7 @@ const updateExecutionMode = async () => {
       mode: executionMode.value
     })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

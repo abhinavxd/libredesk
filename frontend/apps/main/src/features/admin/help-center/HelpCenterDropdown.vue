@@ -4,19 +4,19 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="emit('open', props.helpCenter)">
         <FileText class="mr-2 h-4 w-4" />
-        {{ $t('globals.terms.article', 2) }}
+        {{ i18n.ngettext('Article', 'Articles', 2) }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="emit('edit', props.helpCenter)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="visitSite">
         <ExternalLink class="mr-2 h-4 w-4" />
-        {{ $t('helpCenter.visitSite') }}
+        {{ i18n._('Visit site') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="emit('toggle', props.helpCenter)">
         <component :is="props.helpCenter.is_active ? PowerOff : Power" class="mr-2 h-4 w-4" />
-        {{ props.helpCenter.is_active ? $t('helpCenter.pause') : $t('helpCenter.resume') }}
+        {{ props.helpCenter.is_active ? i18n._('Pause site') : i18n._('Resume site') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -24,7 +24,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -32,15 +32,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('helpCenter.deleteConfirmation') }}
+          {{ i18n._('This will permanently delete the help center, including all its collections and articles.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          $t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

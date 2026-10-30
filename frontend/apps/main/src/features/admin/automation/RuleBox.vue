@@ -9,21 +9,21 @@
         <div class="flex items-center space-x-2">
           <RadioGroupItem value="OR" />
           <Label>
-            <i18n-t keypath="admin.automation.matchBelow">
+            <TranslatedText :message="matchBelowMessage">
               <template #any_or_all
-                ><b>{{ $t('admin.automation.any') }}</b></template
+                ><b>{{ i18n._('ANY') }}</b></template
               >
-            </i18n-t>
+            </TranslatedText>
           </Label>
         </div>
         <div class="flex items-center space-x-2">
           <RadioGroupItem value="AND" />
           <Label>
-            <i18n-t keypath="admin.automation.matchBelow">
+            <TranslatedText :message="matchBelowMessage">
               <template #any_or_all
-                ><b>{{ $t('admin.automation.all') }}</b></template
+                ><b>{{ i18n._('ALL') }}</b></template
               >
-            </i18n-t>
+            </TranslatedText>
           </Label>
         </div>
       </RadioGroup>
@@ -44,18 +44,18 @@
                 @update:modelValue="(value) => handleFieldChange(value, index)"
               >
                 <SelectTrigger :class="FIELD_CLASS">
-                  <SelectValue :placeholder="t('placeholders.selectField')" />
+                  <SelectValue :placeholder="i18n._('Select field')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel v-if="!contactsOnly">{{
-                      $t('globals.terms.conversation')
+                      i18n.ngettext('Conversation', 'Conversations', 1)
                     }}</SelectLabel>
                     <SelectItem v-for="(field, key) in currentFilters" :key="key" :value="key">
                       {{ field.label }}
                     </SelectItem>
                     <SelectLabel v-if="hasContactCustomAttributes">{{
-                      $t('globals.terms.contact')
+                      i18n.ngettext('Contact', 'Contacts', 1)
                     }}</SelectLabel>
                     <SelectItem
                       v-for="(field, key) in contactCustomAttributes"
@@ -73,7 +73,7 @@
                 @update:modelValue="(value) => handleOperatorChange(value, index)"
               >
                 <SelectTrigger :class="FIELD_CLASS">
-                  <SelectValue :placeholder="t('placeholders.selectOperator')" />
+                  <SelectValue :placeholder="i18n._('Select operator')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -82,7 +82,7 @@
                       :key="key"
                       :value="op"
                     >
-                      {{ operatorLabel(op, t) }}
+                      {{ operatorLabel(op, i18n) }}
                     </SelectItem>
                   </SelectGroup>
                 </SelectContent>
@@ -91,7 +91,7 @@
               <div v-if="showInput(index)" :class="FIELD_CLASS">
                 <Input
                   type="text"
-                  :placeholder="t('actions.setValue')"
+                  :placeholder="i18n._('Set value')"
                   v-if="inputType(index) === 'text'"
                   v-model="rule.value"
                   @update:modelValue="(value) => handleValueChange(value, index)"
@@ -100,7 +100,7 @@
 
                 <Input
                   type="number"
-                  :placeholder="t('actions.setValue')"
+                  :placeholder="i18n._('Set value')"
                   v-if="inputType(index) === 'number'"
                   v-model="rule.value"
                   @update:modelValue="(value) => handleValueChange(value, index)"
@@ -142,16 +142,16 @@
                       <TagsInputItemText />
                       <TagsInputItemDelete type="button" />
                     </TagsInputItem>
-                    <TagsInputInput :placeholder="t('placeholders.selectValue')" />
+                    <TagsInputInput :placeholder="i18n._('Select value')" />
                   </TagsInput>
                   <p class="text-xs text-muted-foreground mt-1">
-                    {{ $t('globals.messages.pressEnterToSelectAValue') }}
+                    {{ i18n._('Press enter to select a value') }}
                   </p>
                 </div>
 
                 <Input
                   type="date"
-                  :placeholder="t('actions.setValue')"
+                  :placeholder="i18n._('Set value')"
                   v-if="inputType(index) === 'date'"
                   v-model="rule.value"
                   @update:modelValue="(value) => handleValueChange(value, index)"
@@ -164,12 +164,12 @@
                   v-if="inputType(index) === 'boolean'"
                 >
                   <SelectTrigger>
-                    <SelectValue :placeholder="t('placeholders.selectValue')" />
+                    <SelectValue :placeholder="i18n._('Select value')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="true">{{ $t('globals.messages.true') }}</SelectItem>
-                      <SelectItem value="false">{{ $t('globals.messages.false') }}</SelectItem>
+                      <SelectItem value="true">{{ i18n._('True') }}</SelectItem>
+                      <SelectItem value="false">{{ i18n._('False') }}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -186,13 +186,13 @@
               :checked="!!rule.case_sensitive_match"
               @update:checked="(value) => handleCaseSensitiveCheck(value, index)"
             />
-            <label for="terms"> {{ $t('globals.messages.caseSensitiveMatch') }} </label>
+            <label for="terms"> {{ i18n._('Case sensitive match') }} </label>
           </div>
         </div>
       </div>
       <div>
         <Button type="button" variant="outline" size="sm" @click.prevent="addCondition">
-          {{ $t('actions.addCondition') }}
+          {{ i18n._('Add condition') }}
         </Button>
       </div>
     </div>
@@ -200,6 +200,10 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
+const matchBelowMessage = msg({ message: "Match {any_or_all} below." })
+
 const FIELD_CLASS = 'min-w-0 w-full'
 
 import { toRefs, computed, watch } from 'vue'
@@ -225,7 +229,7 @@ import {
 } from '@shared-ui/components/ui/tags-input'
 import { Label } from '@shared-ui/components/ui/label'
 import { Input } from '@shared-ui/components/ui/input'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useConversationFilters } from '@/composables/useConversationFilters'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
@@ -259,7 +263,7 @@ const hasContactCustomAttributes = computed(
 )
 const { ruleGroup } = toRefs(props)
 const emit = defineEmits(['update-group', 'add-condition', 'remove-condition'])
-const { t } = useI18n()
+const i18n = useI18n()
 
 // Computed property to get the correct filters based on type
 const currentFilters = computed(() => {

@@ -18,7 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -47,7 +47,7 @@ type pushSettingStore interface {
 type PushManager struct {
 	store       pushSubscriptionStore
 	lo          *logf.Logger
-	i18n        *i18n.I18n
+	i18n        *gotext.Locale
 	publicKey   string
 	privateKey  string
 	subject     string
@@ -61,7 +61,7 @@ type PushManagerOpts struct {
 	DB          *sqlx.DB
 	Settings    pushSettingStore
 	Lo          *logf.Logger
-	I18n        *i18n.I18n
+	I18n        *gotext.Locale
 	RootURL     string
 	Concurrency int
 	QueueSize   int
@@ -103,7 +103,7 @@ func (m *PushManager) Endpoints(userID int) ([]string, error) {
 	subscriptions, err := m.store.List(userID)
 	if err != nil {
 		m.lo.Error("error fetching push subscriptions", "user_id", userID, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	endpoints := make([]string, 0, len(subscriptions))
 	for _, subscription := range subscriptions {
@@ -114,22 +114,22 @@ func (m *PushManager) Endpoints(userID int) ([]string, error) {
 
 func (m *PushManager) Upsert(userID int, subscription PushSubscriptionInput) error {
 	if !validPushSubscription(subscription) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("notification.invalidPushSubscription"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This browser subscription is invalid. Disable and enable browser notifications, then try again."), nil)
 	}
 	if err := m.store.Upsert(userID, subscription); err != nil {
 		m.lo.Error("error saving push subscription", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
 
 func (m *PushManager) Delete(userID int, endpoint string) error {
 	if endpoint == "" {
-		return envelope.NewError(envelope.InputError, m.i18n.T("notification.invalidPushSubscription"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This browser subscription is invalid. Disable and enable browser notifications, then try again."), nil)
 	}
 	if err := m.store.Delete(userID, endpoint); err != nil {
 		m.lo.Error("error deleting push subscription", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

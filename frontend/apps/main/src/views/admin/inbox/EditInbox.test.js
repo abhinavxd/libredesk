@@ -18,7 +18,7 @@ vi.mock('@/api', () => ({
   }
 }))
 vi.mock('@/stores/inbox', () => ({ useInboxStore: () => ({ fetchInboxes }) }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }))
+vi.mock('@shared-ui/i18n', () => ({ useI18n: () => ({ _: (key) => key }) }))
 vi.mock('@/composables/useEmitter', () => ({ useEmitter: () => ({ emit: vi.fn() }) }))
 vi.mock('@/features/admin/inbox/EmailInboxForm.vue', () => ({
   default: {
@@ -57,7 +57,7 @@ const mount = async (aliases) => {
   vi.useFakeTimers()
   getInbox.mockResolvedValue(response(aliases))
   app = createApp(EditInbox, { id: '1' })
-  app.config.globalProperties.$t = (key) => key
+  app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: (message) => typeof message === 'string' ? message : message.message }
   app.mount(document.createElement('div'))
   await settle()
 }
@@ -126,7 +126,7 @@ it('does not start checking when the page closes before the inbox loads', async 
   let resolveInbox
   getInbox.mockReturnValue(new Promise((resolve) => (resolveInbox = resolve)))
   app = createApp(EditInbox, { id: '1' })
-  app.config.globalProperties.$t = (key) => key
+  app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: (message) => typeof message === 'string' ? message : message.message }
   app.mount(document.createElement('div'))
   app.unmount()
   app = null

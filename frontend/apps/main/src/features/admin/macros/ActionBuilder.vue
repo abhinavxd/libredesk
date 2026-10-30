@@ -6,7 +6,7 @@
       class="text-center py-12 px-6 border-2 border-dashed border-muted rounded-lg"
     >
       <h3 class="ui-heading mb-2">
-        {{ $t('actions.noActions') }}
+        {{ i18n._('No actions') }}
       </h3>
       <Button
         type="button"
@@ -31,7 +31,7 @@
               <div class="flex flex-col sm:flex-row gap-4">
                 <div class="flex-1 max-w-xs">
                   <label class="block text-sm font-medium mb-2">{{
-                    $t('macro.actionType')
+                    i18n._('Action type')
                   }}</label>
                   <Select
                     v-model="action.type"
@@ -59,7 +59,7 @@
                   v-if="action.type && config.actions[action.type]?.type === 'select'"
                   class="flex-1 max-w-xs"
                 >
-                  <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.value', 1) }}</label>
+                  <label class="block text-sm font-medium mb-2">{{ i18n.ngettext('Value', 'Values', 1) }}</label>
 
                   <SelectAgentCombobox
                     v-if="action.type === 'assign_user'"
@@ -88,7 +88,7 @@
                 v-if="action.type && config.actions[action.type]?.type === 'tag'"
                 class="max-w-md"
               >
-                <label class="block text-sm font-medium mb-2">{{ $t('globals.terms.tag') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ i18n.ngettext('Tag', 'Tags', 1) }}</label>
                 <SelectTagCombobox multiple v-model="action.value" />
               </div>
             </div>

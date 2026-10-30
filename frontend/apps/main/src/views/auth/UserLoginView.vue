@@ -11,7 +11,7 @@
           <CardTitle class="ui-display-heading">
             {{ appSettingsStore.public_config?.['app.site_name'] || 'libredesk' }}
           </CardTitle>
-          <p class="text-sm text-muted-foreground">{{ t('auth.signIn') }}</p>
+          <p class="text-sm text-muted-foreground">{{ i18n._('Sign in to your account') }}</p>
         </div>
 
         <div v-if="enabledOIDCProviders.length" class="space-y-3">
@@ -37,14 +37,14 @@
               <span class="w-full border-t border-border"></span>
             </div>
             <div class="relative flex justify-center text-xs uppercase">
-              <span class="px-2 text-muted-foreground bg-card">{{ t('auth.orContinueWith') }}</span>
+              <span class="px-2 text-muted-foreground bg-card">{{ i18n._('Or continue with') }}</span>
             </div>
           </div>
         </div>
 
         <form v-if="localLoginEnabled" @submit.prevent="loginAction" class="space-y-3">
           <div class="space-y-2">
-            <Label for="email" class="text-muted-foreground">{{ t('globals.terms.email') }}</Label>
+            <Label for="email" class="text-muted-foreground">{{ i18n.ngettext('Email', 'Emails', 1) }}</Label>
             <Input
               id="email"
               type="text"
@@ -60,7 +60,7 @@
 
           <div class="space-y-2">
             <Label for="password" class="text-muted-foreground">
-              {{ t('globals.terms.password') }}
+              {{ i18n.ngettext('Password', 'Passwords', 1) }}
             </Label>
             <div class="relative">
               <Input
@@ -76,7 +76,7 @@
                 type="button"
                 variant="ghost"
                 size="icon"
-                :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                :aria-label="showPassword ? i18n._('Hide password') : i18n._('Show password')"
                 class="absolute right-0 top-0 text-muted-foreground"
                 @click="showPassword = !showPassword"
               >
@@ -91,7 +91,7 @@
               to="/reset-password"
               class="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {{ t('auth.forgotPassword') }}
+              {{ i18n._('Forgot password?') }}
             </router-link>
           </div>
 
@@ -100,9 +100,9 @@
               <div
                 class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
               ></div>
-              {{ t('auth.loggingIn') }}
+              {{ i18n._('Logging in...') }}
             </span>
-            <span v-else>{{ t('auth.signInButton') }}</span>
+            <span v-else>{{ i18n._('Sign in') }}</span>
           </Button>
         </form>
 
@@ -118,6 +118,8 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
@@ -131,14 +133,14 @@ import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useUserStore } from '@main/stores/user'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const errorMessage = ref('')
 const isLoading = ref(false)
 const router = useRouter()
@@ -161,13 +163,13 @@ const demoCredentials = {
   password: 'demo@libredesk.io'
 }
 
-const oidcErrorKeys = {
-  oidc_invalid_client: 'auth.oidcInvalidClient',
-  oidc_access_denied: 'auth.oidcAccessDenied',
-  oidc_session_expired: 'auth.oidcSessionExpired',
-  oidc_no_account: 'auth.oidcNoAccount',
-  oidc_account_disabled: 'user.accountDisabled',
-  oidc_login_failed: 'auth.oidcLoginFailed'
+const oidcErrorMessages = {
+  oidc_invalid_client: msg({ message: 'Sign-in is unavailable due to a configuration problem. Ask your administrator to check the SSO client ID and secret.' }),
+  oidc_access_denied: msg({ message: 'The sign-in was cancelled or denied at the identity provider. Try signing in again.' }),
+  oidc_session_expired: msg({ message: 'Your sign-in session expired. Try signing in again.' }),
+  oidc_no_account: msg({ message: 'There is no agent account for the email your SSO provider returned. Contact your administrator for access.' }),
+  oidc_account_disabled: msg({ message: 'Your account is disabled, Please contact administrator' }),
+  oidc_login_failed: msg({ message: 'Sign-in failed. Try again, and contact your administrator if it keeps happening.' })
 }
 
 onMounted(async () => {
@@ -183,8 +185,8 @@ onMounted(async () => {
 const showOIDCError = () => {
   const { error, ...query } = router.currentRoute.value.query
   if (!error) return
-  errorMessage.value = t(
-    Object.hasOwn(oidcErrorKeys, error) ? oidcErrorKeys[error] : 'auth.oidcLoginFailed'
+  errorMessage.value = i18n._(
+    Object.hasOwn(oidcErrorMessages, error) ? oidcErrorMessages[error] : msg({ message: 'Sign-in failed. Try again, and contact your administrator if it keeps happening.' })
   )
   applyTemporaryClass('login-container', 'animate-shake')
   router.replace({ query })
@@ -215,12 +217,12 @@ const redirectToOIDC = (provider) => {
 
 const validateForm = () => {
   if (!validateEmail(loginForm.value.email) && loginForm.value.email !== 'System') {
-    errorMessage.value = t('validation.invalidEmail')
+    errorMessage.value = i18n._('Invalid email address')
     applyTemporaryClass('login-container', 'animate-shake')
     return false
   }
   if (!loginForm.value.password) {
-    errorMessage.value = t('validation.passwordCannotBeEmpty')
+    errorMessage.value = i18n._('Password cannot be empty')
     applyTemporaryClass('login-container', 'animate-shake')
     return false
   }

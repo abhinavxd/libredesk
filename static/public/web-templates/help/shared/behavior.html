@@ -129,8 +129,8 @@
     if (prose && navigator.clipboard) {
         var copyIcon = '{{ LucideIcon "copy" }}';
         var copiedIcon = '{{ LucideIcon "check" }}';
-        var copyLabel = '{{ .L.T "globals.terms.copy" }}';
-        var copiedLabel = '{{ .L.T "globals.messages.copied" }}';
+        var copyLabel = '{{ .L.GetD "templates" "Copy" }}';
+        var copiedLabel = '{{ .L.GetD "templates" "Copied to clipboard" }}';
         prose.querySelectorAll('pre').forEach(function (pre) {
             var code = pre.querySelector('code');
             if (!code) return;

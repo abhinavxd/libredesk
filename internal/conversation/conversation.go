@@ -46,7 +46,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -114,7 +114,7 @@ type Manager struct {
 	dispatcher                 notificationDispatcher
 	lo                         *logf.Logger
 	db                         *sqlx.DB
-	i18n                       *i18n.I18n
+	i18n                       *gotext.Locale
 	automation                 *automation.Engine
 	wsHub                      *ws.Hub
 	template                   *template.Manager
@@ -261,7 +261,7 @@ type Opts struct {
 // New initializes a new conversation Manager.
 func New(
 	wsHub *ws.Hub,
-	i18n *i18n.I18n,
+	i18n *gotext.Locale,
 	slaStore slaStore,
 	statusStore statusStore,
 	priorityStore priorityStore,
@@ -467,7 +467,7 @@ func (c *Manager) CreateConversation(contactID, inboxID int, lastMessage string,
 
 	if err := c.q.InsertConversation.QueryRow(contactID, models.StatusOpen, inboxID, lastMessage, lastMessageAt, subject, prefix, appendRefNumToSubject, metaJSON, customAttrsJSON, since, maxConversations, c.subjectRefFormat).Scan(&id, &uuid); err != nil {
 		if err == sql.ErrNoRows {
-			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.T("globals.messages.tooManyRequests"), nil)
+			return 0, "", envelope.NewError(envelope.RateLimitError, c.i18n.Get("Too many requests."), nil)
 		}
 		c.lo.Error("error inserting new conversation into the DB", "error", err)
 		return 0, "", err
@@ -491,10 +491,10 @@ func (c *Manager) GetConversation(id int, uuid, refNum string) (models.Conversat
 	if err := c.q.GetConversation.Get(&conversation, id, uuidParam, refNum); err != nil {
 		if err == sql.ErrNoRows {
 			return conversation, envelope.NewError(envelope.NotFoundError,
-				c.i18n.T("validation.notFoundConversation"), nil)
+				c.i18n.Get("Conversation not found"), nil)
 		}
 		c.lo.Error("error fetching conversation", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Only email inboxes carry an address here. Other channels store a display name in inbox_mail.
@@ -515,7 +515,7 @@ func (c *Manager) GetContactPreviousConversations(contactID int, limit int, user
 	args := append([]any{contactID, limit, user.ID}, readScopeArgs(user)...)
 	if err := c.q.GetContactPreviousConversations.Select(&conversations, args...); err != nil {
 		c.lo.Error("error fetching previous conversations", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return conversations, nil
 }
@@ -525,7 +525,7 @@ func (c *Manager) GetContactConversationsForAI(contactID, excludeID int) ([]mode
 	conversations := make([]models.AIConversationSummary, 0)
 	if err := c.q.GetContactConversationsForAI.Select(&conversations, contactID, excludeID); err != nil {
 		c.lo.Error("error fetching contact conversations for ai", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return conversations, nil
 }
@@ -535,7 +535,7 @@ func (c *Manager) GetConversationsByContactEmailForAI(email string) ([]models.AI
 	conversations := make([]models.AIConversationSummary, 0)
 	if err := c.q.GetConversationsByContactEmailForAI.Select(&conversations, email); err != nil {
 		c.lo.Error("error fetching conversations by contact email for ai", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return conversations, nil
 }
@@ -545,7 +545,7 @@ func (c *Manager) GetContactChatConversations(contactID, inboxID int) ([]models.
 	var conversations = make([]models.ChatConversation, 0)
 	if err := c.q.GetContactChatConversations.Select(&conversations, contactID, inboxID); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	for i := range conversations {
 		if conversations[i].Assignee.ID == 0 {
@@ -564,7 +564,7 @@ func (c *Manager) GetContactUnreadPreviewMessages(contactID, inboxID, limit int)
 	var messages []models.Message
 	if err := c.q.GetContactUnreadPreviewMessages.Select(&messages, contactID, inboxID, limit); err != nil {
 		c.lo.Error("error fetching unread preview messages", "contact_id", contactID, "inbox_id", inboxID, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	c.RenderMessagesArticleReferences(messages)
@@ -600,7 +600,7 @@ func (c *Manager) GetChatConversation(conversationUUID string) (models.ChatConve
 	var conversation models.ChatConversation
 	if err := c.q.GetChatConversation.Get(&conversation, conversationUUID); err != nil {
 		c.lo.Error("error fetching chat conversation", "uuid", conversationUUID, "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	if conversation.Assignee.ID == 0 {
 		conversation.Assignee = nil
@@ -638,15 +638,15 @@ func (c *Manager) UpdateUserLastSeen(conversationUUID string, userID int, messag
 	var state models.ConversationReadState
 	if messageUUID != "" {
 		if _, err := uuid.Parse(messageUUID); err != nil {
-			return state, envelope.NewError(envelope.InputError, c.i18n.T("errors.parsingRequest"), nil)
+			return state, envelope.NewError(envelope.InputError, c.i18n.Get("Error parsing request"), nil)
 		}
 	}
 	if err := c.q.UpsertUserLastSeen.Get(&state, userID, conversationUUID, messageUUID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+			return state, envelope.NewError(envelope.InputError, c.i18n.Get("Not found"), nil)
 		}
 		c.lo.Error("error upserting user last seen", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
-		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return state, nil
 }
@@ -656,10 +656,10 @@ func (c *Manager) MarkAsUnread(uuid string, userID int) (models.ConversationRead
 	var state models.ConversationReadState
 	if err := c.q.MarkConversationUnread.Get(&state, userID, uuid, pq.Array(nmodels.ReplyTypes)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return state, envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.notFound"), nil)
+			return state, envelope.NewError(envelope.InputError, c.i18n.Get("Not found"), nil)
 		}
 		c.lo.Error("error marking conversation as unread", "user_id", userID, "conversation_uuid", uuid, "error", err)
-		return state, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return state, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return state, nil
 }
@@ -672,7 +672,7 @@ func (c *Manager) UpdateConversationContactLastSeen(uuid string) error {
 			return nil
 		}
 		c.lo.Error("error updating contact last seen timestamp", "conversation_id", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Broadcast the property update to all subscribers.
@@ -685,7 +685,7 @@ func (c *Manager) GetConversationParticipants(uuid string) ([]models.Conversatio
 	conv := make([]models.ConversationParticipant, 0)
 	if err := c.q.GetConversationParticipants.Select(&conv, uuid); err != nil {
 		c.lo.Error("error fetching conversation", "error", err)
-		return conv, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conv, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return conv, nil
 }
@@ -774,7 +774,7 @@ func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, lis
 	query, qArgs, err := c.makeConversationsListQuery(viewingUserID, userID, teamIDs, listTypes, c.q.GetConversations, order, orderBy, page, pageSize, filters)
 	if err != nil {
 		c.lo.Error("error making conversations query", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	tx, err := c.db.BeginTxx(context.Background(), &sql.TxOptions{
@@ -783,12 +783,12 @@ func (c *Manager) GetConversations(viewingUserID, userID int, teamIDs []int, lis
 	defer tx.Rollback()
 	if err != nil {
 		c.lo.Error("error preparing get conversations query", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := tx.Select(&conversations, query, qArgs...); err != nil {
 		c.lo.Error("error fetching conversations", "error", err)
-		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversations, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return conversations, nil
 }
@@ -801,7 +801,7 @@ func (c *Manager) ReOpenConversation(conversationUUID string, actor umodels.User
 			return false, nil
 		}
 		c.lo.Error("error reopening conversation", "uuid", conversationUUID, "error", err)
-		return false, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return false, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Reopening revives any first response or resolution deadline the resolved status had nulled.
@@ -826,7 +826,7 @@ func (c *Manager) ActiveUserConversationsCount(userID int) (int, error) {
 	var count int
 	if err := c.q.GetUserActiveConversationsCount.Get(&count, userID); err != nil {
 		c.lo.Error("error fetching active conversation count", "error", err)
-		return count, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return count, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return count, nil
 }
@@ -869,7 +869,7 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	}
 
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return c.afterUserAssignedHooks(uuid, assigneeID, actor, amodels.PreviousValues(previousConversation))
 }
@@ -885,7 +885,7 @@ func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedT
 	var available, claimed bool
 	if err := c.q.ClaimUnassignedConversation.QueryRow(uuid, assigneeID, expectedTeamID).Scan(&available, &claimed); err != nil {
 		c.lo.Error("error claiming unassigned conversation", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	if !claimed {
 		if !available {
@@ -921,7 +921,7 @@ func (c *Manager) afterUserAssignedHooks(uuid string, assigneeID int, actor umod
 	}
 
 	if err := c.RecordAssigneeUserChange(uuid, assigneeID, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	agent, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
@@ -961,7 +961,7 @@ func (c *Manager) UpdateConversationTeamAssignee(uuid string, teamID int, actor 
 	previousValues := amodels.PreviousValues(conversation)
 
 	if err := c.updateAssignee(uuid, teamID, models.AssigneeTypeTeam); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Assignment succeeded, errors after this point are non-critical and must not skip the remaining side effects.
@@ -1050,7 +1050,7 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 
 	if _, err := c.q.UpdateConversationPriority.Exec(uuid, priority); err != nil {
 		c.lo.Error("error updating conversation priority", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	conversation, err := c.GetConversation(0, uuid, "")
@@ -1060,7 +1060,7 @@ func (c *Manager) UpdateConversationPriority(uuid string, priorityID int, priori
 
 	// Record activity.
 	if err := c.RecordPriorityChange(priority, uuid, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	c.BroadcastConversationUpdate(uuid, map[string]any{"priority": priority})
 	return nil
@@ -1078,7 +1078,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	}
 
 	if status == models.StatusSnoozed && snoozeDur == "" {
-		return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
+		return envelope.NewError(envelope.InputError, c.i18n.Get("Invalid snooze duration"), nil)
 	}
 
 	// Parse the snooze duration if status is snoozed.
@@ -1087,7 +1087,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 		duration, err := time.ParseDuration(snoozeDur)
 		if err != nil || duration <= 0 {
 			c.lo.Debug("error parsing snooze duration", "duration", snoozeDur, "error", err)
-			return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
+			return envelope.NewError(envelope.InputError, c.i18n.Get("Invalid snooze duration"), nil)
 		}
 		snoozeUntil = time.Now().Add(duration)
 	}
@@ -1095,7 +1095,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	conversationBeforeChange, err := c.GetConversation(0, uuid, "")
 	if err != nil {
 		c.lo.Error("error fetching conversation before status change", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	oldStatus := conversationBeforeChange.Status.String
 
@@ -1108,7 +1108,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	// Update the conversation status.
 	if _, err := c.q.UpdateConversationStatus.Exec(uuid, status, snoozeUntil); err != nil {
 		c.lo.Error("error updating conversation status", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Stamps a just-resolved resolution SLA immediately and recomputes the cached deadline.
@@ -1138,7 +1138,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 
 	// Record the status change as an activity.
 	if err := c.RecordStatusChange(status, uuid, actor); err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	agentData := map[string]any{"status": status}
@@ -1193,7 +1193,7 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	// Get current tags list.
 	prevTags, err := c.getConversationTags(uuid)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	if prevTags == nil {
 		prevTags = []string{}
@@ -1203,7 +1203,7 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	if action == amodels.ActionAddTags {
 		if _, err := c.q.AddConversationTags.Exec(uuid, pq.Array(tagNames)); err != nil {
 			c.lo.Error("error adding conversation tags", "error", err)
-			return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
@@ -1211,7 +1211,7 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	if action == amodels.ActionSetTags {
 		if _, err := c.q.SetConversationTags.Exec(uuid, pq.Array(tagNames)); err != nil {
 			c.lo.Error("error setting conversation tags", "error", err)
-			return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
@@ -1219,14 +1219,14 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 	if action == amodels.ActionRemoveTags {
 		if _, err := c.q.RemoveConversationTags.Exec(uuid, pq.Array(tagNames)); err != nil {
 			c.lo.Error("error removing conversation tags", "error", err)
-			return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
 	// Get updated tags list.
 	newTags, err := c.getConversationTags(uuid)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Fetch conversation for webhook.
@@ -1254,7 +1254,7 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 		}
 		// Record the removed tags as activities.
 		if err := c.RecordTagRemoval(uuid, tag, actor); err != nil {
-			return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
@@ -1265,7 +1265,7 @@ func (c *Manager) SetConversationTags(uuid string, action string, tagNames []str
 		}
 		// Record the added tags as activities.
 		if err := c.RecordTagAddition(uuid, tag, actor); err != nil {
-			return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
@@ -1341,7 +1341,7 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeAssignment,
 		Recipients:       recipients,
-		Title:            m.i18n.Ts("notification.conversationAssigned", "referenceNumber", conversation.ReferenceNumber),
+		Title:            m.i18n.Get("Conversation assigned to you #%[1]s", conversation.ReferenceNumber),
 		Body:             null.StringFrom(cmp.Or(conversation.Subject.String, conversation.LastMessage.String)),
 		ConversationID:   null.IntFrom(conversation.ID),
 		ConversationUUID: conversation.UUID,
@@ -1353,22 +1353,24 @@ func (m *Manager) NotifyAssignment(userIDs []int, conversation models.Conversati
 
 // NotifyNewReply notifies the assigned agent and the other participating agents of an incoming reply.
 func (m *Manager) NotifyNewReply(conversation models.Conversation, message models.Message, reopened bool) {
-	assigneeType, assigneeTmpl, assigneeTitleKey := nmodels.NotificationTypeNewReply, template.TmplNewReply, "notification.newReply"
+	assigneeType, assigneeTmpl, assigneeTitle := nmodels.NotificationTypeNewReply, template.TmplNewReply, m.i18n.Get("New reply on #%[1]s",
+		conversation.ReferenceNumber)
 	if reopened {
-		assigneeType, assigneeTmpl, assigneeTitleKey = nmodels.NotificationTypeConversationReopened, template.TmplConversationReopened, "notification.conversationReopened"
+		assigneeType, assigneeTmpl, assigneeTitle = nmodels.NotificationTypeConversationReopened, template.TmplConversationReopened, m.i18n.Get("Conversation reopened #%[1]s",
+			conversation.ReferenceNumber)
 	}
 
 	groups := []replyNotificationGroup{
 		{
 			nType:      assigneeType,
 			tmpl:       assigneeTmpl,
-			title:      m.i18n.Ts(assigneeTitleKey, "referenceNumber", conversation.ReferenceNumber),
+			title:      assigneeTitle,
 			recipients: m.replyNotificationAssignee(conversation, message.SenderID, assigneeType),
 		},
 		{
 			nType:      nmodels.NotificationTypeNewReplyParticipating,
 			tmpl:       template.TmplNewReplyParticipating,
-			title:      m.i18n.Ts("notification.newReply", "referenceNumber", conversation.ReferenceNumber),
+			title:      m.i18n.Get("New reply on #%[1]s", conversation.ReferenceNumber),
 			recipients: m.replyNotificationParticipants(conversation, message.SenderID),
 		},
 	}
@@ -1435,7 +1437,7 @@ func (m *Manager) sendReplyNotification(conversation models.Conversation, messag
 	}
 	messageText := textWithoutQuotedReplies(message)
 	if messageText == "" && len(message.Attachments) > 0 {
-		messageText = m.i18n.Tc("globals.terms.attachment", len(message.Attachments))
+		messageText = m.i18n.GetN("Attachment", "Attachments", len(message.Attachments))
 	}
 	candidateIDs := make([]int, len(group.recipients))
 	for i, recipient := range group.recipients {
@@ -1539,7 +1541,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeMention,
 		Recipients:       recipients,
-		Title:            m.i18n.Ts("notification.mentionedInConversation", "author", author.FullName(), "referenceNumber", conversation.ReferenceNumber),
+		Title:            m.i18n.Get("%[1]s mentioned you in #%[2]s", author.FullName(), conversation.ReferenceNumber),
 		Body:             null.StringFrom(message.TextContent),
 		ConversationID:   null.IntFrom(conversation.ID),
 		MessageID:        null.IntFrom(message.ID),
@@ -1558,7 +1560,7 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 func (m *Manager) UnassignOpen(userID int) error {
 	if _, err := m.q.UnassignOpenConversations.Exec(userID); err != nil {
 		m.lo.Error("error unassigning open conversations", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Error updating conversation"), nil)
 	}
 	return nil
 }
@@ -1568,7 +1570,7 @@ func (m *Manager) ApplySLA(conversation models.Conversation, policyID int, actor
 	policy, err := m.slaStore.ApplySLA(conversation.CreatedAt, conversation.ID, conversation.AssignedTeamID.Int, policyID)
 	if err != nil {
 		m.lo.Error("error applying SLA to conversation", "conversation_id", conversation.ID, "policy_id", policyID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if updated, ferr := m.GetConversation(0, conversation.UUID, ""); ferr == nil {
@@ -1857,7 +1859,7 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 	prev, prevErr := m.GetConversationListItem(uuid)
 	if _, err := m.q.RemoveConversationAssignee.Exec(uuid, typ); err != nil {
 		m.lo.Error("error removing conversation assignee", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Error updating conversation"), nil)
 	}
 
 	// Trigger webhook for conversation unassigned from user.
@@ -1899,7 +1901,7 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	inb, err := m.inboxStore.GetDBRecord(conversation.InboxID)
 	if err != nil {
 		m.lo.Error("error fetching inbox for CSAT", "conversation_uuid", conversation.UUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	isEmail := inb.Channel == inbox.ChannelEmail
 	if isEmail && conversation.Contact.Email.String == "" {
@@ -1911,13 +1913,13 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 		if errors.Is(err, csat.ErrCSATAlreadyExists) {
 			return nil
 		}
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if inb.Channel == inbox.ChannelWhatsApp {
 		appRootURL, err := m.settingsStore.GetAppRootURL()
 		if err != nil {
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		return m.sendWhatsAppCSAT(actorUserID, conversation, csatResp.UUID, m.csatStore.MakePublicURL(appRootURL, csatResp.UUID))
 	}
@@ -1935,29 +1937,29 @@ func (m *Manager) SendCSATReply(actorUserID int, conversation models.Conversatio
 	if isEmail {
 		appRootURL, err := m.settingsStore.GetAppRootURL()
 		if err != nil {
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		data, err := m.BuildTemplateData(conversation.UUID, actorUserID)
 		if err != nil {
 			m.lo.Error("error building CSAT template data", "conversation_uuid", conversation.UUID, "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		data["CSATLink"] = m.csatStore.MakePublicURL(appRootURL, csatResp.UUID)
 		data["CSATUUID"] = csatResp.UUID
 		message, err = m.template.RenderStoredTemplate(template.TmplCSATRequest, data)
 		if err != nil {
 			m.lo.Error("error rendering CSAT template", "conversation_uuid", conversation.UUID, "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		to = []string{conversation.Contact.Email.String}
 	} else {
 		// The widget renders the rating form from the meta, the text is what the agent view shows.
-		message = m.i18n.T("globals.messages.pleaseRateConversation")
+		message = m.i18n.Get("Please rate this conversation:")
 	}
 
 	if _, err := m.QueueReply(nil /**media**/, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, message, to, nil, nil, "" /** sendFrom **/, meta); err != nil {
 		m.lo.Error("error sending CSAT reply", "conversation_uuid", conversation.UUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -1984,7 +1986,7 @@ func (m *Manager) DeleteConversation(uuid string) error {
 	res, err := m.q.DeleteConversation.Exec(uuid)
 	if err != nil {
 		m.lo.Error("error deleting conversation", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	rows, _ := res.RowsAffected()
 	m.lo.Info("deleted conversation", "uuid", uuid, "rows_affected", rows)
@@ -1996,11 +1998,11 @@ func (c *Manager) UpdateConversationCustomAttributes(uuid string, customAttribut
 	jsonb, err := json.Marshal(customAttributes)
 	if err != nil {
 		c.lo.Error("error marshalling custom attributes", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := c.q.UpdateConversationCustomAttributes.Exec(uuid, jsonb); err != nil {
 		c.lo.Error("error updating conversation custom attributes", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	// Broadcast the custom attributes update.
 	c.BroadcastConversationUpdate(uuid, map[string]any{"custom_attributes": customAttributes})
@@ -2012,7 +2014,7 @@ func (c *Manager) addConversationParticipant(userID int, conversationUUID string
 	res, err := c.q.InsertConversationParticipant.Exec(userID, conversationUUID)
 	if err != nil {
 		c.lo.Error("error adding conversation participant", "user_id", userID, "conversation_uuid", conversationUUID, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
 		return nil
@@ -2046,7 +2048,7 @@ func (c *Manager) getConversationTags(uuid string) ([]string, error) {
 	var tags []string
 	if err := c.q.GetConversationTags.Select(&tags, uuid); err != nil {
 		c.lo.Error("error fetching conversation tags", "error", err)
-		return tags, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return tags, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 	return tags, nil
 }
@@ -2106,9 +2108,10 @@ func (c *Manager) ValidateListFilters(filtersJSON string) error {
 	}
 	c.lo.Debug("error validating view filters", "error", err)
 	if errors.Is(err, dbutil.ErrTooManyGroups) {
-		return envelope.NewError(envelope.InputError, c.i18n.Ts("conversation.filters.tooManyGroups", "max", fmt.Sprintf("%d", dbutil.MaxFilterGroups)), nil)
+		return envelope.NewError(envelope.InputError, c.i18n.Get("Too many filter groups. A view can have at most %[1]s. Remove the extra groups and save again.",
+			fmt.Sprintf("%d", dbutil.MaxFilterGroups)), nil)
 	}
-	return envelope.NewError(envelope.InputError, c.i18n.T("globals.messages.invalidFilters"), nil)
+	return envelope.NewError(envelope.InputError, c.i18n.Get("Invalid filters."), nil)
 }
 
 // ProcessCSATStatus processes messages and adds CSAT submission status for CSAT messages.

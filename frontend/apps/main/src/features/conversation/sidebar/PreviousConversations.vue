@@ -6,7 +6,7 @@
     "
     class="text-center text-sm text-muted-foreground py-4"
   >
-    {{ $t('conversation.sidebar.noPreviousConvo') }}
+    {{ i18n._('No previous conversations') }}
   </div>
   <div v-else class="space-y-1">
     <router-link
@@ -58,11 +58,11 @@
           <TooltipContent>
             <div class="space-y-1 text-xs">
               <p>
-                {{ $t('globals.terms.createdAt') }}:
+                {{ i18n._('Created at') }}:
                 {{ formatFullTimestamp(new Date(conversation.created_at)) }}
               </p>
               <p v-if="conversation.last_message_at">
-                {{ $t('globals.terms.lastMessageAt') }}:
+                {{ i18n._('Last message at') }}:
                 {{ formatFullTimestamp(new Date(conversation.last_message_at)) }}
               </p>
             </div>

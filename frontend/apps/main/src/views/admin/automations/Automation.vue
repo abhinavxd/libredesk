@@ -5,7 +5,7 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.automation.help') }}</p>
+      <p>{{ i18n._('Automate actions when conversations are created, updated, or on an hourly schedule.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>

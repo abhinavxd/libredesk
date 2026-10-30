@@ -64,7 +64,7 @@ func handleCreateRole(r *fastglue.Request) error {
 		req = models.Role{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 	createdRole, err := app.role.Create(req)
 	if err != nil {
@@ -83,7 +83,7 @@ func handleUpdateRole(r *fastglue.Request) error {
 		req   = models.Role{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	// Get old role before update to compare permissions.

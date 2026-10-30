@@ -24,7 +24,7 @@
             <div class="flex items-center gap-2">
               <Clock class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="ui-description">{{ $t('globals.terms.lastActive') }}</p>
+                <p class="ui-description">{{ i18n._('Last active') }}</p>
                 <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_active_at
@@ -37,7 +37,7 @@
             <div class="flex items-center gap-2">
               <LogIn class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="ui-description">{{ $t('globals.terms.lastLogin') }}</p>
+                <p class="ui-description">{{ i18n._('Last login') }}</p>
                 <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_login_at
@@ -58,7 +58,7 @@
           <Checkbox :checked="value" @update:checked="handleChange" />
         </FormControl>
         <div class="space-y-1 leading-none">
-          <FormLabel> {{ $t('globals.terms.enabled') }} </FormLabel>
+          <FormLabel> {{ i18n._('Enabled') }} </FormLabel>
           <FormMessage />
         </div>
       </FormItem>
@@ -68,7 +68,7 @@
     <FormGrid
       ><FormField v-slot="{ field }" name="first_name">
         <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('First name', 'First names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="field" />
           </FormControl>
@@ -77,7 +77,7 @@
       </FormField>
       <FormField v-slot="{ field }" name="last_name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Last name', 'Last names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="field" />
           </FormControl>
@@ -86,7 +86,7 @@
       </FormField>
       <FormField v-slot="{ field }" name="email">
         <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Email', 'Emails', 1) }}</FormLabel>
           <FormControl>
             <Input type="email" placeholder="" v-bind="field" />
           </FormControl>
@@ -96,11 +96,11 @@
     <FormGrid
       ><FormField v-slot="{ componentField, handleChange }" name="teams">
         <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.team', 2) }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Team', 'Teams', 2) }}</FormLabel>
           <FormControl>
             <SelectTag
               :items="teamOptions"
-              :placeholder="t('placeholders.selectTeams')"
+              :placeholder="i18n._('Select teams')"
               v-model="componentField.modelValue"
               @update:modelValue="handleChange"
             />
@@ -110,11 +110,11 @@
       </FormField>
       <FormField v-slot="{ componentField, handleChange }" name="roles">
         <FormItem v-auto-animate>
-          <FormLabel>{{ $t('globals.terms.role', 2) }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Role', 'Roles', 2) }}</FormLabel>
           <FormControl>
             <SelectTag
               :items="roleOptions"
-              :placeholder="t('role.select')"
+              :placeholder="i18n._('Select roles')"
               v-model="componentField.modelValue"
               @update:modelValue="handleChange"
             />
@@ -124,18 +124,18 @@
       </FormField>
       <FormField v-slot="{ componentField }" name="availability_status" v-if="!isNewForm">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.availabilityStatus') }}</FormLabel>
+          <FormLabel>{{ i18n._('Availability status') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField" v-model="componentField.modelValue">
               <SelectTrigger>
-                <SelectValue :placeholder="t('agent.selectAvailabilityStatus')" />
+                <SelectValue :placeholder="i18n._('Select availability status')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="active_group">{{ t('globals.terms.active') }}</SelectItem>
-                  <SelectItem value="away_manual">{{ t('globals.terms.away') }}</SelectItem>
+                  <SelectItem value="active_group">{{ i18n.pgettext('Agent availability', 'Active') }}</SelectItem>
+                  <SelectItem value="away_manual">{{ i18n.ngettext('Away', 'Away', 1) }}</SelectItem>
                   <SelectItem value="away_and_reassigning">
-                    {{ t('globals.terms.awayReassigning') }}
+                    {{ i18n._('Away and reassigning') }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -146,7 +146,7 @@
     ></FormGrid>
     <FormField v-slot="{ field }" name="new_password" v-if="!isNewForm">
       <FormItem class="max-w-xl">
-        <FormLabel>{{ t('globals.terms.setPassword') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Set password', 'Set passwords', 1) }}</FormLabel>
         <FormControl>
           <Input type="password" placeholder="" v-bind="field" />
         </FormControl>
@@ -160,10 +160,10 @@
       <div class="flex items-center justify-between">
         <div>
           <p class="text-base font-semibold text-foreground">
-            {{ $t('globals.terms.apiKey', 2) }}
+            {{ i18n.ngettext('API key', 'API keys', 2) }}
           </p>
           <p class="ui-description">
-            {{ $t('admin.agent.apiKey.description') }}
+            {{ i18n._('Generate API keys for this agent to access Libredesk programmatically.') }}
           </p>
         </div>
       </div>
@@ -174,7 +174,7 @@
           <div class="flex items-center gap-3">
             <Key class="w-4 h-4 text-muted-foreground" />
             <div>
-              <p class="text-sm font-medium">{{ $t('globals.terms.apiKey') }}</p>
+              <p class="text-sm font-medium">{{ i18n.ngettext('API key', 'API keys', 1) }}</p>
               <p class="text-xs text-muted-foreground font-mono">{{ apiKeyData.api_key }}</p>
             </div>
           </div>
@@ -187,7 +187,7 @@
               :disabled="isAPIKeyLoading"
             >
               <RotateCcw class="w-4 h-4 mr-1" />
-              {{ $t('globals.messages.regenerate') }}
+              {{ i18n._('Regenerate') }}
             </Button>
             <Button
               type="button"
@@ -197,14 +197,14 @@
               :disabled="isAPIKeyLoading"
             >
               <Trash2 class="w-4 h-4 mr-1" />
-              {{ $t('globals.messages.revoke') }}
+              {{ i18n._('Revoke') }}
             </Button>
           </div>
         </div>
 
         <!-- Last Used Info -->
         <div v-if="apiKeyLastUsedAt" class="text-xs text-muted-foreground">
-          {{ $t('globals.messages.lastUsed') }}:
+          {{ i18n._('Last used') }}:
           {{ format(new Date(apiKeyLastUsedAt), 'PPpp') }}
         </div>
       </div>
@@ -212,10 +212,10 @@
       <!-- No API Key State -->
       <div v-else class="text-center py-6">
         <Key class="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-        <p class="ui-description mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
+        <p class="ui-description mb-3">{{ i18n._('No API key has been generated for this agent.') }}</p>
         <Button type="button" @click="generateAPIKey" :disabled="isAPIKeyLoading">
           <Plus class="w-4 h-4" />
-          {{ $t('agent.generateApiKey') }}
+          {{ i18n._('Generate API key') }}
         </Button>
       </div>
     </div>
@@ -225,13 +225,13 @@
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {{ $t('toast.apiKeyGenerated') }}
+            {{ i18n._('API key generated') }}
           </DialogTitle>
           <DialogDescription> </DialogDescription>
         </DialogHeader>
         <div class="space-y-4">
           <div>
-            <Label class="text-sm font-medium">{{ $t('globals.terms.apiKey') }}</Label>
+            <Label class="text-sm font-medium">{{ i18n.ngettext('API key', 'API keys', 1) }}</Label>
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_key" readonly class="font-mono text-sm" />
               <CopyButton
@@ -243,7 +243,7 @@
             </div>
           </div>
           <div>
-            <Label class="text-sm font-medium">{{ $t('globals.terms.secret') }}</Label>
+            <Label class="text-sm font-medium">{{ i18n.ngettext('Secret', 'Secrets', 1) }}</Label>
             <div class="flex items-center gap-2 mt-1">
               <Input v-model="newAPIKeyData.api_secret" readonly class="font-mono text-sm" />
               <CopyButton
@@ -256,15 +256,15 @@
           </div>
           <Alert>
             <AlertTriangle class="h-4 w-4" />
-            <AlertTitle>{{ $t('globals.terms.warning') }}</AlertTitle>
+            <AlertTitle>{{ i18n.ngettext('Warning', 'Warnings', 1) }}</AlertTitle>
             <AlertDescription>
-              {{ $t('admin.agent.apiKey.warningMessage') }}
+              {{ i18n._('This secret will only be shown once. Make sure to copy it now.') }}
             </AlertDescription>
           </Alert>
         </div>
         <DialogFooter>
           <Button type="button" @click="closeAPIKeyModal">{{
-            $t('globals.messages.close')
+            i18n._('Close')
           }}</Button>
         </DialogFooter>
       </DialogContent>
@@ -275,7 +275,7 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox :checked="value" @update:checked="handleChange" />
-            <Label>{{ $t('globals.terms.sendWelcomeEmail') }}</Label>
+            <Label>{{ i18n.ngettext('Send welcome email?', 'Send welcome emails?', 1) }}</Label>
           </div>
         </FormControl>
         <FormMessage />
@@ -326,7 +326,7 @@ import {
   DialogTitle
 } from '@shared-ui/components/ui/dialog/index.js'
 import { Alert, AlertDescription, AlertTitle } from '@shared-ui/components/ui/alert/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useEmitter } from '@main/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { format } from 'date-fns'
@@ -356,11 +356,11 @@ const props = defineProps({
     required: false
   }
 })
-const { t } = useI18n()
+const i18n = useI18n()
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 const teams = ref([])
@@ -387,7 +387,7 @@ onMounted(async () => {
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
+      description: i18n._('Something went wrong')
     })
   }
 })
@@ -395,12 +395,12 @@ onMounted(async () => {
 const availabilityStatus = computed(() => {
   const status = form.values.availability_status
   if (status === 'active_group')
-    return { text: t('globals.terms.active'), color: 'bg-success text-success-foreground' }
+    return { text: i18n.pgettext('Agent availability', 'Active'), color: 'bg-success text-success-foreground' }
   if (status === 'away_manual')
-    return { text: t('globals.terms.away'), color: 'bg-warning text-warning-foreground' }
+    return { text: i18n._('{count, plural, one {Away} other {Away}}'), color: 'bg-warning text-warning-foreground' }
   if (status === 'away_and_reassigning')
-    return { text: t('globals.terms.awayReassigning'), color: 'bg-warning text-warning-foreground' }
-  return { text: t('globals.terms.offline'), color: 'bg-muted text-muted-foreground' }
+    return { text: i18n._('Away and reassigning'), color: 'bg-warning text-warning-foreground' }
+  return { text: i18n._('{count, plural, one {Offline} other {Offline}}'), color: 'bg-muted text-muted-foreground' }
 })
 
 const teamOptions = computed(() =>
@@ -411,7 +411,7 @@ const roleOptions = computed(() =>
 )
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const onSubmit = form.handleSubmit((values) => {
@@ -447,13 +447,13 @@ const generateAPIKey = async () => {
 
       showAPIKeyDialog.value = true
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('agent.apiKeyGenerated')
+        description: i18n._('API key generated successfully')
       })
     }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
+      description: i18n._('Something went wrong')
     })
   } finally {
     isAPIKeyLoading.value = false
@@ -473,12 +473,12 @@ const revokeAPIKey = async () => {
     apiKeyData.value.api_secret = ''
     apiKeyLastUsedAt.value = null
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('agent.apiKeyRevoked')
+      description: i18n._('API key revoked successfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
+      description: i18n._('Something went wrong')
     })
   } finally {
     isAPIKeyLoading.value = false

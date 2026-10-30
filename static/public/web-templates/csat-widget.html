@@ -27,18 +27,18 @@
 <body>
     <div>
         {{ if .Data.CSAT.Responded }}
-        <p class="done" role="status">{{ L.T "globals.messages.thankYou" }}</p>
+        <p class="done" role="status">{{ L.GetD "templates" "Thank you!" }}</p>
         {{ else }}
         <div class="stars" id="stars">
-            <button type="button" class="star" data-score="1" aria-label="{{ L.T "globals.terms.poor" }}"><span aria-hidden="true">&#9733;</span></button>
-            <button type="button" class="star" data-score="2" aria-label="{{ L.T "globals.terms.fair" }}"><span aria-hidden="true">&#9733;</span></button>
-            <button type="button" class="star" data-score="3" aria-label="{{ L.T "globals.terms.good" }}"><span aria-hidden="true">&#9733;</span></button>
-            <button type="button" class="star" data-score="4" aria-label="{{ L.T "globals.terms.great" }}"><span aria-hidden="true">&#9733;</span></button>
-            <button type="button" class="star" data-score="5" aria-label="{{ L.T "globals.terms.excellent" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="1" aria-label="{{ L.GetD "templates" "Poor" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="2" aria-label="{{ L.GetD "templates" "Fair" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="3" aria-label="{{ L.GetD "templates" "Good" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="4" aria-label="{{ L.GetD "templates" "Great" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="5" aria-label="{{ L.GetD "templates" "Excellent" }}"><span aria-hidden="true">&#9733;</span></button>
         </div>
-        <p class="done" id="done" role="status" hidden>{{ L.T "globals.messages.thankYou" }}</p>
-        <p class="done" id="submitting" role="status" hidden>{{ L.T "globals.messages.submitting" }}</p>
-        <p class="done" id="error" role="alert" hidden>{{ L.T "globals.messages.somethingWentWrong" }}</p>
+        <p class="done" id="done" role="status" hidden>{{ L.GetD "templates" "Thank you!" }}</p>
+        <p class="done" id="submitting" role="status" hidden>{{ L.GetD "templates" "Submitting..." }}</p>
+        <p class="done" id="error" role="alert" hidden>{{ L.GetD "templates" "Something went wrong" }}</p>
         <script>
         (function() {
             var uuid = '{{ .Data.CSAT.UUID }}';

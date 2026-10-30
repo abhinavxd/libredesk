@@ -11,7 +11,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -25,7 +25,7 @@ var (
 // Manager handles team-related operations.
 type Manager struct {
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 	q    queries
 }
 
@@ -33,7 +33,7 @@ type Manager struct {
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -72,7 +72,7 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return teams, nil
 }
@@ -85,7 +85,7 @@ func (u *Manager) GetAllCompact(query string, page, pageSize int) ([]models.Team
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return teams, nil
 }
@@ -98,7 +98,7 @@ func (u *Manager) GetAllCompactByIDs(ids []int) ([]models.TeamCompact, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams by ids", "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return teams, nil
 }
@@ -108,10 +108,10 @@ func (u *Manager) Get(id int) (models.Team, error) {
 	var team models.Team
 	if err := u.q.GetTeam.Get(&team, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return team, envelope.NewError(envelope.InputError, u.i18n.T("validation.notFoundTeam"), nil)
+			return team, envelope.NewError(envelope.InputError, u.i18n.Get("Team not found"), nil)
 		}
 		u.lo.Error("error fetching team", "id", id, "error", err)
-		return team, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return team, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return team, nil
 }
@@ -121,10 +121,10 @@ func (u *Manager) Create(name, timezone, conversationAssignmentType string, busi
 	var team models.Team
 	if err := u.q.InsertTeam.Get(&team, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return team, envelope.NewError(envelope.GeneralError, u.i18n.T("errors.alreadyExistsTeam"), nil)
+			return team, envelope.NewError(envelope.GeneralError, u.i18n.Get("Team already exists"), nil)
 		}
 		u.lo.Error("error inserting team", "error", err)
-		return team, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return team, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return team, nil
 }
@@ -134,7 +134,7 @@ func (u *Manager) Update(id int, name, timezone, conversationAssignmentType stri
 	var team models.Team
 	if err := u.q.UpdateTeam.Get(&team, id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
 		u.lo.Error("error updating team", "error", err)
-		return team, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return team, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return team, nil
 }
@@ -147,7 +147,7 @@ func (u *Manager) Delete(id int) ([]int, error) {
 	}
 	if _, err := u.q.DeleteTeam.Exec(id); err != nil {
 		u.lo.Error("error deleting team", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	ids := make([]int, 0, len(members))
 	for _, m := range members {
@@ -164,7 +164,7 @@ func (u *Manager) GetUserTeams(userID int) ([]models.Team, error) {
 			return teams, nil
 		}
 		u.lo.Error("error fetching teams", "user_id", userID, "error", err)
-		return teams, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return teams, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return teams, nil
 }
@@ -173,7 +173,7 @@ func (u *Manager) GetUserTeams(userID int) ([]models.Team, error) {
 func (u *Manager) UpsertUserTeams(id int, teamNames []string) error {
 	if _, err := u.q.UpsertUserTeams.Exec(id, pq.Array(teamNames)); err != nil {
 		u.lo.Error("error updating user teams", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -183,7 +183,7 @@ func (u *Manager) UserBelongsToTeam(teamID, userID int) (bool, error) {
 	var exists bool
 	if err := u.q.UserBelongsToTeam.Get(&exists, teamID, userID); err != nil {
 		u.lo.Error("error fetching team members", "team_id", teamID, "user_id", userID, "error", err)
-		return false, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return false, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return exists, nil
 }

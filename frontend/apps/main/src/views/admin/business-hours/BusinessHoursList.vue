@@ -4,7 +4,7 @@
       <template #actions>
         <router-link :to="{ name: 'new-business-hours' }">
           <Button>
-            {{ $t('businessHour.new') }}
+            {{ i18n._('New business hour') }}
           </Button>
         </router-link>
       </template>
@@ -13,7 +13,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="businessHours"
         :loading="isLoading"
       />
@@ -29,13 +29,13 @@ import DataTable from '@main/components/datatable/DataTable.vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { useEmitter } from '@/composables/useEmitter'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { createColumns } from '@/features/admin/business-hours/dataTableColumns.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const businessHours = ref([])
 const isLoading = ref(false)
 const emit = useEmitter()

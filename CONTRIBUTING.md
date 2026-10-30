@@ -2,11 +2,10 @@
 
 Thanks for your interest in contributing.
 
-
 ## Before you start
 
 - All contributions should align with the project's scope, goals, and technical direction.
-- Bug fixes and documentation improvements can go straight to a PR, no prior discussion needed.
+- Bug fixes and documentation improvements can go straight to a PR; no prior discussion is needed.
 - Anything larger should start with an issue. See below for why.
 - Keep changes focused on a single concern wherever possible.
 - For translations, please contribute through [Crowdin](https://crowdin.com/project/libredesk) instead of opening PRs for translation changes.

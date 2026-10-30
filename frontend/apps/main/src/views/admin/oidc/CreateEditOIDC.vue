@@ -21,11 +21,11 @@ import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const oidc = ref({
   provider: 'Google'
 })
@@ -45,11 +45,11 @@ const submitForm = async (values) => {
     let toastDescription = ''
     if (props.id) {
       await api.updateOIDC(props.id, values)
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
     } else {
       await api.createOIDC(values)
       router.push({ name: 'sso-list' })
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: toastDescription
@@ -65,7 +65,7 @@ const submitForm = async (values) => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? i18n._('Edit') : i18n.pgettext('New SSO provider', 'New')
 }
 
 const isNewForm = computed(() => {
@@ -73,7 +73,7 @@ const isNewForm = computed(() => {
 })
 
 const breadcrumbLinks = [
-  { path: 'sso-list', label: t('globals.terms.sso') },
+  { path: 'sso-list', label: i18n._('{count, plural, one {SSO} other {SSOs}}') },
   { path: '', label: breadCrumLabel() }
 ]
 

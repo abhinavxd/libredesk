@@ -16,7 +16,7 @@
                   @update:modelValue="(value) => handleFieldChange(value, index)"
                 >
                   <SelectTrigger class="m-auto">
-                    <SelectValue :placeholder="t('placeholders.selectAction')" />
+                    <SelectValue :placeholder="i18n._('Select action')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -55,17 +55,17 @@
                   :modelValue="action.recipients || []"
                   @update:modelValue="(value) => handleNotifyRecipientsChange(value, index)"
                   :items="notifyRecipientOptions"
-                  :placeholder="t('placeholders.selectRecipients')"
+                  :placeholder="i18n._('Select recipients')"
                   :search="searchRecipients"
                 />
                 <Input
                   type="text"
-                  :placeholder="t('globals.terms.subject')"
+                  :placeholder="i18n.ngettext('Subject', 'Subjects', 1)"
                   :modelValue="action.subject || ''"
                   @update:modelValue="(value) => handleNotifySubjectChange(value, index)"
                 />
                 <Textarea
-                  :placeholder="t('globals.terms.message')"
+                  :placeholder="i18n.ngettext('Message', 'Messages', 1)"
                   :modelValue="action.message || ''"
                   @update:modelValue="(value) => handleNotifyMessageChange(value, index)"
                   class="h-36"
@@ -90,7 +90,7 @@
                   v-else
                   v-model="action.value[0]"
                   :items="conversationActions[action.type]?.options"
-                  :placeholder="t('placeholders.selectValue')"
+                  :placeholder="i18n._('Select value')"
                   @select="handleValueChange($event, index)"
                 />
               </div>
@@ -103,19 +103,19 @@
                   <SelectComboBox
                     v-model="action.value[0]"
                     :items="webhookStore.options"
-                    :placeholder="t('placeholders.selectWebhook')"
+                    :placeholder="i18n._('Select webhook')"
                     @select="handleWebhookChange($event, index)"
                   />
                 </div>
                 <div class="flex-1 min-w-0">
                   <Input
                     type="text"
-                    :placeholder="t('placeholders.webhookEventName')"
+                    :placeholder="i18n._('e.g. priority.escalated')"
                     :modelValue="action.value[1] || ''"
                     @update:modelValue="(value) => handleWebhookEventChange(value, index)"
                   />
                   <p class="text-xs text-muted-foreground mt-1">
-                    {{ $t('admin.automation.webhookEventNameHint') }}
+                    {{ i18n._('Event name sent in the webhook payload.') }}
                   </p>
                 </div>
               </div>
@@ -144,7 +144,7 @@
               :autoFocus="false"
               v-model:htmlContent="action.value[0]"
               @update:htmlContent="(value) => handleEditorChange(value, index)"
-              :placeholder="t('editor.newLine')"
+              :placeholder="i18n._('Shift + Enter to add a new line.')"
             />
           </div>
         </div>
@@ -152,7 +152,7 @@
     </div>
     <div>
       <Button type="button" variant="outline" @click.prevent="addAction">{{
-        $t('actions.addAction')
+        i18n._('Add action')
       }}</Button>
     </div>
   </div>
@@ -179,7 +179,7 @@ import { SelectTag } from '@shared-ui/components/ui/select'
 import HelpPopover from '@main/components/HelpPopover.vue'
 import { useConversationFilters } from '@main/composables/useConversationFilters'
 import { getTextFromHTML, formatTemplateVariables } from '@shared-ui/utils/string'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
@@ -208,30 +208,30 @@ const MESSAGE_VARIABLES = [
 ]
 
 const { actions } = toRefs(props)
-const { t } = useI18n()
+const i18n = useI18n()
 const emit = defineEmits(['update-actions', 'add-action', 'remove-action'])
 const webhookStore = useWebhookStore()
 const uStore = useUsersStore()
 const tStore = useTeamStore()
 const { conversationActions } = useConversationFilters()
 const messageVariablesHelp = computed(
-  () => `${t('globals.terms.variable', 2)}: ${formatTemplateVariables(MESSAGE_VARIABLES)}`
+  () => i18n._('Variables: {variables}', { variables: formatTemplateVariables(MESSAGE_VARIABLES) })
 )
 
 webhookStore.fetchWebhooks()
 
 const recipientKeywords = computed(() => [
-  { label: t('globals.terms.assignee'), value: 'assignee' },
-  { label: t('globals.terms.assignedTeam'), value: 'assigned_team' }
+  { label: i18n._('Assignee'), value: 'assignee' },
+  { label: i18n._('Assigned team'), value: 'assigned_team' }
 ])
 
 const toTeamRecipients = (options) => options.map((o) => ({
-    label: `${t('globals.terms.team')}: ${o.label}`,
+    label: `${i18n._('{count, plural, one {Team} other {Teams}}')}: ${o.label}`,
     value: `team:${o.value}`
   }))
 
 const toUserRecipients = (options) => options.map((o) => ({
-    label: `${t('globals.terms.agent')}: ${o.label}`,
+    label: `${i18n._('{count, plural, one {Agent} other {Agents}}')}: ${o.label}`,
     value: `user:${o.value}`
   }))
 
@@ -314,8 +314,8 @@ const handleWebhookEventChange = (value, index) => {
 }
 
 const placeholderForText = (type) => {
-  if (type === 'snooze') return t('placeholders.snoozeDuration')
-  return t('actions.setValue')
+  if (type === 'snooze') return i18n._('e.g. 30m, 3h, 2h30m')
+  return i18n._('Set value')
 }
 
 const handleFieldChange = (value, index) => {

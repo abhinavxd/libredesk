@@ -3,22 +3,22 @@
   <form @submit="onSubmit" class="shared-view-form space-y-6 w-full" :class="{ 'opacity-50': formLoading }">
     <FormField v-slot="{ componentField }" name="name" :validate-on-blur="false">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
         <FormControl>
           <Input type="text" placeholder="" v-bind="componentField" />
         </FormControl>
-        <FormDescription>{{ t('view.form.name.description') }}</FormDescription>
+        <FormDescription>{{ i18n._('Enter an unique name for your view.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField }" name="filters">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.filter', 2) }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Filter', 'Filters', 2) }}</FormLabel>
         <FormControl>
           <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
         </FormControl>
-        <FormDescription>{{ t('view.form.filters.description') }}</FormDescription>
+        <FormDescription>{{ i18n._('Set one or more filters to customize view.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -34,7 +34,7 @@
         :validate-on-model-update="false"
       >
         <FormItem>
-          <FormLabel>{{ t('globals.terms.visibility') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Visibility', 'Visibilities', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
@@ -42,8 +42,8 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="all">{{ t('sharedView.allAgents') }}</SelectItem>
-                  <SelectItem value="team">{{ t('globals.terms.team') }}</SelectItem>
+                  <SelectItem value="all">{{ i18n._('All agents') }}</SelectItem>
+                  <SelectItem value="team">{{ i18n.ngettext('Team', 'Teams', 1) }}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -58,7 +58,7 @@
         name="team_id"
       >
         <FormItem>
-          <FormLabel>{{ t('globals.terms.team') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Team', 'Teams', 1) }}</FormLabel>
           <FormControl>
             <SelectTeamCombobox v-bind="componentField" />
           </FormControl>
@@ -106,11 +106,11 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { z } from 'zod'
 
 const { conversationsListFilters } = useConversationFilters()
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 const validateTick = ref(0)
 provide('filterValidateTick', validateTick)
@@ -136,7 +136,7 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.initialValues.id ? t('globals.messages.save') : t('globals.messages.create'))
+    (props.initialValues.id ? i18n._('Save') : i18n._('Create'))
   )
 })
 
@@ -157,10 +157,10 @@ const formSchema = toTypedSchema(
     .object({
       name: z
         .string({
-          required_error: t('globals.messages.required')
+          required_error: i18n._('{name} Required')
         })
-        .min(2, { message: t('view.form.name.length') })
-        .max(140, { message: t('view.form.name.length') }),
+        .min(2, { message: i18n._('View name should be between 2 and 140 characters.') })
+        .max(140, { message: i18n._('View name should be between 2 and 140 characters.') }),
       filters: z
         .object({
           logic: z.string().optional(),
@@ -176,7 +176,7 @@ const formSchema = toTypedSchema(
         if (data.visibility === 'team') return !!data.team_id
         return true
       },
-      { message: t('globals.messages.required'), path: ['team_id'] }
+      { message: i18n._('{name} Required'), path: ['team_id'] }
     )
 )
 
@@ -191,7 +191,7 @@ const form = useForm({
 const onSubmit = form.handleSubmit(async (values) => {
   const leaves = collectLeaves(values.filters)
   if (leaves.length === 0) {
-    form.setFieldError('filters', t('view.form.filter.selectAtLeastOne'))
+    form.setFieldError('filters', i18n._('Select at least one filter.'))
     return
   }
   if (leaves.some(isPartialLeaf)) {

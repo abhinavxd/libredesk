@@ -15,7 +15,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/template/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -36,7 +36,7 @@ type Manager struct {
 	funcMap          template.FuncMap
 	q                queries
 	lo               *logf.Logger
-	i18n             *i18n.I18n
+	i18n             *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -52,7 +52,7 @@ type queries struct {
 }
 
 // New creates and returns a new instance of the Manager.
-func New(lo *logf.Logger, db *sqlx.DB, webTpls *template.Template, tpls *template.Template, funcMap template.FuncMap, i18n *i18n.I18n) (*Manager, error) {
+func New(lo *logf.Logger, db *sqlx.DB, webTpls *template.Template, tpls *template.Template, funcMap template.FuncMap, i18n *gotext.Locale) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		return nil, err
@@ -75,10 +75,10 @@ func (m *Manager) Update(id int, t models.Template) (models.Template, error) {
 	var result models.Template
 	if err := m.q.UpdateTemplate.Get(&result, id, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
 		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
-			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil /** data **/)
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.Get("Default template already exists"), nil /** data **/)
 		}
 		m.lo.Error("error updating template", "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -94,10 +94,10 @@ func (m *Manager) Create(t models.Template) (models.Template, error) {
 	var result models.Template
 	if err := m.q.InsertTemplate.Get(&result, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
 		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
-			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil /** data **/)
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.Get("Default template already exists"), nil /** data **/)
 		}
 		m.lo.Error("error inserting template", "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -107,7 +107,7 @@ func (m *Manager) GetAll(typ string) ([]models.Template, error) {
 	var templates = make([]models.Template, 0)
 	if err := m.q.GetAllTemplates.Select(&templates, typ); err != nil {
 		m.lo.Error("error fetching templates", "error", err)
-		return templates, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return templates, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return templates, nil
 }
@@ -117,10 +117,10 @@ func (m *Manager) Get(id int) (models.Template, error) {
 	var templates = models.Template{}
 	if err := m.q.GetTemplate.Get(&templates, id); err != nil {
 		if err == sql.ErrNoRows {
-			return templates, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundTemplate"), nil)
+			return templates, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Template not found"), nil)
 		}
 		m.lo.Error("error fetching template", "error", err)
-		return templates, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return templates, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return templates, nil
 }
@@ -130,14 +130,14 @@ func (m *Manager) Delete(id int) error {
 	// Do not allow deletion of built-in templates.
 	isBuiltIn, err := m.isBuiltIn(id)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if isBuiltIn {
-		return envelope.NewError(envelope.PermissionError, m.i18n.T("template.cannotDeleteBuiltInTemplate"), nil)
+		return envelope.NewError(envelope.PermissionError, m.i18n.Get("Cannot delete built-in template"), nil)
 	}
 	if _, err := m.q.DeleteTemplate.Exec(id); err != nil {
 		m.lo.Error("error deleting template", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -213,7 +213,8 @@ func (m *Manager) validateOutgoingTemplate(t models.Template) error {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 	if _, err := parseOutgoingTemplate(t.Body, texttemplate.FuncMap(m.funcMap)); err != nil {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("template.invalidOutgoingTemplate", "content", `{{ template "content" . }}`), nil /** data **/)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This email template cannot deliver replies. Check the syntax and include %[1]s.",
+			`{{ template "content" . }}`), nil /** data **/)
 	}
 	return nil
 }

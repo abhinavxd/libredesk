@@ -3,7 +3,7 @@
     <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
       <template #actions>
         <router-link :to="{ name: 'new-team' }">
-          <Button> {{ $t('globals.messages.new') }} </Button>
+          <Button> {{ i18n.pgettext('New team', 'New') }} </Button>
         </router-link>
       </template>
     </AdminToolbar>

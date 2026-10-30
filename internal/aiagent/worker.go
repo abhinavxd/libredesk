@@ -93,7 +93,7 @@ func (m *Manager) Close() {
 func (m *Manager) worker(ctx context.Context) {
 	for convID := range m.queue {
 		if ctx.Err() != nil {
-			m.handoffByConvID(convID, m.i18n.T("ai.agent.handoffError"))
+			m.handoffByConvID(convID, m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human."))
 		} else {
 			m.handleWithRecover(ctx, convID)
 		}
@@ -153,7 +153,7 @@ func (m *Manager) enqueue(convID int) {
 		m.wg.Add(1)
 		go func() {
 			defer m.wg.Done()
-			m.handoffByConvID(convID, m.i18n.T("ai.agent.handoffError"))
+			m.handoffByConvID(convID, m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human."))
 		}()
 	}
 }
@@ -250,7 +250,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	// only act on a turn the primary contact authored - otherwise a participant's message could drive
 	// tool actions under the contact's identity. Anyone else gets a human.
 	if inbound.SenderID != conv.ContactID {
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffOtherParticipant"))
+		m.handoff(conv, assistant, m.i18n.Get("Someone other than the contact replied on this conversation, so the AI assistant handed it off to a human."))
 		return
 	}
 	// Turn cap is per engagement (since the assistant was last assigned), so a human reassigning a
@@ -258,11 +258,11 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	var turns int
 	if err := m.q.CountAITurns.Get(&turns, conv.ID, assistant.UserID); err != nil {
 		m.lo.Error("error counting ai turns", "conversation_id", conv.ID, "error", err)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		m.handoff(conv, assistant, m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human."))
 		return
 	}
 	if turns >= assistant.MaxTurns {
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffMaxTurns"))
+		m.handoff(conv, assistant, m.i18n.Get("The AI assistant reached its response limit for this conversation and handed it off to a human."))
 		return
 	}
 
@@ -346,7 +346,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if err != nil {
 		m.lo.Error("error running ai agent", "conversation_uuid", conv.UUID, "error", err)
-		reason := m.i18n.T("ai.agent.handoffError")
+		reason := m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human.")
 		if outcome.handedOff {
 			reason = outcome.handoffReason
 		}
@@ -366,18 +366,18 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
 		if err := m.postReply(conv, assistant, answer, replyMeta(answerSuggestions, articleIDs)); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human."))
 			return
 		}
 	}
 	if confirm != "" {
 		if len(confirmSuggestions) == 0 {
-			confirmSuggestions = []string{m.i18n.T("globals.messages.yes"), m.i18n.T("ai.agent.needMoreHelp")}
+			confirmSuggestions = []string{m.i18n.Get("Yes"), m.i18n.Get("No, I need more help")}
 		}
 		meta := suggestedRepliesMeta(confirmSuggestions)
 		meta["is_confirmation"] = true
 		if err := m.postReply(conv, assistant, confirm, meta); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.i18n.Get("The AI assistant could not respond and handed this conversation off to a human."))
 			return
 		}
 	}
@@ -395,7 +395,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer == "" {
 		m.lo.Debug("ai agent no answer, handing off", "conversation_uuid", conv.UUID)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
+		m.handoff(conv, assistant, m.i18n.Get("The AI assistant did not have an answer and handed this conversation off to a human."))
 	}
 }
 
@@ -495,7 +495,7 @@ func (m *Manager) requestHandoffForm(conv cmodels.Conversation, assistant models
 	if !config.PreChatForm.Enabled || !config.PreChatForm.HandoffOnly || !slices.ContainsFunc(config.PreChatForm.Fields, func(field livechat.PreChatFormField) bool { return field.Enabled }) {
 		return false
 	}
-	if err := m.postReply(conv, assistant, m.i18n.T("ai.agent.handoffFormPrompt"), map[string]any{"handoff_form_pending": true}); err != nil {
+	if err := m.postReply(conv, assistant, m.i18n.Get("Please share these details before I connect you with a human."), map[string]any{"handoff_form_pending": true}); err != nil {
 		return false
 	}
 	return true
@@ -506,7 +506,7 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 	actor := m.actorUser(assistant)
 	note := strings.TrimSpace(reason)
 	if note == "" {
-		note = m.i18n.T("ai.agent.handoffDefault")
+		note = m.i18n.Get("The AI assistant handed this conversation off to a human.")
 	}
 	if _, err := m.convo.SendPrivateNote(nil, assistant.UserID, conv.UUID, note, nil); err != nil {
 		m.lo.Error("error posting handoff note", "conversation_uuid", conv.UUID, "error", err)

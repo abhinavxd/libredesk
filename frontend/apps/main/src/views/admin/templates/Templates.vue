@@ -5,14 +5,14 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.template.help') }}</p>
+      <p>{{ i18n._('Customize the look and content of outgoing emails to customers and notification emails to your team.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/email-templates"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ $t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>

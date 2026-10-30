@@ -22,7 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
@@ -66,7 +66,7 @@ type Manager struct {
 	q        queries
 	db       *sqlx.DB
 	lo       *logf.Logger
-	i18n     *i18n.I18n
+	i18n     *gotext.Locale
 	ai       *ai.Manager
 	convo    *conversation.Manager
 	inbox    *inbox.Manager
@@ -103,7 +103,7 @@ type Manager struct {
 type Opts struct {
 	DB                 *sqlx.DB
 	Lo                 *logf.Logger
-	I18n               *i18n.I18n
+	I18n               *gotext.Locale
 	QueueSize          int
 	MaxSteps           int
 	MaxHistoryMessages int
@@ -149,7 +149,7 @@ func (m *Manager) GetAssistants() ([]models.Assistant, error) {
 	assistants := []models.Assistant{}
 	if err := m.q.GetAssistants.Select(&assistants); err != nil {
 		m.lo.Error("error fetching assistants", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	toolsByAssistant, err := m.allAssistantTools()
 	if err != nil {
@@ -173,7 +173,7 @@ func (m *Manager) allAssistantTools() (map[int][]int, error) {
 	}
 	if err := m.q.GetAllAssistantTools.Select(&rows); err != nil {
 		m.lo.Error("error fetching assistant tools", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	out := make(map[int][]int)
 	for _, r := range rows {
@@ -225,7 +225,7 @@ func (m *Manager) statWindow(a models.Assistant, start, end time.Time) (models.S
 	var w models.StatWindow
 	if err := m.q.GetAssistantWindowStats.Get(&w, a.UserID, a.ID, start, end); err != nil {
 		m.lo.Error("error fetching assistant stats", "error", err)
-		return w, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return w, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return w, nil
 }
@@ -270,30 +270,30 @@ func (m *Manager) CreateAssistant(a models.Assistant) (models.Assistant, error) 
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
 	var userID int
 	if err := tx.Stmtx(m.q.InsertAssistantUser).QueryRow(a.Name).Scan(&userID); err != nil {
 		m.lo.Error("error creating assistant user", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	var id int
 	if err := tx.Stmtx(m.q.InsertAssistant).QueryRow(userID, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled).Scan(&id); err != nil {
 		m.lo.Error("error creating assistant", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := insertTools(tx, m.q.InsertAssistantTool, id, a.ToolIDs); err != nil {
 		m.lo.Error("error linking assistant tools", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing assistant", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := m.refreshAssistantUserIDs(); err != nil {
 		m.lo.Error("error refreshing assistant user ids cache", "error", err)
@@ -314,30 +314,30 @@ func (m *Manager) UpdateAssistant(id int, a models.Assistant) (models.Assistant,
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
 	if _, err := tx.Stmtx(m.q.UpdateAssistant).Exec(id, a.Description, a.Instructions, a.Guardrails, a.Tone, a.ResponseLength, a.MaxTurns, a.FallbackTeamID, a.Enabled, a.Expectation, a.HandoffEnabled, a.Languages, a.CitationsEnabled); err != nil {
 		m.lo.Error("error updating assistant", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := tx.Stmtx(m.q.UpdateAssistantUser).Exec(existing.UserID, a.Name); err != nil {
 		m.lo.Error("error updating assistant user", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := tx.Stmtx(m.q.DeleteAssistantTools).Exec(id); err != nil {
 		m.lo.Error("error clearing assistant tools", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := insertTools(tx, m.q.InsertAssistantTool, id, a.ToolIDs); err != nil {
 		m.lo.Error("error linking assistant tools", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing assistant update", "error", err)
-		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Assistant{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := m.refreshAssistantUserIDs(); err != nil {
 		m.lo.Error("error refreshing assistant user ids cache", "error", err)
@@ -355,28 +355,28 @@ func (m *Manager) DeleteAssistant(id int) (int, error) {
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
 	if _, err := tx.Stmtx(m.q.DeleteAssistant).Exec(id); err != nil {
 		m.lo.Error("error deleting assistant", "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := tx.Stmtx(m.q.SoftDeleteAssistantUser).Exec(a.UserID); err != nil {
 		m.lo.Error("error soft-deleting assistant user", "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	// Conversations left assigned to the deleted assistant would never get a reply from anyone;
 	// move them to the fallback team, or the unassigned queue when none is set.
 	if _, err := tx.Stmtx(m.q.UnassignAssistantConvos).Exec(a.UserID, a.FallbackTeamID); err != nil {
 		m.lo.Error("error unassigning deleted assistant conversations", "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing assistant delete", "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := m.refreshAssistantUserIDs(); err != nil {
 		m.lo.Error("error refreshing assistant user ids cache", "error", err)
@@ -388,10 +388,10 @@ func (m *Manager) getAssistantRow(id int) (models.Assistant, error) {
 	var a models.Assistant
 	if err := m.q.GetAssistant.Get(&a, id); err != nil {
 		if err == sql.ErrNoRows {
-			return a, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return a, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching assistant", "error", err)
-		return a, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return a, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return a, nil
 }
@@ -400,7 +400,7 @@ func (m *Manager) getTools(assistantID int) ([]int, error) {
 	ids := []int{}
 	if err := m.q.GetAssistantTools.Select(&ids, assistantID); err != nil {
 		m.lo.Error("error fetching assistant tools", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return ids, nil
 }
@@ -408,7 +408,7 @@ func (m *Manager) getTools(assistantID int) ([]int, error) {
 func (m *Manager) validate(a *models.Assistant) error {
 	a.Name = strings.TrimSpace(a.Name)
 	if a.Name == "" {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.name")), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", m.i18n.Get("Name")), nil)
 	}
 	if a.Tone == "" {
 		a.Tone = "professional"
@@ -417,7 +417,7 @@ func (m *Manager) validate(a *models.Assistant) error {
 		a.ResponseLength = "balanced"
 	}
 	if !slices.Contains(models.Tones, a.Tone) || !slices.Contains(models.ResponseLengths, a.ResponseLength) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if a.MaxTurns <= 0 || a.MaxTurns > 20 {
 		a.MaxTurns = 6

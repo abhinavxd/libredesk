@@ -5,11 +5,11 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox
-              :aria-label="$t('globals.terms.active')"
+              :aria-label="i18n._('Active')"
               :checked="value"
               @update:checked="handleChange"
             />
-            <Label>{{ $t('globals.terms.active') }}</Label>
+            <Label>{{ i18n._('Active') }}</Label>
           </div>
         </FormControl>
         <FormMessage />
@@ -19,7 +19,7 @@
     <FormGrid class="webhook-settings-grid">
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="My Webhook" v-bind="componentField" />
           </FormControl>
@@ -29,7 +29,7 @@
 
       <FormField v-slot="{ componentField }" name="url">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.url') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('URL', 'URLs', 1) }}</FormLabel>
           <FormControl>
             <Input type="url" placeholder="https://your-app.com/webhook" v-bind="componentField" />
           </FormControl>
@@ -40,9 +40,9 @@
 
     <FormField name="events" v-slot="{ componentField, handleChange }">
       <FormItem>
-        <FormLabel>{{ $t('globals.terms.event', 2) }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Event', 'Events', 2) }}</FormLabel>
         <FormDescription>
-          {{ $t('admin.webhook.events.description') }}
+          {{ i18n._('Select the events you want to subscribe to.') }}
         </FormDescription>
         <FormControl>
           <div class="space-y-6">
@@ -90,11 +90,11 @@
     <FormGrid class="webhook-settings-grid">
       <FormField v-slot="{ componentField }" name="secret">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.secret') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Secret', 'Secrets', 1) }}</FormLabel>
           <FormControl>
             <Input type="password" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ $t('admin.webhook.secret.description') }}</FormDescription>
+          <FormDescription>{{ i18n._('Optional secret key for webhook signature verification.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -111,7 +111,7 @@ import { Label } from '@shared-ui/components/ui/label'
 import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref } from 'vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   FormControl,
   FormField,
@@ -132,12 +132,12 @@ defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const eventId = useId()
 
 const webhookEvents = ref([
   {
-    name: t('globals.terms.conversation'),
+    name: i18n._('{count, plural, one {Conversation} other {Conversations}}'),
     events: [
       {
         value: 'conversation.created',
@@ -162,7 +162,7 @@ const webhookEvents = ref([
     ]
   },
   {
-    name: t('globals.terms.message'),
+    name: i18n._('{count, plural, one {Message} other {Messages}}'),
     events: [
       {
         value: 'message.created',

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createApp, h, nextTick, ref } from 'vue'
-import { createI18n } from 'vue-i18n'
+import { createI18n } from '@shared-ui/i18n'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import DataTable from './DataTable.vue'
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
@@ -76,16 +76,9 @@ function mountTable({
   })
   app.use(
     createI18n({
-      legacy: false,
-      locale: 'en',
-      messages: {
-        en: {
-          'globals.terms.search': 'Search',
-          'globals.terms.loading': 'Loading',
-          'globals.messages.clearSearch': 'Clear search',
-          'globals.messages.noResultsFound': 'No results found'
-        }
-      }
+      locale: 'en-US',
+      messages: {},
+      english: {}
     })
   )
   app.mount(container)
@@ -193,7 +186,7 @@ describe('DataTable row actions', () => {
           }
         )
     })
-    app.config.globalProperties.$t = () => 'More actions'
+    app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: () => 'More actions' }
     app.mount(container)
     const trigger = container.querySelector('button')
     expect(trigger.getAttribute('aria-label')).toBe('More actions')

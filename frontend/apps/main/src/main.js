@@ -27,16 +27,7 @@ async function initApp () {
     setFavicon(config['app.favicon_url'])
 
   // Initialize i18n.
-  const i18nConfig = {
-    legacy: false,
-    locale: lang,
-    fallbackLocale: 'en-US',
-    messages: {
-      [lang]: langMessages.data
-    }
-  }
-
-  const i18n = initI18n(i18nConfig)
+  const i18n = initI18n(langMessages.data)
   const app = createApp(Root)
   const pinia = createPinia()
   app.use(pinia)

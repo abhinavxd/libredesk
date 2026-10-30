@@ -1,16 +1,16 @@
 <template>
-  <div class="flex flex-col min-h-[20rem] max-h-[32rem]" role="region" :aria-label="t('globals.terms.notification', 2)">
+  <div class="flex flex-col min-h-[20rem] max-h-[32rem]" role="region" :aria-label="i18n.ngettext('Notification', 'Notifications', 2)">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5 border-b border-border">
-      <h3 class="ui-heading">{{ t('globals.terms.notification', 2) }}</h3>
+      <h3 class="ui-heading">{{ i18n.ngettext('Notification', 'Notifications', 2) }}</h3>
       <div class="flex items-center gap-1">
         <Button
           v-if="notificationStore.unreadCount > 0"
           variant="ghost"
           size="sm"
           class="h-6 px-1.5"
-          :title="t('globals.messages.markAllAsRead')"
-          :aria-label="t('globals.messages.markAllAsRead')"
+          :title="i18n._('Mark all as read')"
+          :aria-label="i18n._('Mark all as read')"
           @click="handleMarkAllAsRead"
         >
           <CheckCheck class="h-3.5 w-3.5" />
@@ -20,8 +20,8 @@
           variant="ghost"
           size="sm"
           class="h-6 px-1.5"
-          :title="t('globals.messages.deleteAll')"
-          :aria-label="t('globals.messages.deleteAll')"
+          :title="i18n._('Delete all')"
+          :aria-label="i18n._('Delete all')"
           @click="handleDeleteAll"
         >
           <Trash2 class="h-3.5 w-3.5" />
@@ -48,7 +48,7 @@
         class="flex flex-col items-center justify-center flex-1 text-muted-foreground"
       >
         <BellOff class="h-7 w-7 mb-2" />
-        <p class="text-xs">{{ t('toast.noNotificationsFound') }}</p>
+        <p class="text-xs">{{ i18n._('No notifications found') }}</p>
       </div>
 
       <!-- Notifications -->
@@ -87,7 +87,7 @@
                 variant="ghost"
                 size="sm"
                 class="h-5 w-5 p-0"
-                :aria-label="t('globals.messages.markAsRead')"
+                :aria-label="i18n._('Mark as read')"
                 @click.stop="handleMarkAsRead(notification)"
               >
                 <Check class="h-2.5 w-2.5" />
@@ -96,7 +96,7 @@
                 variant="ghost"
                 size="sm"
                 class="h-5 w-5 p-0 hover:text-destructive"
-                :aria-label="t('globals.messages.delete')"
+                :aria-label="i18n._('Delete')"
                 @click.stop="handleDelete(notification)"
               >
                 <X class="h-2.5 w-2.5" />
@@ -115,7 +115,7 @@
           :disabled="notificationStore.isLoading"
           @click="notificationStore.loadMore"
         >
-          {{ notificationStore.isLoading ? t('globals.terms.loading') : t('globals.terms.loadMore') }}
+          {{ notificationStore.isLoading ? i18n._('Loading') : i18n._('Load more') }}
         </Button>
       </div>
     </div>
@@ -127,7 +127,7 @@
         @click="emit('close')"
       >
         <Settings aria-hidden="true" />
-        <span>{{ t('notification.settings') }}</span>
+        <span>{{ i18n._('Notification settings') }}</span>
       </router-link>
     </div>
   </div>
@@ -135,7 +135,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   Bell,
   BellOff,
@@ -159,7 +159,7 @@ import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 const emit = defineEmits(['close'])
 
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const notificationStore = useNotificationStore()
 
 

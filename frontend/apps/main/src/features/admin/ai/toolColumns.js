@@ -1,12 +1,14 @@
+
+
 import { h } from 'vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import dropdown from './toolDropdown.vue'
 
-export const createToolColumns = (t, { onEdit } = {}) => [
+export const createToolColumns = (i18n, { onEdit } = {}) => [
   {
     accessorKey: 'name',
-    header: () => h('div', null, t('globals.terms.name')),
+    header: () => h('div', null, i18n._('{count, plural, one {Name} other {Names}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -25,7 +27,7 @@ export const createToolColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'url',
-    header: () => h('div', null, t('globals.terms.url')),
+    header: () => h('div', null, i18n._('{count, plural, one {URL} other {URLs}}')),
     cell: ({ row }) =>
       h('div', { class: 'text-muted-foreground' }, row.getValue('url'))
   },
@@ -33,13 +35,13 @@ export const createToolColumns = (t, { onEdit } = {}) => [
     accessorKey: 'enabled',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) =>
       h(
         'div',
         null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
-          row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          row.getValue('enabled') ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
   },
@@ -47,7 +49,7 @@ export const createToolColumns = (t, { onEdit } = {}) => [
     accessorKey: 'updated_at',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.updatedAt')),
+    header: () => h('div', null, i18n._('Updated at')),
     cell: ({ row }) =>
       h(TableDate, { value: row.getValue('updated_at') })
   },

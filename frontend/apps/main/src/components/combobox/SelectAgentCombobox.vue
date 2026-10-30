@@ -24,7 +24,7 @@
 
 <script setup>
 import { computed, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useUsersStore } from '@/stores/users'
 import { useUserStore } from '@/stores/user'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
@@ -63,11 +63,11 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const usersStore = useUsersStore()
 const userStore = useUserStore()
 
-const placeholderText = computed(() => props.placeholder || t('placeholders.selectAgent'))
+const placeholderText = computed(() => props.placeholder || i18n._('Select agent'))
 
 const items = computed(() => {
   let options = props.excludeAiAssistants
@@ -79,7 +79,7 @@ const items = computed(() => {
     if (me) options = [me, ...options.filter((option) => !isMe(option))]
   }
   const prepended = props.includeNone
-    ? [{ value: 'none', label: t('globals.terms.none') }, ...props.prependItems]
+    ? [{ value: 'none', label: i18n.pgettext('No assigned agent', 'None') }, ...props.prependItems]
     : props.prependItems
   return [...prepended, ...options]
 })

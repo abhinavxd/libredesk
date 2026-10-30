@@ -13,20 +13,20 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
 
 const router = useRouter()
 const emit = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const macroStore = useMacroStore()
 const formLoading = ref(false)
 const breadcrumbLinks = [
-  { path: 'macro-list', label: t('globals.terms.macro', 2) },
+  { path: 'macro-list', label: i18n._('{count, plural, one {Macro} other {Macros}}', 2) },
   {
     path: '',
-    label: t('macro.new')
+    label: i18n._('New macro')
   }
 ]
 
@@ -42,7 +42,7 @@ const createMacro = async (values) => {
     macroStore.clearCache()
     
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     router.push({ name: 'macro-list' })
   } catch (error) {

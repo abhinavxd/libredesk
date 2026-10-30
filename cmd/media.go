@@ -45,19 +45,19 @@ func handleMediaUpload(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data.", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error parsing request"), nil, envelope.GeneralError)
 	}
 
 	files, ok := form.File["files"]
 	if !ok || len(files) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundFile"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("File not found"), nil, envelope.InputError)
 	}
 
 	fileHeader := files[0]
 	file, err := fileHeader.Open()
 	if err != nil {
 		app.lo.Error("error reading uploaded file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	defer file.Close()
 
@@ -87,7 +87,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 		if !allowed {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Permission denied"), nil, envelope.PermissionError)
 		}
 	}
 
@@ -100,7 +100,7 @@ func handleMediaUpload(r *fastglue.Request) error {
 	// Check if file is empty
 	if srcFileSize == 0 {
 		app.lo.Debug("upload rejected: file is empty")
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileEmpty"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("This file is 0 bytes, so it will not be attached."), nil, envelope.InputError)
 	}
 
 	// Check file size
@@ -109,14 +109,15 @@ func handleMediaUpload(r *fastglue.Request) error {
 		app.lo.Debug("upload rejected: file exceeds size limit", "size_mb", bytesToMegabytes(srcFileSize), "max_allowed_mb", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
 			fasthttp.StatusRequestEntityTooLarge,
-			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
+			app.i18n.Get("File size too large, please upload a file less than %[1]s",
+				fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
 			nil,
 			envelope.GeneralError,
 		)
 	}
 
 	if !slices.Contains(consts.AllowedUploadFileExtensions, "*") && !slices.Contains(consts.AllowedUploadFileExtensions, srcExt) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("File type not allowed"), nil, envelope.InputError)
 	}
 
 	// Delete files on any error.
@@ -185,7 +186,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	if err != nil {
 		// Anonymous probes must not distinguish missing media from existing private media.
 		if authMethod == authMethodPublic {
-			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+			return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Get("Invalid or expired session"), nil, envelope.UnauthorizedError)
 		}
 		return sendErrorEnvelope(r, err)
 	}
@@ -203,7 +204,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	// Unauthenticated and not a signed URL - private media requires auth.
 	auser, ok := r.RequestCtx.UserValue("user").(amodels.User)
 	if !ok {
-		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("auth.invalidOrExpiredSession"), nil, envelope.UnauthorizedError)
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Get("Invalid or expired session"), nil, envelope.UnauthorizedError)
 	}
 
 	// Session/API key authenticated - perform full permission check.
@@ -213,7 +214,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	}
 
 	if media.ModelID.Int <= 0 && !media.UploadedByUser(auser.ID) {
-		return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(http.StatusForbidden, app.i18n.Get("Permission denied"), nil, envelope.PermissionError)
 	}
 
 	// Check if the user has permission to access the linked model.
@@ -236,7 +237,7 @@ func handleServeMedia(r *fastglue.Request) error {
 	}
 
 	if !allowed {
-		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.T("status.deniedPermission"), nil, envelope.UnauthorizedError)
+		return r.SendErrorEnvelope(http.StatusUnauthorized, app.i18n.Get("Permission denied"), nil, envelope.UnauthorizedError)
 	}
 
 	return serveMediaFile(r, app, uuid, &media)
@@ -302,7 +303,7 @@ func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, err
 	seen := make(map[int]bool, len(all))
 	for _, m := range all {
 		if !m.UploadedByUser(userID) || (m.Model.String != "" && m.Model.String != mmodels.ModelMessages) {
-			return nil, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+			return nil, envelope.NewError(envelope.PermissionError, app.i18n.Get("Permission denied"), nil)
 		}
 		if seen[m.ID] {
 			continue
@@ -321,7 +322,7 @@ func getUnassociatedMedia(app *App, ids []int, userID int) ([]mmodels.Media, err
 func getMediaByUUID(app *App, mediaUUID string) (mmodels.Media, error) {
 	mediaUUID = strings.TrimPrefix(mediaUUID, image.ThumbPrefix)
 	if _, err := uuid.Parse(mediaUUID); err != nil {
-		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil)
+		return mmodels.Media{}, envelope.NewError(envelope.NotFoundError, app.i18n.Get("Not found"), nil)
 	}
 	return app.media.Get(0, mediaUUID)
 }

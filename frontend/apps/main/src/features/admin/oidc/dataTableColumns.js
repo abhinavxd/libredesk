@@ -1,14 +1,16 @@
+
+
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import TableDate from '@main/components/table/TableDate.vue'
 
-export const createColumns = (t) => [
+export const createColumns = (i18n) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t('globals.terms.name'))
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
     },
     cell: function ({ row }) {
       return h('div', null,
@@ -25,7 +27,7 @@ export const createColumns = (t) => [
   {
     accessorKey: 'provider',
     header: function () {
-      return h('div', null, t('globals.terms.provider'))
+      return h('div', null, i18n._('{count, plural, one {Provider} other {Providers}}'))
     },
     cell: function ({ row }) {
       return h('div', null, row.getValue('provider'))
@@ -35,14 +37,14 @@ export const createColumns = (t) => [
     accessorKey: 'enabled',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) => {
       const enabled = row.getValue('enabled')
       return h(
         'div',
         null,
         h(Badge, { variant: enabled ? 'success' : 'secondary' }, () =>
-          enabled ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          enabled ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
     }
@@ -52,7 +54,7 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })
@@ -63,7 +65,7 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.updatedAt'))
+      return h('div', null, i18n._('Updated at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('updated_at') })

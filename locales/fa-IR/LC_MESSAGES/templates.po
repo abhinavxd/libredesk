@@ -1,0 +1,250 @@
+# LibreDesk translations.
+msgid ""
+msgstr ""
+"Project-Id-Version: LibreDesk\n"
+"PO-Revision-Date: 2026-10-20 00:00+0000\n"
+"Last-Translator: LibreDesk contributors\n"
+"Language-Team: LibreDesk contributors\n"
+"Language: fa-IR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: cmd/init.go:490:17
+msgid "%d result"
+msgid_plural "%d results"
+msgstr[0] ""
+msgstr[1] ""
+
+#: static/public/web-templates/csat.html:45
+msgid "Additional feedback (optional)"
+msgstr "بازخورد اضافی (اختیاری)"
+
+#: static/public/web-templates/help/shared/partials.html:3
+msgid "Announcement"
+msgstr "اطلاعیه"
+
+#: static/public/web-templates/help/docs/collection.html:33
+msgid "Article"
+msgid_plural "Articles"
+msgstr[0] ""
+msgstr[1] ""
+
+#: static/public/web-templates/help/classic/notfound.html:8
+#: static/public/web-templates/help/docs/notfound.html:13
+msgid "Back to help center"
+msgstr ""
+
+#: static/public/web-templates/help/classic/article.html:4
+#: static/public/web-templates/help/classic/collection.html:12
+#: static/public/web-templates/help/docs/layout.html:236
+msgid "Breadcrumb"
+msgstr ""
+
+#: static/public/web-templates/help/docs/layout.html:48
+#: static/public/web-templates/help/shared/partials.html:5
+msgid "Close"
+msgstr "بستن"
+
+#: static/public/web-templates/help/docs/home.html:28
+#: static/public/web-templates/help/docs/layout.html:57
+msgid "Collection"
+msgid_plural "Collections"
+msgstr[0] ""
+msgstr[1] ""
+
+#: static/public/web-templates/help/shared/behavior.html:133
+msgid "Copied to clipboard"
+msgstr "در کلیپ‌بورد کپی شد"
+
+#: static/public/web-templates/help/shared/behavior.html:132
+msgid "Copy"
+msgstr "کپی"
+
+#: static/public/web-templates/csat-widget.html:37
+#: static/public/web-templates/csat.html:36
+msgid "Excellent"
+msgstr "بسیار عالی"
+
+#: static/public/web-templates/csat-widget.html:34
+#: static/public/web-templates/csat.html:18
+msgid "Fair"
+msgstr "متوسط"
+
+#: static/public/web-templates/help/classic/layout.html:50
+#: static/public/web-templates/help/docs/layout.html:102
+msgid "Footer"
+msgstr ""
+
+#: static/public/web-templates/csat-widget.html:35
+#: static/public/web-templates/csat.html:24
+msgid "Good"
+msgstr "خوب"
+
+#: static/public/web-templates/csat-widget.html:36
+#: static/public/web-templates/csat.html:30
+msgid "Great"
+msgstr "عالی"
+
+#: static/public/web-templates/help/shared/partials.html:127
+#: static/public/web-templates/help/shared/partials.html:18
+msgid "Language"
+msgstr "زبان"
+
+#: static/public/web-templates/help/classic/article.html:22
+#: static/public/web-templates/help/docs/article.html:14
+msgid "Last updated"
+msgstr "آخرین به‌روزرسانی"
+
+#: static/public/web-templates/help/classic/layout.html:9
+#: static/public/web-templates/help/docs/layout.html:25
+msgid "Main"
+msgstr ""
+
+#: static/public/web-templates/help/classic/layout.html:14
+#: static/public/web-templates/help/docs/layout.html:11
+msgid "Menu"
+msgstr ""
+
+#: static/public/web-templates/help/docs/layout.html:46
+msgid "Navigate"
+msgstr "پیمایش"
+
+#: static/public/web-templates/help/shared/partials.html:55
+msgid "No"
+msgstr "خیر"
+
+#: static/public/web-templates/help/classic/layout.html:32
+#: static/public/web-templates/help/classic/search.html:16
+#: static/public/web-templates/help/docs/layout.html:40
+#: static/public/web-templates/help/docs/search.html:22
+msgid "No articles matched your search. Try fewer or different words."
+msgstr ""
+
+#: static/public/web-templates/help/classic/home.html:18
+#: static/public/web-templates/help/docs/home.html:32
+msgid "Nothing has been published here yet. Please check back later."
+msgstr ""
+
+#: static/public/web-templates/help/shared/partials.html:40
+#: static/public/web-templates/help/shared/partials.html:42
+msgid "On this page"
+msgstr ""
+
+#: static/public/web-templates/help/shared/partials.html:134
+msgid "Open in help center"
+msgstr ""
+
+#: static/public/web-templates/csat.html:40
+msgid "Please select %[1]s before submitting"
+msgstr "لطفا قبل از ارسال %[1]s را انتخاب کنید"
+
+#: static/public/web-templates/csat-widget.html:33
+#: static/public/web-templates/csat.html:12
+msgid "Poor"
+msgstr "ضعیف"
+
+#: static/public/web-templates/help/classic/layout.html:59
+#: static/public/web-templates/help/docs/layout.html:111
+msgid "Powered by"
+msgstr ""
+
+#: static/public/web-templates/csat.html:4
+msgid "Rate your recent interaction"
+msgstr "تعامل اخیر خود را ارزیابی کنید"
+
+#: static/public/web-templates/help/classic/article.html:35
+#: static/public/web-templates/help/docs/article.html:27
+msgid "Related articles"
+msgstr ""
+
+#: static/public/web-templates/help/classic/search.html:5
+#: static/public/web-templates/help/docs/search.html:11
+msgid "Results for"
+msgstr ""
+
+#: static/public/web-templates/help/classic/layout.html:35
+#: static/public/web-templates/help/classic/search.html:19
+#: static/public/web-templates/help/docs/layout.html:20
+#: static/public/web-templates/help/docs/layout.html:39
+#: static/public/web-templates/help/docs/layout.html:43
+#: static/public/web-templates/help/docs/search.html:25
+#: static/public/web-templates/help/docs/search.html:7
+msgid "Search"
+msgstr "جستجو"
+
+#: static/public/web-templates/help/classic/layout.html:34
+#: static/public/web-templates/help/docs/home.html:10
+#: static/public/web-templates/help/docs/layout.html:42
+#: static/public/web-templates/help/docs/notfound.html:10
+#: static/public/web-templates/help/docs/search.html:6
+msgid "Search articles..."
+msgstr ""
+
+#: static/public/web-templates/help/docs/layout.html:47
+msgid "Select"
+msgstr "انتخاب"
+
+#: static/public/web-templates/help/classic/layout.html:6
+#: static/public/web-templates/help/docs/layout.html:6
+msgid "Skip to main content"
+msgstr ""
+
+#: static/public/web-templates/csat-widget.html:41
+#: static/public/web-templates/help/shared/partials.html:58
+msgid "Something went wrong"
+msgstr "مشکلی پیش آمد"
+
+#: static/public/web-templates/help/classic/search.html:20
+#: static/public/web-templates/help/docs/search.html:26
+msgid "Start typing to search..."
+msgstr "برای جستجو شروع به تایپ کنید..."
+
+#: static/public/web-templates/csat.html:52
+msgid "Submit"
+msgstr "ارسال"
+
+#: static/public/web-templates/csat-widget.html:40
+msgid "Submitting..."
+msgstr "در حال ارسال..."
+
+#: static/public/web-templates/csat-widget.html:30
+#: static/public/web-templates/csat-widget.html:39
+msgid "Thank you!"
+msgstr "متشکریم!"
+
+#: static/public/web-templates/help/shared/partials.html:57
+msgid "Thanks for your feedback."
+msgstr ""
+
+#: static/public/web-templates/help/classic/collection.html:49
+#: static/public/web-templates/help/docs/collection.html:44
+msgid "This collection has no articles yet. Try searching, or browse the other collections."
+msgstr ""
+
+#: static/public/web-templates/help/shared/partials.html:30
+msgid "Toggle theme"
+msgstr ""
+
+#: static/public/web-templates/help/shared/partials.html:52
+msgid "Was this article helpful?"
+msgstr ""
+
+#: static/public/web-templates/help/shared/partials.html:54
+msgid "Yes"
+msgstr "بله"
+
+#: static/public/web-templates/help/shared/partials.html:79
+#: static/public/web-templates/help/shared/partials.html:82
+msgid "article"
+msgid_plural "articles"
+msgstr[0] ""
+msgstr[1] ""
+
+#: static/public/web-templates/help/shared/partials.html:79
+msgid "author"
+msgid_plural "authors"
+msgstr[0] ""
+msgstr[1] ""
+

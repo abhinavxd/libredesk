@@ -1,5 +1,7 @@
+
+
 import { computed, reactive, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -13,7 +15,7 @@ import {
 const RESERVED_NAME_PREFIX = 'libredesk_csat_'
 
 export function useWhatsAppTemplatePicker() {
-  const { t } = useI18n()
+  const i18n = useI18n()
   const emitter = useEmitter()
   const templates = ref([])
   const selectedTemplate = ref(null)
@@ -32,11 +34,11 @@ export function useWhatsAppTemplatePicker() {
     if (!selectedTemplate.value) return []
     const out = []
     for (const name of extractPlaceholders([selectedTemplate.value.body_content])) {
-      out.push({ key: `body:${name}`, name, partLabel: t('globals.terms.body') })
+      out.push({ key: `body:${name}`, name, partLabel: i18n._('Body') })
     }
     if (selectedTemplate.value.header_type === 'TEXT' && selectedTemplate.value.header_content) {
       for (const name of extractPlaceholders([selectedTemplate.value.header_content])) {
-        out.push({ key: `header:${name}`, name, partLabel: t('globals.terms.header') })
+        out.push({ key: `header:${name}`, name, partLabel: i18n._('{count, plural, one {Header} other {Headers}}') })
       }
     }
     return out

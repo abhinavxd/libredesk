@@ -2,11 +2,11 @@
   <form @submit="onSubmit" novalidate class="space-y-6 w-full">
     <FormField v-slot="{ componentField }" name="title">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.title') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Title', 'Titles', 1) }}</FormLabel>
         <FormControl>
           <Input
             type="text"
-            :placeholder="t('admin.ai.editorPrompt.titlePlaceholder')"
+            :placeholder="i18n._('Make it friendlier')"
             v-bind="componentField"
           />
         </FormControl>
@@ -16,11 +16,11 @@
 
     <FormField v-slot="{ componentField }" name="content">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.content') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Content', 'Contents', 1) }}</FormLabel>
         <FormControl>
           <Textarea
             class="min-h-[240px] max-h-[60vh]"
-            :placeholder="t('admin.ai.editorPrompt.contentPlaceholder')"
+            :placeholder="i18n._('Rewrite the text in a warm, friendly tone while keeping the original meaning.')"
             v-bind="componentField"
           />
         </FormControl>
@@ -30,7 +30,7 @@
 
     <DialogFooter class="mt-10">
       <Button type="submit" :isLoading="formLoading">
-        {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
+        {{ isEditing ? i18n._('Save') : i18n._('Create') }}
       </Button>
     </DialogFooter>
   </form>
@@ -52,7 +52,7 @@ import {
   FormLabel,
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   initialValues: { type: Object, default: () => ({}) },
@@ -60,19 +60,19 @@ const props = defineProps({
   submitForm: { type: Function, required: true }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
       title: z
-        .string({ required_error: t('globals.messages.required') })
-        .min(1, { message: t('globals.messages.required') })
+        .string({ required_error: i18n._('{name} Required') })
+        .min(1, { message: i18n._('{name} Required') })
         .max(140),
       content: z
-        .string({ required_error: t('globals.messages.required') })
-        .min(1, { message: t('globals.messages.required') })
+        .string({ required_error: i18n._('{name} Required') })
+        .min(1, { message: i18n._('{name} Required') })
     })
   ),
   initialValues: { title: '', content: '' }

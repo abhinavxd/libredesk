@@ -20,10 +20,10 @@ import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const slaData = ref({})
 const emitter = useEmitter()
 const isLoading = ref(false)
@@ -42,12 +42,12 @@ const submitForm = async (values) => {
     if (props.id) {
       await api.updateSLA(props.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
     } else {
       await api.createSLA(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
       router.push({ name: 'sla-list' })
     }
@@ -62,11 +62,11 @@ const submitForm = async (values) => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? i18n._('Edit') : i18n.pgettext('New SLA policy', 'New')
 }
 
 const breadcrumbLinks = [
-  { path: 'sla-list', label: t('globals.terms.sla') },
+  { path: 'sla-list', label: i18n._('{count, plural, one {SLA} other {SLAs}}') },
   { path: '', label: breadCrumLabel() }
 ]
 

@@ -30,7 +30,7 @@
                     <span class="hcd-row-title">{{ .Name }}</span>
                     {{ if .Description }}<span class="hcd-row-excerpt">{{ .Description }}</span>{{ end }}
                 </span>
-                <span class="hcd-row-count">{{ len .Articles }} {{ $.L.Tc "globals.terms.article" (len .Articles) }}</span>
+                <span class="hcd-row-count">{{ len .Articles }} {{ $.L.GetND "templates" "Article" "Articles" (len .Articles) }}</span>
                 {{ template "hc-arrow-icon" }}
             </a>
         </li>
@@ -41,7 +41,7 @@
 {{ end }}
 
 {{ if and (not .Data.Collection.Articles) (not .Data.Collection.Children) }}
-<p class="hcd-empty">{{ .L.T "helpCenter.noArticles" }}</p>
+<p class="hcd-empty">{{ .L.GetD "templates" "This collection has no articles yet. Try searching, or browse the other collections." }}</p>
 {{ end }}
 
 {{ template "docs-footer" . }}

@@ -5,7 +5,7 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.agent.help') }}</p>
+      <p>{{ i18n._('Manage support agents, roles, permissions and teams.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>

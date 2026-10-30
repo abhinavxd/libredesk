@@ -27,7 +27,7 @@
       @click.stop="addGroup"
     >
       <Plus class="w-3 h-3 mr-1" />
-      {{ t('filter.addGroup') }}
+      {{ i18n._('Add group') }}
     </Button>
   </div>
 </template>
@@ -36,7 +36,7 @@
 import { watch } from 'vue'
 import { Button } from '@shared-ui/components/ui/button'
 import { Plus } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import FilterGroupCard from '@/components/filter/FilterGroupCard.vue'
 import ConnectorToggle from '@/components/filter/ConnectorToggle.vue'
 import {
@@ -54,7 +54,7 @@ defineProps({
   fields: { type: Array, required: true }
 })
 const modelValue = defineModel('modelValue', { default: () => createRoot() })
-const { t } = useI18n()
+const i18n = useI18n()
 
 watch(
   modelValue,

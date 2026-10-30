@@ -5,13 +5,13 @@
       class="box border-destructive/40 bg-destructive/5 p-3 text-sm flex items-start gap-2"
     >
       <TriangleAlert class="size-4 mt-0.5 text-destructive shrink-0" />
-      <span>{{ $t('admin.inbox.authenticationFailed') }}</span>
+      <span>{{ i18n._('Authentication failed. This inbox can\'\'t send or receive messages until you update its credentials.') }}</span>
     </div>
     <div v-show="!showFormFields" class="space-y-4">
       <div class="space-y-2">
-        <h3 class="ui-heading">{{ $t('admin.inbox.oauth.chooseSetupMethod') }}</h3>
+        <h3 class="ui-heading">{{ i18n._('Choose setup method') }}</h3>
         <p class="ui-description">
-          {{ $t('admin.inbox.oauth.selectConnectionMethod') }}
+          {{ i18n._('Select how you want to connect your email account') }}
         </p>
       </div>
       <div class="grid gap-3 sm:grid-cols-3">
@@ -26,10 +26,10 @@
           <span class="flex items-center gap-2 font-semibold">
             <img v-if="provider.icon" :src="provider.icon" alt="" class="size-5" />
             <Mail v-else class="size-5" aria-hidden="true" />
-            {{ $t(provider.label) }}
+            {{ i18n._(provider.label) }}
           </span>
           <span class="text-sm font-normal text-muted-foreground">{{
-            $t(provider.description)
+            i18n._(provider.description)
           }}</span>
         </Button>
       </div>
@@ -39,11 +39,11 @@
         <CheckCircle2 class="size-5 shrink-0 text-success" aria-hidden="true" />
         <div class="min-w-0 flex-1">
           <p class="font-semibold text-foreground">
-            {{ $t('admin.inbox.oauth.connectedVia', { provider: oauthProvider }) }}
+            {{ i18n._('Connected via OAuth - {provider}', { provider: oauthProvider }) }}
           </p>
           <p class="break-all ui-description">{{ oauthEmail }}</p>
           <p v-show="oauthClientId" class="mt-1 break-all font-mono text-xs text-muted-foreground">
-            {{ $t('globals.terms.clientID') }}: {{ oauthClientId.substring(0, 20) }}...{{
+            {{ i18n._('Client ID') }}: {{ oauthClientId.substring(0, 20) }}...{{
               oauthClientId.slice(-8)
             }}
           </p>
@@ -57,7 +57,7 @@
           @click="reconnectOAuth"
         >
           <RefreshCw class="size-4" aria-hidden="true" />
-          {{ $t('globals.terms.reconnect') }}
+          {{ i18n._('Reconnect') }}
         </Button>
       </div>
 
@@ -65,7 +65,7 @@
         <div class="grid gap-4 sm:grid-cols-2">
           <FormField v-slot="{ componentField, handleChange, meta }" name="name">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+              <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
               <FormControl>
                 <Input
                   type="text"
@@ -80,18 +80,18 @@
           </FormField>
           <FormField v-slot="{ componentField, handleChange, meta }" name="from">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.fromEmailAddress') }}</FormLabel>
+              <FormLabel>{{ i18n.ngettext('From email address', 'From email addresses', 1) }}</FormLabel>
               <FormControl>
                 <Input
                   type="text"
-                  :placeholder="t('admin.inbox.fromEmailAddress.placeholder')"
+                  :placeholder="i18n._('My inbox \u003csupport@example.com\u003e')"
                   :name="componentField.name"
                   :model-value="componentField.modelValue"
                   @update:model-value="(v) => handleChange(v, meta.validated)"
                 />
               </FormControl>
               <FormDescription>
-                {{ $t('admin.inbox.fromEmailAddress.description') }}
+                {{ i18n._('From email address for your inbox. e.g. My inbox \u003csupport@example.com\u003e') }}
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -100,8 +100,8 @@
         <FormField v-slot="{ componentField, handleChange, meta }" name="enabled">
           <FormItem>
             <SwitchField
-              :title="$t('globals.terms.enabled')"
-              :description="$t('admin.inbox.enabled.description')"
+              :title="i18n._('Enabled')"
+              :description="i18n._('Toggle scanning inbox and sending out messages.')"
               :checked="componentField.modelValue"
               @update:checked="(v) => handleChange(v, meta.validated)"
             />
@@ -117,14 +117,14 @@
         <div class="space-y-1.5">
           <div class="flex items-center justify-between gap-4">
             <h3 id="inbox-aliases-heading" class="ui-heading">
-              {{ $t('globals.terms.emailAlias', 2) }}
+              {{ i18n.ngettext('Email alias', 'Email aliases', 2) }}
             </h3>
             <Button type="button" variant="outline" size="sm" class="shrink-0" @click="addAlias">
               <Plus class="size-4" aria-hidden="true" />
-              {{ $t('globals.messages.add') }}
+              {{ i18n._('Add') }}
             </Button>
           </div>
-          <p class="ui-description">{{ $t('admin.inbox.aliases.description') }}</p>
+          <p class="ui-description">{{ i18n._('Aliases must forward to this inbox\'\'s mailbox, and your SMTP provider must allow sending as each alias.') }}</p>
         </div>
         <ul v-show="aliasFields.length" class="divide-y" role="list">
           <li
@@ -141,7 +141,7 @@
                 class="grid grid-cols-[minmax(0,1fr)_2.25rem] items-center gap-x-3 gap-y-2 space-y-0 sm:grid-cols-[minmax(0,1fr)_7rem_2.25rem]"
               >
                 <FormLabel class="sr-only"
-                  >{{ $t('globals.terms.email') }} {{ index + 1 }}</FormLabel
+                  >{{ i18n.ngettext('Email', 'Emails', 1) }} {{ index + 1 }}</FormLabel
                 >
                 <FormControl>
                   <Input
@@ -168,10 +168,10 @@
                         class="size-3.5 shrink-0"
                         aria-hidden="true"
                       />
-                      {{ $t(aliasStatus(field.value).label) }}
+                      {{ i18n._(aliasStatus(field.value).label) }}
                     </span>
                     <span v-else class="text-xs text-muted-foreground" role="status">
-                      {{ $t('admin.inbox.aliases.saveBeforeVerify') }}
+                      {{ i18n._('Save the inbox first to verify this alias.') }}
                     </span>
                   </div>
                   <Button
@@ -182,7 +182,7 @@
                     :disabled="!verifyAlias || !savedAliasStatus(field.value)"
                     @click="handleVerifyAlias(field.value)"
                   >
-                    {{ $t(aliasStatus(field.value).action) }}
+                    {{ i18n._(aliasStatus(field.value).action) }}
                   </Button>
                 </div>
                 <Button
@@ -190,7 +190,7 @@
                   variant="ghost"
                   size="icon"
                   class="col-start-2 row-start-1 text-muted-foreground hover:text-destructive sm:col-start-3"
-                  :aria-label="$t('globals.terms.remove')"
+                  :aria-label="i18n._('Remove')"
                   @click="removeAlias(index)"
                 >
                   <Trash2 class="size-4" aria-hidden="true" />
@@ -205,13 +205,13 @@
       <Accordion type="multiple" v-model="openSections" class="border-t">
         <AccordionItem value="imap" data-section="imap" data-connection="imap">
           <AccordionTrigger type="button" class="hover:no-underline">
-            {{ $t('admin.inbox.imapConfig') }}
+            {{ i18n._('IMAP Configuration') }}
           </AccordionTrigger>
           <AccordionContent force-mount class="space-y-4 pb-6 pt-1">
             <div class="grid grid-cols-2 items-start gap-4 sm:grid-cols-6">
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.host">
                 <FormItem class="col-span-2 sm:col-span-3">
-                  <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Host', 'Hosts', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -226,7 +226,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.port">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Port', 'Ports', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -241,7 +241,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.tls_type">
                 <FormItem class="sm:col-span-2">
-                  <FormLabel>{{ $t('globals.terms.tls') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('TLS', 'TLSs', 1) }}</FormLabel>
                   <FormControl>
                     <Select
                       :name="componentField.name"
@@ -249,16 +249,16 @@
                       @update:model-value="(v) => handleChange(v, meta.validated)"
                     >
                       <SelectTrigger type="button">
-                        <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+                        <SelectValue :placeholder="i18n._('Select TLS type')" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
+                        <SelectItem value="none">{{ i18n._('OFF') }}</SelectItem>
                         <SelectItem value="tls">SSL/TLS</SelectItem>
                         <SelectItem value="starttls">STARTTLS</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>{{ $t('admin.inbox.imap.tls.description') }}</FormDescription>
+                  <FormDescription>{{ i18n._('Choose the encryption method for IMAP.') }}</FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>
@@ -274,7 +274,7 @@
             >
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.username">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Username', 'Usernames', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -289,7 +289,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="imap.password">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Password', 'Passwords', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
@@ -307,13 +307,13 @@
             <Accordion type="single" collapsible v-model="imapAdvanced">
               <AccordionItem value="advanced" class="border-b-0">
                 <AccordionTrigger type="button" :class="ADVANCED_TRIGGER_CLASS">{{
-                  $t('globals.terms.advanced')
+                  i18n._('Advanced')
                 }}</AccordionTrigger>
                 <AccordionContent force-mount class="space-y-4 pt-5">
                   <FormGrid compact>
                     <FormField v-slot="{ componentField, handleChange, meta }" name="imap.mailbox">
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.mailbox') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Mailbox') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -324,7 +324,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.mailbox.description') }}
+                          {{ i18n._('Mailbox (folder) to scan for incoming emails. Default is INBOX (usually no need to change).') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -334,7 +334,7 @@
                       name="imap.read_interval"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.imapScanInterval') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Scan Interval') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -345,7 +345,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.imapScanInterval.description') }}
+                          {{ i18n._('Interval to scan the inbox for new emails. Format: 120s, 1m, 1h') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -356,7 +356,7 @@
                       name="imap.scan_inbox_since"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.imapScanInboxSince') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Scan Inbox Since') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -367,7 +367,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.imapScanInboxSince.description') }}
+                          {{ i18n._('To improve performance in large helpdesks with high email volume, this limits scans to emails received since the specified duration (e.g., `2h`, `48h`) by subtracting it from the current time.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -380,8 +380,8 @@
                   >
                     <FormItem v-show="!isOAuthInbox || form.errors.value['imap.tls_skip_verify']">
                       <SwitchField
-                        :title="$t('admin.inbox.skipTLSVerification')"
-                        :description="$t('admin.inbox.skipTLSVerification.description')"
+                        :title="i18n._('Skip TLS Verification')"
+                        :description="i18n._('Skip hostname check on the TLS certificate.')"
                         :checked="componentField.modelValue"
                         @update:checked="(v) => handleChange(v, meta.validated)"
                       />
@@ -394,13 +394,13 @@
         </AccordionItem>
         <AccordionItem value="smtp" data-section="smtp" data-connection="smtp">
           <AccordionTrigger type="button" class="hover:no-underline">
-            {{ $t('admin.inbox.smtpConfig') }}
+            {{ i18n._('SMTP Configuration') }}
           </AccordionTrigger>
           <AccordionContent force-mount class="space-y-4 pb-6 pt-1">
             <div class="grid grid-cols-2 items-start gap-4 sm:grid-cols-6">
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.host">
                 <FormItem class="col-span-2 sm:col-span-3">
-                  <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Host', 'Hosts', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -415,7 +415,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.port">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Port', 'Ports', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -430,7 +430,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.tls_type">
                 <FormItem class="sm:col-span-2">
-                  <FormLabel>{{ t('globals.terms.tls') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('TLS', 'TLSs', 1) }}</FormLabel>
                   <FormControl>
                     <Select
                       :name="componentField.name"
@@ -438,16 +438,16 @@
                       @update:model-value="(v) => handleChange(v, meta.validated)"
                     >
                       <SelectTrigger type="button">
-                        <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+                        <SelectValue :placeholder="i18n._('Select TLS type')" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
+                        <SelectItem value="none">{{ i18n._('OFF') }}</SelectItem>
                         <SelectItem value="tls">SSL/TLS</SelectItem>
                         <SelectItem value="starttls">STARTTLS</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription> {{ $t('admin.inbox.tls.description') }} </FormDescription>
+                  <FormDescription> {{ i18n._('TLS/SSL encryption, STARTTLS is commonly used.') }} </FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>
@@ -463,7 +463,7 @@
             >
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.username">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Username', 'Usernames', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -478,7 +478,7 @@
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="smtp.password">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Password', 'Passwords', 1) }}</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
@@ -496,7 +496,7 @@
             <Accordion type="single" collapsible v-model="smtpAdvanced">
               <AccordionItem value="advanced" class="border-b-0">
                 <AccordionTrigger type="button" :class="ADVANCED_TRIGGER_CLASS">{{
-                  $t('globals.terms.advanced')
+                  i18n._('Advanced')
                 }}</AccordionTrigger>
                 <AccordionContent force-mount class="space-y-4 pt-5">
                   <FormGrid compact>
@@ -505,7 +505,7 @@
                       name="smtp.max_conns"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.maxConnections') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Max Connections') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -516,7 +516,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.maxConnections.description') }}
+                          {{ i18n._('Maximum number of concurrent connections to the server.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -527,7 +527,7 @@
                       name="smtp.max_msg_retries"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.maxRetries') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Max Retries') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -538,7 +538,7 @@
                           />
                         </FormControl>
                         <FormDescription
-                          >{{ $t('admin.inbox.maxRetries.description') }}
+                          >{{ i18n._('Number of times to retry when a message fails.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -549,7 +549,7 @@
                       name="smtp.idle_timeout"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.idleTimeout') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Idle Timeout') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -560,7 +560,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.idleTimeout.description') }}
+                          {{ i18n._('Maximum time an inactive connection must be kept alive before closing it and removing it from the pool.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -571,7 +571,7 @@
                       name="smtp.pool_wait_timeout"
                     >
                       <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.waitTimeout') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Wait Timeout') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -582,7 +582,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.waitTimeout.description') }}
+                          {{ i18n._('Maximum time to wait to obtain a connection before timing out. Timeouts may occur when all open connections are busy sending e-mails and they\'\'re not returning to the pool fast enough. This is also the timeout used when creating new SMTP connections.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -595,7 +595,7 @@
                       name="smtp.auth_protocol"
                     >
                       <FormItem v-show="!isOAuthInbox || form.errors.value['smtp.auth_protocol']">
-                        <FormLabel>{{ $t('admin.inbox.authProtocol') }}</FormLabel>
+                        <FormLabel>{{ i18n._('Authentication Protocol') }}</FormLabel>
                         <FormControl>
                           <Select
                             :name="componentField.name"
@@ -603,22 +603,22 @@
                             @update:model-value="(v) => handleChange(v, meta.validated)"
                           >
                             <SelectTrigger type="button">
-                              <SelectValue :placeholder="t('placeholders.selectProtocol')" />
+                              <SelectValue :placeholder="i18n._('Select protocol')" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="login">{{
-                                $t('admin.inbox.authProtocol.login')
+                                i18n._('Login')
                               }}</SelectItem>
                               <SelectItem value="cram">CRAM</SelectItem>
                               <SelectItem value="plain">{{
-                                $t('admin.inbox.authProtocol.plain')
+                                i18n._('Plain')
                               }}</SelectItem>
-                              <SelectItem value="none">{{ $t('globals.terms.none') }}</SelectItem>
+                              <SelectItem value="none">{{ i18n.pgettext('No authentication', 'None') }}</SelectItem>
                             </SelectContent>
                           </Select>
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.authProtocol.description') }}
+                          {{ i18n._('Authentication protocol to use.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -629,7 +629,7 @@
                       name="smtp.hello_hostname"
                     >
                       <FormItem v-show="!isOAuthInbox || form.errors.value['smtp.hello_hostname']">
-                        <FormLabel>{{ $t('admin.inbox.heloHostname') }}</FormLabel>
+                        <FormLabel>{{ i18n._('HELO Hostname') }}</FormLabel>
                         <FormControl>
                           <Input
                             type="text"
@@ -640,7 +640,7 @@
                           />
                         </FormControl>
                         <FormDescription>
-                          {{ $t('admin.inbox.heloHostname.description') }}
+                          {{ i18n._('The hostname to use in the HELO/EHLO command. If not set, defaults to localhost.') }}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -653,8 +653,8 @@
                   >
                     <FormItem v-show="!isOAuthInbox || form.errors.value['smtp.tls_skip_verify']">
                       <SwitchField
-                        :title="$t('admin.inbox.skipTLSVerification')"
-                        :description="$t('admin.inbox.skipTLSVerification.description')"
+                        :title="i18n._('Skip TLS Verification')"
+                        :description="i18n._('Skip hostname check on the TLS certificate.')"
                         :checked="componentField.modelValue"
                         @update:checked="(v) => handleChange(v, meta.validated)"
                       />
@@ -667,45 +667,45 @@
         </AccordionItem>
         <AccordionItem value="options" data-section="options" class="border-b-0">
           <AccordionTrigger type="button" class="hover:no-underline">
-            {{ $t('globals.messages.options') }}
+            {{ i18n._('Options') }}
           </AccordionTrigger>
           <AccordionContent force-mount class="space-y-4 pb-6 pt-1">
             <div class="grid gap-4 sm:grid-cols-2">
               <FormField v-slot="{ componentField, handleChange, meta }" name="from_name_template">
                 <FormItem>
                   <div class="flex items-center gap-1">
-                    <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
+                    <FormLabel>{{ i18n._('From display name template (optional)') }}</FormLabel>
                     <HelpPopover :text="fromNameVariablesHelp" />
                   </div>
                   <FormControl>
                     <Input
                       type="text"
-                      :placeholder="t('admin.inbox.fromNameTemplate.placeholder')"
+                      :placeholder="i18n._(literalExampleMessage2)"
                       :name="componentField.name"
                       :model-value="componentField.modelValue"
                       @update:model-value="(v) => handleChange(v, meta.validated)"
                     />
                   </FormControl>
                   <FormDescription>
-                    {{ $t('admin.inbox.fromNameTemplate.description') }}
+                    {{ i18n._('Display name for outgoing email replies. Leave blank to use the name from the From address.') }}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>
               <FormField v-slot="{ componentField, handleChange, meta }" name="reply_to">
                 <FormItem>
-                  <FormLabel>{{ $t('admin.inbox.replyToAddress') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Reply-To address (optional)') }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
-                      :placeholder="t('admin.inbox.replyToAddress.placeholder')"
+                      :placeholder="i18n._('support@example.com')"
                       :name="componentField.name"
                       :model-value="componentField.modelValue"
                       @update:model-value="(v) => handleChange(v, meta.validated)"
                     />
                   </FormControl>
                   <FormDescription>
-                    {{ $t('admin.inbox.replyToAddress.description') }}
+                    {{ i18n._('Where customer replies go. Only needed when SMTP From and IMAP mailbox are on different domains.') }}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -717,8 +717,8 @@
             >
               <FormItem>
                 <SwitchField
-                  :title="$t('admin.inbox.enablePlusAddressing')"
-                  :description="$t('admin.inbox.enablePlusAddressing.description')"
+                  :title="i18n._('Enable plus addressing')"
+                  :description="i18n._('Improves conversation threading but requires provider support (e.g., Gmail, Microsoft 365).')"
                   :checked="componentField.modelValue"
                   :disabled="isMicrosoftInbox && componentField.modelValue"
                   @update:checked="(v) => handleChange(v, meta.validated)"
@@ -728,15 +728,15 @@
                   :class="AUTH_HINT_CLASS"
                 >
                   <Lightbulb class="size-4 shrink-0" aria-hidden="true" />
-                  <span>{{ $t('admin.inbox.enablePlusAddressing.requiredForMicrosoft') }}</span>
+                  <span>{{ i18n._('Required for Microsoft inboxes to thread replies correctly.') }}</span>
                 </p>
               </FormItem>
             </FormField>
             <FormField v-slot="{ componentField, handleChange, meta }" name="csat_enabled">
               <FormItem>
                 <SwitchField
-                  :title="$t('admin.inbox.csatSurveys')"
-                  :description="$t('admin.inbox.csatSurveys.description_1')"
+                  :title="i18n._('CSAT Surveys')"
+                  :description="i18n._('Send customer satisfaction surveys when a conversation is marked as resolved.')"
                   :checked="componentField.modelValue"
                   @update:checked="(v) => handleChange(v, meta.validated)"
                 />
@@ -744,16 +744,16 @@
               <p :class="AUTH_HINT_CLASS">
                 <Lightbulb class="size-4 shrink-0" aria-hidden="true" />
                 <span
-                  >{{ $t('admin.inbox.csatSurveys.description_2') }}
-                  {{ $t('admin.inbox.csatSurveys.description_3') }}</span
+                  >{{ i18n._('For better control on when to send surveys, disable this option and create an automation rule to send surveys.') }}
+                  {{ i18n._('CSAT surveys are only sent once per conversation.') }}</span
                 >
               </p>
             </FormField>
             <FormField v-slot="{ componentField, handleChange, meta }" name="prompt_tags_on_reply">
               <FormItem>
                 <SwitchField
-                  :title="$t('admin.inbox.promptTagsOnReply')"
-                  :description="$t('admin.inbox.promptTagsOnReply.description')"
+                  :title="i18n._('Prompt to tag before replying')"
+                  :description="i18n._('Warn agents before they send a reply on a conversation that has no tags. Agents can still send without tagging by confirming the prompt.')"
                   :checked="componentField.modelValue"
                   @update:checked="(v) => handleChange(v, meta.validated)"
                 />
@@ -777,25 +777,25 @@
         <DialogTitle>
           {{
             flowType === 'reconnect'
-              ? $t('admin.inbox.oauth.reconnectAccount', {
+              ? i18n._('Reconnect {provider} account', {
                   provider:
                     selectedProvider === PROVIDER_GOOGLE
-                      ? $t('globals.terms.google')
-                      : $t('globals.terms.microsoft')
+                      ? i18n._('Google')
+                      : i18n._('Microsoft')
                 })
-              : $t('admin.inbox.oauth.connectAccount', {
+              : i18n._('Connect {provider} account', {
                   provider:
                     selectedProvider === PROVIDER_GOOGLE
-                      ? $t('globals.terms.google')
-                      : $t('globals.terms.microsoft')
+                      ? i18n._('Google')
+                      : i18n._('Microsoft')
                 })
           }}
         </DialogTitle>
         <DialogDescription>
           {{
             flowType === 'reconnect'
-              ? $t('admin.inbox.oauth.reconnectDescription')
-              : $t('admin.inbox.oauth.followSteps')
+              ? i18n._('Re-enter your credentials to refresh the OAuth connection')
+              : i18n._('Follow the steps below to connect your email account')
           }}
         </DialogDescription>
       </DialogHeader>
@@ -803,7 +803,7 @@
       <div class="space-y-4">
         <ol v-show="flowType === 'new_inbox'" class="space-y-3 border-l-2 pl-4 text-sm" role="list">
           <li>
-            {{ $t('admin.inbox.oauth.step1CreateApp') }}
+            {{ i18n._('1. Create OAuth app at') }}
             <a
               :href="
                 selectedProvider === PROVIDER_GOOGLE
@@ -816,17 +816,17 @@
             >
               {{
                 selectedProvider === PROVIDER_GOOGLE
-                  ? $t('admin.inbox.oauth.googleCloudConsole')
-                  : $t('admin.inbox.oauth.microsoftAzurePortal')
+                  ? i18n._('Google Cloud Console')
+                  : i18n._('Microsoft Azure Portal')
               }}
             </a>
           </li>
 
           <li class="space-y-1.5">
-            <p>{{ $t('admin.inbox.oauth.step2AddCallback') }}</p>
+            <p>{{ i18n._('2. Add this callback URL:') }}</p>
             <div class="flex items-center gap-2">
               <Input
-                :aria-label="$t('admin.inbox.oauth.step2AddCallback')"
+                :aria-label="i18n._('2. Add this callback URL:')"
                 :model-value="callbackUrl"
                 readonly
                 class="font-mono text-xs"
@@ -837,37 +837,37 @@
                 size="sm"
                 @click="copyToClipboard(callbackUrl)"
               >
-                {{ $t('globals.terms.copy') }}
+                {{ i18n._('Copy') }}
               </Button>
             </div>
           </li>
 
-          <li>{{ $t('admin.inbox.oauth.step3EnterCredentials') }}</li>
+          <li>{{ i18n._('3. Enter your credentials below:') }}</li>
         </ol>
 
         <div class="space-y-2">
-          <Label for="oauth-client_id">{{ $t('globals.terms.clientID') }}</Label>
+          <Label for="oauth-client_id">{{ i18n._('Client ID') }}</Label>
           <Input
             id="oauth-client_id"
             v-model="oauthCredentials.client_id"
-            :placeholder="t('admin.inbox.oauth.enterClientID')"
+            :placeholder="i18n._('Enter your OAuth client ID')"
             :disabled="isSubmittingOAuth"
           />
         </div>
 
         <div class="space-y-2">
-          <Label for="oauth-client_secret">{{ $t('globals.terms.clientSecret') }}</Label>
+          <Label for="oauth-client_secret">{{ i18n._('Client secret') }}</Label>
           <Input
             id="oauth-client_secret"
             v-model="oauthCredentials.client_secret"
             type="password"
-            :placeholder="t('admin.inbox.oauth.enterClientSecret')"
+            :placeholder="i18n._('Enter your OAuth client secret')"
             :disabled="isSubmittingOAuth"
           />
         </div>
 
         <div v-show="selectedProvider === PROVIDER_MICROSOFT" class="space-y-2">
-          <Label for="oauth-tenant_id">{{ $t('globals.terms.tenantID') }}</Label>
+          <Label for="oauth-tenant_id">{{ i18n._('Tenant ID') }}</Label>
           <Input
             id="oauth-tenant_id"
             v-model="oauthCredentials.tenant_id"
@@ -883,10 +883,10 @@
           @click="showOAuthModal = false"
           :disabled="isSubmittingOAuth"
         >
-          {{ $t('globals.messages.cancel') }}
+          {{ i18n._('Cancel') }}
         </Button>
         <Button type="button" @click="submitOAuthCredentials" :disabled="isSubmittingOAuth">
-          {{ isSubmittingOAuth ? $t('globals.messages.connecting') : $t('globals.terms.continue') }}
+          {{ isSubmittingOAuth ? i18n._('Connecting...') : i18n._('Continue') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -894,6 +894,11 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
+const literalExampleMessage2 = msg({ message: '\'{{ .Agent.FirstName }} at {{ .Inbox.Name }}\'' })
+
+
 const AUTH_HINT_CLASS = '!mt-2 flex items-start gap-1.5 text-xs text-muted-foreground'
 
 import FormGrid from '@shared-ui/components/FormGrid.vue'
@@ -948,7 +953,7 @@ import {
   Trash2,
   TriangleAlert
 } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -964,25 +969,25 @@ import { useAppSettingsStore } from '@/stores/appSettings'
 const ALIAS_STATUS = {
   not_verified: {
     icon: Circle,
-    label: 'globals.terms.notVerified',
-    action: 'globals.messages.verify'
+    label: msg({ message: 'Not verified' }),
+    action: msg({ message: 'Verify' })
   },
   pending: {
     icon: Clock,
-    label: 'globals.terms.pending',
-    action: 'globals.messages.resend'
+    label: msg({ message: 'Pending' }),
+    action: msg({ message: 'Resend' })
   },
   verified: {
     class: 'text-success',
     icon: CheckCircle2,
-    label: 'globals.terms.verified',
-    action: 'globals.messages.verify'
+    label: msg({ message: 'Verified' }),
+    action: msg({ message: 'Verify' })
   },
   failed: {
     class: 'text-destructive',
     icon: XCircle,
-    label: 'globals.terms.failed',
-    action: 'globals.terms.tryAgain'
+    label: msg({ message: 'Failed' }),
+    action: msg({ message: 'Try again' })
   }
 }
 const ADVANCED_TRIGGER_CLASS =
@@ -1034,9 +1039,9 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const fromNameVariablesHelp = computed(
-  () => `${t('globals.terms.variable', 2)}: ${formatTemplateVariables(FROM_NAME_TEMPLATE_VARS)}`
+  () => i18n._('Variables: {variables}', { variables: formatTemplateVariables(FROM_NAME_TEMPLATE_VARS) })
 )
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
@@ -1070,7 +1075,7 @@ const showFormFields = computed(
 )
 
 const form = useForm({
-  validationSchema: computed(() => toTypedSchema(createFormSchema(t))),
+  validationSchema: computed(() => toTypedSchema(createFormSchema(i18n))),
   initialValues: {
     name: '',
     from: '',
@@ -1145,7 +1150,7 @@ const isMicrosoftInbox = computed(() => form.values.oauth?.provider === PROVIDER
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 
@@ -1190,20 +1195,20 @@ const onSubmit = form.handleSubmit(
 const setupProviders = [
   {
     value: PROVIDER_GOOGLE,
-    label: 'globals.terms.google',
-    description: 'admin.inbox.oauth.googleDescription',
+    label: msg({ message: 'Google' }),
+    description: msg({ message: 'Connect with Google Workspace or Gmail' }),
     icon: '/images/google-logo.svg'
   },
   {
     value: PROVIDER_MICROSOFT,
-    label: 'globals.terms.microsoft',
-    description: 'admin.inbox.oauth.microsoftDescription',
+    label: msg({ message: 'Microsoft' }),
+    description: msg({ message: 'Connect with Microsoft 365 or Outlook' }),
     icon: '/images/microsoft-logo.svg'
   },
   {
     value: 'manual',
-    label: 'admin.inbox.oauth.otherProvider',
-    description: 'admin.inbox.oauth.otherProviderDescription'
+    label: msg({ message: 'Other provider' }),
+    description: msg({ message: 'Configure IMAP and SMTP manually' })
   }
 ]
 
@@ -1238,7 +1243,7 @@ const submitOAuthCredentials = async () => {
   if (!oauthCredentials.value.client_id || !oauthCredentials.value.client_secret) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('admin.inbox.oauth.clientIDSecretRequired')
+      description: i18n._('Please provide both client ID and client secret')
     })
     return
   }
@@ -1268,12 +1273,12 @@ const copyToClipboard = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.copied')
+      description: i18n._('Copied to clipboard')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
+      description: i18n._('Something went wrong')
     })
   }
 }

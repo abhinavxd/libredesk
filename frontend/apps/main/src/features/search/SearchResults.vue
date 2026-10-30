@@ -4,7 +4,7 @@
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <TabsList>
           <TabsTrigger v-for="type in TYPES" :key="type" :value="type" class="gap-1.5">
-            {{ t(tabLabelKeys[type], 2) }}
+            {{ i18n._(tabMessages[type], 2) }}
             <span class="text-xs tabular-nums text-muted-foreground">
               {{ knownResultCount(results[type]) }}
             </span>
@@ -19,11 +19,11 @@
           @click="emit('clearFilters')"
         >
           <X class="h-4 w-4" aria-hidden="true" />
-          {{ t('globals.messages.clearFilters') }}
+          {{ i18n._('Clear filters') }}
         </Button>
         <div class="ml-auto flex items-center gap-2">
           <Label for="search-sort" class="font-normal text-muted-foreground">
-            {{ t('globals.messages.sortBy') }}
+            {{ i18n._('Sort by') }}
           </Label>
           <Select
             :model-value="sorts[activeTab]"
@@ -38,7 +38,7 @@
                 :key="option.value"
                 :value="option.value"
               >
-                {{ t(option.label) }}
+                {{ i18n._(option.label) }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -55,10 +55,10 @@
             class="p-8 text-center text-sm text-muted-foreground"
             role="status"
           >
-            <Spinner v-if="loading" :absolute="false" :text="t('globals.terms.loading')" />
+            <Spinner v-if="loading" :absolute="false" :text="i18n._('Loading')" />
             <template v-else>
-              <p>{{ t('globals.messages.noResultsFound') }}</p>
-              <p class="mt-1">{{ t('search.adjustSearchTerms') }}</p>
+              <p>{{ i18n._('No results found') }}</p>
+              <p class="mt-1">{{ i18n._('Try adjusting your search terms or filters.') }}</p>
             </template>
           </div>
           <div v-else class="divide-y divide-border" :inert="loading">
@@ -84,8 +84,10 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { X } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Label } from '@shared-ui/components/ui/label'
 import { Spinner } from '@shared-ui/components/ui/spinner'
@@ -103,19 +105,19 @@ import SearchResultItem from './SearchResultItem.vue'
 const TYPES = ['conversations', 'messages']
 const SORT_OPTIONS = {
   conversations: [
-    { value: 'newest', label: 'conversation.sort.newestActivity' },
-    { value: 'oldest', label: 'conversation.sort.oldestActivity' },
-    { value: 'started_first', label: 'conversation.sort.startedFirst' },
-    { value: 'started_last', label: 'conversation.sort.startedLast' }
+    { value: 'newest', label: msg({ message: 'Newest activity' }) },
+    { value: 'oldest', label: msg({ message: 'Oldest activity' }) },
+    { value: 'started_first', label: msg({ message: 'Started first' }) },
+    { value: 'started_last', label: msg({ message: 'Started last' }) }
   ],
   messages: [
-    { value: 'newest', label: 'conversation.sort.newestActivity' },
-    { value: 'oldest', label: 'conversation.sort.oldestActivity' }
+    { value: 'newest', label: msg({ message: 'Newest activity' }) },
+    { value: 'oldest', label: msg({ message: 'Oldest activity' }) }
   ]
 }
-const tabLabelKeys = {
-  conversations: 'globals.terms.conversation',
-  messages: 'globals.terms.message'
+const tabMessages = {
+  conversations: msg({ message: '{count, plural, one {Conversation} other {Conversations}}' }),
+  messages: msg({ message: '{count, plural, one {Message} other {Messages}}' })
 }
 
 defineProps({
@@ -128,7 +130,7 @@ defineProps({
 })
 const emit = defineEmits(['update:activeTab', 'changeSort', 'changePage', 'clearFilters'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const knownResultCount = (page) => {
   const count = (page.page - 1) * page.per_page + page.results.length

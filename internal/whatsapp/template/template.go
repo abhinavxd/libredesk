@@ -17,7 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -37,7 +37,7 @@ type AccountResolver interface {
 type Manager struct {
 	q        queries
 	lo       *logf.Logger
-	i18n     *i18n.I18n
+	i18n     *gotext.Locale
 	client   *whatsapp.Client
 	resolver AccountResolver
 }
@@ -61,7 +61,7 @@ type queries struct {
 type Opts struct {
 	Lo       *logf.Logger
 	DB       *sqlx.DB
-	I18n     *i18n.I18n
+	I18n     *gotext.Locale
 	Client   *whatsapp.Client
 	Resolver AccountResolver
 }
@@ -84,7 +84,7 @@ func (m *Manager) GetByInbox(inboxID int) ([]models.Template, error) {
 	out := make([]models.Template, 0)
 	if err := m.q.GetByInbox.Select(&out, inboxID); err != nil {
 		m.lo.Error("error fetching whatsapp templates", "inbox_id", inboxID, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return out, nil
 }
@@ -93,10 +93,10 @@ func (m *Manager) GetByID(id int) (models.Template, error) {
 	var t models.Template
 	if err := m.q.GetByID.Get(&t, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return t, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return t, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching whatsapp template", "id", id, "error", err)
-		return t, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return t, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return t, nil
 }
@@ -145,9 +145,9 @@ func (m *Manager) Create(ctx context.Context, t models.Template) (models.Templat
 	); err != nil {
 		m.lo.Error("error inserting whatsapp template", "error", err)
 		if dbutil.IsUniqueViolationError(err) {
-			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	return m.submitNewToMeta(ctx, stored), nil
@@ -186,21 +186,21 @@ func (m *Manager) Update(ctx context.Context, id int, desired models.Template) (
 		return models.Template{}, err
 	}
 	if desired.InboxID != existing.InboxID || desired.Name != existing.Name || desired.Language != existing.Language {
-		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.identityLocked"), nil)
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.Get("The inbox, name, and language cannot be changed. Create a new template to use different values."), nil)
 	}
 	var buttons []whatsapp.TemplateButton
 	if strings.HasPrefix(existing.Name, models.CSATTemplateNamePrefix) ||
 		!existing.SupportsTextContent() ||
 		!slices.Contains([]string{models.StatusApproved, models.StatusRejected, models.StatusPaused}, existing.Status) ||
 		json.Unmarshal(existing.Buttons, &buttons) != nil || len(buttons) > 3 {
-		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.editUnavailable"), nil)
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.Get("This template cannot be edited here in its current state or format. Sync templates from Meta, or edit it in WhatsApp Manager."), nil)
 	}
 	if existing.Status == models.StatusApproved && !strings.EqualFold(existing.Category, desired.Category) {
-		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.categoryLocked"), nil)
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.Get("An approved template's category cannot be changed. Create a new template for a different category."), nil)
 	}
 	desired.ComponentTypes = contentComponentTypes(desired)
 	if !desired.SupportsTextContent() {
-		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.editUnavailable"), nil)
+		return models.Template{}, envelope.NewError(envelope.InputError, m.i18n.Get("This template cannot be edited here in its current state or format. Sync templates from Meta, or edit it in WhatsApp Manager."), nil)
 	}
 	return m.editTemplate(ctx, existing, desired)
 }
@@ -235,12 +235,12 @@ func (m *Manager) submitNewToMeta(ctx context.Context, stored models.Template) m
 
 func (m *Manager) editTemplate(ctx context.Context, existing, desired models.Template) (models.Template, error) {
 	if m.client == nil || m.resolver == nil {
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	acc, err := m.resolver.WhatsAppAccount(existing.InboxID)
 	if err != nil {
 		m.lo.Error("error resolving whatsapp account for template edit", "inbox_id", existing.InboxID, "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	submission, err := buildSubmission(desired)
 	if err != nil {
@@ -282,7 +282,7 @@ func (m *Manager) updateContent(id int, t models.Template) (models.Template, err
 		t.BodyContent, t.FooterContent, buttons, sample, contentComponentTypes(t), t.Status, t.MetaTemplateID,
 	); err != nil {
 		m.lo.Error("error updating whatsapp template", "id", id, "error", err)
-		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return updated, nil
 }
@@ -302,17 +302,17 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 		return err
 	}
 	if strings.HasPrefix(t.Name, models.CSATTemplateNamePrefix) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.whatsappTemplates.error.reserved"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This template is reserved for CSAT surveys and can't be deleted. Edit it in the inbox's CSAT settings."), nil)
 	}
 	// Without a Meta template ID nothing was registered. Deleting by name alone would take out every language variant sharing it.
 	if t.MetaTemplateID.Valid && t.MetaTemplateID.String != "" {
 		if m.client == nil || m.resolver == nil {
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		acc, err := m.resolver.WhatsAppAccount(t.InboxID)
 		if err != nil {
 			m.lo.Error("error resolving whatsapp account for template delete", "inbox_id", t.InboxID, "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		if err := m.client.DeleteTemplate(ctx, acc, t.Name, t.MetaTemplateID.String); err != nil {
 			m.lo.Error("error deleting template on meta", "id", id, "name", t.Name, "error", err)
@@ -321,7 +321,7 @@ func (m *Manager) Delete(ctx context.Context, id int) error {
 	}
 	if _, err := m.q.Delete.Exec(id); err != nil {
 		m.lo.Error("error deleting whatsapp template", "id", id, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

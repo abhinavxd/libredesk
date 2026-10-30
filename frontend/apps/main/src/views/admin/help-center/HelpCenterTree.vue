@@ -7,7 +7,7 @@
           <div class="flex items-center gap-3">
             <CustomBreadcrumb :links="breadcrumbLinks" />
             <Badge v-if="helpCenter && !helpCenter.is_active" variant="secondary">
-              {{ t('globals.terms.paused') }}
+              {{ i18n._('Paused') }}
             </Badge>
           </div>
 
@@ -30,40 +30,40 @@
             <Button variant="outline" size="icon" @click="toggleExpandAll">
               <component :is="allExpanded ? ChevronsDownUp : ChevronsUpDown" class="h-4 w-4" />
               <span class="sr-only">{{
-                allExpanded ? t('globals.messages.collapseAll') : t('globals.messages.expandAll')
+                allExpanded ? i18n._('Collapse all') : i18n._('Expand all')
               }}</span>
             </Button>
 
             <Button variant="outline" @click="openInsights">
               <BarChart3 class="h-4 w-4" />
-              {{ t('helpCenter.insights') }}
+              {{ i18n._('Search insights') }}
             </Button>
 
             <Button variant="outline" @click="visitSite">
               <ExternalLink class="h-4 w-4" />
-              {{ t('helpCenter.visitSite') }}
+              {{ i18n._('Visit site') }}
             </Button>
 
             <Button @click="openCreateCollectionModal">
               <Plus class="h-4 w-4" />
-              {{ t('helpCenter.newCollection') }}
+              {{ i18n._('New collection') }}
             </Button>
 
             <DropdownMenu :modal="false">
               <DropdownMenuTrigger as-child>
                 <Button variant="ghost" size="sm">
-                  <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
+                  <span class="sr-only">{{ i18n._('Open menu') }}</span>
                   <MoreVertical class="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem @click="editHelpCenter">
                   <Pencil class="mr-2 h-4 w-4" />
-                  {{ t('globals.messages.edit') }}
+                  {{ i18n._('Edit') }}
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="toggleActive">
                   <component :is="helpCenter?.is_active ? PowerOff : Power" class="mr-2 h-4 w-4" />
-                  {{ helpCenter?.is_active ? t('helpCenter.pause') : t('helpCenter.resume') }}
+                  {{ helpCenter?.is_active ? i18n._('Pause site') : i18n._('Resume site') }}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -71,7 +71,7 @@
                   class="text-destructive focus:text-destructive"
                 >
                   <Trash class="mr-2 h-4 w-4" />
-                  {{ t('globals.messages.delete') }}
+                  {{ i18n._('Delete') }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -86,10 +86,10 @@
               >
                 <Folder class="h-12 w-12 text-muted-foreground" />
               </div>
-              <p class="text-muted-foreground mb-6">{{ t('helpCenter.noCollections') }}</p>
+              <p class="text-muted-foreground mb-6">{{ i18n._('No collections yet.') }}</p>
               <Button @click="openCreateCollectionModal">
                 <Plus class="h-4 w-4 mr-2" />
-                {{ t('helpCenter.newCollection') }}
+                {{ i18n._('New collection') }}
               </Button>
             </div>
 
@@ -113,14 +113,14 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.helpCenter.treeHelp') }}</p>
+      <p>{{ i18n._('Group articles into collections. Drag a row by its handle to change the order readers see.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/help-center"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -163,7 +163,7 @@
   <Sheet :open="showInsights" @update:open="showInsights = $event">
     <SheetContent class="sm:max-w-lg overflow-y-auto">
       <SheetHeader>
-        <SheetTitle>{{ t('helpCenter.insights') }}</SheetTitle>
+        <SheetTitle>{{ i18n._('Search insights') }}</SheetTitle>
       </SheetHeader>
 
       <LoadingOverlay v-if="insightsLoading" :loading="insightsLoading" reserve-height class="mt-6" />
@@ -171,16 +171,16 @@
       <div v-else class="mt-6 space-y-8">
         <div>
           <h3 class="ui-heading mb-3">
-            {{ t('helpCenter.topSearches') }}
+            {{ i18n._('Top searches') }}
           </h3>
           <p v-if="!insights.top_searches?.length" class="ui-description">
-            {{ t('helpCenter.noSearchData') }}
+            {{ i18n._('No searches recorded yet.') }}
           </p>
           <table v-else class="w-full text-sm">
             <thead>
               <tr class="text-left text-muted-foreground border-b">
-                <th class="py-1 font-medium">{{ t('helpCenter.searchTerm') }}</th>
-                <th class="py-1 font-medium text-right">{{ t('helpCenter.searchCount') }}</th>
+                <th class="py-1 font-medium">{{ i18n._('Search term') }}</th>
+                <th class="py-1 font-medium text-right">{{ i18n._('Searches') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -194,16 +194,16 @@
 
         <div>
           <h3 class="ui-heading mb-3">
-            {{ t('helpCenter.noResultSearches') }}
+            {{ i18n._('Searches with no results') }}
           </h3>
           <p v-if="!insights.no_result_searches?.length" class="ui-description">
-            {{ t('helpCenter.noSearchData') }}
+            {{ i18n._('No searches recorded yet.') }}
           </p>
           <table v-else class="w-full text-sm">
             <thead>
               <tr class="text-left text-muted-foreground border-b">
-                <th class="py-1 font-medium">{{ t('helpCenter.searchTerm') }}</th>
-                <th class="py-1 font-medium text-right">{{ t('helpCenter.searchCount') }}</th>
+                <th class="py-1 font-medium">{{ i18n._('Search term') }}</th>
+                <th class="py-1 font-medium text-right">{{ i18n._('Searches') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -225,15 +225,15 @@
   <AlertDialog :open="showDeleteDialog" @update:open="showDeleteDialog = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
           {{ deleteConfirmationText }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="confirmDelete">{{
-          t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -295,7 +295,7 @@ import ArticleEditSheet from '@/features/admin/help-center/ArticleEditSheet.vue'
 import CollectionEditSheet from '@/features/admin/help-center/CollectionEditSheet.vue'
 import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   id: {
@@ -311,7 +311,7 @@ const props = defineProps({
 const router = useRouter()
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
-const { t } = useI18n()
+const i18n = useI18n()
 const loading = ref(true)
 const isSubmittingCollection = ref(false)
 const isSubmittingArticle = ref(false)
@@ -339,18 +339,18 @@ const createdCollection = ref(null)
 const deletingItem = ref(null)
 
 const breadcrumbLinks = computed(() => [
-  { path: 'help-center-list', label: t('globals.terms.helpCenter', 2) },
+  { path: 'help-center-list', label: i18n._('{count, plural, one {Help center} other {Help centers}}', 2) },
   { path: '', label: helpCenter.value?.name || '' }
 ])
 
 const deleteConfirmationText = computed(() => {
   switch (deletingItem.value?.type) {
     case 'collection':
-      return t('helpCenter.deleteCollectionConfirmation')
+      return i18n._('This will permanently delete the collection and all articles in it.')
     case 'article':
-      return t('helpCenter.deleteArticleConfirmation')
+      return i18n._('This will permanently delete the article.')
     default:
-      return t('helpCenter.deleteConfirmation')
+      return i18n._('This will permanently delete the help center, including all its collections and articles.')
   }
 })
 
@@ -473,7 +473,7 @@ const toggleActive = async () => {
     const { data } = await api.toggleHelpCenter(props.id)
     helpCenter.value = data.data
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -501,7 +501,7 @@ const handleCollectionSave = async (formData) => {
       savedCollection = data.data
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     const keepArticleDraft = savedCollection && showArticleEditSheet.value
     closeCollectionSheet()
@@ -573,7 +573,7 @@ const handleArticleSave = async (formData) => {
       await api.createArticle(formData.collection_id || createArticleCollectionId.value, formData)
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     closeEditSheet()
     if (!followSavedLocale(formData.locale)) fetchTree({ silent: true })
@@ -599,7 +599,7 @@ const confirmDelete = async () => {
     } else if (deletingItem.value.type === 'help_center') {
       await api.deleteHelpCenter(deletingItem.value.id)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.deletedSuccessfully')
+        description: i18n._('Deleted successfully')
       })
       router.push({ name: 'help-center-list' })
       return
@@ -608,7 +608,7 @@ const confirmDelete = async () => {
     }
 
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.deletedSuccessfully')
+      description: i18n._('Deleted successfully')
     })
 
     if (selectedItem.value?.id === deletingItem.value.id) {
@@ -700,7 +700,7 @@ const toggleStatus = async (item) => {
       await api.updateArticleStatus(item.id, { status: item.status })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

@@ -2,7 +2,7 @@
   <FormField v-slot="{ componentField, handleChange, meta }" :name="countryCodeName">
     <FormItem>
       <FormLabel class="flex items-center">
-        {{ label || t('globals.terms.phoneNumber') }}
+        {{ label || i18n.ngettext('Phone number', 'Phone numbers', 1) }}
         <span v-if="required" class="text-destructive">*</span>
       </FormLabel>
       <div class="flex items-start">
@@ -11,7 +11,7 @@
             <ComboBox
               v-bind="fieldBinding(componentField, handleChange, meta)"
               :items="allCountries"
-              :placeholder="t('globals.terms.select')"
+              :placeholder="i18n._('Select')"
               button-class="w-auto rounded-r-none border-r-0 bg-transparent"
             >
               <template #item="{ item }">
@@ -71,7 +71,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from './ui/f
 import { Input } from './ui/input'
 import ComboBox from './ui/combobox/ComboBox.vue'
 import { countryCallingOptions as allCountries } from '@shared-ui/constants/countries.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   countryCodeName: { type: String, default: 'phone_number_country_code' },
@@ -82,7 +82,7 @@ const props = defineProps({
   deferValidation: { type: Boolean, default: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const fieldBinding = (componentField, handleChange, meta) => {
   if (!props.deferValidation) return componentField

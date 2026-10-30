@@ -15,7 +15,7 @@ const ChildStub = defineComponent({
   }
 })
 
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }))
+vi.mock('@shared-ui/i18n', () => ({ useI18n: () => ({ _: (key) => key }) }))
 vi.mock('@shared-ui/components/ui/select', () => ({ SelectTag: ChildStub }))
 vi.mock('@/components/combobox/SelectCombobox.vue', () => ({ default: ChildStub }))
 vi.mock('@/stores/team', () => ({

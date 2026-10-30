@@ -166,14 +166,15 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 			meta["whatsapp_template_params"] = map[string]string{"button_url_0": csatUUID}
 			if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, "", nil, nil, nil, "" /** sendFrom **/, meta); err != nil {
 				m.lo.Error("error sending whatsapp CSAT template", "conversation_uuid", conversation.UUID, "error", err)
-				return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 			}
 			return nil
 		}
 	}
 
 	if m.whatsAppWindowOpen(conversation.ContactID, conversation.InboxID) {
-		content := m.i18n.Ts("conversation.whatsapp.csatMessage", "link", csatURL)
+		content := m.i18n.Get("Your conversation has been resolved. How did we do? Rate your experience: %[1]s",
+			csatURL)
 		if m.whatsappTemplate != nil {
 			if tmpl, err := m.whatsappTemplate.GetByName(conversation.InboxID, wtmodels.CSATTemplateName(conversation.InboxID)); err == nil && tmpl.BodyContent != "" {
 				content = tmpl.BodyContent + "\n" + csatURL
@@ -181,7 +182,7 @@ func (m *Manager) sendWhatsAppCSAT(actorUserID int, conversation models.Conversa
 		}
 		if _, err := m.QueueReply(nil, conversation.InboxID, actorUserID, conversation.ContactID, conversation.UUID, content, nil, nil, nil, "" /** sendFrom **/, meta); err != nil {
 			m.lo.Error("error sending whatsapp CSAT link", "conversation_uuid", conversation.UUID, "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		return nil
 	}
@@ -224,10 +225,10 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 	}
 	if err := m.q.GetConversationInboxContact.Get(&conv, conversationUUID); err != nil {
 		m.lo.Error("error fetching conversation inbox and contact", "conversation_uuid", conversationUUID, "error", err)
-		return content, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return content, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if conv.InboxID != inboxRecord.ID {
-		return content, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return content, envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// The channel identity is the wa_id Meta routes by. The phone columns are display data an agent may edit freely.
@@ -241,19 +242,19 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 			return content, err
 		}
 		if contact.PhoneNumber.String == "" {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("This contact has no phone number. Add one to message them on WhatsApp."), nil)
 		}
 		dialCode := countries.DialCodeForISO(contact.PhoneNumberCountryCode.String)
 		if dialCode == "" {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("This contact's phone number has no valid country code. Fix it on the contact to message them on WhatsApp."), nil)
 		}
 		var matchesCountry bool
 		toPhone, matchesCountry = stringutil.WhatsAppPhoneForDialCode(contact.PhoneNumber.String, dialCode)
 		if !matchesCountry {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactCountryCodeInvalid"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("This contact's phone number has no valid country code. Fix it on the contact to message them on WhatsApp."), nil)
 		}
 		if toPhone == "" {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.contactNoPhone"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("This contact has no phone number. Add one to message them on WhatsApp."), nil)
 		}
 		// Link the wa_id now so the contact's reply threads back to this contact instead of forking a duplicate.
 		linkedID, err := m.userStore.LinkChannelIdentity(conv.ContactID, whatsappChannel.ChannelWhatsApp, toPhone)
@@ -261,7 +262,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 			return content, err
 		}
 		if linkedID != conv.ContactID {
-			return content, envelope.NewError(envelope.ConflictError, m.i18n.T("conversation.whatsapp.error.numberLinkedToAnotherContact"), nil)
+			return content, envelope.NewError(envelope.ConflictError, m.i18n.Get("This phone number already belongs to another contact on WhatsApp. Merge or correct the contacts first."), nil)
 		}
 	}
 
@@ -276,23 +277,25 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 	if templateID > 0 {
 		if m.whatsappTemplate == nil {
-			return content, envelope.NewError(envelope.GeneralError, m.i18n.T("conversation.whatsapp.error.templateStoreUnavailable"), nil)
+			return content, envelope.NewError(envelope.GeneralError, m.i18n.Get("WhatsApp templates are unavailable right now. Try again in a moment."), nil)
 		}
 		t, err := m.whatsappTemplate.GetByID(templateID)
 		if err != nil {
 			return content, err
 		}
 		if t.InboxID != inboxRecord.ID {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.templateWrongInbox"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("That template belongs to another inbox. Pick one from this inbox's templates."), nil)
 		}
 		if !strings.EqualFold(t.Status, wtmodels.StatusApproved) {
-			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateNotApproved", "status", t.Status), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("Meta has not approved this template yet (status: %[1]s). Wait for approval or pick another template.",
+				t.Status), nil)
 		}
 		if t.HeaderType.Valid && !slices.Contains(sendableTemplateHeaderTypes, strings.ToUpper(t.HeaderType.String)) {
-			return content, envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.templateHeaderUnsupported", "type", strings.ToUpper(t.HeaderType.String)), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("Templates with a %[1]s header can't be sent from libredesk yet. Pick a template with a text header or none.",
+				strings.ToUpper(t.HeaderType.String)), nil)
 		}
 		if !t.SupportsTextContent() {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.templateUnsupported"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("This template needs content libredesk cannot send. Choose a text template or sync templates from Meta."), nil)
 		}
 		send.TemplateName = t.Name
 		send.TemplateLanguage = t.Language
@@ -316,7 +319,7 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 		rendered = renderTemplateBody(t.BodyContent, templateParams)
 	} else {
 		if !m.whatsAppWindowOpen(conv.ContactID, conv.InboxID) {
-			return content, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.windowClosed"), nil)
+			return content, envelope.NewError(envelope.InputError, m.i18n.Get("The 24-hour reply window has closed. Send an approved template instead."), nil)
 		}
 		if err := m.validateWhatsAppContent(content, hasAttachments); err != nil {
 			return content, err
@@ -334,14 +337,15 @@ func (m *Manager) prepareWhatsAppOutbound(inboxRecord imodels.Inbox, conversatio
 
 func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) error {
 	if strings.TrimSpace(content) == "" && !hasAttachments {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.messageOrAttachmentRequired"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Type a message or attach a file before sending."), nil)
 	}
 	limit := whatsAppMaxTextLength
 	if hasAttachments {
 		limit = whatsAppMaxCaptionLength
 	}
 	if utf8.RuneCountInString(stringutil.HTML2WhatsApp(content)) > limit {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.tooLong", "limit", strconv.Itoa(limit)), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This message is longer than WhatsApp's limit of %[1]s characters. Shorten it and send again.",
+			strconv.Itoa(limit)), nil)
 	}
 	return nil
 }
@@ -350,13 +354,15 @@ func (m *Manager) validateWhatsAppContent(content string, hasAttachments bool) e
 func (m *Manager) validateTemplateParams(t wtmodels.Template, params map[string]string) error {
 	for _, key := range whatsapp.OrderedPlaceholders(t.BodyContent) {
 		if strings.TrimSpace(params["body:"+key]) == "" {
-			return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingBodyParam", "placeholder", "{{"+key+"}}"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Fill in the %[1]s value before sending this template.",
+				"{{"+key+"}}"), nil)
 		}
 	}
 	if t.HeaderType.Valid && strings.EqualFold(t.HeaderType.String, "TEXT") {
 		for _, key := range whatsapp.OrderedPlaceholders(t.HeaderContent.String) {
 			if strings.TrimSpace(params["header:"+key]) == "" {
-				return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingHeaderParam", "placeholder", "{{"+key+"}}"), nil)
+				return envelope.NewError(envelope.InputError, m.i18n.Get("Fill in the header's %[1]s value before sending this template.",
+					"{{"+key+"}}"), nil)
 			}
 		}
 	}
@@ -368,7 +374,8 @@ func (m *Manager) validateTemplateParams(t wtmodels.Template, params map[string]
 					continue
 				}
 				if strings.TrimSpace(params["button_url_"+strconv.Itoa(i)]) == "" {
-					return envelope.NewError(envelope.InputError, m.i18n.Ts("conversation.whatsapp.error.missingButtonParam", "button", b.Text), nil)
+					return envelope.NewError(envelope.InputError, m.i18n.Get("Fill in the link value for the %[1]s button before sending this template.",
+						b.Text), nil)
 				}
 			}
 		}

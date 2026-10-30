@@ -25,7 +25,7 @@ import (
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -70,7 +70,7 @@ type notificationDispatcher interface {
 type Manager struct {
 	q                queries
 	lo               *logf.Logger
-	i18n             *i18n.I18n
+	i18n             *gotext.Locale
 	teamStore        teamStore
 	userStore        userStore
 	appSettingsStore appSettingsStore
@@ -85,7 +85,7 @@ type Manager struct {
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // Deadlines holds the deadlines for an SLA policy.
@@ -184,10 +184,10 @@ func (m *Manager) Get(id int) (models.SLAPolicy, error) {
 	var sla models.SLAPolicy
 	if err := m.q.GetSLAPolicy.Get(&sla, id); err != nil {
 		if err == sql.ErrNoRows {
-			return sla, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundSla"), nil)
+			return sla, envelope.NewError(envelope.NotFoundError, m.i18n.Get("SLA not found"), nil)
 		}
 		m.lo.Error("error fetching SLA", "error", err)
-		return sla, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sla, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return sla, nil
 }
@@ -197,7 +197,7 @@ func (m *Manager) GetAll() ([]models.SLAPolicy, error) {
 	var slas = make([]models.SLAPolicy, 0)
 	if err := m.q.GetAllSLAPolicies.Select(&slas); err != nil {
 		m.lo.Error("error fetching SLAs", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return slas, nil
 }
@@ -207,7 +207,7 @@ func (m *Manager) Create(name, description string, firstResponseTime, resolution
 	var result models.SLAPolicy
 	if err := m.q.InsertSLAPolicy.Get(&result, name, description, firstResponseTime, resolutionTime, nextResponseTime, notifications); err != nil {
 		m.lo.Error("error inserting SLA", "error", err)
-		return models.SLAPolicy{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.SLAPolicy{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -217,7 +217,7 @@ func (m *Manager) Update(id int, name, description string, firstResponseTime, re
 	var result models.SLAPolicy
 	if err := m.q.UpdateSLAPolicy.Get(&result, id, name, description, firstResponseTime, resolutionTime, nextResponseTime, notifications); err != nil {
 		m.lo.Error("error updating SLA", "error", err)
-		return models.SLAPolicy{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.SLAPolicy{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -226,7 +226,7 @@ func (m *Manager) Update(id int, name, description string, firstResponseTime, re
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteSLAPolicy.Exec(id); err != nil {
 		m.lo.Error("error deleting SLA", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -302,7 +302,7 @@ func (m *Manager) ApplySLA(startTime time.Time, conversationID, assignedTeamID, 
 		deadlines.Resolution,
 	).Scan(&appliedSLAID); err != nil {
 		m.lo.Error("error applying SLA", "error", err)
-		return sla, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return sla, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Schedule SLA notifications if any exist. SLA breaches have not occurred yet, as this is the first time the SLA is being applied.
@@ -750,16 +750,16 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			notifType = metricNotificationTypes[scheduledNotification.Metric].breach
 		}
 
-		notificationTitle := m.i18n.Ts("notification.slaAlert",
-			"type", scheduledNotification.NotificationType,
-			"metric", metricLabel,
-			"referenceNumber", appliedSLA.ConversationReferenceNumber)
+		notificationTitle := m.i18n.Get("SLA %[1]s: %[2]s for #%[3]s",
+			scheduledNotification.NotificationType,
+			metricLabel,
+			appliedSLA.ConversationReferenceNumber)
 
 		var notificationBody string
 		if scheduledNotification.NotificationType == NotificationTypeBreach {
-			notificationBody = m.i18n.Ts("notification.slaOverdue", "duration", overdueBy)
+			notificationBody = m.i18n.Get("Overdue by %[1]s", overdueBy)
 		} else {
-			notificationBody = m.i18n.Ts("notification.slaDueIn", "duration", dueIn)
+			notificationBody = m.i18n.Get("Due in %[1]s", dueIn)
 		}
 
 		if _, err := m.dispatcher.Send(nmodels.Notification{

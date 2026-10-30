@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/abhinavxd/libredesk/internal/whatsapp/template/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -902,12 +902,9 @@ func testLogger() *logf.Logger {
 	return &l
 }
 
-func testI18n(t *testing.T) *i18n.I18n {
+func testI18n(t *testing.T) *gotext.Locale {
 	t.Helper()
-	i, err := i18n.New([]byte(`{"_.code":"en","_.name":"English","globals.messages.somethingWentWrong":"Something went wrong","globals.messages.notFound":"Not found","globals.messages.errorAlreadyExists":"Already exists"}`))
-	if err != nil {
-		t.Fatalf("i18n: %v", err)
-	}
+	i := gotext.NewLocale("", "en_US")
 	return i
 }
 

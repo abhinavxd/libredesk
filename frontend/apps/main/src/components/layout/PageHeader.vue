@@ -15,14 +15,14 @@ import { computed } from 'vue'
 import { Separator } from '@shared-ui/components/ui/separator'
 import { SidebarTrigger } from '@shared-ui/components/ui/sidebar'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const route = useRoute()
-const { t } = useI18n()
+const i18n = useI18n()
 const title = computed(() => {
-  const key = route.meta?.titleKey
-  if (!key) return ''
-  return t(key, route.meta?.titleCount || 1)
+  const message = route.meta?.titleMessage
+  if (!message) return ''
+  return i18n._(message, route.meta?.titleCount || 1)
 })
 const isHidden = computed(() => route.meta.hidePageHeader === true)
 </script>

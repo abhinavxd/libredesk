@@ -7,7 +7,7 @@
   <section
     v-if="dialogOpen"
     role="dialog"
-    :aria-label="$t('conversation.newConversation')"
+    :aria-label="i18n._('New conversation')"
     :class="panelClass"
   >
     <header class="flex items-center gap-1 border-b border-border bg-muted pl-4 pr-1 h-11 shrink-0">
@@ -16,17 +16,17 @@
         class="flex-1 min-w-0 truncate text-left text-sm font-medium"
         @click="minimized = !minimized"
       >
-        {{ $t('conversation.newConversation') }}
+        {{ i18n._('New conversation') }}
       </button>
       <Badge v-if="minimized && hasDraft" variant="secondary" class="shrink-0">
-        {{ $t('globals.terms.draft') }}
+        {{ i18n._('Draft') }}
       </Badge>
       <Button
         type="button"
         size="icon"
         variant="ghost"
         :class="HEADER_BUTTON_CLASS"
-        :aria-label="minimized ? t('globals.terms.expand') : t('globals.terms.collapse')"
+        :aria-label="minimized ? i18n._('Expand') : i18n._('Collapse')"
         @click="minimized = !minimized"
       >
         <ChevronUp v-if="minimized" />
@@ -37,7 +37,7 @@
         size="icon"
         variant="ghost"
         :class="[HEADER_BUTTON_CLASS, 'max-sm:hidden']"
-        :aria-label="expanded ? t('globals.terms.collapse') : t('globals.terms.expand')"
+        :aria-label="expanded ? i18n._('Collapse') : i18n._('Expand')"
         @click="toggleExpanded"
       >
         <component :is="expanded ? Minimize2 : Maximize2" />
@@ -47,7 +47,7 @@
         size="icon"
         variant="ghost"
         :class="HEADER_BUTTON_CLASS"
-        :aria-label="t('globals.messages.close')"
+        :aria-label="i18n._('Close')"
         @click="discard"
       >
         <X />
@@ -57,8 +57,8 @@
     <div v-show="!minimized" class="flex flex-col flex-1 min-h-0">
       <Tabs v-if="showChannelTabs" v-model="channel" class="flex flex-col flex-1 min-h-0">
         <TabsList class="w-max mx-3 mt-3 mb-2">
-          <TabsTrigger value="email">{{ $t('globals.terms.email') }}</TabsTrigger>
-          <TabsTrigger value="whatsapp">{{ $t('globals.terms.whatsapp') }}</TabsTrigger>
+          <TabsTrigger value="email">{{ i18n.ngettext('Email', 'Emails', 1, {}, 'Communication channel') }}</TabsTrigger>
+          <TabsTrigger value="whatsapp">{{ i18n._('WhatsApp') }}</TabsTrigger>
         </TabsList>
         <EmailConversationForm
           ref="emailFormRef"
@@ -86,7 +86,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ChevronUp, Maximize2, Minimize2, Minus, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
@@ -109,7 +109,7 @@ const props = defineProps({
   startMinimized: { type: Boolean, default: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const inboxStore = useInboxStore()
 const palette = useCommandPalette()
 const drafts = { email: useNewConversationDraft('email'), whatsapp: useNewConversationDraft('whatsapp') }

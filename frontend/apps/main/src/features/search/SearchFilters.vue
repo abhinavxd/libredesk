@@ -5,7 +5,7 @@
         <SelectComboBox
           :model-value="filters.status"
           :items="statusItems"
-          :placeholder="t('globals.terms.status')"
+          :placeholder="i18n.ngettext('Status', 'Statuses', 1)"
           align="start"
           @update:model-value="set('status', $event)"
         />
@@ -14,7 +14,7 @@
         <SelectComboBox
           :model-value="filters.inbox"
           :items="inboxStore.options"
-          :placeholder="t('globals.terms.inbox')"
+          :placeholder="i18n.ngettext('Inbox', 'Inboxes', 1)"
           align="start"
           @update:model-value="set('inbox', $event)"
         />
@@ -22,7 +22,7 @@
       <div :class="FILTER_CLASS">
         <SelectAgentCombobox
           :model-value="filters.assignee"
-          :placeholder="t('globals.terms.assignee')"
+          :placeholder="i18n._('Assignee')"
           :prepend-items="unassignedItem"
           align="start"
           @update:model-value="set('assignee', $event)"
@@ -31,7 +31,7 @@
       <CollapsibleTrigger as-child>
         <Button type="button" variant="outline" class="shrink-0 gap-2 font-normal">
           <SlidersHorizontal class="size-4" aria-hidden="true" />
-          {{ t('globals.messages.moreFilters') }}
+          {{ i18n._('More filters') }}
           <Badge v-if="advancedFilterCount" variant="secondary" class="tabular-nums">
             {{ advancedFilterCount }}
           </Badge>
@@ -46,7 +46,7 @@
           <SelectComboBox
             :model-value="filters.priority"
             :items="priorityItems"
-            :placeholder="t('globals.terms.priority')"
+            :placeholder="i18n.ngettext('Priority', 'Priorities', 1)"
             align="start"
             @update:model-value="set('priority', $event)"
           />
@@ -54,7 +54,7 @@
         <div :class="FILTER_CLASS">
           <SelectTeamCombobox
             :model-value="filters.team"
-            :placeholder="t('globals.terms.team')"
+            :placeholder="i18n.ngettext('Team', 'Teams', 1)"
             :prepend-items="unassignedItem"
             align="start"
             @update:model-value="set('team', $event)"
@@ -66,7 +66,7 @@
         <div class="flex-[1.5] min-w-60">
           <DateFilterValue
             :model-value="filters.created"
-            :placeholder="t('globals.terms.conversationDate')"
+            :placeholder="i18n._('Conversation date')"
             range
             @update:model-value="set('created', $event)"
           />
@@ -82,7 +82,7 @@
         variant="secondary"
         size="xs"
         class="max-w-full gap-1 font-normal"
-        :aria-label="`${t('globals.terms.remove')} ${tag.label}`"
+        :aria-label="`${i18n._('Remove')} ${tag.label}`"
         @click="removeTag(tag.value)"
       >
         <span class="truncate">{{ tag.label }}</span>
@@ -103,7 +103,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger
 } from '@shared-ui/components/ui/collapsible'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import SelectTeamCombobox from '@main/components/combobox/SelectTeamCombobox.vue'
@@ -137,14 +137,14 @@ watch(advancedFilterCount, (count, previousCount) => {
   if (count > 0 && previousCount === 0) advancedOpen.value = true
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const conversationStore = useConversationStore()
 const statusItems = computed(() => asStringValues(conversationStore.statusOptions))
 const priorityItems = computed(() => asStringValues(conversationStore.priorityOptions))
 const inboxStore = useInboxStore()
 const tagStore = useTagStore()
 
-const unassignedItem = computed(() => [{ value: UNASSIGNED, label: t('globals.terms.unassigned') }])
+const unassignedItem = computed(() => [{ value: UNASSIGNED, label: i18n._('Unassigned') }])
 const selectedTags = computed(() => {
   const labels = new Map(tagStore.tagOptions.map((tag) => [String(tag.value), tag.label]))
   return props.filters.tags.map((value) => ({

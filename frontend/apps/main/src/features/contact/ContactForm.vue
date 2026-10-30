@@ -4,7 +4,7 @@
       <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="first_name">
           <FormItem class="flex flex-col">
-            <FormLabel class="flex items-center">{{ t('globals.terms.firstName') }}</FormLabel>
+            <FormLabel class="flex items-center">{{ i18n.ngettext('First name', 'First names', 1) }}</FormLabel>
             <FormControl><Input v-bind="componentField" type="text" /></FormControl>
             <FormMessage />
           </FormItem>
@@ -14,7 +14,7 @@
       <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="last_name">
           <FormItem class="flex flex-col">
-            <FormLabel class="flex items-center">{{ t('globals.terms.lastName') }}</FormLabel>
+            <FormLabel class="flex items-center">{{ i18n.ngettext('Last name', 'Last names', 1) }}</FormLabel>
             <FormControl><Input v-bind="componentField" type="text" /></FormControl>
             <FormMessage />
           </FormItem>
@@ -32,7 +32,7 @@
       <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="email">
           <FormItem class="flex flex-col">
-            <FormLabel class="flex items-center">{{ t('globals.terms.email') }}</FormLabel>
+            <FormLabel class="flex items-center">{{ i18n.ngettext('Email', 'Emails', 1) }}</FormLabel>
             <FormControl><Input v-bind="componentField" type="email" /></FormControl>
             <FormMessage />
           </FormItem>
@@ -48,12 +48,12 @@
       <div :class="FIELD_COLUMN_CLASS">
         <FormField v-slot="{ componentField }" name="country">
           <FormItem class="flex flex-col">
-            <FormLabel class="flex items-center">{{ t('globals.terms.country') }}</FormLabel>
+            <FormLabel class="flex items-center">{{ i18n._('Country') }}</FormLabel>
             <FormControl>
               <ComboBox
                 v-bind="componentField"
                 :items="countryOptions"
-                :placeholder="t('globals.terms.select')"
+                :placeholder="i18n._('Select')"
                 button-class="bg-transparent"
               >
                 <template #item="{ item }">
@@ -79,7 +79,7 @@
 
     <div v-if="userStore.can('contacts:write')">
       <Button type="submit" :isLoading="formLoading" :disabled="formLoading">
-        {{ submitLabel || t('contact.updateContact') }}
+        {{ submitLabel || i18n._('Update contact') }}
       </Button>
     </div>
   </form>
@@ -101,11 +101,11 @@ import { Button } from '@shared-ui/components/ui/button'
 import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import PhoneNumberInput from '@shared-ui/components/PhoneNumberInput.vue'
 import { countryOptions } from '@shared-ui/constants/countries.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useUserStore } from '@main/stores/user'
 
 defineProps(['formLoading', 'onSubmit', 'submitLabel'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 const userStore = useUserStore()
 </script>

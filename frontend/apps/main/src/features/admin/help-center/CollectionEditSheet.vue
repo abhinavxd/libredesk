@@ -5,10 +5,10 @@
         <div class="flex items-center justify-between p-4 sm:p-6 border-b bg-card/50">
           <div>
             <SheetTitle>
-              {{ collection ? t('helpCenter.editCollection') : t('helpCenter.newCollection') }}
+              {{ collection ? i18n._('Edit collection') : i18n._('New collection') }}
             </SheetTitle>
             <SheetDescription v-if="collection" class="mt-1">
-              {{ t('globals.terms.lastUpdated') }}:
+              {{ i18n._('Last updated') }}:
               {{ formatDate(collection.updated_at) }}
             </SheetDescription>
           </div>
@@ -22,9 +22,9 @@
                   <FormControl>
                     <Input
                       ref="nameInput"
-                      :aria-label="t('globals.terms.name')"
+                      :aria-label="i18n.ngettext('Name', 'Names', 1)"
                       type="text"
-                      :placeholder="t('globals.terms.name')"
+                      :placeholder="i18n.ngettext('Name', 'Names', 1)"
                       v-bind="componentField"
                       class="text-xl font-semibold border-0 px-0 py-3 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60"
                     />
@@ -38,7 +38,7 @@
                   <FormControl class="flex-1 min-h-0">
                     <Textarea
                       ref="descriptionInput"
-                      :placeholder="t('globals.terms.description')"
+                      :placeholder="i18n.ngettext('Description', 'Descriptions', 1)"
                       v-bind="componentField"
                       class="h-full border-0 px-0 py-2 shadow-none focus-visible:ring-0 resize-none placeholder:text-muted-foreground/60"
                     />
@@ -55,7 +55,7 @@
             <div class="space-y-6">
               <div class="space-y-4">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.action', 2) }}
+                  {{ i18n.ngettext('Action', 'Actions', 2) }}
                 </h3>
 
                 <div class="flex gap-2">
@@ -66,7 +66,7 @@
                     @click="$emit('cancel')"
                     class="flex-1"
                   >
-                    {{ t('globals.messages.cancel') }}
+                    {{ i18n._('Cancel') }}
                   </Button>
                   <Button
                     type="button"
@@ -83,7 +83,7 @@
               <FormField v-slot="{ componentField, handleChange }" name="is_published">
                 <FormItem>
                   <SwitchField
-                    :title="t('globals.terms.published')"
+                    :title="i18n._('Published')"
                     :checked="componentField.modelValue"
                     @update:checked="handleChange"
                   />
@@ -92,7 +92,7 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.icon') }}
+                  {{ i18n.ngettext('Icon', 'Icons', 1) }}
                 </h3>
                 <FormField v-slot="{ value, handleChange }" name="icon">
                   <FormItem>
@@ -106,7 +106,7 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.language') }}
+                  {{ i18n.ngettext('Language', 'Languages', 1) }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="locale">
                   <FormItem>
@@ -129,7 +129,7 @@
 
               <div v-if="localeParents.length > 0" class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('helpCenter.parentCollection') }}
+                  {{ i18n._('Parent collection') }}
                 </h3>
 
                 <FormField v-slot="{ componentField }" name="parent_id">
@@ -140,7 +140,7 @@
                           <SelectValue>{{ parentLabel }}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="0">{{ t('globals.terms.none') }}</SelectItem>
+                          <SelectItem value="0">{{ i18n.pgettext('No parent collection', 'None') }}</SelectItem>
                           <SelectItem
                             v-for="parent in localeParents"
                             :key="parent.id"
@@ -158,15 +158,15 @@
 
               <div v-if="collection" class="space-y-3 text-sm border-t pt-4">
                 <div class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('globals.terms.createdAt') }}</span>
+                  <span class="text-muted-foreground">{{ i18n._('Created at') }}</span>
                   <span>{{ formatDate(collection.created_at) }}</span>
                 </div>
                 <div class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('globals.terms.updatedAt') }}</span>
+                  <span class="text-muted-foreground">{{ i18n._('Updated at') }}</span>
                   <span>{{ formatDate(collection.updated_at) }}</span>
                 </div>
                 <div v-if="collection.articles" class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('globals.terms.article', 2) }}</span>
+                  <span class="text-muted-foreground">{{ i18n.ngettext('Article', 'Articles', 2) }}</span>
                   <Badge variant="outline">{{ collection.articles.length }}</Badge>
                 </div>
               </div>
@@ -203,14 +203,14 @@ import {
 } from '@shared-ui/components/ui/form/index.js'
 import { createCollectionFormSchema } from './collectionFormSchema.js'
 import IconPicker from './IconPicker.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { format, isValid } from 'date-fns'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const formatDate = (value) => {
   const date = new Date(value)
   return isValid(date) ? format(date, 'PPpp') : '-'
@@ -262,7 +262,7 @@ const nameInput = ref(null)
 const descriptionInput = ref(null)
 
 const submitLabel = computed(() =>
-  props.collection ? t('globals.messages.update') : t('globals.messages.create')
+  props.collection ? i18n._('Update') : i18n._('Create')
 )
 
 const toFormValues = () => ({
@@ -276,7 +276,7 @@ const toFormValues = () => ({
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createCollectionFormSchema(t)),
+  validationSchema: toTypedSchema(createCollectionFormSchema(i18n)),
   initialValues: toFormValues()
 })
 
@@ -290,7 +290,7 @@ const localeParents = computed(() =>
 // arrives after the value is set, so the label is resolved here instead.
 const parentLabel = computed(() => {
   const id = String(form.values.parent_id ?? '0')
-  if (id === '0') return t('globals.terms.none')
+  if (id === '0') return i18n.pgettext('No parent collection', 'None')
   return localeParents.value.find((parent) => String(parent.id) === id)?.name || ''
 })
 

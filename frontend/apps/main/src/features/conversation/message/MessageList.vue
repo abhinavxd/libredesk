@@ -57,7 +57,7 @@
       role="status"
     >
       <Loader2 class="size-4 animate-spin" aria-hidden="true" />
-      <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
+      <span class="sr-only">{{ i18n._('Loading') }}</span>
     </div>
 
     <!-- Sticky container for the scroll arrow -->

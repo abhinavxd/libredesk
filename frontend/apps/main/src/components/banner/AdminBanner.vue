@@ -11,7 +11,7 @@
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-2 text-sm text-foreground">
-            <span>{{ $t('update.newUpdateAvailable') }}</span>
+            <span>{{ i18n._('A new update is available') }}</span>
             <a
               :href="appSettingsStore.settings['app.update'].update.url"
               target="_blank"
@@ -48,7 +48,7 @@
         </div>
         <div class="min-w-0 flex-1">
           <div class="text-sm text-foreground">
-            {{ $t('admin.banner.restartMessage') }}
+            {{ i18n._('Some settings have been changed that require an application restart to take effect.') }}
           </div>
         </div>
       </div>

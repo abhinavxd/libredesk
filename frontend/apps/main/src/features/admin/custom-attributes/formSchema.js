@@ -1,62 +1,62 @@
 import * as z from 'zod'
-export const createFormSchema = (t) => z.object({
+export const createFormSchema = (i18n) => z.object({
     id: z.number().optional(),
     applies_to: z.enum(['contact', 'conversation'], {
-        required_error: t('globals.messages.required'),
+        required_error: i18n._('{name} Required'),
     }),
     name: z
         .string({
-            required_error: t('globals.messages.required'),
+            required_error: i18n._('{name} Required'),
         })
         .min(3, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 140,
             })
         })
         .max(140, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 140,
             })
         }),
     key: z
         .string({
-            required_error: t('globals.messages.required'),
+            required_error: i18n._('{name} Required'),
         })
         .min(3, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 140,
             })
         })
         .max(140, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 140,
             })
         })
         .regex(/^[a-z0-9_]+$/, {
-            message: t('validation.invalidKey'),
+            message: i18n._('Invalid key'),
         }),
     description: z
         .string({
-            required_error: t('globals.messages.required'),
+            required_error: i18n._('{name} Required'),
         })
         .min(3, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 300,
             })
         })
         .max(300, {
-            message: t('validation.minmax', {
+            message: i18n._('Must be between {min} and {max} characters', {
                 min: 3,
                 max: 300,
             })
         }),
     data_type: z.enum(['text', 'number', 'checkbox', 'date', 'link', 'list'], {
-        required_error: t('globals.messages.required'),
+        required_error: i18n._('{name} Required'),
     }),
     regex: z.string().optional(),
     regex_hint: z.string().optional(),
@@ -72,7 +72,7 @@ export const createFormSchema = (t) => z.object({
                     minimum: 1,
                     type: "array",
                     inclusive: true,
-                    message: t('globals.messages.required'),
+                    message: i18n._('{name} Required'),
                     path: ['values'],
                 });
             }

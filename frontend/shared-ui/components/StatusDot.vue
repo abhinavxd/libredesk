@@ -31,8 +31,10 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   status: {
@@ -46,19 +48,19 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const isOnline = computed(() => ['online', 'away'].includes(props.status))
 
 const isAway = computed(() => ['away_manual', 'away_and_reassigning'].includes(props.status))
 
 const statusLabel = computed(() =>
-  t(
+  i18n._(
     isOnline.value
-      ? 'globals.terms.online'
+      ? msg({ message: '{count, plural, one {Online} other {Online}}' })
       : isAway.value
-        ? 'globals.terms.away'
-        : 'globals.terms.offline',
+        ? msg({ message: '{count, plural, one {Away} other {Away}}' })
+        : msg({ message: '{count, plural, one {Offline} other {Offline}}' }),
     1
   )
 )

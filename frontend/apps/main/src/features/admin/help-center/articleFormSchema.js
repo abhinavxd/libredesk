@@ -7,12 +7,12 @@ const hasArticleContent = (html) =>
     .replace(/&nbsp;/g, ' ')
     .trim().length > 0 || /<(img|table|iframe|video|hr|blockquote|details)\b/i.test(html)
 
-export const createArticleFormSchema = (t) =>
+export const createArticleFormSchema = (i18n) =>
   z.object({
-    title: z.string().trim().min(1, t('globals.messages.required')),
-    content: z.string().refine(hasArticleContent, t('globals.messages.required')),
+    title: z.string().trim().min(1, i18n._('{name} Required')),
+    content: z.string().refine(hasArticleContent, i18n._('{name} Required')),
     status: z.enum(['draft', 'published']).default('draft'),
-    collection_id: z.coerce.number().min(1, t('globals.messages.required')),
+    collection_id: z.coerce.number().min(1, i18n._('{name} Required')),
     sort_order: z.number().default(0),
     ai_enabled: z.boolean().default(false),
     locale: z.string().default('en'),

@@ -174,7 +174,7 @@ func handleRetryMessage(r *fastglue.Request) error {
 	}
 
 	if msg.SenderType != cmodels.SenderTypeAgent || msg.Status != cmodels.MessageStatusFailed || msg.SenderID != user.ID || msg.ConversationUUID != cuuid {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 
 	if err = app.conversation.MarkMessageAsPending(uuid); err != nil {
@@ -205,11 +205,11 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Debug("error unmarshalling message request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if !canCreateConversationMessage(user, req) {
-		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+		return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Permission denied"), nil, envelope.PermissionError)
 	}
 
 	// Make sure the inbox is enabled.
@@ -218,16 +218,16 @@ func handleSendMessage(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if !inbox.Enabled {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledInbox"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Inbox is disabled"), nil, envelope.InputError)
 	}
 
 	if req.SenderType != umodels.UserTypeAgent && req.SenderType != umodels.UserTypeContact {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	// Contacts cannot send private messages
 	if req.SenderType == umodels.UserTypeContact && req.Private {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 
 	// Check if user has permission to send messages as contact
@@ -235,15 +235,15 @@ func handleSendMessage(r *fastglue.Request) error {
 		parts := strings.Split(authzModels.PermMessagesWriteAsContact, ":")
 		if len(parts) != 2 {
 			app.lo.Error("error parsing permission string", "permission", authzModels.PermMessagesWriteAsContact)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil))
 		}
 		ok, err := app.authz.Enforce(user, parts[0], parts[1])
 		if err != nil {
 			app.lo.Error("error checking permission", "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil))
 		}
 		if !ok {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("status.deniedPermission"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Permission denied"), nil, envelope.PermissionError)
 		}
 	}
 

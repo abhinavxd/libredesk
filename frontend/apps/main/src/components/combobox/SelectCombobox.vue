@@ -35,7 +35,7 @@
         <span v-else-if="item.emoji">{{ item.emoji }}</span>
         <span>{{ item.label }}</span>
         <span v-if="isCurrentUser(item)" class="text-muted-foreground text-xs"
-          >({{ t('globals.terms.you') }})</span
+          >({{ i18n._('You') }})</span
         >
       </div>
     </template>
@@ -67,7 +67,7 @@
           <span v-else-if="selected.emoji" class="shrink-0">{{ selected.emoji }}</span>
           <span class="truncate">{{ selected.label }}</span>
           <span v-if="isCurrentUser(selected)" class="text-muted-foreground text-xs shrink-0"
-            >({{ t('globals.terms.you') }})</span
+            >({{ i18n._('You') }})</span
           >
         </div>
         <span v-else class="truncate font-normal text-muted-foreground">{{ placeholder }}</span>
@@ -83,8 +83,8 @@ import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import PriorityMarker from '@main/features/conversation/PriorityMarker.vue'
 import { useUserStore } from '@/stores/user'
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
+import { useI18n } from '@shared-ui/i18n'
+const i18n = useI18n()
 const userStore = useUserStore()
 
 const props = defineProps({

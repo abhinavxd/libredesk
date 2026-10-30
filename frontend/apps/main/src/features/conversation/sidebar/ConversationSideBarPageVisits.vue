@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="loaded && pageVisits.length === 0" class="text-center text-sm text-muted-foreground py-4">
-      {{ t('globals.messages.noResultsFound') }}
+      {{ i18n._('No results found') }}
     </div>
     <div v-else class="space-y-1">
       <a
@@ -45,14 +45,14 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 import { getRelativeTime, formatFullTimestamp } from '@shared-ui/utils/datetime.js'
 import api from '../../../api'
 
 const conversationStore = useConversationStore()
 const conversation = computed(() => conversationStore.current)
-const { t } = useI18n()
+const i18n = useI18n()
 const loaded = ref(false)
 let requestSeq = 0
 

@@ -6,7 +6,7 @@
         <FormField v-slot="{ componentField }" :name="`${name}[${index}].label`">
           <FormItem class="flex-1">
             <FormControl>
-              <Input type="text" :placeholder="t('globals.terms.label')" v-bind="componentField" />
+              <Input type="text" :placeholder="i18n.ngettext('Label', 'Labels', 1)" v-bind="componentField" />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -15,7 +15,7 @@
       <FormField v-slot="{ componentField }" :name="`${name}[${index}].url`">
         <FormItem class="flex-1">
           <FormControl>
-            <Input type="text" :placeholder="t('globals.terms.url')" v-bind="componentField" />
+            <Input type="text" :placeholder="i18n.ngettext('URL', 'URLs', 1)" v-bind="componentField" />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -24,20 +24,20 @@
         type="button"
         variant="ghost"
         size="icon"
-        :aria-label="t('globals.terms.remove')"
+        :aria-label="i18n._('Remove')"
         @click="remove(index)"
       >
         <X class="w-4 h-4" />
       </Button>
     </div>
     <Button type="button" variant="outline" size="sm" @click="push({ ...newItem })">
-      {{ t('globals.messages.add') }}
+      {{ i18n._('Add') }}
     </Button>
   </div>
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useFieldArray } from 'vee-validate'
 import { X } from 'lucide-vue-next'
 import { Label } from '@shared-ui/components/ui/label'
@@ -56,6 +56,6 @@ const props = defineProps({
   newItem: { type: Object, default: () => ({ label: '', url: '' }) }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const { fields, push, remove } = useFieldArray(props.name)
 </script>

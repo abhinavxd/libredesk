@@ -3,7 +3,7 @@
   <form @submit="onSubmit" class="space-y-6 w-full" :class="{ 'opacity-50': formLoading }">
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }} </FormLabel>
+        <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }} </FormLabel>
         <FormControl>
           <Input type="text" placeholder="" v-bind="componentField" />
         </FormControl>
@@ -13,13 +13,13 @@
 
     <FormField v-slot="{ componentField }" name="message_content">
       <FormItem>
-        <FormLabel>{{ t('admin.macro.messageContent') }}</FormLabel>
+        <FormLabel>{{ i18n._('Response to be sent when macro is used (optional)') }}</FormLabel>
         <FormControl>
           <div class="box p-2 h-96 min-h-96">
             <Editor
               v-model:htmlContent="componentField.modelValue"
               @update:htmlContent="(value) => componentField.onChange(value)"
-              :placeholder="t('editor.newLine')"
+              :placeholder="i18n._('Shift + Enter to add a new line.')"
             />
           </div>
         </FormControl>
@@ -35,7 +35,7 @@
     >
       <FormItem>
         <FormLabel>
-          {{ t('globals.terms.action', 2) }} ({{ t('globals.terms.optional', 1) }})
+          {{ i18n.ngettext('Action', 'Actions', 2) }} ({{ i18n.ngettext('Optional', 'Optionals', 1) }})
         </FormLabel>
         <FormControl>
           <ActionBuilder
@@ -51,17 +51,17 @@
     <FormGrid>
       <FormField v-slot="{ componentField, handleChange }" name="visible_when">
         <FormItem>
-          <FormLabel>{{ t('globals.messages.visibleWhen') }}</FormLabel>
+          <FormLabel>{{ i18n._('Visible when') }}</FormLabel>
           <FormControl>
             <SelectTag
               :items="[
-                { label: t('globals.messages.replying'), value: 'replying' },
+                { label: i18n._('Replying'), value: 'replying' },
                 {
-                  label: t('actions.startingConversation'),
+                  label: i18n._('Starting conversation'),
                   value: 'starting_conversation'
                 },
                 {
-                  label: t('actions.addingPrivateNotes'),
+                  label: i18n._('Adding private notes'),
                   value: 'adding_private_note'
                 }
               ]"
@@ -83,7 +83,7 @@
         :validate-on-model-update="false"
       >
         <FormItem>
-          <FormLabel>{{ t('globals.terms.visibility') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Visibility', 'Visibilities', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
@@ -91,9 +91,9 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="all">{{ t('sharedView.allAgents') }}</SelectItem>
-                  <SelectItem value="team">{{ t('globals.terms.team') }}</SelectItem>
-                  <SelectItem value="user">{{ t('globals.terms.agent') }}</SelectItem>
+                  <SelectItem value="all">{{ i18n._('All agents') }}</SelectItem>
+                  <SelectItem value="team">{{ i18n.ngettext('Team', 'Teams', 1) }}</SelectItem>
+                  <SelectItem value="user">{{ i18n.ngettext('Agent', 'Agents', 1) }}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -108,7 +108,7 @@
         name="team_id"
       >
         <FormItem>
-          <FormLabel>{{ t('globals.terms.team') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Team', 'Teams', 1) }}</FormLabel>
           <FormControl>
             <SelectTeamCombobox v-bind="componentField" />
           </FormControl>
@@ -122,7 +122,7 @@
         name="user_id"
       >
         <FormItem>
-          <FormLabel>{{ t('globals.terms.agent') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Agent', 'Agents', 1) }}</FormLabel>
           <FormControl>
             <SelectAgentCombobox v-bind="componentField" />
           </FormControl>
@@ -164,11 +164,11 @@ import {
   SelectValue,
   SelectTag
 } from '@shared-ui/components/ui/select/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import Editor from '@main/components/editor/ConversationEditor.vue'
 
 const { macroActions } = useConversationFilters()
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 const props = defineProps({
   initialValues: {
@@ -192,11 +192,11 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.initialValues.id ? t('globals.messages.save') : t('globals.messages.create'))
+    (props.initialValues.id ? i18n._('Save') : i18n._('Create'))
   )
 })
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     visible_when: props.initialValues.visible_when || [
       'replying',
@@ -209,9 +209,9 @@ const form = useForm({
 
 const actionConfig = ref({
   actions: macroActions,
-  typePlaceholder: t('placeholders.selectAction'),
-  valuePlaceholder: t('placeholders.selectValue'),
-  addButtonText: t('actions.addAction')
+  typePlaceholder: i18n._('Select action'),
+  valuePlaceholder: i18n._('Select value'),
+  addButtonText: i18n._('Add action')
 })
 
 const onSubmit = form.handleSubmit(async (values) => {

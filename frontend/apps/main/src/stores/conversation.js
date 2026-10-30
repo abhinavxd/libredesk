@@ -1,3 +1,7 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
+
+
 import { defineStore } from 'pinia'
 import { computed, reactive, ref, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
@@ -205,14 +209,14 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  const sortFieldI18nKeys = {
-    oldest: 'conversation.sort.oldestActivity',
-    newest: 'conversation.sort.newestActivity',
-    started_first: 'conversation.sort.startedFirst',
-    started_last: 'conversation.sort.startedLast',
-    waiting_longest: 'conversation.sort.waitingLongest',
-    next_sla_target: 'conversation.sort.nextSLATarget',
-    priority_first: 'conversation.sort.priorityFirst'
+  const sortFieldMessages = {
+    oldest: msg({ message: 'Oldest activity' }),
+    newest: msg({ message: 'Newest activity' }),
+    started_first: msg({ message: 'Started first' }),
+    started_last: msg({ message: 'Started last' }),
+    waiting_longest: msg({ message: 'Waiting longest' }),
+    next_sla_target: msg({ message: 'Next SLA target' }),
+    priority_first: msg({ message: 'Priority first' })
   }
 
   const persistedListStatus = useStorage('conversationListStatus', CONVERSATION_DEFAULT_STATUSES.OPEN)
@@ -306,9 +310,8 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   const getListSortField = computed(() => {
-    const i18n = getI18n()
-    const t = i18n?.global?.t || ((key) => key.split('.').pop())
-    return t(sortFieldI18nKeys[conversations.sortField])
+    const i18n = getI18n()?.global || { _: (key) => key.split('.').pop() }
+    return i18n._(sortFieldMessages[conversations.sortField])
   })
 
 
@@ -872,7 +875,7 @@ export const useConversationStore = defineStore('conversation', () => {
       } else if (action === TAG_ACTION.SET) {
         conv.tags = [...tags]
       } else if (action === TAG_ACTION.REMOVE) {
-        conv.tags = conv.tags.filter(t => !tags.includes(t))
+        conv.tags = conv.tags.filter(i18n => !tags.includes(i18n))
       }
     }
   }
@@ -1291,13 +1294,12 @@ export const useConversationStore = defineStore('conversation', () => {
   function getMediaPreview (attachments) {
     if (!attachments?.length) return ''
     const contentType = attachments[0].content_type || ''
-    const i18n = getI18n()
-    const t = i18n?.global?.t || ((key) => key.split('.').pop())
+    const i18n = getI18n()?.global || { _: (key) => key.split('.').pop() }
 
-    if (contentType.startsWith('image/')) return t('globals.terms.image')
-    if (contentType.startsWith('video/')) return t('globals.terms.video')
-    if (contentType.startsWith('audio/')) return t('globals.terms.audio')
-    return t('globals.terms.file')
+    if (contentType.startsWith('image/')) return i18n._('{count, plural, one {Image} other {Images}}')
+    if (contentType.startsWith('video/')) return i18n._('{count, plural, one {Video} other {Videos}}')
+    if (contentType.startsWith('audio/')) return i18n._('Audio')
+    return i18n._('{count, plural, one {File} other {Files}}')
   }
 
   // On new conversation uuids, subscribere user to those conversations.
@@ -1361,7 +1363,7 @@ export const useConversationStore = defineStore('conversation', () => {
     setMacroActions,
     removeAssignee,
     getListSortField,
-    sortFieldI18nKeys,
+    sortFieldMessages,
     getListStatus,
     statuses,
     priorities,

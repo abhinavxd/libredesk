@@ -15,11 +15,11 @@
           <use :href="`#${model}`" />
         </svg>
         <span v-if="model" class="truncate">{{ model }}</span>
-        <span v-else class="text-muted-foreground">{{ t('globals.terms.none') }}</span>
+        <span v-else class="text-muted-foreground">{{ i18n.pgettext('No icon', 'None') }}</span>
       </Button>
     </PopoverTrigger>
     <PopoverContent class="w-72 p-3" align="start">
-      <Input v-model="search" :placeholder="t('globals.terms.search')" class="h-8" />
+      <Input v-model="search" :placeholder="i18n._('Search')" class="h-8" />
       <div class="mt-2 h-56 overflow-y-auto">
         <div class="grid grid-cols-7 gap-1">
           <button
@@ -48,10 +48,10 @@
           v-if="iconNames.length && !filteredIcons.length"
           class="py-4 text-center ui-description"
         >
-          {{ t('globals.messages.noResultsFound') }}
+          {{ i18n._('No results found') }}
         </p>
         <p v-if="loadError" class="py-4 text-center ui-description">
-          {{ t('globals.messages.somethingWentWrong') }}
+          {{ i18n._('Something went wrong') }}
         </p>
       </div>
       <Button
@@ -62,7 +62,7 @@
         class="mt-2 w-full"
         @click="select('')"
       >
-        {{ t('globals.terms.remove') }}
+        {{ i18n._('Remove') }}
       </Button>
     </PopoverContent>
   </Popover>
@@ -70,13 +70,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover/index.js'
 import { loadLucideSprite } from './lucideSprite.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const model = defineModel({ type: String, default: '' })
 
 const open = ref(false)

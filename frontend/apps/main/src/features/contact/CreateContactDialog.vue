@@ -2,12 +2,12 @@
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>{{ t('contact.new') }}</DialogTitle>
+        <DialogTitle>{{ i18n._('New contact') }}</DialogTitle>
       </DialogHeader>
       <ContactForm
         :formLoading="loading"
         :onSubmit="onSubmit"
-        :submitLabel="t('globals.messages.create')"
+        :submitLabel="i18n._('Create')"
       />
     </DialogContent>
   </Dialog>
@@ -15,7 +15,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared-ui/components/ui/dialog'
@@ -35,12 +35,12 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'created'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const loading = ref(false)
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 watch(
@@ -54,7 +54,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
   try {
     const { data } = await api.createContact(values)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.savedSuccessfully') })
+    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: i18n._('Changes saved') })
     emit('update:open', false)
     emit('created', data.data)
   } catch (err) {

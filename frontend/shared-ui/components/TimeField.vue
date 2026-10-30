@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Time } from '@internationalized/date'
 import { TimeFieldInput, TimeFieldRoot } from 'reka-ui'
 import { cn } from '@shared-ui/lib/utils'

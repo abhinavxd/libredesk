@@ -4,15 +4,15 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="editInbox(props.inbox.id)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="toggleInbox(props.inbox.id)" v-if="props.inbox.enabled">
         <PowerOff class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.disable') }}
+        {{ i18n._('Disable') }}
       </DropdownMenuItem>
       <DropdownMenuItem @click="toggleInbox(props.inbox.id)" v-else>
         <Power class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.enable') }}
+        {{ i18n._('Enable') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -20,7 +20,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -28,15 +28,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('confirm.deleteInbox') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this inbox.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          $t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

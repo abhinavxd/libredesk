@@ -22,9 +22,9 @@ import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const businessHours = ref({})
 const emitter = useEmitter()
 const isLoading = ref(false)
@@ -43,12 +43,12 @@ const submitForm = async (values) => {
     if (props.id) {
       await api.updateBusinessHours(props.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
     } else {
       await api.createBusinessHours(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
       router.push({ name: 'business-hours-list' })
     }
@@ -63,7 +63,7 @@ const submitForm = async (values) => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? i18n._('Edit') : i18n.pgettext('New business hours', 'New')
 }
 
 const isNewForm = computed(() => {
@@ -71,7 +71,7 @@ const isNewForm = computed(() => {
 })
 
 const breadcrumbLinks = [
-  { path: 'business-hours-list', label: t('globals.terms.businessHour', 2) },
+  { path: 'business-hours-list', label: i18n._('{count, plural, one {Business hour} other {Business hours}}', 2) },
   { path: '', label: breadCrumLabel() }
 ]
 

@@ -5,11 +5,11 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox
-              :aria-label="$t('globals.terms.active')"
+              :aria-label="i18n._('Active')"
               :checked="value"
               @update:checked="handleChange"
             />
-            <Label>{{ $t('globals.terms.active') }}</Label>
+            <Label>{{ i18n._('Active') }}</Label>
           </div>
         </FormControl>
         <FormMessage />
@@ -19,11 +19,11 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input
               type="text"
-              :placeholder="t('contextLink.namePlaceholder')"
+              :placeholder="i18n._('My App')"
               v-bind="componentField"
             />
           </FormControl>
@@ -33,7 +33,7 @@
 
       <FormField v-slot="{ componentField }" name="url_template">
         <FormItem>
-          <FormLabel>{{ $t('contextLink.urlTemplate') }}</FormLabel>
+          <FormLabel>{{ i18n._('URL template') }}</FormLabel>
           <FormControl>
             <Input
               type="text"
@@ -41,7 +41,7 @@
               v-bind="componentField"
             />
           </FormControl>
-          <FormDescription>{{ $t('contextLink.urlTemplateHelp') }}</FormDescription>
+          <FormDescription>{{ i18n._(literalExampleMessage1) }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -50,22 +50,22 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="secret">
         <FormItem>
-          <FormLabel>{{ $t('contextLink.secret') }}</FormLabel>
+          <FormLabel>{{ i18n.pgettext('Context link encryption key', 'Secret') }}</FormLabel>
           <FormControl>
             <Input type="password" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ $t('contextLink.secretHelp') }}</FormDescription>
+          <FormDescription>{{ i18n._(literalExampleMessage2) }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="token_expiry_seconds">
         <FormItem>
-          <FormLabel>{{ $t('contextLink.tokenExpiry') }}</FormLabel>
+          <FormLabel>{{ i18n._('Token expiry (seconds)') }}</FormLabel>
           <FormControl>
             <Input type="number" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ $t('contextLink.tokenExpiryHelp') }}</FormDescription>
+          <FormDescription>{{ i18n._('The external app should reject tokens older than this. Included as \'\'exp\'\' (expiry timestamp) inside the encrypted token.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -76,10 +76,16 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
+const literalExampleMessage1 = msg({ message: '\'{{token}}\' is a base64-encoded AES-256-GCM encrypted blob containing all contact and agent fields (requires secret). Individual variables like \'{{email}}\', \'{{phone}}\', \'{{external_user_id}}\', \'{{contact_id}}\', \'{{first_name}}\', \'{{last_name}}\', \'{{conversation_uuid}}\' are passed as plain text.' })
+const literalExampleMessage2 = msg({ message: 'A 32-character key shared between Libredesk and the external app. Used to encrypt the \'{{token}}\' so only the external app can read the contact details. Not needed if you only use plain variables like \'{{email}}\'.' })
+
+
 import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Label } from '@shared-ui/components/ui/label'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   FormControl,
   FormField,
@@ -100,5 +106,5 @@ defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 </script>

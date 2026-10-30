@@ -13,7 +13,7 @@ import (
 func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, contactID int, reply string, attrs, meta map[string]any, maxConversations int, window time.Duration) (models.Message, error) {
 	var snapshot proactive.Snapshot
 	if err := json.Unmarshal(delivery.Snapshot, &snapshot); err != nil {
-		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if attrs == nil {
 		attrs = map[string]any{}
@@ -43,7 +43,7 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 	now := time.Now()
 	if err := tx.Stmtx(m.q.InsertConversation).QueryRow(contactID, models.StatusOpen, delivery.InboxID, reply, now, "", "", false, metaJSON, attrsJSON, now.Add(-window), maxConversations, m.subjectRefFormat).Scan(&id, &uuid); err != nil {
 		if err == sql.ErrNoRows {
-			return models.Message{}, envelope.NewError(envelope.RateLimitError, m.i18n.T("globals.messages.tooManyRequests"), nil)
+			return models.Message{}, envelope.NewError(envelope.RateLimitError, m.i18n.Get("Too many requests."), nil)
 		}
 		return models.Message{}, m.proactiveError(err)
 	}
@@ -83,7 +83,7 @@ func (m *Manager) CreateProactiveConversation(delivery proactive.Delivery, conta
 
 func (m *Manager) proactiveError(err error) error {
 	m.lo.Error("error creating proactive conversation", "error", err)
-	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
+	return envelope.NewError(envelope.GeneralError, m.i18n.Get("Error sending message"), nil)
 }
 
 func proactiveSender(meta json.RawMessage) string {

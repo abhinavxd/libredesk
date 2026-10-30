@@ -22,13 +22,13 @@
   <div v-else class="conversation-reference-list bg-background border rounded-lg shadow-lg p-3">
     <span v-if="query.length < MIN_REFERENCE_QUERY_LENGTH" class="text-sm text-muted-foreground">
       {{
-        $t('search.minQueryLength', {
+        i18n._('Please enter at least {length} characters to search.', {
           length: MIN_REFERENCE_QUERY_LENGTH
         })
       }}
     </span>
     <span v-else class="text-sm text-muted-foreground">{{
-      $t('globals.messages.noResultsFound')
+      i18n._('No results found')
     }}</span>
   </div>
 </template>

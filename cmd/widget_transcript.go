@@ -20,7 +20,7 @@ func handleWidgetTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if !config.Features.Transcript {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.Get("Permission denied"), nil))
 	}
 	uuid := r.RequestCtx.UserValue("uuid").(string)
 	_, conversation, err := getContactConversation(r, uuid)

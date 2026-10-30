@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createI18n } from 'vue-i18n'
+import { createI18n } from '@shared-ui/i18n'
 import App from './App.vue'
 import api from './api/index.js'
 import { resolveLanguage } from './utils/language.js'
@@ -21,7 +21,6 @@ async function initWidget () {
         const widgetSettingsResponse = await api.getWidgetSettings(inboxID)
         const widgetConfig = widgetSettingsResponse.data.data
 
-        const fallbackLang = widgetConfig.fallback_language || 'en-US'
         let availableCodes = []
         if (widgetConfig.language === 'auto') {
             const availableResp = await api.getAvailableLanguages()
@@ -35,16 +34,7 @@ async function initWidget () {
         const langMessages = await api.getLanguage(lang)
 
         // Initialize i18n
-        const i18nConfig = {
-            legacy: false,
-            locale: lang,
-            fallbackLocale: fallbackLang,
-            messages: {
-                [lang]: langMessages.data
-            }
-        }
-
-        const i18n = createI18n(i18nConfig)
+        const i18n = createI18n(langMessages.data)
         const app = createApp(App)
         const pinia = createPinia()
 

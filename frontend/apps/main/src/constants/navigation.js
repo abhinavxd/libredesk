@@ -1,6 +1,8 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
 export const reportsNavItems = [
   {
-    titleKey: 'globals.terms.overview',
+    titleMessage: msg({ message: 'Overview' }),
     href: '/reports/overview',
     permission: 'reports:manage',
     icon: 'BarChart3'
@@ -9,38 +11,38 @@ export const reportsNavItems = [
 
 export const adminNavItems = [
   {
-    titleKey: 'globals.terms.workspace',
+    titleMessage: msg({ message: 'Workspace' }),
     children: [
       {
-        titleKey: 'globals.terms.general',
+        titleMessage: msg({ message: 'General' }),
         href: '/admin/general',
         permission: 'general_settings:manage',
         icon: 'Settings'
       },
       {
-        titleKey: 'globals.terms.businessHour',
+        titleMessage: msg({ message: '{count, plural, one {Business hour} other {Business hours}}' }),
         href: '/admin/business-hours',
         createRouteName: 'new-business-hours',
         permission: 'business_hours:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Clock'
       },
       {
-        titleKey: 'globals.terms.slaPolicy',
+        titleMessage: msg({ message: '{count, plural, one {SLA policy} other {SLA policies}}' }),
         href: '/admin/sla',
         createRouteName: 'new-sla',
         permission: 'sla:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Timer'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.helpCenter',
+    titleMessage: msg({ message: '{count, plural, one {Help center} other {Help centers}}' }),
     badge: 'BETA',
     children: [
       {
-        titleKey: 'globals.terms.helpCenter',
+        titleMessage: msg({ message: '{count, plural, one {Help center} other {Help centers}}' }),
         href: '/admin/help-center',
         permission: 'help_center:manage',
         icon: 'BookOpen'
@@ -48,69 +50,69 @@ export const adminNavItems = [
     ]
   },
   {
-    titleKey: 'admin.ai.title',
+    titleMessage: msg({ message: 'AI' }),
     badge: 'BETA',
     children: [
       {
-        titleKey: 'globals.terms.provider',
+        titleMessage: msg({ message: '{count, plural, one {Provider} other {Providers}}' }),
         href: '/admin/ai/providers',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Sparkles'
       },
       {
-        titleKey: 'admin.ai.snippets',
+        titleMessage: msg({ message: '{count, plural, one {Snippet} other {Snippets}}' }),
         href: '/admin/ai/snippets',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'NotebookText'
       },
       {
-        titleKey: 'admin.ai.editorPrompts',
+        titleMessage: msg({ message: '{count, plural, one {Editor prompt} other {Editor prompts}}' }),
         href: '/admin/ai/editor-prompts',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'WandSparkles'
       },
       {
-        titleKey: 'admin.ai.suggestions',
+        titleMessage: msg({ message: 'Suggestions' }),
         href: '/admin/ai/suggestions',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Lightbulb'
       },
       {
-        titleKey: 'admin.ai.tools',
+        titleMessage: msg({ message: 'Tools' }),
         href: '/admin/ai/tools',
         createRouteName: 'new-ai-tool',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Wrench'
       },
       {
-        titleKey: 'admin.ai.assistants',
+        titleMessage: msg({ message: 'Assistants' }),
         href: '/admin/ai/assistants',
         createRouteName: 'new-ai-assistant',
         permission: 'ai:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Bot'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.channel',
-    isTitleKeyPlural: true,
+    titleMessage: msg({ message: 'Channel' }),
+    isTitlePlural: true,
     children: [
       {
-        titleKey: 'globals.terms.inbox',
+        titleMessage: msg({ message: '{count, plural, one {Inbox} other {Inboxes}}' }),
         href: '/admin/inboxes',
         createRouteName: 'new-inbox',
         permission: 'inboxes:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Inbox'
       },
       {
-        titleKey: 'admin.whatsappTemplates.title',
+        titleMessage: msg({ message: 'WhatsApp templates' }),
         href: '/admin/whatsapp/templates',
         permission: 'inboxes:manage',
         icon: 'WhatsApp'
@@ -118,123 +120,123 @@ export const adminNavItems = [
     ]
   },
   {
-    titleKey: 'globals.terms.conversation',
-    isTitleKeyPlural: true,
+    titleMessage: msg({ message: '{count, plural, one {Conversation} other {Conversations}}' }),
+    isTitlePlural: true,
     children: [
       {
-        titleKey: 'globals.terms.status',
+        titleMessage: msg({ message: '{count, plural, one {Status} other {Statuses}}' }),
         href: '/admin/conversations/statuses',
         permission: 'status:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'CircleDot'
       },
       {
-        titleKey: 'globals.terms.tag',
+        titleMessage: msg({ message: '{count, plural, one {Tag} other {Tags}}' }),
         href: '/admin/conversations/tags',
         permission: 'tags:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Tag'
       },
       {
-        titleKey: 'globals.terms.customAttribute',
+        titleMessage: msg({ message: '{count, plural, one {Custom attribute} other {Custom attributes}}' }),
         href: '/admin/custom-attributes',
         permission: 'custom_attributes:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'SlidersHorizontal'
       },
       {
-        titleKey: 'globals.terms.sharedView',
+        titleMessage: msg({ message: '{count, plural, one {Shared view} other {Shared views}}' }),
         href: '/admin/conversations/shared-views',
         createRouteName: 'new-shared-view',
         permission: 'shared_views:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Eye'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.productivity',
+    titleMessage: msg({ message: 'Productivity' }),
     children: [
       {
-        titleKey: 'globals.terms.macro',
+        titleMessage: msg({ message: '{count, plural, one {Macro} other {Macros}}' }),
         href: '/admin/conversations/macros',
         createRouteName: 'new-macro',
         permission: 'macros:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Zap'
       },
       {
-        titleKey: 'globals.terms.automation',
+        titleMessage: msg({ message: '{count, plural, one {Automation} other {Automations}}' }),
         href: '/admin/automations',
         createRouteName: 'new-automation',
         permission: 'automations:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Workflow'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.teammate',
-    isTitleKeyPlural: true,
+    titleMessage: msg({ message: '{count, plural, one {Teammate} other {Teammates}}' }),
+    isTitlePlural: true,
     children: [
       {
-        titleKey: 'globals.terms.agent',
+        titleMessage: msg({ message: '{count, plural, one {Agent} other {Agents}}' }),
         href: '/admin/teams/agents',
         createRouteName: 'new-agent',
         permission: 'users:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'UserRound'
       },
       {
-        titleKey: 'globals.terms.team',
+        titleMessage: msg({ message: '{count, plural, one {Team} other {Teams}}' }),
         href: '/admin/teams/teams',
         createRouteName: 'new-team',
         permission: 'teams:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'UsersRound'
       },
       {
-        titleKey: 'globals.terms.role',
+        titleMessage: msg({ message: '{count, plural, one {Role} other {Roles}}' }),
         href: '/admin/teams/roles',
         createRouteName: 'new-role',
         permission: 'roles:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Shield'
       },
       {
-        titleKey: 'globals.terms.activityLog',
+        titleMessage: msg({ message: '{count, plural, one {Activity log} other {Activity logs}}' }),
         href: '/admin/teams/activity-log',
         permission: 'activity_logs:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'ScrollText'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.notification',
-    isTitleKeyPlural: true,
+    titleMessage: msg({ message: '{count, plural, one {Notification} other {Notifications}}' }),
+    isTitlePlural: true,
     children: [
       {
-        titleKey: 'globals.terms.email',
+        titleMessage: msg({ message: '{count, plural, one {Email} other {Emails}}', context: 'Communication channel' }),
         href: '/admin/notification',
         permission: 'notification_settings:manage',
         icon: 'Mail'
       },
       {
-        titleKey: 'globals.terms.template',
+        titleMessage: msg({ message: '{count, plural, one {Template} other {Templates}}' }),
         href: '/admin/templates',
         createRouteName: 'new-template',
         permission: 'templates:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'FileText'
       }
     ]
   },
   {
-    titleKey: 'globals.terms.security',
+    titleMessage: msg({ message: 'Security' }),
     children: [
       {
-        titleKey: 'globals.terms.sso',
+        titleMessage: msg({ message: '{count, plural, one {SSO} other {SSOs}}' }),
         href: '/admin/sso',
         createRouteName: 'new-sso',
         permission: 'oidc:manage',
@@ -243,23 +245,23 @@ export const adminNavItems = [
     ]
   },
   {
-    titleKey: 'globals.terms.integration',
-    isTitleKeyPlural: true,
+    titleMessage: msg({ message: '{count, plural, one {Integration} other {Integrations}}' }),
+    isTitlePlural: true,
     children: [
       {
-        titleKey: 'globals.terms.webhook',
+        titleMessage: msg({ message: '{count, plural, one {Webhook} other {Webhooks}}' }),
         href: '/admin/webhooks',
         createRouteName: 'new-webhook',
         permission: 'webhooks:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Webhook'
       },
       {
-        titleKey: 'globals.terms.contextLink',
+        titleMessage: msg({ message: '{count, plural, one {Context link} other {Context links}}' }),
         href: '/admin/context-links',
         createRouteName: 'new-context-link',
         permission: 'context_links:manage',
-        isTitleKeyPlural: true,
+        isTitlePlural: true,
         icon: 'Link'
       }
     ]
@@ -268,24 +270,24 @@ export const adminNavItems = [
 
 export const accountNavItems = [
   {
-    titleKey: 'globals.terms.profile',
+    titleMessage: msg({ message: '{count, plural, one {Profile} other {Profiles}}' }),
     href: '/account/profile',
     icon: 'CircleUser'
   },
   {
-    titleKey: 'globals.terms.notification',
+    titleMessage: msg({ message: '{count, plural, one {Notification} other {Notifications}}' }),
     href: '/account/notifications',
-    isTitleKeyPlural: true,
+    isTitlePlural: true,
     icon: 'Bell'
   }
 ]
 
 export const contactNavItems = [
   {
-    titleKey: 'globals.terms.contact',
-    allLabelKey: 'contact.allContacts',
+    titleMessage: msg({ message: '{count, plural, one {Contact} other {Contacts}}' }),
+    allLabelMessage: msg({ message: 'All contacts' }),
     href: '/contacts',
-    isTitleKeyPlural: true,
+    isTitlePlural: true,
     icon: 'Contact'
   }
 ]

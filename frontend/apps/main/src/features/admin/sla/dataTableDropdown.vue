@@ -4,7 +4,7 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="edit(props.role.id)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -12,7 +12,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -20,15 +20,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ t('sla.deletionConfirmation') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this SLA policy.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">
-          {{ t('globals.messages.delete') }}
+          {{ i18n._('Delete') }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -59,10 +59,10 @@ import { useRouter } from 'vue-router'
 import api from '@/api'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const alertOpen = ref(false)

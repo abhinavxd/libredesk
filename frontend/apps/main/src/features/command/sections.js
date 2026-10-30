@@ -1,3 +1,5 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
 export const SECTIONS = {
   BULK: 'bulk',
   CONVERSATION: 'conversation',
@@ -25,17 +27,17 @@ export const SECTION_ORDER = [
   SECTIONS.CONVERSATION_RESULTS
 ]
 
-export const SECTION_LABEL_KEYS = {
-  [SECTIONS.BULK]: 'command.section.selectedConversations',
-  [SECTIONS.CONVERSATION]: 'globals.terms.conversation',
-  [SECTIONS.CONTACT]: 'globals.terms.contact',
-  [SECTIONS.LIST]: 'command.section.list',
-  [SECTIONS.ACTIONS]: 'globals.terms.action',
-  [SECTIONS.CREATE]: 'globals.messages.create',
-  [SECTIONS.GOTO]: 'command.section.goTo',
-  [SECTIONS.ACCOUNT]: 'globals.terms.account',
-  [SECTIONS.CONTACT_RESULTS]: 'globals.terms.contact',
-  [SECTIONS.CONVERSATION_RESULTS]: 'globals.terms.conversation'
+export const SECTION_MESSAGES = {
+  [SECTIONS.BULK]: msg({ message: 'Selected conversations' }),
+  [SECTIONS.CONVERSATION]: msg({ message: '{count, plural, one {Conversation} other {Conversations}}' }),
+  [SECTIONS.CONTACT]: msg({ message: '{count, plural, one {Contact} other {Contacts}}' }),
+  [SECTIONS.LIST]: msg({ message: 'Conversation list' }),
+  [SECTIONS.ACTIONS]: msg({ message: '{count, plural, one {Action} other {Actions}}' }),
+  [SECTIONS.CREATE]: msg({ message: 'Create' }),
+  [SECTIONS.GOTO]: msg({ message: 'Go to' }),
+  [SECTIONS.ACCOUNT]: msg({ message: '{count, plural, one {Account} other {Accounts}}' }),
+  [SECTIONS.CONTACT_RESULTS]: msg({ message: '{count, plural, one {Contact} other {Contacts}}' }),
+  [SECTIONS.CONVERSATION_RESULTS]: msg({ message: '{count, plural, one {Conversation} other {Conversations}}' })
 }
 
 export const SECTION_LABEL_PLURAL = new Set([

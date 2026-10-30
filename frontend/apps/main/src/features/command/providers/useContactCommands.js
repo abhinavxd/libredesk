@@ -1,6 +1,9 @@
+
+
+
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   Download,
   MessageSquarePlus,
@@ -17,7 +20,7 @@ import { SECTIONS } from '../sections'
 
 export function useContactCommands() {
   const route = useRoute()
-  const { t } = useI18n()
+  const i18n = useI18n()
   const emitter = useEmitter()
   const contactStore = useContactStore()
 
@@ -30,8 +33,8 @@ export function useContactCommands() {
     return [
       {
         id: 'contact.start-conversation',
-        label: t('command.startConversationWithContact'),
-        keywords: [t('conversation.newConversation'), t('globals.messages.create')],
+        label: i18n._('Start conversation with contact'),
+        keywords: [i18n._('New conversation'), i18n._('Create')],
         section,
         icon: MessageSquarePlus,
         permission: perms.CONVERSATIONS_WRITE,
@@ -39,8 +42,8 @@ export function useContactCommands() {
       },
       {
         id: 'contact.add-note',
-        label: t('contact.addNote'),
-        keywords: [t('globals.terms.note')],
+        label: i18n._('Add note'),
+        keywords: [i18n._('{count, plural, one {Note} other {Notes}}')],
         section,
         icon: StickyNote,
         permission: perms.CONTACT_NOTES_WRITE,
@@ -48,8 +51,8 @@ export function useContactCommands() {
       },
       {
         id: 'contact.toggle-block',
-        label: t(contact.enabled ? 'contact.blockContact' : 'contact.unblockContact'),
-        keywords: [t('globals.messages.block'), t('globals.messages.unblock')],
+        label: contact.enabled ? i18n._('Block contact') : i18n._('Unblock contact'),
+        keywords: [i18n._('Block'), i18n._('Unblock')],
         section,
         icon: contact.enabled ? ShieldOff : ShieldCheck,
         permission: perms.CONTACTS_BLOCK,
@@ -57,7 +60,7 @@ export function useContactCommands() {
       },
       {
         id: 'contact.export',
-        label: t('globals.messages.exportData'),
+        label: i18n._('Export data'),
         keywords: ['download', 'json'],
         section,
         icon: Download,
@@ -66,8 +69,8 @@ export function useContactCommands() {
       },
       {
         id: 'contact.delete',
-        label: t('contact.deleteContact'),
-        keywords: [t('globals.messages.delete')],
+        label: i18n._('Delete contact'),
+        keywords: [i18n._('Delete')],
         section,
         icon: Trash2,
         permission: perms.CONTACTS_DELETE,

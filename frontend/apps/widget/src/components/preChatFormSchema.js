@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { countryCodeKey, phoneNumberSchema, countryCodeSchema } from '@shared-ui/utils/phone.js'
 
-export const createPreChatFormSchema = (t, fields = []) => {
+export const createPreChatFormSchema = (i18n, fields = []) => {
   const schemaFields = {}
   
   fields
@@ -10,8 +10,8 @@ export const createPreChatFormSchema = (t, fields = []) => {
       let fieldSchema
 
       if (field.type === 'phone') {
-        let numberSchema = phoneNumberSchema(t, field.required)
-        let codeSchema = countryCodeSchema(t, field.required)
+        let numberSchema = phoneNumberSchema(i18n, field.required)
+        let codeSchema = countryCodeSchema(i18n, field.required)
 
         if (!field.required) {
           numberSchema = numberSchema.optional()
@@ -27,8 +27,8 @@ export const createPreChatFormSchema = (t, fields = []) => {
         case 'email':
           fieldSchema = z
             .string()
-            .max(254, { message: t('globals.messages.maxLength', { max: 254 }) })
-            .email({ message: t('validation.invalidEmail') })
+            .max(254, { message: i18n._('Must be at most {max} characters', { max: 254 }) })
+            .email({ message: i18n._('Invalid email address') })
           break
 
         case 'number': {
@@ -37,14 +37,14 @@ export const createPreChatFormSchema = (t, fields = []) => {
             schemaFields[field.key] = z.preprocess(
               emptyToUndefined,
               z.number({
-                required_error: t('globals.messages.required'),
-                invalid_type_error: t('validation.invalid')
+                required_error: i18n._('{name} Required'),
+                invalid_type_error: i18n._('Invalid')
               })
             )
           } else {
             schemaFields[field.key] = z.preprocess(
               emptyToUndefined,
-              z.number({ invalid_type_error: t('validation.invalid') }).optional()
+              z.number({ invalid_type_error: i18n._('Invalid') }).optional()
             )
           }
           return
@@ -56,7 +56,7 @@ export const createPreChatFormSchema = (t, fields = []) => {
 
         case 'date':
           fieldSchema = z.string().regex(/^(\d{4}-\d{2}-\d{2}|)$/, {
-            message: t('validation.invalid')
+            message: i18n._('Invalid')
           })
           break
 
@@ -64,15 +64,15 @@ export const createPreChatFormSchema = (t, fields = []) => {
           if (field.required) {
             schemaFields[field.key] = z
               .string()
-              .max(1000, { message: t('globals.messages.maxLength', { max: 1000 }) })
-              .min(1, { message: t('globals.messages.required') })
-              .url({ message: t('validation.invalidUrl') })
+              .max(1000, { message: i18n._('Must be at most {max} characters', { max: 1000 }) })
+              .min(1, { message: i18n._('{name} Required') })
+              .url({ message: i18n._('Invalid URL') })
           } else {
             schemaFields[field.key] = z
               .string()
-              .max(1000, { message: t('globals.messages.maxLength', { max: 1000 }) })
+              .max(1000, { message: i18n._('Must be at most {max} characters', { max: 1000 }) })
               .refine((val) => val === '' || z.string().url().safeParse(val).success, {
-                message: t('validation.invalidUrl')
+                message: i18n._('Invalid URL')
               })
               .optional()
           }
@@ -83,14 +83,14 @@ export const createPreChatFormSchema = (t, fields = []) => {
         default: {
           const max = field.key === 'name' ? 128 : 1000
           fieldSchema = z.string().max(max, {
-            message: t('globals.messages.maxLength', { max })
+            message: i18n._('Must be at most {max} characters', { max })
           })
         }
       }
       
       if (field.required && field.type !== 'checkbox') {
         fieldSchema = fieldSchema.min(1, {
-          message: t('globals.messages.required')
+          message: i18n._('{name} Required')
         })
       } else if (field.type !== 'checkbox') {
         fieldSchema = fieldSchema.or(z.literal('')).optional()

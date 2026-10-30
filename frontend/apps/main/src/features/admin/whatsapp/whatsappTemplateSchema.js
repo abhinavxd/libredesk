@@ -4,25 +4,25 @@ export const TEMPLATE_CATEGORIES = ['MARKETING', 'UTILITY']
 export const HEADER_TYPES = ['NONE', 'TEXT']
 export const BUTTON_TYPES = ['URL', 'PHONE_NUMBER', 'QUICK_REPLY']
 
-export const createFormSchema = (t) =>
+export const createFormSchema = (i18n) =>
   z.object({
-    inbox_id: z.number().int().positive(t('globals.messages.required')),
+    inbox_id: z.number().int().positive(i18n._('{name} Required')),
     name: z
       .string()
-      .min(1, t('globals.messages.required'))
+      .min(1, i18n._('{name} Required'))
       .max(512)
-      .regex(/^[a-z0-9_]+$/, t('globals.messages.lowercaseLettersNumbersUnderscoresOnly')),
-    language: z.string().min(1, t('globals.messages.required')).max(20),
+      .regex(/^[a-z0-9_]+$/, i18n._('Use lowercase letters, numbers, and underscores only.')),
+    language: z.string().min(1, i18n._('{name} Required')).max(20),
     category: z.enum(TEMPLATE_CATEGORIES),
     header_type: z.enum(HEADER_TYPES).optional(),
     header_content: z.string().optional(),
-    body_content: z.string().min(1, t('globals.messages.required')),
+    body_content: z.string().min(1, i18n._('{name} Required')),
     footer_content: z.string().max(60).optional(),
     buttons: z
       .array(
         z.object({
           type: z.enum(BUTTON_TYPES),
-          text: z.string().min(1, t('globals.messages.required')),
+          text: z.string().min(1, i18n._('{name} Required')),
           url: z.string().optional(),
           phone_number: z.string().optional()
         })
@@ -36,7 +36,7 @@ export const createFormSchema = (t) =>
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['header_content'],
-          message: t('globals.messages.required')
+          message: i18n._('{name} Required')
         })
       }
     })

@@ -18,7 +18,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/redis/go-redis/v9"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -68,7 +68,7 @@ type Config struct {
 type Auth struct {
 	mu           sync.RWMutex
 	cfg          Config
-	i18n         *i18n.I18n
+	i18n         *gotext.Locale
 	oauthCfgs    map[int]oauth2.Config
 	verifiers    map[int]*oidc.IDTokenVerifier
 	redirectURLs map[int]func() (string, error)
@@ -79,7 +79,7 @@ type Auth struct {
 }
 
 // New creates an Auth service with configured OIDC providers.
-func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
+func New(cfg Config, i18n *gotext.Locale, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
 	verifiers := make(map[int]*oidc.IDTokenVerifier)
 	redirectURLs := make(map[int]func() (string, error))
@@ -206,12 +206,12 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	defer a.mu.RUnlock()
 	oauthCfg, ok := a.oauthCfgs[providerID]
 	if !ok {
-		return "", envelope.NewError(envelope.InputError, a.i18n.T("validation.notFoundProvider"), nil)
+		return "", envelope.NewError(envelope.InputError, a.i18n.Get("Provider not found"), nil)
 	}
 	redirectURL, err := a.resolveRedirectURL(providerID)
 	if err != nil {
 		a.logger.Error("error resolving oidc redirect url", "provider_id", providerID, "error", err)
-		return "", envelope.NewError(envelope.GeneralError, a.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, a.i18n.Get("Something went wrong"), nil)
 	}
 	oauthCfg.RedirectURL = redirectURL
 	return oauthCfg.AuthCodeURL(state), nil
@@ -455,7 +455,7 @@ func (a *Auth) DestroyUserSessions(ctx context.Context, userID int) error {
 
 	if err := DestroyUserSessions(ctx, a.rd, userID); err != nil {
 		a.logger.Error("error destroying user sessions", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, a.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, a.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

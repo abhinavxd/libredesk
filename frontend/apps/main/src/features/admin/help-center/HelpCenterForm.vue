@@ -4,8 +4,8 @@
       <AdminToolbar>
         <template #left>
           <TabsList class="w-max justify-start">
-            <TabsTrigger value="general">{{ t('globals.terms.general') }}</TabsTrigger>
-            <TabsTrigger value="appearance">{{ t('globals.terms.appearance') }}</TabsTrigger>
+            <TabsTrigger value="general">{{ i18n._('General') }}</TabsTrigger>
+            <TabsTrigger value="appearance">{{ i18n._('Appearance') }}</TabsTrigger>
           </TabsList>
         </template>
       </AdminToolbar>
@@ -15,7 +15,7 @@
           <FormGrid>
             <FormField v-slot="{ componentField }" name="name">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
@@ -25,11 +25,11 @@
 
             <FormField v-slot="{ componentField }" name="slug">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.slug') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Slug', 'Slugs', 1) }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
-                <FormDescription>{{ t('helpCenter.slugHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Used in the help center URL.') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -38,7 +38,7 @@
           <FormGrid>
             <FormField v-slot="{ componentField }" name="custom_domain">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.customDomain') }}</FormLabel>
+                <FormLabel>{{ i18n._('Custom domain (optional)') }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
@@ -46,21 +46,21 @@
                     v-bind="componentField"
                   />
                 </FormControl>
-                <FormDescription>{{ t('helpCenter.customDomainHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Serve this help center on its own domain instead of the app URL. Point the domain at Libredesk in your DNS and reverse proxy first.') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
 
             <FormField v-slot="{ componentField }" name="livechat_inbox_id">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.liveChatInbox') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Live chat inbox', 'Live chat inboxes', 1) }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField">
                     <SelectTrigger>
-                      <SelectValue :placeholder="t('placeholders.selectInbox')" />
+                      <SelectValue :placeholder="i18n._('Select inbox')" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{{ t('globals.terms.none') }}</SelectItem>
+                      <SelectItem value="none">{{ i18n.pgettext('No linked inbox', 'None') }}</SelectItem>
                       <SelectItem
                         v-for="option in inboxStore.livechatOptions"
                         :key="option.value"
@@ -71,7 +71,7 @@
                     </SelectContent>
                   </Select>
                 </FormControl>
-                <FormDescription>{{ t('helpCenter.livechatInboxHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Shows the chat widget for this inbox on every help center page.') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -80,7 +80,7 @@
           <FormGrid>
             <FormField v-slot="{ componentField }" name="page_title">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.pageTitle') }}</FormLabel>
+                <FormLabel>{{ i18n._('Page title') }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
@@ -90,7 +90,7 @@
 
             <FormField v-slot="{ componentField }" name="template">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.template') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Template', 'Templates', 1, {}, 'Help center layout') }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField">
                     <SelectTrigger>
@@ -98,16 +98,16 @@
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="classic">{{
-                        t('helpCenter.templates.classic')
+                        i18n._('Classic')
                       }}</SelectItem>
-                      <SelectItem value="docs">{{ t('helpCenter.templates.docs') }}</SelectItem>
+                      <SelectItem value="docs">{{ i18n._('Docs') }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>
                 <FormDescription>{{
                   form.values.template === 'classic'
-                    ? t('helpCenter.templates.classicHint')
-                    : t('helpCenter.templates.docsHint')
+                    ? i18n._('Landing page layout with a hero banner, a large search bar and collection cards.')
+                    : i18n._('Documentation layout with a top navigation bar, a sidebar listing collections and quick search (Ctrl+K).')
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -116,21 +116,21 @@
 
           <FormField v-slot="{ componentField }" name="meta_description">
             <FormItem>
-              <FormLabel>{{ t('helpCenter.metaDescription') }}</FormLabel>
+              <FormLabel>{{ i18n._('Meta description') }}</FormLabel>
               <FormControl>
                 <Textarea :rows="2" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ t('helpCenter.homeMetaDescriptionHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('Shown in search-engine results and social previews for the help center home page. Leave blank to use the header text.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
 
-          <LinkListField name="theme.nav_links" :label="t('helpCenter.navLinks')" />
+          <LinkListField name="theme.nav_links" :label="i18n._('Navigation links')" />
 
           <div class="space-y-2">
-            <Label>{{ t('helpCenter.supportedLanguages') }}</Label>
+            <Label>{{ i18n._('Supported languages') }}</Label>
             <p class="ui-description">
-              {{ t('helpCenter.supportedLanguagesHint') }}
+              {{ i18n._('Add a language before authoring articles in it.') }}
             </p>
             <div
               v-for="(field, index) in localeFields"
@@ -143,7 +143,7 @@
                     <SelectComboBox
                       v-bind="componentField"
                       :items="localeItemsFor(index)"
-                      :placeholder="t('placeholders.selectLanguage')"
+                      :placeholder="i18n.pgettext('Language selector', 'Select language')"
                     />
                   </FormControl>
                   <FormMessage />
@@ -153,7 +153,7 @@
                 type="button"
                 variant="ghost"
                 size="icon"
-                :aria-label="`${t('globals.terms.remove')} ${field.value || ''}`"
+                :aria-label="`${i18n._('Remove')} ${field.value || ''}`"
                 :disabled="localeFields.length <= 1"
                 @click="removeLocale(index)"
               >
@@ -161,13 +161,13 @@
               </Button>
             </div>
             <Button type="button" variant="outline" size="sm" @click="pushLocale('')">
-              {{ t('globals.messages.add') }}
+              {{ i18n._('Add') }}
             </Button>
           </div>
 
           <FormField v-slot="{ componentField }" name="default_locale">
             <FormItem>
-              <FormLabel>{{ t('helpCenter.defaultLanguage') }}</FormLabel>
+              <FormLabel>{{ i18n._('Default language') }}</FormLabel>
               <FormControl>
                 <Select v-bind="componentField">
                   <SelectTrigger>
@@ -180,7 +180,7 @@
                   </SelectContent>
                 </Select>
               </FormControl>
-              <FormDescription>{{ t('helpCenter.defaultLanguageHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('Visitors land on this language unless they pick another.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -188,17 +188,17 @@
 
         <div v-show="activeTab === 'appearance'">
           <CollapsibleSection
-            :title="t('helpCenter.styling.brand')"
+            :title="i18n._('Brand')"
             :open="openSection === 'brand'"
             @toggle="toggleSection('brand')"
           >
             <FormField v-slot="{ componentField }" name="theme.favicon">
               <FormItem>
-                <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
+                <FormLabel>{{ i18n._('Favicon URL') }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
-                    :placeholder="t('helpCenter.faviconHint')"
+                    :placeholder="i18n._('https://example.com/favicon.ico')"
                     v-bind="componentField"
                   />
                 </FormControl>
@@ -208,24 +208,24 @@
 
             <FormField v-slot="{ componentField }" name="theme.color_scheme">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.theme') }}</FormLabel>
+                <FormLabel>{{ i18n._('Theme') }}</FormLabel>
                 <FormControl>
                   <RadioGroup v-bind="componentField" class="flex gap-4">
                     <div class="flex items-center space-x-2">
                       <RadioGroupItem id="hc-scheme-system" value="system" />
-                      <Label for="hc-scheme-system">{{ t('globals.terms.matchSystem') }}</Label>
+                      <Label for="hc-scheme-system">{{ i18n._('Match system') }}</Label>
                     </div>
                     <div class="flex items-center space-x-2">
                       <RadioGroupItem id="hc-scheme-light" value="light" />
-                      <Label for="hc-scheme-light">{{ t('globals.terms.light') }}</Label>
+                      <Label for="hc-scheme-light">{{ i18n._('Light') }}</Label>
                     </div>
                     <div class="flex items-center space-x-2">
                       <RadioGroupItem id="hc-scheme-dark" value="dark" />
-                      <Label for="hc-scheme-dark">{{ t('globals.terms.dark') }}</Label>
+                      <Label for="hc-scheme-dark">{{ i18n._('Dark') }}</Label>
                     </div>
                   </RadioGroup>
                 </FormControl>
-                <FormDescription>{{ t('globals.messages.matchSystemHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Match system follows the visitor\'\'s own color scheme.') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -236,11 +236,11 @@
                   <TabsList class="w-max justify-start">
                     <TabsTrigger value="light" class="gap-2 h-8">
                       <Sun class="size-4" />
-                      {{ t('globals.terms.light') }}
+                      {{ i18n._('Light') }}
                     </TabsTrigger>
                     <TabsTrigger value="dark" class="gap-2 h-8">
                       <Moon class="size-4" />
-                      {{ t('globals.terms.dark') }}
+                      {{ i18n._('Dark') }}
                     </TabsTrigger>
                   </TabsList>
                 </template>
@@ -253,7 +253,7 @@
               keep-value
             >
               <FormItem>
-                <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
+                <FormLabel>{{ i18n._('Logo URL') }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
@@ -267,7 +267,7 @@
               keep-value
             >
               <FormItem>
-                <FormLabel>{{ t('globals.terms.primaryColor') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Primary color', 'Primary colors', 1) }}</FormLabel>
                 <FormControl>
                   <Input type="color" v-bind="componentField" />
                 </FormControl>
@@ -277,13 +277,13 @@
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('helpCenter.styling.header')"
+            :title="i18n._('Header \u0026 hero')"
             :open="openSection === 'header'"
             @toggle="toggleSection('header')"
           >
             <FormField v-slot="{ componentField }" name="theme.header.heading">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.headerText') }}</FormLabel>
+                <FormLabel>{{ i18n._('Header text') }}</FormLabel>
                 <FormControl>
                   <Input type="text" v-bind="componentField" />
                 </FormControl>
@@ -293,11 +293,11 @@
 
             <FormField v-slot="{ componentField }" name="theme.tagline">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.styling.tagline') }}</FormLabel>
+                <FormLabel>{{ i18n._('Tagline') }}</FormLabel>
                 <FormControl>
                   <Textarea :rows="2" v-bind="componentField" />
                 </FormControl>
-                <FormDescription>{{ t('helpCenter.styling.inlineMarkdownHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Markdown is supported, e.g. **bold**, *italic* and [links](https://example.com).') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
@@ -305,19 +305,19 @@
             <div v-show="isClassic">
               <FormField v-slot="{ componentField }" name="theme.header.background_type">
                 <FormItem>
-                  <FormLabel>{{ t('globals.terms.background') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Background') }}</FormLabel>
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
-                        <SelectValue :placeholder="t('helpCenter.styling.bgDefault')" />
+                        <SelectValue :placeholder="i18n._('Default (accent tint)')" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="default">{{
-                          t('helpCenter.styling.bgDefault')
+                          i18n._('Default (accent tint)')
                         }}</SelectItem>
-                        <SelectItem value="solid">{{ t('helpCenter.styling.bgSolid') }}</SelectItem>
-                        <SelectItem value="gradient">{{ t('globals.terms.gradient') }}</SelectItem>
-                        <SelectItem value="image">{{ t('globals.terms.image') }}</SelectItem>
+                        <SelectItem value="solid">{{ i18n._('Solid color') }}</SelectItem>
+                        <SelectItem value="gradient">{{ i18n._('Gradient') }}</SelectItem>
+                        <SelectItem value="image">{{ i18n.ngettext('Image', 'Images', 1) }}</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
@@ -328,7 +328,7 @@
             <div v-show="isClassic && form.values.theme?.header?.background_type === 'solid'">
               <FormField v-slot="{ componentField }" name="theme.header.background_color">
                 <FormItem>
-                  <FormLabel>{{ t('globals.messages.backgroundColor') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Background color') }}</FormLabel>
                   <FormControl>
                     <Input type="color" v-bind="componentField" />
                   </FormControl>
@@ -342,7 +342,7 @@
             >
               <FormField v-slot="{ componentField }" name="theme.header.gradient_from">
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.messages.gradientStart') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Gradient start') }}</FormLabel>
                   <FormControl>
                     <Input type="color" v-bind="componentField" />
                   </FormControl>
@@ -350,7 +350,7 @@
               </FormField>
               <FormField v-slot="{ componentField }" name="theme.header.gradient_to">
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.messages.gradientEnd') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Gradient end') }}</FormLabel>
                   <FormControl>
                     <Input type="color" v-bind="componentField" />
                   </FormControl>
@@ -361,7 +361,7 @@
             <div v-show="isClassic && form.values.theme?.header?.background_type === 'image'">
               <FormField v-slot="{ componentField }" name="theme.header.background_image">
                 <FormItem>
-                  <FormLabel>{{ t('globals.messages.backgroundImageUrl') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Background image URL') }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -369,7 +369,7 @@
                       v-bind="componentField"
                     />
                   </FormControl>
-                  <FormDescription>{{ t('helpCenter.styling.headerImageHint') }}</FormDescription>
+                  <FormDescription>{{ i18n._('Recommended: at least 1600x500px (roughly 3:1), JPG/PNG/WebP. The image is centered and cropped to fit.') }}</FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>
@@ -378,11 +378,11 @@
             <div v-show="isClassic">
               <FormField v-slot="{ componentField }" name="theme.header.text_color">
                 <FormItem>
-                  <FormLabel>{{ t('globals.terms.textColor') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Text color') }}</FormLabel>
                   <FormControl>
                     <Input type="text" placeholder="#ffffff" v-bind="componentField" />
                   </FormControl>
-                  <FormDescription>{{ t('helpCenter.styling.textColorHint') }}</FormDescription>
+                  <FormDescription>{{ i18n._('Leave blank to use the default.') }}</FormDescription>
                   <FormMessage />
                 </FormItem>
               </FormField>
@@ -390,19 +390,19 @@
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('globals.terms.announcement')"
+            :title="i18n.ngettext('Announcement', 'Announcements', 1)"
             :open="openSection === 'announcement'"
             @toggle="toggleSection('announcement')"
           >
             <FormField v-slot="{ componentField }" name="theme.announcement.text">
               <FormItem>
-                <FormLabel>{{ t('globals.terms.message') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Message', 'Messages', 1) }}</FormLabel>
                 <FormControl>
                   <Textarea :rows="2" v-bind="componentField" />
                 </FormControl>
                 <FormDescription
-                  >{{ t('helpCenter.styling.announcementHint') }}
-                  {{ t('helpCenter.styling.inlineMarkdownHint') }}</FormDescription
+                  >{{ i18n._('A dismissible bar shown above the header on every page. Leave the text empty to hide it.') }}
+                  {{ i18n._('Markdown is supported, e.g. **bold**, *italic* and [links](https://example.com).') }}</FormDescription
                 >
                 <FormMessage />
               </FormItem>
@@ -411,7 +411,7 @@
             <div class="flex gap-4">
               <FormField v-slot="{ componentField }" name="theme.announcement.link_label">
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.terms.label') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('Label', 'Labels', 1) }}</FormLabel>
                   <FormControl>
                     <Input type="text" v-bind="componentField" />
                   </FormControl>
@@ -420,7 +420,7 @@
               </FormField>
               <FormField v-slot="{ componentField }" name="theme.announcement.link_url">
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
+                  <FormLabel>{{ i18n.ngettext('URL', 'URLs', 1) }}</FormLabel>
                   <FormControl>
                     <Input type="text" placeholder="https://" v-bind="componentField" />
                   </FormControl>
@@ -431,21 +431,21 @@
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('helpCenter.styling.landingPage')"
+            :title="i18n._('Landing page')"
             :open="openSection === 'landing'"
             @toggle="toggleSection('landing')"
           >
             <FormField v-slot="{ componentField }" name="theme.layout.collections">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.styling.collectionLayout') }}</FormLabel>
+                <FormLabel>{{ i18n._('Collection layout') }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField">
                     <SelectTrigger>
-                      <SelectValue :placeholder="t('helpCenter.styling.layoutGrid')" />
+                      <SelectValue :placeholder="i18n._('Card grid')" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="grid">{{ t('helpCenter.styling.layoutGrid') }}</SelectItem>
-                      <SelectItem value="list">{{ t('helpCenter.styling.layoutList') }}</SelectItem>
+                      <SelectItem value="grid">{{ i18n._('Card grid') }}</SelectItem>
+                      <SelectItem value="list">{{ i18n._('One per row') }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>
@@ -455,7 +455,7 @@
             <div v-show="form.values.theme?.layout?.collections !== 'list'">
               <FormField v-slot="{ componentField }" name="theme.layout.columns">
                 <FormItem>
-                  <FormLabel>{{ t('helpCenter.styling.cardsPerRow') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Cards per row') }}</FormLabel>
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
@@ -474,7 +474,7 @@
             <div v-show="form.values.theme?.layout?.collections !== 'list'">
               <FormField v-slot="{ componentField }" name="theme.cards.icon_position">
                 <FormItem>
-                  <FormLabel>{{ t('helpCenter.styling.cardIconPosition') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Card icon position') }}</FormLabel>
                   <FormControl>
                     <Select v-bind="componentField">
                       <SelectTrigger>
@@ -482,13 +482,13 @@
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="inline">{{
-                          t('helpCenter.styling.iconBesideTitle')
+                          i18n._('Beside the title')
                         }}</SelectItem>
                         <SelectItem value="top">{{
-                          t('helpCenter.styling.iconAboveTitle')
+                          i18n._('Above the title')
                         }}</SelectItem>
                         <SelectItem value="center">{{
-                          t('helpCenter.styling.iconCentered')
+                          i18n._('Centered')
                         }}</SelectItem>
                       </SelectContent>
                     </Select>
@@ -503,14 +503,14 @@
                   <Checkbox :checked="value" @update:checked="handleChange" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showPopularArticles')
+                  i18n._('Show popular articles')
                 }}</FormLabel>
               </FormItem>
             </FormField>
             <div v-show="form.values.theme?.layout?.show_popular_articles">
               <FormField v-slot="{ componentField }" name="theme.layout.popular_articles_label">
                 <FormItem>
-                  <FormLabel>{{ t('helpCenter.styling.popularArticlesLabel') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Popular articles heading') }}</FormLabel>
                   <FormControl>
                     <Input type="text" v-bind="componentField" />
                   </FormControl>
@@ -524,7 +524,7 @@
                   <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showCardDescription')
+                  i18n._('Show collection descriptions')
                 }}</FormLabel>
               </FormItem>
             </FormField>
@@ -534,7 +534,7 @@
                   <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showCardCount')
+                  i18n._('Show article counts')
                 }}</FormLabel>
               </FormItem>
             </FormField>
@@ -544,7 +544,7 @@
                   <Checkbox :checked="value" @update:checked="handleChange" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showIconTile')
+                  i18n._('Show icon background tile')
                 }}</FormLabel>
               </FormItem>
             </FormField>
@@ -554,14 +554,14 @@
                   <Checkbox :checked="value" @update:checked="handleChange" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showCardAuthors')
+                  i18n._('Show author avatars')
                 }}</FormLabel>
               </FormItem>
             </FormField>
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('helpCenter.styling.articlePage')"
+            :title="i18n._('Article page')"
             :open="openSection === 'article'"
             @toggle="toggleSection('article')"
           >
@@ -571,7 +571,7 @@
                   <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showToc')
+                  i18n._('Show table of contents')
                 }}</FormLabel>
               </FormItem>
             </FormField>
@@ -581,7 +581,7 @@
                   <Checkbox :checked="!value" @update:checked="(v) => handleChange(!v)" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showRelated')
+                  i18n._('Show related articles')
                 }}</FormLabel>
               </FormItem>
             </FormField>
@@ -591,14 +591,14 @@
                   <Checkbox :checked="value" @update:checked="handleChange" />
                 </FormControl>
                 <FormLabel class="font-normal cursor-pointer">{{
-                  t('helpCenter.styling.showAuthor')
+                  i18n._('Show author')
                 }}</FormLabel>
               </FormItem>
             </FormField>
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('globals.terms.footer')"
+            :title="i18n._('Footer')"
             :open="openSection === 'footer'"
             @toggle="toggleSection('footer')"
           >
@@ -608,11 +608,11 @@
                   <TabsList class="w-max justify-start">
                     <TabsTrigger value="light" class="gap-2 h-8">
                       <Sun class="size-4" />
-                      {{ t('globals.terms.light') }}
+                      {{ i18n._('Light') }}
                     </TabsTrigger>
                     <TabsTrigger value="dark" class="gap-2 h-8">
                       <Moon class="size-4" />
-                      {{ t('globals.terms.dark') }}
+                      {{ i18n._('Dark') }}
                     </TabsTrigger>
                   </TabsList>
                 </template>
@@ -630,7 +630,7 @@
                 keep-value
               >
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.messages.backgroundColor') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Background color') }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -651,7 +651,7 @@
                 keep-value
               >
                 <FormItem class="flex-1">
-                  <FormLabel>{{ t('globals.terms.textColor') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Text color') }}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
@@ -666,24 +666,24 @@
 
             <FormField v-slot="{ componentField }" name="theme.footer.tagline">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.styling.tagline') }}</FormLabel>
+                <FormLabel>{{ i18n._('Tagline') }}</FormLabel>
                 <FormControl>
                   <Textarea
                     :rows="2"
-                    :placeholder="t('helpCenter.styling.footerTaglineHint')"
+                    :placeholder="i18n._('A company slogan or contact info')"
                     v-bind="componentField"
                   />
                 </FormControl>
-                <FormDescription>{{ t('helpCenter.styling.inlineMarkdownHint') }}</FormDescription>
+                <FormDescription>{{ i18n._('Markdown is supported, e.g. **bold**, *italic* and [links](https://example.com).') }}</FormDescription>
                 <FormMessage />
               </FormItem>
             </FormField>
 
-            <LinkListField name="theme.footer_links" :label="t('globals.terms.link', 2)" />
+            <LinkListField name="theme.footer_links" :label="i18n.ngettext('Link', 'Links', 2)" />
 
             <LinkListField
               name="theme.social_links"
-              :label="t('helpCenter.styling.socialLinks')"
+              :label="i18n._('Social links')"
               :new-item="{ platform: 'website', url: '' }"
             >
               <template #leading="{ index }">
@@ -695,11 +695,11 @@
                     <FormControl>
                       <Select v-bind="componentField">
                         <SelectTrigger>
-                          <SelectValue :placeholder="t('globals.terms.platform')" />
+                          <SelectValue :placeholder="i18n._('Platform')" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem v-for="p in socialPlatforms" :key="p" :value="p">{{
-                            t(`helpCenter.social.${p}`)
+                          <SelectItem v-for="(label, p) in socialPlatforms" :key="p" :value="p">{{
+                            label
                           }}</SelectItem>
                         </SelectContent>
                       </Select>
@@ -712,13 +712,13 @@
           </CollapsibleSection>
 
           <CollapsibleSection
-            :title="t('helpCenter.styling.customCode')"
+            :title="i18n._('Custom code')"
             :open="openSection === 'code'"
             @toggle="toggleSection('code')"
           >
             <FormField v-slot="{ componentField }" name="custom_css">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.customCSS') }}</FormLabel>
+                <FormLabel>{{ i18n._('Custom CSS') }}</FormLabel>
                 <FormControl>
                   <Textarea
                     rows="4"
@@ -733,7 +733,7 @@
 
             <FormField v-slot="{ componentField }" name="custom_js">
               <FormItem>
-                <FormLabel>{{ t('helpCenter.customJS') }}</FormLabel>
+                <FormLabel>{{ i18n._('Custom JS') }}</FormLabel>
                 <FormControl>
                   <Textarea
                     rows="4"
@@ -752,7 +752,7 @@
 
     <div class="flex justify-end space-x-2 pt-4">
       <Button type="button" variant="outline" @click="$emit('cancel')">
-        {{ t('globals.messages.cancel') }}
+        {{ i18n._('Cancel') }}
       </Button>
       <Button type="submit" :isLoading="isLoading">
         {{ submitLabel }}
@@ -796,7 +796,7 @@ import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { useInboxStore } from '@/stores/inbox'
 import { createHelpCenterFormSchema } from './helpCenterFormSchema.js'
 import api from '@/api'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 // Field path prefix -> [tab, section] to reveal when that field errors on submit.
 const FIELD_LOCATION = [
@@ -846,22 +846,22 @@ const props = defineProps({
 
 const emit = defineEmits(['cancel', 'change'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 const inboxStore = useInboxStore()
 
 const submitLabel = computed(() =>
-  props.helpCenter ? t('globals.messages.update') : t('globals.messages.create')
+  props.helpCenter ? i18n._('Update') : i18n._('Create')
 )
 
-const socialPlatforms = [
-  'website',
-  'twitter',
-  'github',
-  'linkedin',
-  'facebook',
-  'instagram',
-  'youtube'
-]
+const socialPlatforms = computed(() => ({
+  website: i18n._('Website'),
+  twitter: i18n._('X (Twitter)'),
+  github: i18n._('GitHub'),
+  linkedin: i18n._('LinkedIn'),
+  facebook: i18n._('Facebook'),
+  instagram: i18n._('Instagram'),
+  youtube: i18n._('YouTube')
+}))
 
 const toFormValues = (hc) => ({
   name: hc?.name || '',
@@ -900,7 +900,7 @@ const toFormValues = (hc) => ({
       show_popular_articles: hc?.theme?.layout?.show_popular_articles ?? true,
       popular_articles_label: hc
         ? hc.theme?.layout?.popular_articles_label || ''
-        : t('helpCenter.popularArticles')
+        : i18n._('Popular articles')
     },
     cards: {
       hide_description: !!hc?.theme?.cards?.hide_description,
@@ -940,7 +940,7 @@ const toggleSection = (key) => {
 }
 
 const form = useForm({
-  validationSchema: toTypedSchema(createHelpCenterFormSchema(t)),
+  validationSchema: toTypedSchema(createHelpCenterFormSchema(i18n)),
   initialValues: toFormValues(props.helpCenter)
 })
 

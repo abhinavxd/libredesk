@@ -6,7 +6,7 @@
         @click="$emit('goBack')"
         variant="ghost"
         size="sm"
-        :aria-label="$t('globals.messages.goBack')"
+        :aria-label="i18n._('Go back')"
       >
         <ArrowLeft />
       </Button>
@@ -15,7 +15,7 @@
     <div class="flex items-center gap-2 ml-auto">
       <DropdownMenu v-if="!widgetStore.isMobileFullScreen || canDownloadTranscript">
         <DropdownMenuTrigger as-child>
-          <Button type="button" variant="ghost" size="sm" :aria-label="$t('globals.terms.more')">
+          <Button type="button" variant="ghost" size="sm" :aria-label="i18n._('More')">
             <Ellipsis class="size-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -26,7 +26,7 @@
           >
             <Minimize2 v-if="widgetStore.isExpanded" class="mr-2 h-4 w-4" aria-hidden="true" />
             <Maximize2 v-else class="mr-2 h-4 w-4" aria-hidden="true" />
-            {{ widgetStore.isExpanded ? $t('globals.terms.collapse') : $t('globals.terms.expand') }}
+            {{ widgetStore.isExpanded ? i18n._('Collapse') : i18n._('Expand') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             v-if="canDownloadTranscript"
@@ -34,7 +34,7 @@
             @select="downloadTranscript"
           >
             <Download class="mr-2 h-4 w-4" aria-hidden="true" />
-            {{ $t('conversation.downloadTranscript') }}
+            {{ i18n._('Download transcript') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

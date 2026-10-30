@@ -42,7 +42,7 @@ const mount = async () => {
   document.body.append(host)
   emitter = mitt()
   app = createApp(ConversationDetailView)
-  app.config.globalProperties.$t = (key) => key
+  app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: (message) => typeof message === 'string' ? message : message.message }
   app.config.globalProperties.emitter = emitter
   app.mount(host)
   await settle()

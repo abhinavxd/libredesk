@@ -9,7 +9,7 @@
 {{ define "classic-help-collection" }}
 {{ template "classic-header" . }}
 
-<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
+<nav class="hc-breadcrumb" aria-label="{{ .L.GetD "templates" "Breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
         <li><span class="hc-current" aria-current="page">{{ .Data.Collection.Name }}</span></li>
@@ -46,7 +46,7 @@
 {{ end }}
 
 {{ if and (not .Data.Collection.Articles) (not .Data.Collection.Children) }}
-<p class="hc-empty">{{ $.L.T "helpCenter.noArticles" }}</p>
+<p class="hc-empty">{{ $.L.GetD "templates" "This collection has no articles yet. Try searching, or browse the other collections." }}</p>
 {{ end }}
 
 {{ template "classic-footer" . }}

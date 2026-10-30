@@ -3,17 +3,17 @@
     <FormGrid class="tool-connection-grid">
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ t('admin.ai.tool.nameHint') }}</FormDescription>
+          <FormDescription>{{ i18n._('Letters, numbers, hyphen and underscore only, up to 64 characters.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
       <FormField v-slot="{ componentField }" name="url">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('URL', 'URLs', 1) }}</FormLabel>
           <FormControl>
             <Input
               type="text"
@@ -27,7 +27,7 @@
 
       <FormField v-slot="{ componentField }" name="method">
         <FormItem>
-          <FormLabel>{{ t('admin.ai.tool.method') }}</FormLabel>
+          <FormLabel>{{ i18n._('Method') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
@@ -47,29 +47,29 @@
 
     <FormField v-slot="{ componentField }" name="description">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Description', 'Descriptions', 1) }}</FormLabel>
         <FormControl>
           <Textarea
             rows="3"
-            :placeholder="t('admin.ai.tool.descriptionPlaceholder')"
+            :placeholder="i18n._('Looks up an order\'\'s status and delivery date by order ID.')"
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.descriptionHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('The model reads this to decide when to call the tool, so describe what it does and when it should be used.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
 
     <FormField v-slot="{ componentField, handleChange, meta }" name="headers">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.header', 2) }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Header', 'Headers', 2, {}, 'HTTP request headers') }}</FormLabel>
         <FormControl>
           <ToolHeadersField
             :modelValue="componentField.modelValue"
             @update:modelValue="(v) => handleChange(v, meta.validated)"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.headersHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Sent with every request to this tool\'\'s URL. Values are encrypted at rest.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -77,7 +77,7 @@
     <FormField v-slot="{ componentField }" name="parameters">
       <FormItem>
         <div class="flex items-center justify-between">
-          <FormLabel>{{ t('admin.ai.tool.parameters') }}</FormLabel>
+          <FormLabel>{{ i18n._('Parameters (JSON schema)') }}</FormLabel>
           <Button
             v-if="!componentField.modelValue"
             type="button"
@@ -85,7 +85,7 @@
             size="sm"
             @click="insertParametersExample"
           >
-            {{ t('globals.messages.insertExample') }}
+            {{ i18n._('Insert example') }}
           </Button>
         </div>
         <FormControl>
@@ -96,7 +96,7 @@
             v-bind="componentField"
           />
         </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.parametersHint') }}</FormDescription>
+        <FormDescription>{{ i18n._('Arguments the model can pass when calling this tool. Leave blank for a single text input.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -104,7 +104,7 @@
     <FormField v-slot="{ componentField, handleChange }" name="enabled">
       <FormItem>
         <SwitchField
-          :title="t('globals.terms.enabled')"
+          :title="i18n._('Enabled')"
           :checked="componentField.modelValue"
           @update:checked="handleChange"
         />
@@ -114,8 +114,8 @@
     <FormField v-slot="{ componentField }" name="requires_verification">
       <FormItem>
         <SwitchField
-          :title="t('admin.ai.tool.requireVerification')"
-          :description="t('admin.ai.tool.requireVerificationHint')"
+          :title="i18n._('Require verified contact')"
+          :description="i18n._('The assistant emails the customer a one-time code and runs this tool only after they enter it. Copilot and Generate Reply run it without the code, since a human agent asks for it there.')"
           :checked="componentField.modelValue"
           @update:checked="onToggleVerification"
         />
@@ -124,13 +124,13 @@
 
     <fieldset class="min-w-0">
       <legend class="ui-heading mb-4">
-        {{ t('globals.terms.agentAccess') }}
+        {{ i18n._('Agent access') }}
       </legend>
       <div class="space-y-5">
         <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
           <FormItem>
             <SwitchField
-              :title="t('admin.ai.tool.availableInCopilot')"
+              :title="i18n._('Available in Copilot')"
               :checked="componentField.modelValue"
               @update:checked="handleChange"
             />
@@ -140,7 +140,7 @@
         <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
           <FormItem>
             <SwitchField
-              :title="t('admin.ai.tool.availableInGenerateReply')"
+              :title="i18n._('Available in Generate Reply')"
               :checked="componentField.modelValue"
               @update:checked="handleChange"
             />
@@ -150,8 +150,8 @@
         <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
           <FormItem>
             <SwitchField
-              :title="t('admin.ai.tool.requireAgentApproval')"
-              :description="t('admin.ai.tool.requireAgentApprovalHint')"
+              :title="i18n._('Require agent approval')"
+              :description="i18n._('The tool pauses before it runs, and an agent approves or declines it. Keep this on for tools that change data.')"
               :checked="componentField.modelValue"
               :disabled="!hasAgentSurface"
               @update:checked="handleChange"
@@ -163,7 +163,7 @@
 
     <div class="flex justify-end">
       <Button type="submit" :isLoading="formLoading">
-        {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
+        {{ isEditing ? i18n._('Save') : i18n._('Create') }}
       </Button>
     </div>
   </form>
@@ -171,26 +171,26 @@
   <AlertDialog :open="confirmTurnOffOpen" @update:open="onConfirmDialogOpenChange">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('admin.ai.tool.turnOffVerificationTitle') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Turn off customer authentication?') }}</AlertDialogTitle>
         <AlertDialogDescription as="div" class="space-y-3">
-          <p>{{ t('admin.ai.tool.turnOffVerificationBody') }}</p>
-          <p>{{ t('admin.ai.tool.turnOffVerificationEndpoint') }}</p>
+          <p>{{ i18n._('With verification on, Libredesk emails the customer a one-time code and runs this tool only after they enter it. Turning it off lets anyone in the chat trigger the tool.') }}</p>
+          <p>{{ i18n._('If the tool accesses sensitive data or performs actions, your endpoint must authenticate the customer itself. Every request carries an X-Libredesk-Contact-Verified header.') }}</p>
           <a
             href="https://docs.libredesk.io/configuration/ai#writing-a-custom-tool"
             target="_blank"
             rel="noopener noreferrer"
             class="link-style"
           >
-            {{ t('globals.terms.learnMore') }}
+            {{ i18n._('Learn more') }}
           </a>
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>
-          {{ t('admin.ai.tool.keepVerificationOn') }}
+          {{ i18n._('Keep authentication on') }}
         </AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="confirmTurnOff">
-          {{ t('admin.ai.tool.turnOffVerification') }}
+          {{ i18n._('Turn off') }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -234,7 +234,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const methods = ['GET', 'POST']
 
@@ -252,27 +252,27 @@ const props = defineProps({
   submitForm: { type: Function, required: true }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
       name: z
-        .string({ required_error: t('globals.messages.required') })
-        .min(1, { message: t('globals.messages.required') })
-        .max(64, { message: t('admin.ai.tool.nameHint') })
-        .regex(/^[A-Za-z0-9_-]+$/, { message: t('admin.ai.tool.nameHint') }),
+        .string({ required_error: i18n._('{name} Required') })
+        .min(1, { message: i18n._('{name} Required') })
+        .max(64, { message: i18n._('Letters, numbers, hyphen and underscore only, up to 64 characters.') })
+        .regex(/^[A-Za-z0-9_-]+$/, { message: i18n._('Letters, numbers, hyphen and underscore only, up to 64 characters.') }),
       description: z.string().optional(),
       url: z
-        .string({ required_error: t('globals.messages.required') })
-        .min(1, { message: t('globals.messages.required') }),
+        .string({ required_error: i18n._('{name} Required') })
+        .min(1, { message: i18n._('{name} Required') }),
       method: z.string().optional(),
       headers: z
         .array(z.object({ key: z.string(), value: z.string() }))
         .optional()
         .refine((headers) => (headers ?? []).every((h) => !!h.key.trim() === !!h.value.trim()), {
-          message: t('admin.ai.tool.headersInvalid')
+          message: i18n._('Enter both a name and a value for every header, or remove the incomplete one.')
         }),
       parameters: z.string().optional(),
       enabled: z.boolean().optional(),
@@ -356,7 +356,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     try {
       parameters = JSON.parse(values.parameters)
     } catch {
-      form.setFieldError('parameters', t('admin.ai.tool.parametersInvalid'))
+      form.setFieldError('parameters', i18n._('Invalid JSON. Check for a missing comma, quote, or bracket.'))
       return
     }
   }

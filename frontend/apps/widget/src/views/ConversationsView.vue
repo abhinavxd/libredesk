@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-full relative">
     <!-- Header -->
-    <WidgetHeader :title="$t('globals.terms.message', 2)" />
+    <WidgetHeader :title="i18n.ngettext('Message', 'Messages', 2)" />
 
     <!-- Messages List -->
     <div class="flex-1 overflow-y-auto pb-20">

@@ -21,7 +21,7 @@
         @click="goBack"
       >
         <ChevronLeft class="h-3.5 w-3.5" />
-        {{ $t('globals.messages.back') }}
+        {{ i18n._('Back') }}
       </button>
       <span class="rounded-md bg-muted px-2 py-0.5 font-medium text-foreground">
         {{ breadcrumb }}
@@ -92,19 +92,19 @@
     >
       <span class="flex items-center gap-1 text-xs text-muted-foreground">
         <kbd :class="KBD_CLASS">Enter</kbd>
-        {{ $t('globals.terms.select') }}
+        {{ i18n._('Select') }}
       </span>
       <span class="flex items-center gap-1 text-xs text-muted-foreground">
         <kbd :class="KBD_CLASS">&uarr;&darr;</kbd>
-        {{ $t('command.navigate') }}
+        {{ i18n._('Navigate') }}
       </span>
       <span class="flex items-center gap-1 text-xs text-muted-foreground">
         <kbd :class="KBD_CLASS">Esc</kbd>
-        {{ $t('globals.messages.close') }}
+        {{ i18n._('Close') }}
       </span>
       <span v-if="parent" class="flex items-center gap-1 text-xs text-muted-foreground">
         <kbd :class="KBD_CLASS">Backspace</kbd>
-        {{ $t('globals.messages.back') }}
+        {{ i18n._('Back') }}
       </span>
     </div>
   </CommandDialog>
@@ -118,7 +118,7 @@ const KBD_CLASS =
 const ASYNC_SEARCH_DEBOUNCE = 250
 
 import { computed, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useDebounceFn } from '@vueuse/core'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import {
@@ -137,7 +137,7 @@ import SnoozeDatePicker from './SnoozeDatePicker.vue'
 import { MACROS_COMMAND, useCommandPalette } from './useCommandPalette'
 import { useCommandRegistry, commandMatches } from './useCommandRegistry'
 import { useGlobalShortcuts } from './useGlobalShortcuts'
-import { SECTION_ORDER, SECTION_LABEL_KEYS, SECTION_LABEL_PLURAL } from './sections'
+import { SECTION_ORDER, SECTION_MESSAGES, SECTION_LABEL_PLURAL } from './sections'
 import { useNavigationCommands } from './providers/useNavigationCommands'
 import { useCreateCommands } from './providers/useCreateCommands'
 import { useAccountCommands } from './providers/useAccountCommands'
@@ -147,7 +147,7 @@ import { useBulkCommands } from './providers/useBulkCommands'
 import { useContactCommands } from './providers/useContactCommands'
 import { useEntitySearch, ENTITY_SEARCH_MIN_LENGTH } from './providers/useEntitySearch'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const palette = useCommandPalette()
 const { open, parent, searchTerm, macroContext, closePalette, setParent } = palette
@@ -176,12 +176,12 @@ const entitySearch = useEntitySearch()
 const isMacroMode = computed(() => parent.value === MACROS_COMMAND)
 const parentCommand = computed(() => registry.get(parent.value))
 const breadcrumb = computed(() =>
-  isMacroMode.value ? t('globals.terms.macro', 2) : parentCommand.value?.label || ''
+  isMacroMode.value ? i18n._('{count, plural, one {Macro} other {Macros}}', 2) : parentCommand.value?.label || ''
 )
 
 const placeholder = computed(() => {
-  if (isMacroMode.value) return t('command.searchMacros')
-  return parentCommand.value?.placeholder || t('command.searchOrJumpTo')
+  if (isMacroMode.value) return i18n._('Search macros...')
+  return parentCommand.value?.placeholder || i18n._('Search or jump to...')
 })
 
 // Results of the current async source: a group's own search, or the root entity search.
@@ -263,7 +263,7 @@ const groups = computed(() => {
   }
   return SECTION_ORDER.map((section) => ({
     section,
-    label: t(SECTION_LABEL_KEYS[section], SECTION_LABEL_PLURAL.has(section) ? 2 : 1),
+    label: i18n._(SECTION_MESSAGES[section], SECTION_LABEL_PLURAL.has(section) ? 2 : 1),
     commands: visibleCommands.value.filter((c) => c.section === section)
   })).filter((group) => group.commands.length)
 })
@@ -280,8 +280,8 @@ const filterFunction = (values, term) => {
 
 const emptyText = computed(() =>
   !parent.value && searchTerm.value.trim().length < ENTITY_SEARCH_MIN_LENGTH
-    ? t('command.noCommandAvailable')
-    : t('globals.messages.noResultsFound')
+    ? i18n._('No command available')
+    : i18n._('No results found')
 )
 
 const onSelect = async (event, command) => {

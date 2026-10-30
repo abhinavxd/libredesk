@@ -1,5 +1,7 @@
+
+
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useConversationStore } from '@/stores/conversation'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents'
@@ -11,7 +13,7 @@ const bulkLoading = ref(false)
 export function useBulkActions() {
   const conversationStore = useConversationStore()
   const emitter = useEmitter()
-  const { t } = useI18n()
+  const i18n = useI18n()
 
   const runBulkAction = async (actionFn) => {
     const uuids = [...conversationStore.selectedUUIDs]
@@ -28,12 +30,12 @@ export function useBulkActions() {
     if (hasFailures) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        title: t('globals.terms.error', 1),
-        description: t('conversation.bulkActions.failedToast')
+        title: i18n._('{count, plural, one {Error} other {Errors}}', 1),
+        description: i18n._('Some conversations couldn\'\'t be updated')
       })
     } else {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('conversation.bulkActions.successToast')
+        description: i18n._('Conversations updated')
       })
     }
   }

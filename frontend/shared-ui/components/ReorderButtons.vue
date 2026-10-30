@@ -1,5 +1,5 @@
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ArrowDown, ArrowUp } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 
@@ -9,7 +9,7 @@ defineProps({
 })
 
 const emit = defineEmits(['move'])
-const { t } = useI18n()
+const i18n = useI18n()
 </script>
 
 <template>
@@ -20,7 +20,7 @@ const { t } = useI18n()
       size="icon"
       class="size-7"
       :disabled="index === 0"
-      :aria-label="t('globals.messages.moveUp')"
+      :aria-label="i18n._('Move up')"
       @click="emit('move', -1)"
     >
       <ArrowUp aria-hidden="true" />
@@ -31,7 +31,7 @@ const { t } = useI18n()
       size="icon"
       class="size-7"
       :disabled="index === length - 1"
-      :aria-label="t('globals.messages.moveDown')"
+      :aria-label="i18n._('Move down')"
       @click="emit('move', 1)"
     >
       <ArrowDown aria-hidden="true" />

@@ -4,7 +4,7 @@
       <template #actions>
         <router-link :to="{ name: 'new-inbox' }">
           <Button>
-            {{ $t('inbox.newInbox') }}
+            {{ i18n._('New inbox') }}
           </Button>
         </router-link>
       </template>
@@ -22,6 +22,8 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 
 import { onMounted, ref } from 'vue'
@@ -37,14 +39,14 @@ import DataTable from '@main/components/datatable/DataTable.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { useRouter, useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import TableDate from '@main/components/table/TableDate.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useInboxStore } from '@main/stores/inbox'
 import api from '@main/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const route = useRoute()
 const emitter = useEmitter()
@@ -60,15 +62,15 @@ onMounted(async () => {
   if (errorCode) {
     let msg
     if (errorCode === 'oauth_denied') {
-      msg = t('toast.authorizationDenied')
+      msg = i18n._('Authorization denied')
     } else if (errorCode === 'inbox_already_exists') {
-      msg = t('inbox.oauthAlreadyExists')
+      msg = i18n._('An inbox with this email already exists. Use Reconnect to update credentials.')
     } else if (errorCode === 'inbox_not_found') {
-      msg = t('inbox.oauthNotFound')
+      msg = i18n._('No inbox found with this email to reconnect.')
     } else if (errorCode === 'email_mismatch') {
-      msg = t('inbox.oauthEmailMismatch')
+      msg = i18n._('The authorized email doesn\'\'t match this inbox. Please authorize with the correct account.')
     } else {
-      msg = t('toast.errorConnectingInbox')
+      msg = i18n._('Error connecting inbox')
     }
     setTimeout(() => {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -78,7 +80,7 @@ onMounted(async () => {
     }, 500)
   } else if (successCode) {
     const msg =
-      successCode === 'oauth_reconnected' ? t('toast.inboxReconnected') : t('toast.inboxConnected')
+      successCode === 'oauth_reconnected' ? i18n._('Inbox reconnected successfully') : i18n._('Inbox connected successfully')
     setTimeout(() => {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: msg })
     }, 500)
@@ -104,16 +106,16 @@ const getInboxes = async () => {
 
 // Columns for the data table
 const CHANNEL_LABEL_KEYS = {
-  email: 'globals.terms.email',
-  livechat: 'globals.terms.liveChat',
-  whatsapp: 'globals.terms.whatsapp'
+  email: msg({ message: '{count, plural, one {Email} other {Emails}}', context: 'Communication channel' }),
+  livechat: msg({ message: 'Live Chat' }),
+  whatsapp: msg({ message: 'WhatsApp' })
 }
 
 const columns = [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t('globals.terms.name'))
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
     },
     cell: function ({ row }) {
       const children = [
@@ -133,7 +135,7 @@ const columns = [
               h(TooltipTrigger, { asChild: true }, () =>
                 h(TriangleAlert, { class: 'size-4 text-destructive shrink-0' })
               ),
-              h(TooltipContent, null, () => t('admin.inbox.authenticationFailed'))
+              h(TooltipContent, null, () => i18n._('Authentication failed. This inbox can\'\'t send or receive messages until you update its credentials.'))
             ]
           })
         )
@@ -145,28 +147,28 @@ const columns = [
     accessorKey: 'channel',
     meta: { compact: true },
     header: function () {
-      return h('div', null, t('globals.terms.channel'))
+      return h('div', null, i18n._('Channel'))
     },
     cell: function ({ row }) {
       const channel = row.getValue('channel')
       return h(
         'div',
         null,
-        CHANNEL_LABEL_KEYS[channel] ? t(CHANNEL_LABEL_KEYS[channel], 1) : channel
+        CHANNEL_LABEL_KEYS[channel] ? i18n._(CHANNEL_LABEL_KEYS[channel], 1) : channel
       )
     }
   },
   {
     accessorKey: 'enabled',
     meta: { compact: true },
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) => {
       const enabled = row.getValue('enabled')
       return h(
         'div',
         null,
         h(Badge, { variant: enabled ? 'success' : 'secondary' }, () =>
-          enabled ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          enabled ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
     }
@@ -175,7 +177,7 @@ const columns = [
     accessorKey: 'created_at',
     meta: { compact: true },
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })
@@ -185,7 +187,7 @@ const columns = [
     accessorKey: 'updated_at',
     meta: { compact: true },
     header: function () {
-      return h('div', null, t('globals.terms.updatedAt'))
+      return h('div', null, i18n._('Updated at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('updated_at') })

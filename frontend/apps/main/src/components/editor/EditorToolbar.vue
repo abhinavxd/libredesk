@@ -38,16 +38,16 @@
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem @select="setParagraph">
-          <span class="font-normal">{{ $t('editor.paragraph') }}</span>
+          <span class="font-normal">{{ i18n._('Paragraph') }}</span>
         </DropdownMenuItem>
         <DropdownMenuItem @select="() => setHeading(2)">
-          <span class="text-xl font-bold">{{ $t('editor.heading', { level: 2 }) }}</span>
+          <span class="text-xl font-bold">{{ i18n._('Heading {level}', { level: 2 }) }}</span>
         </DropdownMenuItem>
         <DropdownMenuItem @select="() => setHeading(3)">
-          <span class="text-base font-semibold">{{ $t('editor.heading', { level: 3 }) }}</span>
+          <span class="text-base font-semibold">{{ i18n._('Heading {level}', { level: 3 }) }}</span>
         </DropdownMenuItem>
         <DropdownMenuItem @select="() => setHeading(4)">
-          <span class="text-sm font-semibold">{{ $t('editor.heading', { level: 4 }) }}</span>
+          <span class="text-sm font-semibold">{{ i18n._('Heading {level}', { level: 4 }) }}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -57,14 +57,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('globals.terms.bold')"
+          :aria-label="i18n._('Bold')"
           @click.prevent="editor?.chain().focus().toggleBold().run()"
           :class="{ 'bg-secondary': editor?.isActive('bold') }"
         >
           <Bold size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('globals.terms.bold') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Bold') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -72,14 +72,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('globals.terms.italic')"
+          :aria-label="i18n._('Italic')"
           @click.prevent="editor?.chain().focus().toggleItalic().run()"
           :class="{ 'bg-secondary': editor?.isActive('italic') }"
         >
           <Italic size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('globals.terms.italic') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Italic') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -87,14 +87,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('editor.tooltip.strikethrough')"
+          :aria-label="i18n._('Strikethrough')"
           @click.prevent="editor?.chain().focus().toggleStrike().run()"
           :class="{ 'bg-secondary': editor?.isActive('strike') }"
         >
           <Strikethrough size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('editor.tooltip.strikethrough') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Strikethrough') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -102,14 +102,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('editor.tooltip.underline')"
+          :aria-label="i18n._('Underline')"
           @click.prevent="editor?.chain().focus().toggleUnderline().run()"
           :class="{ 'bg-secondary': editor?.isActive('underline') }"
         >
           <UnderlineIcon size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('editor.tooltip.underline') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Underline') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -117,14 +117,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('editor.tooltip.bulletList')"
+          :aria-label="i18n._('Bullet list')"
           @click.prevent="editor?.chain().focus().toggleBulletList().run()"
           :class="{ 'bg-secondary': editor?.isActive('bulletList') }"
         >
           <List size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('editor.tooltip.bulletList') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Bullet list') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -132,14 +132,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('editor.tooltip.orderedList')"
+          :aria-label="i18n._('Numbered list')"
           @click.prevent="editor?.chain().focus().toggleOrderedList().run()"
           :class="{ 'bg-secondary': editor?.isActive('orderedList') }"
         >
           <ListOrdered size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('editor.tooltip.orderedList') }}</TooltipContent>
+      <TooltipContent>{{ i18n._('Numbered list') }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
@@ -147,14 +147,14 @@
           type="button"
           size="sm"
           variant="ghost"
-          :aria-label="$t('globals.terms.link')"
+          :aria-label="i18n.ngettext('Link', 'Links', 1)"
           @click.prevent="emit('openLink')"
           :class="{ 'bg-secondary': editor?.isActive('link') }"
         >
           <LinkIcon size="14" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{{ $t('globals.terms.link') }}</TooltipContent>
+      <TooltipContent>{{ i18n.ngettext('Link', 'Links', 1) }}</TooltipContent>
     </Tooltip>
     <template v-if="showArticleTools">
       <DropdownMenu v-if="editor?.isActive('codeBlock')">
@@ -166,7 +166,7 @@
                 size="sm"
                 variant="ghost"
                 class="bg-secondary flex items-center"
-                :aria-label="$t('editor.tooltip.codeBlock')"
+                :aria-label="i18n._('Code block')"
               >
                 <Code size="14" />
                 <span class="ml-1 text-xs">{{ getCurrentLanguageLabel() }}</span>
@@ -174,14 +174,14 @@
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ $t('editor.tooltip.codeBlock') }}</TooltipContent>
+          <TooltipContent>{{ i18n._('Code block') }}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent>
           <DropdownMenuItem
             class="text-destructive"
             @select="editor?.chain().focus().toggleCodeBlock().run()"
           >
-            {{ $t('globals.terms.remove') }}
+            {{ i18n._('Remove') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <div class="max-h-64 overflow-y-auto">
@@ -201,13 +201,13 @@
             type="button"
             size="sm"
             variant="ghost"
-            :aria-label="$t('editor.tooltip.codeBlock')"
+            :aria-label="i18n._('Code block')"
             @click.prevent="editor?.chain().focus().toggleCodeBlock().run()"
           >
             <Code size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.codeBlock') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Code block') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -215,14 +215,14 @@
             type="button"
             size="sm"
             variant="ghost"
-            :aria-label="$t('editor.tooltip.blockquote')"
+            :aria-label="i18n._('Quote')"
             @click.prevent="editor?.chain().focus().toggleBlockquote().run()"
             :class="{ 'bg-secondary': editor?.isActive('blockquote') }"
           >
             <Quote size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.blockquote') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Quote') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-for="a in alignments" :key="a.dir">
         <TooltipTrigger as-child>
@@ -230,69 +230,69 @@
             type="button"
             size="sm"
             variant="ghost"
-            :aria-label="$t(a.label)"
+            :aria-label="i18n._(a.label)"
             @click.prevent="editor?.chain().focus().setTextAlign(a.dir).run()"
             :class="{ 'bg-secondary': editor?.isActive({ textAlign: a.dir }) }"
           >
             <component :is="a.icon" size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t(a.label) }}</TooltipContent>
+        <TooltipContent>{{ i18n._(a.label) }}</TooltipContent>
       </Tooltip>
       <DropdownMenu v-if="editor?.isActive('table')">
         <Tooltip>
           <TooltipTrigger as-child>
             <DropdownMenuTrigger as-child>
-              <Button type="button" size="sm" variant="ghost" class="bg-secondary flex items-center" :aria-label="$t('editor.tooltip.table')">
+              <Button type="button" size="sm" variant="ghost" class="bg-secondary flex items-center" :aria-label="i18n._('Table')">
                 <TableIcon size="14" />
                 <ChevronDown class="w-3 h-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ $t('editor.tooltip.table') }}</TooltipContent>
+          <TooltipContent>{{ i18n._('Table') }}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent>
-          <DropdownMenuItem @select="editor?.chain().focus().addRowBefore().run()">{{ $t('editor.table.addRowBefore') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().addRowAfter().run()">{{ $t('editor.table.addRowAfter') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().addColumnBefore().run()">{{ $t('editor.table.addColumnBefore') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().addColumnAfter().run()">{{ $t('editor.table.addColumnAfter') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().deleteRow().run()">{{ $t('editor.table.deleteRow') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().deleteColumn().run()">{{ $t('editor.table.deleteColumn') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleHeaderRow().run()">{{ $t('editor.table.toggleHeaderRow') }}</DropdownMenuItem>
-          <DropdownMenuItem class="text-destructive" @select="editor?.chain().focus().deleteTable().run()">{{ $t('editor.table.deleteTable') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().addRowBefore().run()">{{ i18n._('Add row above') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().addRowAfter().run()">{{ i18n._('Add row below') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().addColumnBefore().run()">{{ i18n._('Add column left') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().addColumnAfter().run()">{{ i18n._('Add column right') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().deleteRow().run()">{{ i18n._('Delete row') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().deleteColumn().run()">{{ i18n._('Delete column') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleHeaderRow().run()">{{ i18n._('Toggle header row') }}</DropdownMenuItem>
+          <DropdownMenuItem class="text-destructive" @select="editor?.chain().focus().deleteTable().run()">{{ i18n._('Delete table') }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Tooltip v-else>
         <TooltipTrigger as-child>
-          <Button type="button" size="sm" variant="ghost" :aria-label="$t('editor.tooltip.table')" @click.prevent="editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">
+          <Button type="button" size="sm" variant="ghost" :aria-label="i18n._('Table')" @click.prevent="editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">
             <TableIcon size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.table') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Table') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button type="button" size="sm" variant="ghost" :aria-label="$t('editor.tooltip.horizontalRule')" @click.prevent="editor?.chain().focus().setHorizontalRule().run()">
+          <Button type="button" size="sm" variant="ghost" :aria-label="i18n._('Divider')" @click.prevent="editor?.chain().focus().setHorizontalRule().run()">
             <Minus size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.horizontalRule') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Divider') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="enableInlineImages">
         <TooltipTrigger as-child>
-          <Button type="button" size="sm" variant="ghost" :aria-label="$t('globals.terms.image', 1)" @click.prevent="emit('openImage')">
+          <Button type="button" size="sm" variant="ghost" :aria-label="i18n.ngettext('Image', 'Images', 1)" @click.prevent="emit('openImage')">
             <ImageIcon size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('globals.terms.image', 1) }}</TooltipContent>
+        <TooltipContent>{{ i18n.ngettext('Image', 'Images', 1) }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button type="button" size="sm" variant="ghost" :aria-label="$t('editor.tooltip.youtube')" @click.prevent="emit('openYoutube')">
+          <Button type="button" size="sm" variant="ghost" :aria-label="i18n._('YouTube video')" @click.prevent="emit('openYoutube')">
             <YoutubeIcon size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.youtube') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('YouTube video') }}</TooltipContent>
       </Tooltip>
       <DropdownMenu>
         <Tooltip>
@@ -303,7 +303,7 @@
                 size="sm"
                 variant="ghost"
                 class="flex items-center"
-                :aria-label="$t('editor.tooltip.callout')"
+                :aria-label="i18n._('Callout')"
                 :class="{ 'bg-secondary': editor?.isActive('callout') }"
               >
                 <Info size="14" />
@@ -311,32 +311,34 @@
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>{{ $t('editor.tooltip.callout') }}</TooltipContent>
+          <TooltipContent>{{ i18n._('Callout') }}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent>
           <template v-if="editor?.isActive('callout')">
-            <DropdownMenuItem class="text-destructive" @select="editor?.chain().focus().unsetCallout().run()">{{ $t('globals.terms.remove') }}</DropdownMenuItem>
+            <DropdownMenuItem class="text-destructive" @select="editor?.chain().focus().unsetCallout().run()">{{ i18n._('Remove') }}</DropdownMenuItem>
             <DropdownMenuSeparator />
           </template>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('info').run()">{{ $t('globals.terms.info') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('success').run()">{{ $t('globals.terms.success') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('warning').run()">{{ $t('globals.terms.warning') }}</DropdownMenuItem>
-          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('danger').run()">{{ $t('globals.terms.danger') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('info').run()">{{ i18n._('Info') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('success').run()">{{ i18n._('Success') }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('warning').run()">{{ i18n.ngettext('Warning', 'Warnings', 1) }}</DropdownMenuItem>
+          <DropdownMenuItem @select="editor?.chain().focus().toggleCallout('danger').run()">{{ i18n._('Danger') }}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button type="button" size="sm" variant="ghost" :aria-label="$t('editor.tooltip.collapsible')" @click.prevent="editor?.chain().focus().setDetails().run()">
+          <Button type="button" size="sm" variant="ghost" :aria-label="i18n._('Collapsible section')" @click.prevent="editor?.chain().focus().setDetails().run()">
             <ListCollapse size="14" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('editor.tooltip.collapsible') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Collapsible section') }}</TooltipContent>
       </Tooltip>
     </template>
   </div>
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { ref } from 'vue'
 import {
   ChevronDown,
@@ -386,9 +388,9 @@ const aiPromptStore = useAiPromptStore()
 const isGenerating = ref(false)
 
 const alignments = [
-  { dir: 'left', icon: AlignLeft, label: 'editor.tooltip.alignLeft' },
-  { dir: 'center', icon: AlignCenter, label: 'editor.tooltip.alignCenter' },
-  { dir: 'right', icon: AlignRight, label: 'editor.tooltip.alignRight' }
+  { dir: 'left', icon: AlignLeft, label: msg({ message: 'Align left' }) },
+  { dir: 'center', icon: AlignCenter, label: msg({ message: 'Align center' }) },
+  { dir: 'right', icon: AlignRight, label: msg({ message: 'Align right' }) }
 ]
 
 const setHeading = (level) => props.editor?.chain().focus().toggleHeading({ level }).run()

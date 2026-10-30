@@ -22,7 +22,7 @@ vi.mock('@main/websocket', async importOriginal => ({
   sendTypingIndicator: vi.fn(),
   subscribeListReplace: vi.fn()
 }))
-vi.mock('@main/i18n', () => ({ getI18n: () => ({ global: { t: key => key } }) }))
+vi.mock('@main/i18n', () => ({ getI18n: () => ({ global: { _: key => key } }) }))
 vi.mock('@shared-ui/utils/http.js', () => ({ handleHTTPError: error => error }))
 
 const oldMessage = { id: 1, uuid: 'old-message', created_at: '2026-01-01T00:00:00Z', type: 'incoming' }

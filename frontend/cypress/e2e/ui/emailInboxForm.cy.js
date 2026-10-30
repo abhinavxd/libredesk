@@ -79,8 +79,10 @@ describe('Email inbox form', () => {
     cy.viewport(1280, 900)
     cy.login()
     cy.intercept('**/api/v1/**', { body: { data: [] } })
-    cy.readFile('../i18n/en-US.json').then((messages) => {
-      cy.intercept('GET', '**/api/v1/lang/en-US', { body: messages })
+    cy.readFile('../locales/en-US/LC_MESSAGES/frontend.json').then((catalog) => {
+      cy.intercept('GET', '**/api/v1/lang/en-US', {
+        body: { ...catalog, english: catalog.messages }
+      })
     })
     cy.intercept('GET', '**/api/v1/config', { body: { data: { 'app.lang': 'en-US' } } })
     cy.intercept('GET', '**/api/v1/settings/general', {

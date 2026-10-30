@@ -67,11 +67,11 @@ func (m *Manager) ResumeAgentRun(ctx context.Context, runID string, agentID int,
 	response, err := m.continueAgentRun(ctx, run)
 	if err != nil {
 		m.lo.Error("error completing agent run after tool decision", "run_id", runID, "agent_id", agentID, "tool", toolCall.Function.Name, "approved", approved, "error", err)
-		messageKey := "ai.toolDeclinedResponseFailed"
+		messageKey := m.i18n.Get("The tool was declined, but the AI could not complete its response. Run the AI action again if you still need a reply.")
 		if approved {
-			messageKey = "ai.toolRanResponseFailed"
+			messageKey = m.i18n.Get("The tool request finished, but the AI could not complete its response. Check the external system before running it again.")
 		}
-		return completedAgentRun(m.i18n.T(messageKey)), scope, nil
+		return completedAgentRun(messageKey), scope, nil
 	}
 	return response, scope, err
 }
@@ -82,10 +82,10 @@ func (m *Manager) PendingAgentRunScope(runID string, agentID int) (AgentRunScope
 	m.deleteExpiredAgentRunsLocked(time.Now())
 	run, ok := m.pendingRuns[runID]
 	if !ok {
-		return AgentRunScope{}, envelope.NewError(envelope.NotFoundError, m.i18n.T("ai.toolApprovalExpired"), nil)
+		return AgentRunScope{}, envelope.NewError(envelope.NotFoundError, m.i18n.Get("This tool request is no longer available. Run the AI action again to create a new request."), nil)
 	}
 	if run.Scope.AgentID != agentID {
-		return AgentRunScope{}, envelope.NewError(envelope.PermissionError, m.i18n.T("ai.toolApprovalUnavailable"), nil)
+		return AgentRunScope{}, envelope.NewError(envelope.PermissionError, m.i18n.Get("This tool request cannot be approved for this conversation. Run the AI action again to create a new request."), nil)
 	}
 	return run.Scope, nil
 }
@@ -155,7 +155,7 @@ func (m *Manager) continueAgentRun(ctx context.Context, run *pendingAgentRun) (m
 	}
 	if strings.TrimSpace(res.Content) == "" {
 		m.lo.Warn("agent produced no answer within the step budget", "max_steps", run.MaxSteps)
-		return models.AgentRunResult{}, envelope.NewError(envelope.GeneralError, m.i18n.T("ai.noAnswerWithinSteps"), nil)
+		return models.AgentRunResult{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("The AI hit its step limit before answering. Try a simpler request, or ask an admin to raise the limit."), nil)
 	}
 	m.lo.Debug("ai run final answer", "answer", res.Content, "forced", true)
 	return completedAgentRun(res.Content), nil
@@ -201,7 +201,7 @@ func (m *Manager) storeAgentRun(run *pendingAgentRun) error {
 	m.deleteExpiredAgentRunsLocked(time.Now())
 	for _, pending := range m.pendingRuns {
 		if sameAgentRunScope(pending.Scope, run.Scope) {
-			return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.toolApprovalPending"), nil)
+			return envelope.NewError(envelope.ConflictError, m.i18n.Get("A tool request is waiting for approval. Approve or decline it before running the AI again."), nil)
 		}
 	}
 	m.pendingRuns[run.ID] = run
@@ -215,10 +215,10 @@ func (m *Manager) claimAgentRun(runID string, agentID int) (*pendingAgentRun, er
 	m.deleteExpiredAgentRunsLocked(now)
 	run, ok := m.pendingRuns[runID]
 	if !ok {
-		return nil, envelope.NewError(envelope.NotFoundError, m.i18n.T("ai.toolApprovalExpired"), nil)
+		return nil, envelope.NewError(envelope.NotFoundError, m.i18n.Get("This tool request is no longer available. Run the AI action again to create a new request."), nil)
 	}
 	if run.Scope.AgentID != agentID {
-		return nil, envelope.NewError(envelope.PermissionError, m.i18n.T("ai.toolApprovalUnavailable"), nil)
+		return nil, envelope.NewError(envelope.PermissionError, m.i18n.Get("This tool request cannot be approved for this conversation. Run the AI action again to create a new request."), nil)
 	}
 	delete(m.pendingRuns, runID)
 	return run, nil
@@ -227,13 +227,13 @@ func (m *Manager) claimAgentRun(runID string, agentID int) (*pendingAgentRun, er
 func (m *Manager) validateApprovedTool(run *pendingAgentRun) error {
 	tool, err := m.GetTool(run.ToolID)
 	if err != nil || !tool.Enabled || tool.Name != run.ToolCalls[run.NextToolCall].Function.Name || !tool.UpdatedAt.Equal(run.ToolUpdatedAt) {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.toolChangedBeforeApproval"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This tool changed after approval was requested and was not run. Run the AI action again to review the current tool."), nil)
 	}
 	if run.Scope.Surface == models.ToolInvocationCopilot && !tool.CopilotEnabled {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.toolChangedBeforeApproval"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This tool changed after approval was requested and was not run. Run the AI action again to review the current tool."), nil)
 	}
 	if run.Scope.Surface == models.ToolInvocationReply && !tool.GenerateReplyEnabled {
-		return envelope.NewError(envelope.ConflictError, m.i18n.T("ai.toolChangedBeforeApproval"), nil)
+		return envelope.NewError(envelope.ConflictError, m.i18n.Get("This tool changed after approval was requested and was not run. Run the AI action again to review the current tool."), nil)
 	}
 	return nil
 }

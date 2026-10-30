@@ -136,7 +136,7 @@ func handleWidgetCampaignEvent(r *fastglue.Request) error {
 			return c.ID == delivery.CampaignID && c.Enabled
 		})
 		if !active || delivery.Dismissed || delivery.Replied || time.Since(delivery.CreatedAt) > time.Minute {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.T("widget.invitationExpired"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.Get("This invitation is no longer available. Start a new chat to contact us."), nil))
 		}
 	}
 	if err := app.proactive.RecordEvent(delivery.ID, req.Event); err != nil {
@@ -177,7 +177,7 @@ func campaignWithinHours(app *App, c proactive.Campaign, now time.Time, loc *tim
 	}
 	hours, err := app.businessHours.Get(c.BusinessHoursID)
 	if err != nil {
-		return false, envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+		return false, envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 	}
 	if hours.IsAlwaysOpen {
 		return true, nil
@@ -242,7 +242,7 @@ func validCampaignKey(key string) bool {
 }
 
 func campaignInputError(app *App) error {
-	return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+	return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 }
 
 func validateWidgetFeatures(app *App, config livechat.Config) error {
@@ -264,7 +264,9 @@ func validateWidgetFeatures(app *App, config livechat.Config) error {
 	ids := make(map[string]bool)
 	for _, campaign := range config.Campaigns {
 		if err := campaign.Validate(); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.livechat.campaignInvalid", "name", campaign.Name, "field", err.Error()), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Proactive message `%[1]s` is invalid: %[2]s",
+				campaign.Name,
+				err.Error()), nil)
 		}
 		if ids[campaign.ID] {
 			return campaignInputError(app)

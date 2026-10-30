@@ -40,7 +40,7 @@
 
     <!-- Closed conversation notice -->
     <div v-if="isConversationClosed" class="border-t p-4 text-center text-sm text-muted-foreground">
-      {{ $t('widget.conversationClosed') }}
+      {{ i18n._('This conversation has been closed') }}
     </div>
   </div>
 </template>

@@ -42,7 +42,7 @@ func handleGetCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	attribute, err := app.customAttribute.Get(id)
@@ -72,7 +72,7 @@ func handleCreateCustomAttribute(r *fastglue.Request) error {
 		attribute = cmodels.CustomAttribute{}
 	)
 	if err := r.Decode(&attribute, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 	if err := validateCustomAttribute(app, attribute); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -92,10 +92,10 @@ func handleUpdateCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&attribute, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 	if err := validateCustomAttribute(app, attribute); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -114,7 +114,7 @@ func handleDeleteCustomAttribute(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := removeAttributeFromPreChatForms(app, id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -128,22 +128,22 @@ func handleDeleteCustomAttribute(r *fastglue.Request) error {
 // validateCustomAttribute validates a custom attribute.
 func validateCustomAttribute(app *App, attribute cmodels.CustomAttribute) error {
 	if attribute.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 	if attribute.AppliesTo == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`applies_to`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`applies_to`"), nil)
 	}
 	if attribute.DataType == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`type`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`type`"), nil)
 	}
 	if attribute.Description == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`description`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`description`"), nil)
 	}
 	if attribute.Key == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`key`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`key`"), nil)
 	}
 	if slices.Contains(disallowedKeys, attribute.Key) {
-		return envelope.NewError(envelope.InputError, app.i18n.T("admin.customAttributes.keyNotAllowed"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("The provided key is not allowed as it conflicts with default attributes. Please use a different key."), nil)
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func removeAttributeFromPreChatForms(app *App, attributeID int) error {
 	}
 	if failed > 0 {
 		app.lo.Error("error clearing deleted custom attribute from live chat inboxes", "inboxes", failed)
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

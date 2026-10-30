@@ -68,7 +68,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
         >
           <Cross2Icon class="w-4 h-4" aria-hidden="true" />
-          <span class="sr-only">{{ $t('globals.messages.close') }}</span>
+          <span class="sr-only">{{ i18n._('Close') }}</span>
         </DialogClose>
       </DialogContent>
     </DialogOverlay>

@@ -5,14 +5,14 @@
         <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
           <template #actions>
             <Button @click="router.push({ name: 'new-ai-assistant' })">{{
-              t('admin.ai.assistant.new')
+              i18n._('New assistant')
             }}</Button>
           </template>
         </AdminToolbar>
         <DataTable
           v-model:search="searchTerm"
           :searchable="false"
-          :columns="createAssistantColumns(t, { onEdit: editAssistant })"
+          :columns="createAssistantColumns(i18n, { onEdit: editAssistant })"
           :data="assistants"
           :loading="isLoading"
         />
@@ -20,14 +20,14 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.assistantsHelp') }}</p>
+      <p>{{ i18n._('Assistants reply to conversations you route to them with an automation rule, and hand off to a human when they can\'\'t help. Each one has its own persona, instructions and tools, and they all read from the same knowledge base.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#assistants"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -45,12 +45,12 @@ import { createAssistantColumns } from '@/features/admin/ai/assistantColumns.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const router = useRouter()
 const isLoading = ref(false)

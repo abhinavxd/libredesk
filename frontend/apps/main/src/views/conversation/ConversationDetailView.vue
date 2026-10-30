@@ -26,7 +26,7 @@
         v-if="!useDetailsDrawer"
         v-show="sidebarOpen"
         class="w-1 bg-transparent after:w-1 can-hover:hover:after:bg-border"
-        :aria-label="$t('copilot.details')"
+        :aria-label="i18n._('Details')"
         @dragging="resizingSidebar = $event"
         @keydown.capture="onSidebarResizeKey"
         @keyup="resizingSidebar = false"
@@ -61,7 +61,7 @@
         class="w-[90vw] max-w-sm overflow-hidden p-0 [&>button]:hidden"
         :aria-describedby="undefined"
       >
-        <SheetTitle class="sr-only">{{ $t('globals.terms.contact') }}</SheetTitle>
+        <SheetTitle class="sr-only">{{ i18n.ngettext('Contact', 'Contacts', 1) }}</SheetTitle>
         <ConversationSideBar />
       </SheetContent>
     </Sheet>

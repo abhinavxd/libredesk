@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs'
 import { createFormSchema } from './formSchema'
 import { BUILT_IN_TEMPLATE_BODIES } from './defaults'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createFormSchema(mockI18n)
 
 const validForm = {
     name: 'New reply',

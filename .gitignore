@@ -1,4 +1,6 @@
 node_modules
+locales/*/LC_MESSAGES/*.mo
+locales/*/LC_MESSAGES/frontend.json
 config.toml
 config.toml.*
 libredesk.bin

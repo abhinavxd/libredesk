@@ -19,7 +19,7 @@
           v-else
           arrow
           size="lg"
-          fallback-label="globals.messages.sendUsMessage"
+          :fallback-label="i18n._('Send us a message')"
           class="w-full font-semibold shadow-md"
         />
       </HomeHeader>

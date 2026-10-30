@@ -26,22 +26,22 @@ func (m *Manager) ImportKnowledgeBaseFromURL(ctx context.Context, rawURL string)
 	rawURL = strings.TrimSpace(rawURL)
 	u, err := url.Parse(rawURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.invalidUrl"), nil)
+		return item, envelope.NewError(envelope.InputError, m.i18n.Get("Enter a valid http or https URL."), nil)
 	}
 
 	body, contentType, err := m.fetchURL(ctx, u.String())
 	if err != nil {
 		m.lo.Error("error fetching knowledge base import url", "host", u.Hostname(), "error", err)
-		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.fetchFailed"), nil)
+		return item, envelope.NewError(envelope.InputError, m.i18n.Get("The page could not be fetched. Check the URL is reachable and try again."), nil)
 	}
 	if !isHTMLContentType(contentType) {
 		m.lo.Warn("unsupported content type", "contentType", contentType)
-		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.unsupportedContentType"), nil)
+		return item, envelope.NewError(envelope.InputError, m.i18n.Get("That URL doesn't return a web page, so it can't be imported. Enter a link to an HTML page, or add the content manually as a snippet."), nil)
 	}
 
 	title, content := stringutil.ExtractReadableContent(body)
 	if content == "" {
-		return item, envelope.NewError(envelope.InputError, m.i18n.T("ai.urlImport.noContent"), nil)
+		return item, envelope.NewError(envelope.InputError, m.i18n.Get("No readable content was found at that URL."), nil)
 	}
 	if title == "" {
 		title = u.Host + u.Path

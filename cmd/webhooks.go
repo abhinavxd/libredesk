@@ -48,7 +48,7 @@ func handleGetWebhook(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	webhook, err := app.webhook.Get(id)
@@ -71,7 +71,7 @@ func handleCreateWebhook(r *fastglue.Request) error {
 		webhook = models.Webhook{}
 	)
 	if err := r.Decode(&webhook, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	// Validate webhook fields
@@ -99,11 +99,11 @@ func handleUpdateWebhook(r *fastglue.Request) error {
 	)
 
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&webhook, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	// Validate webhook fields
@@ -129,7 +129,7 @@ func handleDeleteWebhook(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := app.webhook.Delete(id); err != nil {
@@ -147,7 +147,7 @@ func handleToggleWebhook(r *fastglue.Request) error {
 	)
 
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	toggledWebhook, err := app.webhook.Toggle(id)
@@ -169,7 +169,7 @@ func handleTestWebhook(r *fastglue.Request) error {
 	)
 
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := app.webhook.SendTestWebhook(id); err != nil {
@@ -182,13 +182,13 @@ func handleTestWebhook(r *fastglue.Request) error {
 // validateWebhook validates the webhook data.
 func validateWebhook(app *App, webhook models.Webhook) error {
 	if webhook.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 	if webhook.URL == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`url`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`url`"), nil)
 	}
 	if len(webhook.Events) == 0 {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`events`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`events`"), nil)
 	}
 	return nil
 }

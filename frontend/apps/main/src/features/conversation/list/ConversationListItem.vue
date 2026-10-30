@@ -36,7 +36,7 @@
             >
               <Checkbox
                 :checked="isItemSelected"
-                :aria-label="t('conversation.bulkActions.selectConversation')"
+                :aria-label="i18n._('Select conversation')"
                 class="w-5 h-5"
               />
             </div>
@@ -75,13 +75,13 @@
                   </Tooltip>
                   <Tooltip v-if="nearestSlaDeadline">
                     <TooltipTrigger as-child>
-                      <div role="img" :aria-label="`${t(nearestSlaDeadline.title)}: ${formatFullTimestamp(nearestSlaDeadline.dueAt)}`">
+                      <div role="img" :aria-label="`${i18n._(nearestSlaDeadline.title)}: ${formatFullTimestamp(nearestSlaDeadline.dueAt)}`">
                         <SlaBadge :dueAt="nearestSlaDeadline.dueAt" compact :showExtra="false" />
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <div v-for="deadline in pendingSlaDeadlines" :key="deadline.label" class="py-1">
-                        <p>{{ t(deadline.title) }}</p>
+                        <p>{{ i18n._(deadline.title) }}</p>
                         <p>{{ formatFullTimestamp(deadline.dueAt) }}</p>
                       </div>
                     </TooltipContent>
@@ -93,12 +93,12 @@
                         <span class="inline-flex size-3 shrink-0 items-center justify-center" aria-hidden="true">
                           <Hourglass class="size-2.5" :size="10" :stroke-width="2.4" />
                         </span>
-                        <span class="sr-only">{{ t('globals.terms.waiting') }}</span>
+                        <span class="sr-only">{{ i18n._('Waiting') }}</span>
                         <span>{{ relativeWaitingTime }}</span>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{{ t('globals.terms.waitingSince') }}</p>
+                      <p>{{ i18n._('Waiting since') }}</p>
                       <p>{{ formatFullTimestamp(conversation.waiting_since) }}</p>
                     </TooltipContent>
                   </Tooltip>
@@ -132,10 +132,10 @@
                 :class="isUnread ? 'text-foreground font-medium' : 'text-muted-foreground'"
               >
                 <template v-if="isTyping">
-                  <span class="italic text-foreground">{{ $t('globals.terms.typing') }}</span>
+                  <span class="italic text-foreground">{{ i18n._('Typing...') }}</span>
                 </template>
                 <template v-else-if="hasDraftForConversation && !isCurrent">
-                  <span class="font-medium text-foreground">{{ $t('globals.terms.draft') }}:</span>
+                  <span class="font-medium text-foreground">{{ i18n._('Draft') }}:</span>
                   {{ draftPreview }}
                 </template>
                 <template v-else>
@@ -180,17 +180,19 @@
       <!-- Long press is the only way to reach the first checkbox on touch. -->
       <ContextMenuItem v-if="canBulkAct && !showCheckbox" @click="handleSelect">
         <SquareCheck class="w-4 h-4 mr-2" />
-        {{ $t('conversation.bulkActions.selectConversation') }}
+        {{ i18n._('Select conversation') }}
       </ContextMenuItem>
       <ContextMenuItem @click="handleMarkAsUnread">
         <MailOpen class="w-4 h-4 mr-2" />
-        {{ $t('globals.messages.markAsUnread') }}
+        {{ i18n._('Mark as unread') }}
       </ContextMenuItem>
     </ContextMenuContent>
   </ContextMenu>
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 const INDICATOR_GROUP_CLASS = 'flex shrink-0 items-center gap-1'
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -214,7 +216,7 @@ import { useUsersStore } from '@main/stores/users'
 import { useTeamStore } from '@main/stores/team'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 let timer = null
 const now = ref(new Date())
@@ -224,7 +226,7 @@ const usersStore = useUsersStore()
 const teamStore = useTeamStore()
 const appSettingsStore = useAppSettingsStore()
 const { canBulkAct } = useBulkActionPermissions()
-const { t } = useI18n()
+const i18n = useI18n()
 
 const props = defineProps({
   conversation: Object,
@@ -286,9 +288,9 @@ const ownerLabel = computed(() => {
   if (assignedAgent.value) {
     return [assignedAgent.value.first_name, assignedAgent.value.last_name].filter(Boolean).join(' ')
   }
-  if (props.conversation.assigned_user_id) return t('globals.terms.assignee')
-  if (props.conversation.assigned_team_id) return assignedTeam.value?.name || t('globals.terms.team', 1)
-  return t('globals.terms.unassigned')
+  if (props.conversation.assigned_user_id) return i18n._('Assignee')
+  if (props.conversation.assigned_team_id) return assignedTeam.value?.name || i18n._('{count, plural, one {Team} other {Teams}}', 1)
+  return i18n._('Unassigned')
 })
 const ownerInitials = computed(() => {
   if (assignedAgent.value) {
@@ -308,9 +310,9 @@ const pendingSlaDeadlines = computed(() => {
   const c = props.conversation
   if (conversationStatus.value?.category === 'resolved') return []
   return [
-    { label: 'FRD', title: 'admin.sla.firstResponseTime', dueAt: c.first_response_deadline_at, actualAt: c.first_reply_at },
-    { label: 'RD', title: 'admin.sla.resolutionTime', dueAt: c.resolution_deadline_at, actualAt: c.resolved_at },
-    { label: 'NRD', title: 'admin.sla.nextResponseTime', dueAt: c.next_response_deadline_at, actualAt: c.next_response_met_at }
+    { label: 'FRD', title: msg({ message: 'First response time' }), dueAt: c.first_response_deadline_at, actualAt: c.first_reply_at },
+    { label: 'RD', title: msg({ message: 'Resolution time' }), dueAt: c.resolution_deadline_at, actualAt: c.resolved_at },
+    { label: 'NRD', title: msg({ message: 'Next response time' }), dueAt: c.next_response_deadline_at, actualAt: c.next_response_met_at }
   ].filter((deadline) => deadline.dueAt && !deadline.actualAt)
     .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt))
 })
@@ -328,7 +330,7 @@ const draftPreview = computed(() => {
   const text = (draft.content || '').replace(/<[^>]*>/g, '').trim()
   if (text) return text.length > 120 ? text.slice(0, 120) + '...' : text
   if (draft.meta?.attachments?.length) return conversationStore.getMediaPreview(draft.meta.attachments)
-  if (/<img\b/i.test(draft.content || '')) return t('globals.terms.image', 1)
+  if (/<img\b/i.test(draft.content || '')) return i18n._('{count, plural, one {Image} other {Images}}', 1)
   return ''
 })
 

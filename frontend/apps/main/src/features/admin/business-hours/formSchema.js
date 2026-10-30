@@ -2,14 +2,14 @@ import * as z from 'zod'
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/
 
-export const createFormSchema = (t) => z.object({
-    name: z.string().min(1, t('globals.messages.required')),
+export const createFormSchema = (i18n) => z.object({
+    name: z.string().min(1, i18n._('{name} Required')),
     description: z.string().nullable().optional().transform(v => v ?? ''),
     is_always_open: z.boolean(),
     hours: z.record(
         z.object({
-            open: z.string().regex(timeRegex, t('validation.invalidTimeFormat')),
-            close: z.string().regex(timeRegex, t('validation.invalidTimeFormat')),
+            open: z.string().regex(timeRegex, i18n._('Invalid time format (HH:mm)')),
+            close: z.string().regex(timeRegex, i18n._('Invalid time format (HH:mm)')),
         })
     ).optional()
 }).superRefine((data, ctx) => {
@@ -17,7 +17,7 @@ export const createFormSchema = (t) => z.object({
         if (!data.hours || Object.keys(data.hours).length === 0) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: t('globals.messages.required'),
+                message: i18n._('{name} Required'),
                 path: ['hours']
             })
         } else {
@@ -25,7 +25,7 @@ export const createFormSchema = (t) => z.object({
                 if (!data.hours[day].open || !data.hours[day].close) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
-                        message: t('globals.messages.required'),
+                        message: i18n._('{name} Required'),
                         path: ['hours', day]
                     })
                 }
