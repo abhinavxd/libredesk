@@ -21,6 +21,7 @@ describe('General Form Schema', () => {
             ...validForm,
             lang: 'en',
             timezone: 'Asia/Kolkata',
+            time_format: '24h',
             business_hours_id: '1',
             logo_url: 'https://support.example.com/logo.png',
             allowed_file_upload_extensions: ['png', 'pdf'],
@@ -111,6 +112,15 @@ describe('General Form Schema', () => {
 
     test('allowed_file_upload_extensions accepts null', () => {
         expect(() => schema.parse({ ...validForm, allowed_file_upload_extensions: null })).not.toThrow()
+    })
+
+    test('time_format accepts 12h and 24h', () => {
+        expect(() => schema.parse({ ...validForm, time_format: '12h' })).not.toThrow()
+        expect(() => schema.parse({ ...validForm, time_format: '24h' })).not.toThrow()
+    })
+
+    test('time_format rejects other values', () => {
+        expect(() => schema.parse({ ...validForm, time_format: '12' })).toThrow()
     })
 
     test('show_conversation_subject must be boolean', () => {

@@ -56,6 +56,10 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	if req.Timezone != "" && !stringutil.IsValidTimezone(req.Timezone) {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, "Invalid timezone.", nil, envelope.InputError)
 	}
+	// Time format is either "12h" or "24h", anything else falls back to the default "12h".
+	if req.TimeFormat != "24h" {
+		req.TimeFormat = "12h"
+	}
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 	if !httputil.IsValidHTTPURL(req.RootURL) {

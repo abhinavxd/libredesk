@@ -13,6 +13,7 @@ describe('General settings form', () => {
     'app.root_url',
     'app.allowed_file_upload_extensions',
     'app.timezone',
+    'app.time_format',
     'app.business_hours_id',
     'app.show_conversation_subject'
   ]

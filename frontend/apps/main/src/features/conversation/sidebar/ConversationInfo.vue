@@ -25,7 +25,7 @@
 
       <dt class="sidebar-label">{{ $t('globals.terms.initiatedAt') }}</dt>
       <dd :class="INFO_VALUE_CLASS">
-        {{ conversation.created_at ? format(conversation.created_at, 'PPpp') : '-' }}
+        {{ conversation.created_at ? formatDateTime(conversation.created_at) : '-' }}
       </dd>
 
       <dt class="sidebar-label flex flex-wrap items-center gap-1.5">
@@ -38,7 +38,7 @@
         />
       </dt>
       <dd :class="INFO_VALUE_CLASS">
-        {{ conversation.first_reply_at ? format(conversation.first_reply_at, 'PPpp') : '-' }}
+        {{ conversation.first_reply_at ? formatDateTime(conversation.first_reply_at) : '-' }}
       </dd>
 
       <dt class="sidebar-label flex flex-wrap items-center gap-1.5">
@@ -51,7 +51,7 @@
         />
       </dt>
       <dd :class="INFO_VALUE_CLASS">
-        {{ conversation.resolved_at ? format(conversation.resolved_at, 'PPpp') : '-' }}
+        {{ conversation.resolved_at ? formatDateTime(conversation.resolved_at) : '-' }}
       </dd>
 
       <dt class="sidebar-label flex flex-wrap items-center gap-1.5">
@@ -64,12 +64,12 @@
         />
       </dt>
       <dd :class="INFO_VALUE_CLASS">
-        {{ conversation.last_reply_at ? format(conversation.last_reply_at, 'PPpp') : '-' }}
+        {{ conversation.last_reply_at ? formatDateTime(conversation.last_reply_at) : '-' }}
       </dd>
 
       <template v-if="conversation.closed_at">
         <dt class="sidebar-label">{{ $t('globals.terms.closedAt') }}</dt>
-        <dd :class="INFO_VALUE_CLASS">{{ format(conversation.closed_at, 'PPpp') }}</dd>
+        <dd :class="INFO_VALUE_CLASS">{{ formatDateTime(conversation.closed_at) }}</dd>
       </template>
 
       <template v-if="conversation.sla_policy_name">
@@ -130,7 +130,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { format } from 'date-fns'
+import { formatDateTime } from '@shared-ui/utils/datetime.js'
 import { Mail } from 'lucide-vue-next'
 import { CHANNEL_ICONS } from '@main/constants/channelIcons.js'
 import SlaBadge from '@/features/sla/SlaBadge.vue'

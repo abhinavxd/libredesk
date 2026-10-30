@@ -10,6 +10,7 @@ export const createFormSchema = (t) => z.object({
     }),
   lang: z.string().optional(),
   timezone: z.string().optional(),
+  time_format: z.enum(['12h', '24h']).optional(),
   business_hours_id: z.string().optional(),
   logo_url: z.string().url({
     message: t('admin.general.logoURL.valid'),
