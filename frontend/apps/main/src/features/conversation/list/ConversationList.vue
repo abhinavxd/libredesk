@@ -4,6 +4,18 @@
     <div class="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3">
       <SidebarTrigger class="cursor-pointer" />
       <h1 class="ui-heading min-w-0 truncate" :title="title">{{ title }}</h1>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        class="ml-auto shrink-0"
+        :title="t('globals.terms.refresh')"
+        :aria-label="t('globals.terms.refresh')"
+        :disabled="conversationStore.conversations.fetching"
+        @click="conversationStore.fetchFirstPageConversations"
+      >
+        <RefreshCw class="size-4" :class="{ 'animate-spin': conversationStore.conversations.fetching }" aria-hidden="true" />
+      </Button>
     </div>
 
     <!-- Bulk Action Toolbar (when items selected) -->
@@ -156,7 +168,7 @@ const FILTER_TRIGGER_CLASS = 'min-w-0 justify-start gap-1.5 px-2 text-xs'
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Inbox, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
+import { Inbox, MessageCircleWarning, ChevronDown, Loader2, RefreshCw } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,
