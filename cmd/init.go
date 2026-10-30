@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -120,6 +121,12 @@ func validateConfig(ko *koanf.Koanf) {
 
 	if len(encKey) != 32 {
 		log.Fatalf("encryption_key must be exactly 32 characters, got %d", len(encKey))
+	}
+
+	if wsURL := ko.String("app.ws_url"); wsURL != "" {
+		if u, err := url.Parse(wsURL); err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Host == "" {
+			log.Fatalf("app.ws_url must be a ws:// or wss:// URL, got %q", wsURL)
+		}
 	}
 
 	// Warn if using sample config value.
