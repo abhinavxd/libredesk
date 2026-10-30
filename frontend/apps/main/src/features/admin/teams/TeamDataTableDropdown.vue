@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only">Open menu</span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTeam(props.team.id)">
         <Pencil class="mr-2 h-4 w-4" />
@@ -43,14 +38,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import { Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -62,12 +57,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../../api'
+import api from '@/api'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

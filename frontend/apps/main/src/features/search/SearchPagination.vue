@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky bottom-0 mt-auto bg-background pb-4 pt-3">
+  <div class="sticky bottom-0 mt-auto bg-card pb-4 pt-3">
     <div
       class="flex items-center justify-between gap-4 rounded-md border border-border px-4 py-3 shadow-sm"
     >

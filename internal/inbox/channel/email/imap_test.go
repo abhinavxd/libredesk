@@ -1,15 +1,335 @@
 package email
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"mime"
+	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
+	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/emersion/go-imap/v2/imapserver"
+	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
+	"github.com/stretchr/testify/require"
+	"github.com/zerodha/logf"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/unicode"
 )
+
+type fakeMessageStore struct {
+	enqueued []models.IncomingMessage
+}
+
+type fakeUserStore struct{}
+
+type failingFetchSession struct {
+	imapserver.Session
+	failEnvelope bool
+}
+
+func (f *fakeMessageStore) MessageExists(string) (bool, error) { return false, nil }
+
+func (f *fakeMessageStore) EnqueueIncoming(m models.IncomingMessage) error {
+	f.enqueued = append(f.enqueued, m)
+	return nil
+}
+
+func (fakeUserStore) GetAgent(int, string) (umodels.User, error) { return umodels.User{}, nil }
+
+func (fakeUserStore) IsEmailBlocked(string) (bool, error) { return false, nil }
+
+func (s *failingFetchSession) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
+	if options.Envelope == s.failEnvelope {
+		return &imap.Error{Type: imap.StatusResponseTypeNo, Text: "forced fetch failure"}
+	}
+	return s.Session.Fetch(w, numSet, options)
+}
+
+func TestAliasVerificationRetriesAfterFailure(t *testing.T) {
+	user := imapmemserver.NewUser("test", "" /* password */)
+	require.NoError(t, user.Create("INBOX", nil /* options */))
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return imapmemserver.NewUserSession(user), &imapserver.GreetingData{PreAuth: true}, nil
+		},
+		Caps: imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapUIDPlus: {}},
+	})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { server.Close() })
+	go server.Serve(listener)
+	client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+	require.NoError(t, err)
+	t.Cleanup(func() { client.Close() })
+	raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+		headerAliasVerification + ": test-token\r\n" +
+		headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+	appendCmd := client.Append("INBOX", int64(len(raw)), nil /* options */)
+	_, err = io.WriteString(appendCmd, raw)
+	require.NoError(t, err)
+	require.NoError(t, appendCmd.Close())
+	_, err = appendCmd.Wait()
+	require.NoError(t, err)
+	_, err = client.Select("INBOX", nil /* options */).Wait()
+	require.NoError(t, err)
+
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	attempts := 0
+	e := &Email{
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
+		lo:      &logger,
+		aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+			attempts++
+			require.Equal(t, "test-token", token)
+			require.Equal(t, "billing@example.com", from)
+			if attempts == 1 {
+				return errors.New("database unavailable")
+			}
+			return nil
+		},
+	}
+	for _, remaining := range []int{1, 0} {
+		results, err := client.Search(&imap.SearchCriteria{NotFlag: []imap.Flag{imap.FlagSeen, imap.FlagDeleted}}, nil /* options */).Wait()
+		require.NoError(t, err)
+		require.Len(t, results.AllSeqNums(), 1)
+		require.NoError(t, e.fetchAndProcessMessages(t.Context(), client, results, e.id))
+		results, err = client.Search(&imap.SearchCriteria{}, nil /* options */).Wait()
+		require.NoError(t, err)
+		require.Len(t, results.AllSeqNums(), remaining)
+	}
+	require.Equal(t, 2, attempts)
+}
+
+func TestMailboxCheckExpiresAliasVerificationsAfterCompletingFoundOnes(t *testing.T) {
+	user := imapmemserver.NewUser("test", "secret")
+	require.NoError(t, user.Create("INBOX", nil /* options */))
+	mem := imapmemserver.New()
+	mem.AddUser(user)
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return mem.NewSession(), nil, nil
+		},
+		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapUIDPlus: {}},
+		InsecureAuth: true,
+	})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { server.Close() })
+	go server.Serve(listener)
+	client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+	require.NoError(t, err)
+	t.Cleanup(func() { client.Close() })
+	require.NoError(t, client.Login("test", "secret").Wait())
+	raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+		headerAliasVerification + ": test-token\r\n" +
+		headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+	appendCmd := client.Append("INBOX", int64(len(raw)), nil /* options */)
+	_, err = io.WriteString(appendCmd, raw)
+	require.NoError(t, err)
+	require.NoError(t, appendCmd.Close())
+	_, err = appendCmd.Wait()
+	require.NoError(t, err)
+
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	var calls []string
+	var cutoff time.Time
+	e := &Email{
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
+		lo:      &logger,
+		aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+			calls = append(calls, "complete")
+			return nil
+		},
+		aliasExpiryCallback: func(ctx context.Context, startedBefore time.Time) error {
+			calls = append(calls, "expire")
+			cutoff = startedBefore
+			return nil
+		},
+	}
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	portNum, err := strconv.Atoi(port)
+	require.NoError(t, err)
+	cfg := imodels.IMAPConfig{Host: host, Port: portNum, Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none"}
+	checkStarted := time.Now()
+	require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+	require.Equal(t, []string{"complete", "expire"}, calls)
+	require.WithinDuration(t, checkStarted.Add(-aliasVerificationTimeout), cutoff, time.Minute)
+}
+
+func TestProcessMailboxDecodesNonUTF8Headers(t *testing.T) {
+	process := mailboxProcessor(t)
+	cases := []struct {
+		name, subject, from, wantSubject, wantFirst, wantLast string
+	}{
+		{
+			name:        "Windows1252QuotedPrintable",
+			subject:     "=?Windows-1252?Q?Sicherheitsdatenbl=E4tter_im_OS_hinterlegen?=",
+			from:        "=?Windows-1252?Q?J=F6rg_M=FCller?=",
+			wantSubject: "Sicherheitsdatenblätter im OS hinterlegen", wantFirst: "Jörg", wantLast: "Müller",
+		},
+		{
+			name:    "Windows1252Base64",
+			subject: "=?windows-1252?B?UHJlaXMgMTAggA==?=", from: "=?windows-1252?B?SvZyZyBN/GxsZXI=?=",
+			wantSubject: "Preis 10 €", wantFirst: "Jörg", wantLast: "Müller",
+		},
+		{
+			name:        "FoldedMixedCharsets",
+			subject:     "Re: =?windows-1252?Q?caf=E9?=\r\n\t=?UTF-8?B?5pel5pys6Kqe?=",
+			from:        "=?windows-1252?Q?J=F6rg?= =?UTF-8?Q?_M=C3=BCller?=",
+			wantSubject: "Re: café日本語", wantFirst: "Jörg", wantLast: "Müller",
+		},
+		{
+			name: "PlainASCII", subject: "Support request", from: "John Smith",
+			wantSubject: "Support request", wantFirst: "John", wantLast: "Smith",
+		},
+		{
+			name: "UnknownCharset", subject: "=?x-unknown?Q?hello?=", from: "John Smith",
+			wantSubject: "=?x-unknown?Q?hello?=", wantFirst: "John", wantLast: "Smith",
+		},
+		{
+			name: "MalformedBase64", subject: "=?windows-1252?B?%%%?=", from: "John Smith",
+			wantSubject: "=?windows-1252?B?%%%?=", wantFirst: "John", wantLast: "Smith",
+		},
+		{
+			name: "MalformedQuotedPrintable", subject: "=?windows-1252?Q?bad=ZZ?=", from: "John Smith",
+			wantSubject: "=?windows-1252?Q?bad=ZZ?=", wantFirst: "John", wantLast: "Smith",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := process(t, tc.subject, tc.from)
+			require.Equal(t, tc.wantSubject, msg.Subject)
+			require.Equal(t, tc.wantFirst, msg.Contact.FirstName)
+			require.Equal(t, tc.wantLast, msg.Contact.LastName)
+		})
+	}
+}
+
+func TestProcessMailboxDecodesEncodedSenderEnvelope(t *testing.T) {
+	for _, from := range []string{
+		"=?windows-1252?Q?J=F6rg_M=FCller?=",
+		"=?windows-1252?B?SvZyZyBN/GxsZXI=?=",
+	} {
+		t.Run(from, func(t *testing.T) {
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { listener.Close() })
+			serverErr := make(chan error, 1)
+			go func() { serverErr <- serveEncodedSenderEnvelope(listener, from) }()
+
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			store := &fakeMessageStore{}
+			e := &Email{
+				primary: "support@example.com", uuid: "inbox-uuid", lo: &logger,
+				messageStore: store, userStore: fakeUserStore{},
+			}
+			host, port, err := net.SplitHostPort(listener.Addr().String())
+			require.NoError(t, err)
+			portNum, err := strconv.Atoi(port)
+			require.NoError(t, err)
+			cfg := imodels.IMAPConfig{
+				Host: host, Port: portNum, Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none",
+			}
+			require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+			require.NoError(t, <-serverErr)
+			require.Len(t, store.enqueued, 1)
+			require.Equal(t, "Sender test", store.enqueued[0].Subject)
+			require.Equal(t, "Jörg", store.enqueued[0].Contact.FirstName)
+			require.Equal(t, "Müller", store.enqueued[0].Contact.LastName)
+			require.Equal(t, "jorg@example.com", store.enqueued[0].Contact.Email.String)
+			require.Equal(t, "body", store.enqueued[0].Content)
+		})
+	}
+}
+
+func FuzzProcessMailboxEncodedHeaders(f *testing.F) {
+	process := mailboxProcessor(f)
+	for charsetIndex := range uint8(7) {
+		f.Add([]byte{0, 1, 2, 3, 4, 5}, charsetIndex, false /* base64 */)
+		f.Add([]byte{5, 4, 3, 2, 1, 0}, charsetIndex, true /* base64 */)
+		f.Add([]byte(strings.Repeat("x", 128)), charsetIndex, true /* base64 */)
+	}
+	f.Add([]byte{}, uint8(0) /* charsetIndex */, false /* base64 */)
+	f.Fuzz(func(t *testing.T, data []byte, charsetIndex uint8, base64 bool) {
+		charsets := []struct {
+			name, alphabet string
+			codec          encoding.Encoding
+		}{
+			{"windows-1252", "éöüß€AZ09_?=", charmap.Windows1252},
+			{"ISO-8859-2", "ŁąćęńóśźżAZ09_?=", charmap.ISO8859_2},
+			{"KOI8-R", "ПриветмирAZ09_?=", charmap.KOI8R},
+			{"Shift_JIS", "日本語東京AZ09_?=", japanese.ShiftJIS},
+			{"GBK", "中文测试AZ09_?=", simplifiedchinese.GBK},
+			{"UTF-8", "é日本語🙂AZ09_?=", unicode.UTF8},
+			{"ISO-8859-1", "éöüßAZ09_?=", charmap.ISO8859_1},
+		}
+		cs := charsets[int(charsetIndex)%len(charsets)]
+		alphabet := []rune(cs.alphabet)
+		text := []rune{alphabet[0]}
+		for _, b := range data[:min(len(data), 128)] {
+			text = append(text, alphabet[int(b)%len(alphabet)])
+		}
+		word := string(text)
+		encoder := mime.QEncoding
+		if base64 {
+			encoder = mime.BEncoding
+		}
+		encode := func(text string) string {
+			encoded, err := cs.codec.NewEncoder().String(text)
+			require.NoError(t, err)
+			return encoder.Encode(cs.name, encoded)
+		}
+		msg := process(t, "Re: "+encode(word+" request"), encode(word+" Sender"))
+		require.Equal(t, "Re: "+word+" request", msg.Subject)
+		require.Equal(t, word, msg.Contact.FirstName)
+		require.Equal(t, "Sender", msg.Contact.LastName)
+	})
+}
+
+func FuzzProcessMailboxMalformedHeaders(f *testing.F) {
+	process := mailboxProcessor(f)
+	for _, header := range []string{
+		"=?windows-1252?Q?bad=ZZ?=", "=?windows-1252?B?%%%?=",
+		"=?x-unknown?Q?hello?=", "=?Shift_JIS?B?gQ==?=", "=?UTF-8?Q?=FF?=", "",
+	} {
+		f.Add(header)
+	}
+	f.Fuzz(func(t *testing.T, header string) {
+		var safe strings.Builder
+		for _, b := range []byte(header[:min(len(header), 512)]) {
+			if b >= 32 && b <= 126 {
+				safe.WriteByte(b)
+			}
+		}
+		msg := process(t, safe.String(), "John Smith")
+		require.True(t, utf8.ValidString(msg.Subject))
+		require.Equal(t, "John", msg.Contact.FirstName)
+		require.Equal(t, "Smith", msg.Contact.LastName)
+	})
+}
 
 func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 	e := &Email{}
@@ -73,6 +393,85 @@ func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 				t.Errorf("extractUUIDFromReplyAddress(%q) = %q; expected %q", tc.address, result, tc.expected)
 			}
 		})
+	}
+}
+
+func TestResolveInboxAddress(t *testing.T) {
+	e := &Email{
+		from:    "Support <support@example.com>",
+		primary: "support@example.com",
+		uuid:    "inbox-uuid",
+		receiveAddresses: map[string]struct{}{
+			"support@example.com":    {},
+			"billing@example.com":    {},
+			"sales@example.com":      {},
+			"billing+eu@example.com": {},
+		},
+	}
+	tests := []struct {
+		name    string
+		headers string
+		want    string
+	}{
+		{"owned To beats Cc", "To: customer@example.net, billing@example.com\r\nCc: sales@example.com\r\n", "billing@example.com"},
+		{"first owned To wins", "To: sales@example.com, billing@example.com\r\n", "sales@example.com"},
+		{"Cc when To unowned", "To: customer@example.net\r\nCc: BILLING@example.com\r\n", "billing@example.com"},
+		{"Bcc when available", "To: customer@example.net\r\nBcc: sales@example.com\r\n", "sales@example.com"},
+		{"original before delivered", "X-Original-To: billing@example.com\r\nDelivered-To: sales@example.com\r\n", "billing@example.com"},
+		{"ignore unowned delivery", "X-Original-To: other@example.com\r\nDelivered-To: billing@example.com\r\n", "billing@example.com"},
+		{"fallback primary", "To: customer@example.net\r\n", "support@example.com"},
+		{"quoted comma in display name", "To: \"Billing, Team\" <billing@example.com>\r\n", "billing@example.com"},
+		{"quoted semicolon in display name", "To: \"Billing; Team\" <billing@example.com>\r\n", "billing@example.com"},
+		{"address group", "To: Support: billing@example.com, sales@example.com;\r\n", "billing@example.com"},
+		{"empty group then owned recipient", "To: Undisclosed:;, sales@example.com\r\n", "sales@example.com"},
+		{"original recipient type prefix", "Original-Recipient: rfc822; billing@example.com\r\n", "billing@example.com"},
+		{"encoded display name", "To: =?UTF-8?Q?Billing=3B_Team?= <billing@example.com>\r\n", "billing@example.com"},
+		{"plus addressed alias", "To: billing+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "billing@example.com"},
+		{"plus addressed alias before bare Cc", "To: BILLING+CONV-550e8400-e29b-41d4-a716-446655440000@example.com\r\nCc: sales@example.com\r\n", "billing@example.com"},
+		{"plus addressed delivery header", "Delivered-To: sales+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "sales@example.com"},
+		{"alias with existing plus tag", "To: billing+eu+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\n", "billing+eu@example.com"},
+		{"unowned plus address", "To: other+conv-550e8400-e29b-41d4-a716-446655440000@example.com\r\nCc: sales@example.com\r\n", "sales@example.com"},
+		{"ordinary plus tag preserved", "To: billing+eu@example.com\r\n", "billing+eu@example.com"},
+		{"unknown plus tag ignored", "To: billing+unknown@example.com\r\n", "support@example.com"},
+		{"invalid conversation tag ignored", "To: billing+conv-invalid@example.com\r\n", "support@example.com"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := tt.headers + "From: customer@example.net\r\nSubject: test\r\n\r\nbody"
+			envelope, err := enmime.ReadEnvelope(strings.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := e.resolveInboxAddress(envelope); got != tt.want {
+				t.Fatalf("resolveInboxAddress() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLoopMessageIdentity(t *testing.T) {
+	e := &Email{uuid: "550e8400-e29b-41d4-a716-446655440000", receiveAddresses: map[string]struct{}{"support@example.com": {}, "billing@example.com": {}}}
+	for _, identity := range []string{e.uuid, "support@example.com", "BILLING@example.com"} {
+		raw := headerLibredeskLoopPrevention + ": " + identity + "\r\n\r\nbody"
+		envelope, err := enmime.ReadEnvelope(strings.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !e.isLoopMessage(envelope) {
+			t.Fatalf("expected %q to identify loop", identity)
+		}
+	}
+}
+
+func TestEmailReceivesAliases(t *testing.T) {
+	e := &Email{receiveAddresses: map[string]struct{}{
+		"support@example.com": {}, "billing@example.com": {}, "support@otherbrand.example": {},
+	}}
+	for _, address := range []string{"support@example.com", "BILLING@EXAMPLE.COM", "support@otherbrand.example"} {
+		require.True(t, e.ReceivesAddress(address))
+	}
+	for _, address := range []string{"", "invalid", "other@example.com"} {
+		require.False(t, e.ReceivesAddress(address))
 	}
 }
 
@@ -906,4 +1305,237 @@ func TestMimeParser_Charsets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSearchMessagesExcludesDeletedAndOldMessages(t *testing.T) {
+	for _, extended := range []bool{false, true} {
+		name := "SEARCH"
+		if extended {
+			name = "ESEARCH"
+		}
+		t.Run(name, func(t *testing.T) {
+			user := imapmemserver.NewUser("test", "" /* password */)
+			require.NoError(t, user.Create("INBOX", nil /* options */))
+			caps := imap.CapSet{imap.CapIMAP4rev1: {}}
+			if extended {
+				caps[imap.CapESearch] = struct{}{}
+			}
+			server := imapserver.New(&imapserver.Options{
+				NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+					return imapmemserver.NewUserSession(user), &imapserver.GreetingData{PreAuth: true}, nil
+				},
+				Caps: caps,
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { server.Close() })
+			go server.Serve(listener)
+			client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+			require.NoError(t, err)
+			t.Cleanup(func() { client.Close() })
+
+			for _, message := range []struct {
+				token string
+				flags []imap.Flag
+				date  time.Time
+			}{
+				{token: "first", date: time.Now()},
+				{token: "deleted", flags: []imap.Flag{imap.FlagDeleted}, date: time.Now()},
+				{token: "seen", flags: []imap.Flag{imap.FlagSeen}, date: time.Now()},
+				{token: "old", date: time.Now().Add(-72 * time.Hour)},
+			} {
+				raw := "From: billing@example.com\r\nTo: support@example.com\r\n" +
+					headerAliasVerification + ": " + message.token + "\r\n" +
+					headerLibredeskLoopPrevention + ": inbox-uuid\r\n\r\nverification"
+				cmd := client.Append("INBOX", int64(len(raw)), &imap.AppendOptions{Flags: message.flags, Time: message.date})
+				_, err := io.WriteString(cmd, raw)
+				require.NoError(t, err)
+				require.NoError(t, cmd.Close())
+				_, err = cmd.Wait()
+				require.NoError(t, err)
+			}
+			_, err = client.Select("INBOX", nil /* options */).Wait()
+			require.NoError(t, err)
+
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			var processed []string
+			e := &Email{
+				primary: "support@example.com",
+				uuid:    "inbox-uuid",
+				lo:      &logger,
+				aliasVerificationCallback: func(ctx context.Context, token, from string) error {
+					processed = append(processed, token)
+					return nil
+				},
+			}
+			since := time.Now().Add(-24 * time.Hour)
+			results, err := e.searchMessages(client, since)
+			require.NoError(t, err)
+			require.Equal(t, []uint32{1, 3}, results.AllSeqNums())
+			if extended {
+				require.Equal(t, uint32(1), results.Min)
+				require.Equal(t, uint32(3), results.Max)
+			}
+			require.NoError(t, e.fetchAndProcessMessages(t.Context(), client, results, e.id))
+			require.Equal(t, []string{"first", "seen"}, processed)
+			results, err = e.searchMessages(client, since)
+			require.NoError(t, err)
+			require.Empty(t, results.AllSeqNums())
+		})
+	}
+}
+
+func TestFetchCompletionFailureIsReturned(t *testing.T) {
+	for _, envelope := range []bool{true, false} {
+		name := "body"
+		if envelope {
+			name = "headers"
+		}
+		t.Run(name, func(t *testing.T) {
+			user := imapmemserver.NewUser("test", "" /** password **/)
+			require.NoError(t, user.Create("INBOX", nil /** options **/))
+			server := imapserver.New(&imapserver.Options{
+				NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+					return &failingFetchSession{Session: imapmemserver.NewUserSession(user), failEnvelope: envelope}, &imapserver.GreetingData{PreAuth: true}, nil
+				},
+				Caps: imap.CapSet{imap.CapIMAP4rev1: {}},
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { server.Close() })
+			go server.Serve(listener)
+			client, err := imapclient.DialInsecure(listener.Addr().String(), nil /** options **/)
+			require.NoError(t, err)
+			t.Cleanup(func() { client.Close() })
+			raw := "From: customer@example.com\r\nTo: support@example.com\r\nMessage-ID: <fetch-test@example.com>\r\n\r\nHello"
+			appendCmd := client.Append("INBOX", int64(len(raw)), nil /** options **/)
+			_, err = io.WriteString(appendCmd, raw)
+			require.NoError(t, err)
+			require.NoError(t, appendCmd.Close())
+			_, err = appendCmd.Wait()
+			require.NoError(t, err)
+			_, err = client.Select("INBOX", nil /** options **/).Wait()
+			require.NoError(t, err)
+			results, err := client.Search(&imap.SearchCriteria{}, nil /** options **/).Wait()
+			require.NoError(t, err)
+			var logs bytes.Buffer
+			logger := logf.New(logf.Opts{Writer: &logs})
+			e := &Email{primary: "support@example.com", lo: &logger, messageStore: &fakeMessageStore{}, userStore: fakeUserStore{}}
+			err = e.fetchAndProcessMessages(t.Context(), client, results, 1 /** inboxID **/)
+			if envelope {
+				require.ErrorContains(t, err, "forced fetch failure")
+			} else {
+				require.NoError(t, err)
+				require.Contains(t, logs.String(), "forced fetch failure")
+				require.Contains(t, logs.String(), "level=error")
+			}
+		})
+	}
+}
+
+func mailboxProcessor(t testing.TB) func(*testing.T, string, string) models.IncomingMessage {
+	t.Helper()
+	user := imapmemserver.NewUser("test", "secret")
+	require.NoError(t, user.Create("INBOX", nil /* options */))
+	mem := imapmemserver.New()
+	mem.AddUser(user)
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return mem.NewSession(), nil, nil
+		},
+		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}},
+		InsecureAuth: true,
+	})
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { server.Close() })
+	go server.Serve(listener)
+	client, err := imapclient.DialInsecure(listener.Addr().String(), nil /* options */)
+	require.NoError(t, err)
+	t.Cleanup(func() { client.Close() })
+	require.NoError(t, client.Login("test", "secret").Wait())
+
+	logger := logf.New(logf.Opts{Writer: io.Discard})
+	store := &fakeMessageStore{}
+	e := &Email{
+		primary:      "support@example.com",
+		uuid:         "inbox-uuid",
+		lo:           &logger,
+		messageStore: store,
+		userStore:    fakeUserStore{},
+	}
+	host, port, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+	portNum, err := strconv.Atoi(port)
+	require.NoError(t, err)
+	cfg := imodels.IMAPConfig{Host: host, Port: portNum, Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none"}
+	_, err = client.Select("INBOX", nil /* options */).Wait()
+	require.NoError(t, err)
+	return func(t *testing.T, subject, from string) models.IncomingMessage {
+		t.Helper()
+		store.enqueued = nil
+		raw := "From: " + from + " <jorg@example.com>\r\nTo: support@example.com\r\n" +
+			"Subject: " + subject + "\r\n" +
+			"Message-ID: <decode-test@example.com>\r\n\r\nbody"
+		appendCmd := client.Append("INBOX", int64(len(raw)), nil /* options */)
+		_, err = io.WriteString(appendCmd, raw)
+		require.NoError(t, err)
+		require.NoError(t, appendCmd.Close())
+		_, err = appendCmd.Wait()
+		require.NoError(t, err)
+
+		require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+		require.Len(t, store.enqueued, 1)
+		require.Equal(t, "body", store.enqueued[0].Content)
+		require.Equal(t, "jorg@example.com", store.enqueued[0].Contact.Email.String)
+		require.NoError(t, client.Store(imap.SeqSetNum(1), &imap.StoreFlags{
+			Op: imap.StoreFlagsAdd, Flags: []imap.Flag{imap.FlagDeleted},
+		}, nil /* options */).Close())
+		require.NoError(t, client.Expunge().Close())
+		return store.enqueued[0]
+	}
+}
+
+// Raw responses preserve the sender charset that imapmemserver converts before delivery.
+func serveEncodedSenderEnvelope(listener net.Listener, from string) error {
+	conn, err := listener.Accept()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(conn, "* OK [CAPABILITY IMAP4rev1] ready\r\n"); err != nil {
+		return err
+	}
+	headers := "Message-ID: <sender-test@example.com>\r\n\r\n"
+	raw := "From: Plain Sender <jorg@example.com>\r\nTo: support@example.com\r\n" +
+		"Subject: Sender test\r\n" + headers + "body"
+	envelope := fmt.Sprintf("(NIL \"Sender test\" ((%s NIL \"jorg\" \"example.com\")) NIL NIL NIL NIL NIL NIL \"<sender-test@example.com>\")", strconv.Quote(from))
+	replies := []struct {
+		command, response string
+	}{
+		{"LOGIN ", "{tag} OK [CAPABILITY IMAP4rev1] logged in\r\n"},
+		{"SELECT ", "* 1 EXISTS\r\n* OK [UIDVALIDITY 1] valid\r\n{tag} OK [READ-WRITE] selected\r\n"},
+		{"SEARCH ", "* SEARCH 1\r\n{tag} OK searched\r\n"},
+		{"FETCH ", fmt.Sprintf("* 1 FETCH (UID 1 ENVELOPE %s BODY[HEADER.FIELDS (MESSAGE-ID)] {%d}\r\n%s)\r\n{tag} OK fetched\r\n", envelope, len(headers), headers)},
+		{"FETCH ", fmt.Sprintf("* 1 FETCH (BODY[] {%d}\r\n%s)\r\n{tag} OK fetched\r\n", len(raw), raw)},
+		{"LOGOUT", "* BYE closing\r\n{tag} OK logged out\r\n"},
+	}
+	reader := bufio.NewReader(conn)
+	for _, reply := range replies {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		tag, command, ok := strings.Cut(line, " ")
+		if !ok || !strings.HasPrefix(command, reply.command) {
+			return fmt.Errorf("expected %s, got %q", reply.command, line)
+		}
+		if _, err := io.WriteString(conn, strings.ReplaceAll(reply.response, "{tag}", tag)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

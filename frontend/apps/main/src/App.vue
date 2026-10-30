@@ -1,7 +1,7 @@
 <template>
-  <div class="flex w-full h-dvh text-foreground bg-canvas p-1 md:p-1.5">
+  <div class="flex h-dvh w-full gap-1 bg-canvas p-1 text-foreground">
     <SidebarProvider v-if="!isMobile" style="--sidebar-width: 3rem" class="w-auto z-50">
-      <ShadcnSidebar collapsible="none" class="border border-sidebar-border rounded-lg overflow-hidden">
+      <ShadcnSidebar collapsible="none" class="overflow-hidden rounded-xl">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
@@ -42,7 +42,14 @@
         @delete-view="deleteView"
         @create-conversation="openCreateConversation()"
       >
-        <div class="flex flex-col h-full rounded-lg overflow-hidden bg-background">
+        <div
+          class="flex h-full min-h-0 flex-col overflow-hidden rounded-xl"
+          :class="
+            route.path.startsWith('/inboxes') && route.name !== 'search'
+              ? 'bg-canvas'
+              : 'border border-border bg-card'
+          "
+        >
           <ConnectionBanner />
 
           <!-- Show admin banner only in admin routes -->
@@ -52,7 +59,7 @@
           <PageHeader />
 
           <!-- Main content -->
-          <RouterView class="flex-grow" />
+          <RouterView class="min-h-0 flex-1" />
         </div>
         <ViewForm v-model:openDialog="openCreateViewForm" v-model:view="view" />
       </Sidebar>
@@ -65,8 +72,10 @@
   <!-- Create conversation dialog -->
   <CreateConversation
     v-if="openCreateConversationDialog"
+    ref="createConversationRef"
     v-model="openCreateConversationDialog"
     :initial-contact="createConversationContact"
+    :start-minimized="createConversationMinimized"
   />
 
   <KeyboardShortcutsDialog v-model:open="showShortcuts" />
@@ -105,6 +114,7 @@ import { toast as sooner } from 'vue-sonner'
 import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
+import { hasNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import {
@@ -163,8 +173,11 @@ const viewStore = useViewStore()
 const { open: showShortcuts } = useKeyboardShortcutsDialog()
 const view = ref({})
 const openCreateViewForm = ref(false)
-const openCreateConversationDialog = ref(false)
+const hasSavedDraft = hasNewConversationDraft(window.localStorage)
+const openCreateConversationDialog = ref(hasSavedDraft)
 const createConversationContact = ref(null)
+const createConversationMinimized = ref(hasSavedDraft)
+const createConversationRef = ref(null)
 const { t } = useI18n()
 const notificationStore = useNotificationStore()
 const aiPromptStore = useAiPromptStore()
@@ -199,6 +212,8 @@ onMounted(() => {
 
 const openCreateConversation = ({ contact = null } = {}) => {
   createConversationContact.value = contact
+  createConversationMinimized.value = false
+  createConversationRef.value?.restore()
   openCreateConversationDialog.value = true
 }
 

@@ -1833,3 +1833,20 @@ func TestMoreThanTwoGroups_RuleSkipped(t *testing.T) {
 
 	assert.Equal(t, 0, mockStore.callCount, "rules with more than 2 groups must be skipped entirely")
 }
+
+func TestContactEmail_IgnoresCaseSensitiveFlag(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conversation := createTestConversation(func(c *cmodels.Conversation) {
+		c.Contact.Email = null.StringFrom("Customer@Example.com")
+	})
+
+	rule := models.RuleDetail{
+		Field:              models.ContactEmail,
+		FieldType:          models.FieldTypeConversationField,
+		Operator:           models.RuleOperatorEquals,
+		Value:              "customer@example.com",
+		CaseSensitiveMatch: true,
+	}
+
+	assert.True(t, engine.evaluateRule(rule, conversation, nil))
+}

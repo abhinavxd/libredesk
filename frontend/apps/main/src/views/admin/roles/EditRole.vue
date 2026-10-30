@@ -2,18 +2,24 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading"></Spinner>
-  <RoleForm :initial-values="role" :submitForm="submitForm" :isLoading="formLoading" v-else />
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <RoleForm
+      :initial-values="role"
+      :submitForm="submitForm"
+      :isLoading="formLoading"
+      v-if="!isLoading"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import RoleForm from '@/features/admin/roles/RoleForm.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
-import api from '../../../api'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import api from '@/api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 

@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.0"
+          go-version: "1.27.3"
           cache: false
 
       - name: Go build cache
@@ -40,7 +40,7 @@ jobs:
           for target in \
             darwin/amd64 darwin/arm64 \
             linux/amd64 linux/arm64 linux/arm/6 linux/arm/7 \
-            windows/amd64 windows/arm64 windows/arm/6 windows/arm/7 \
+            windows/amd64 windows/arm64 \
             freebsd/amd64 freebsd/arm64 freebsd/arm/6 freebsd/arm/7 \
             netbsd/amd64 netbsd/arm64 netbsd/arm/6 netbsd/arm/7 \
             openbsd/amd64 openbsd/arm64 openbsd/arm/6 openbsd/arm/7; do

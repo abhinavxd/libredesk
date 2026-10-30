@@ -11,9 +11,9 @@ export function useReplyPreviews() {
   const widget = useWidgetStore()
   const chat = useChatStore()
   const user = useUserStore()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   watch(
-    () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen],
+    () => [chat.getConversations, user.userID, widget.isDark, widget.isOpen, locale.value],
     async () => {
       await nextTick()
       const element = document.querySelector('.libredesk-widget-app')
@@ -56,6 +56,8 @@ export function useReplyPreviews() {
           identity: String(user.userID || 'visitor'),
           previews,
           labels: {
+            openChat: t('globals.messages.openChat'),
+            closeChat: t('globals.messages.closeChat'),
             dismiss: t('globals.terms.dismiss'),
             dismissAll: t('widget.dismissPreviews'),
             open: t('globals.messages.openConversation')

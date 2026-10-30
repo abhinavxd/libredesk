@@ -2,7 +2,9 @@
 package priority
 
 import (
+	"database/sql"
 	"embed"
+	"errors"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/priority/models"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -64,7 +66,9 @@ func (m *Manager) GetAll() ([]models.Priority, error) {
 func (m *Manager) Get(id int) (models.Priority, error) {
 	var priority models.Priority
 	if err := m.q.Get.Get(&priority, id); err != nil {
-		m.lo.Error("error fetching priority", "error", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			m.lo.Error("error fetching priority", "error", err)
+		}
 		return priority, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return priority, nil

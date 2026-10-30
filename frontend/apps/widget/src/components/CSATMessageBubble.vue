@@ -1,69 +1,91 @@
 <template>
   <div class="p-4 rounded-2xl text-sm bg-background text-foreground border border-border">
-    <div v-if="!isSubmitted">
-      <p class="mb-3">{{ t('globals.messages.pleaseRateConversation') }}</p>
+    <Transition
+      mode="out-in"
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 motion-safe:scale-[0.96]"
+    >
+      <div v-if="!isSubmitted">
+        <p class="mb-3">{{ t('globals.messages.pleaseRateConversation') }}</p>
 
-      <div class="flex gap-3 mb-4">
-        <button
-          v-for="rating in ratings"
-          :key="rating.value"
-          @click="selectedRating = rating.value"
-          :aria-label="rating.text"
-          class="flex flex-col items-center p-2 rounded-md cursor-pointer hover:bg-muted transition-all"
-          :class="{ 'scale-125 bg-muted': selectedRating === rating.value }"
+        <div class="grid grid-cols-5 gap-1 mb-4">
+          <Button
+            type="button"
+            variant="ghost"
+            v-for="rating in ratings"
+            :key="rating.value"
+            @click="selectedRating = rating.value"
+            :aria-label="rating.text"
+            :aria-pressed="selectedRating === rating.value"
+            :disabled="isSubmitting"
+            class="h-auto min-w-0 flex-col gap-1 whitespace-normal px-1 py-2"
+            :class="{ 'bg-muted ring-1 ring-ring': selectedRating === rating.value }"
+          >
+            <span class="text-xl" aria-hidden="true">{{ rating.emoji }}</span>
+            <span class="max-w-full break-words text-xs text-muted-foreground">{{
+              rating.text
+            }}</span>
+          </Button>
+        </div>
+
+        <div class="mb-4">
+          <Label :for="feedbackId" class="text-xs text-muted-foreground mb-2 block">
+            {{ t('globals.messages.additionalFeedback') }}
+          </Label>
+          <Textarea
+            :id="feedbackId"
+            v-model="feedback"
+            :placeholder="$t('globals.terms.tellUsMore')"
+            class="min-h-[60px]"
+            maxlength="500"
+          />
+          <div class="text-xs text-muted-foreground text-right mt-1">{{ feedback.length }}/500</div>
+        </div>
+
+        <WidgetError :error-message="submitError" class="mb-3 rounded-md border" />
+        <Button
+          type="button"
+          class="w-full"
+          :disabled="(!selectedRating && !feedback.trim()) || isSubmitting"
+          @click="submitRating"
         >
-          <span class="text-xl mb-1">{{ rating.emoji }}</span>
-          <span class="text-xs text-muted-foreground">{{ rating.text }}</span>
-        </button>
+          <Spinner v-if="isSubmitting" size="sm" :absolute="false" :center="false" />
+          {{
+            isSubmitting ? t('globals.messages.submitting') : t('globals.messages.submitFeedback')
+          }}
+        </Button>
       </div>
 
-      <div class="mb-4">
-        <label class="text-xs text-muted-foreground mb-2 block">
-          {{ t('globals.messages.additionalFeedback') }}
-        </label>
-        <Textarea
-          v-model="feedback"
-          :placeholder="$t('globals.terms.tellUsMore')"
-          class="min-h-[60px]"
-          maxlength="500"
-        />
-        <div class="text-xs text-muted-foreground text-right mt-1">{{ feedback.length }}/500</div>
-      </div>
+      <div v-else class="text-center py-2" role="status">
+        <p class="mb-3">{{ t('globals.messages.thankYouFeedback') }}</p>
 
-      <Button
-        type="button"
-        class="w-full"
-        :disabled="(!selectedRating && !feedback.trim()) || isSubmitting"
-        @click="submitRating"
-      >
-        <Spinner v-if="isSubmitting" size="sm" :absolute="false" :center="false" />
-        {{ isSubmitting ? t('globals.messages.submitting') : t('globals.messages.submitFeedback') }}
-      </Button>
-    </div>
+        <div v-if="csatMeta.submitted_rating" class="mb-2">
+          <span
+            class="inline-block text-lg"
+            :class="{ 'motion-safe:animate-pop': justSubmitted }"
+            >{{ getRatingEmoji(csatMeta.submitted_rating) }}</span
+          >
+          <span class="text-xs text-muted-foreground ml-2">{{
+            getRatingText(csatMeta.submitted_rating)
+          }}</span>
+        </div>
 
-    <div v-else class="text-center py-2">
-      <p class="mb-3">{{ t('globals.messages.thankYouFeedback') }}</p>
-      
-      <!-- Show submitted rating if provided -->
-      <div v-if="csatMeta.submitted_rating" class="mb-2">
-        <span class="text-lg">{{ getRatingEmoji(csatMeta.submitted_rating) }}</span>
-        <span class="text-xs text-muted-foreground ml-2">{{ getRatingText(csatMeta.submitted_rating) }}</span>
+        <div v-if="csatMeta.submitted_feedback" class="text-xs text-muted-foreground italic">
+          "{{ csatMeta.submitted_feedback }}"
+        </div>
       </div>
-      
-      <!-- Show submitted feedback if provided -->
-      <div v-if="csatMeta.submitted_feedback" class="text-xs text-muted-foreground italic">
-        "{{ csatMeta.submitted_feedback }}"
-      </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import api from '@widget/api/index.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
+import { Label } from '@shared-ui/components/ui/label'
+import WidgetError from '@widget/components/WidgetError.vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 
 const props = defineProps({
@@ -74,7 +96,10 @@ const emit = defineEmits(['submitted'])
 
 const selectedRating = ref(null)
 const feedback = ref('')
+const feedbackId = useId()
+const submitError = ref('')
 const isSubmitting = ref(false)
+const justSubmitted = ref(false)
 
 const csatMeta = computed(() => {
   return props.message.meta
@@ -95,26 +120,30 @@ const ratings = [
 
 const submitRating = async () => {
   if ((!selectedRating.value && !feedback.value.trim()) || !csatUuid.value) return
+  submitError.value = ''
   isSubmitting.value = true
   try {
     await api.submitCSATResponse(csatUuid.value, selectedRating.value || 0, feedback.value)
+    justSubmitted.value = true
     emit('submitted', {
       rating: selectedRating.value,
       feedback: feedback.value,
       message_uuid: props.message.uuid
     })
+  } catch {
+    submitError.value = t('globals.messages.somethingWentWrong')
   } finally {
     isSubmitting.value = false
   }
 }
 
 const getRatingEmoji = (rating) => {
-  const ratingObj = ratings.find(r => r.value === rating)
+  const ratingObj = ratings.find((r) => r.value === rating)
   return ratingObj ? ratingObj.emoji : ''
 }
 
 const getRatingText = (rating) => {
-  const ratingObj = ratings.find(r => r.value === rating)
+  const ratingObj = ratings.find((r) => r.value === rating)
   return ratingObj ? ratingObj.text : ''
 }
 </script>

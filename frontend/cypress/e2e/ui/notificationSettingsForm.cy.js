@@ -147,4 +147,58 @@ describe('Notification settings form', () => {
     cy.contains('p.text-destructive', 'Invalid duration format').should('exist')
     cy.get('@saveNotification.all').should('have.length', 0)
   })
+
+  for (const [protocol, value] of [
+    ['None', 'none'],
+    ['Login', 'login'],
+    ['CRAM-MD5', 'cram'],
+    ['Plain', 'plain']
+  ]) {
+    it(`validates and saves notification SMTP credentials with ${protocol} authentication`, () => {
+      cy.intercept('PUT', '**/api/v1/settings/notifications/email').as('saveNotification')
+      cy.visit(path)
+      cy.get('input[name="host"]').should('not.have.value', '')
+      cy.get('input[name="username"]').clear()
+      cy.get('input[name="password"]').clear()
+      cy.contains('label', 'Authentication Protocol').parent().find('[role="combobox"]').click()
+      cy.contains('[role="option"]', new RegExp(`^${protocol}$`)).click()
+      cy.get('button[type="submit"]').click()
+      if (protocol === 'None') {
+        cy.wait('@saveNotification').then(({ request, response }) => {
+          expect(response.statusCode).to.eq(200)
+          expect(request.body[`${prefix}auth_protocol`]).to.eq('none')
+          expect(request.body[`${prefix}username`]).to.eq('')
+          expect(request.body[`${prefix}password`]).to.eq('')
+        })
+      } else {
+        cy.get('@saveNotification.all').should('have.length', 0)
+        cy.get('input[name="username"]').parent().parent().should('contain.text', 'Required')
+        cy.get('input[name="password"]').parent().parent().should('contain.text', 'Required')
+        cy.get('input[name="username"]').type(seedUsername)
+        cy.get('button[type="submit"]').click()
+        cy.get('input[name="password"]').should('have.attr', 'aria-invalid', 'true')
+        cy.get('@saveNotification.all').should('have.length', 0)
+        cy.get('input[name="username"]').clear()
+        cy.get('input[name="password"]').type('test-password')
+        cy.get('button[type="submit"]').click()
+        cy.get('input[name="username"]').should('have.attr', 'aria-invalid', 'true')
+        cy.get('@saveNotification.all').should('have.length', 0)
+        cy.get('input[name="username"]').type(seedUsername)
+        cy.get('button[type="submit"]').click()
+        cy.wait('@saveNotification').then(({ request, response }) => {
+          expect(response.statusCode).to.eq(200)
+          expect(request.body[`${prefix}auth_protocol`]).to.eq(value)
+          expect(request.body[`${prefix}username`]).to.eq(seedUsername)
+          expect(request.body[`${prefix}password`]).to.eq('test-password')
+        })
+        cy.reload()
+        cy.contains('label', 'Authentication Protocol')
+          .parent()
+          .find('[role="combobox"]')
+          .should('contain.text', protocol)
+        cy.get('input[name="username"]').should('have.value', seedUsername)
+        cy.get('input[name="password"]').should('have.value', maskedPassword)
+      }
+    })
+  }
 })

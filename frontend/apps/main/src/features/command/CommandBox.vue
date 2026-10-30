@@ -33,7 +33,7 @@
       :key="parent || 'root'"
       :class="
         isMacroMode
-          ? 'h-[50vh] min-h-[50vh] min-w-[50vw] overflow-hidden [&>div]:h-full'
+          ? 'h-[50vh] min-h-[50vh] overflow-hidden [&>div]:h-full'
           : 'h-auto min-h-[220px] max-h-[min(52vh,440px)]'
       "
     >

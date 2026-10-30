@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only">{{ $t('globals.terms.openMenu') }}</span>
-        <MoreHorizontal class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="emit('open', props.helpCenter)">
         <FileText class="mr-2 h-4 w-4" />
@@ -53,22 +48,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import {
-  ExternalLink,
-  FileText,
-  MoreHorizontal,
-  Pencil,
-  Power,
-  PowerOff,
-  Trash
-} from 'lucide-vue-next'
+import { ExternalLink, FileText, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -80,7 +67,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 import { useAppSettingsStore } from '@/stores/appSettings'
 
 const alertOpen = ref(false)

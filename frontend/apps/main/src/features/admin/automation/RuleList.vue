@@ -12,16 +12,7 @@
         <Badge v-else variant="secondary">{{ $t('globals.terms.disabled') }}</Badge>
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button
-            variant="ghost"
-            size="sm"
-            class="h-8 w-8 p-0"
-            :aria-label="$t('globals.messages.options')"
-          >
-            <EllipsisVertical size="18" />
-          </Button>
-        </DropdownMenuTrigger>
+        <DataTableActionTrigger />
         <DropdownMenuContent>
           <DropdownMenuItem @click="navigateToEditRule(rule.id)">
             <Pencil class="mr-2 h-4 w-4" />
@@ -68,13 +59,13 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -86,10 +77,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { EllipsisVertical, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
+import { Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Badge } from '@shared-ui/components/ui/badge'
-import { Button } from '@shared-ui/components/ui/button'
 
 const router = useRouter()
 const alertOpen = ref(false)

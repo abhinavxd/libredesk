@@ -1,7 +1,7 @@
 <template>
   <AdminSplitLayout>
     <template #content>
-      <Spinner v-if="loading" />
+      <LoadingOverlay v-if="loading" :loading="loading" reserve-height />
       <div v-else class="h-full flex flex-col">
         <div class="mb-5">
           <div class="flex items-center gap-3">
@@ -166,14 +166,14 @@
         <SheetTitle>{{ t('helpCenter.insights') }}</SheetTitle>
       </SheetHeader>
 
-      <Spinner v-if="insightsLoading" class="mt-6" />
+      <LoadingOverlay v-if="insightsLoading" :loading="insightsLoading" reserve-height class="mt-6" />
 
       <div v-else class="mt-6 space-y-8">
         <div>
-          <h3 class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <h3 class="ui-heading mb-3">
             {{ t('helpCenter.topSearches') }}
           </h3>
-          <p v-if="!insights.top_searches?.length" class="text-sm text-muted-foreground">
+          <p v-if="!insights.top_searches?.length" class="ui-description">
             {{ t('helpCenter.noSearchData') }}
           </p>
           <table v-else class="w-full text-sm">
@@ -193,10 +193,10 @@
         </div>
 
         <div>
-          <h3 class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <h3 class="ui-heading mb-3">
             {{ t('helpCenter.noResultSearches') }}
           </h3>
-          <p v-if="!insights.no_result_searches?.length" class="text-sm text-muted-foreground">
+          <p v-if="!insights.no_result_searches?.length" class="ui-description">
             {{ t('helpCenter.noSearchData') }}
           </p>
           <table v-else class="w-full text-sm">
@@ -247,7 +247,7 @@ import { useStorage } from '@vueuse/core'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { useAppSettingsStore } from '@/stores/appSettings'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   DropdownMenu,

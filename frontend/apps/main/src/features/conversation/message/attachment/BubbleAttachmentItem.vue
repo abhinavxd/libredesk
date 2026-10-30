@@ -1,25 +1,29 @@
 <template>
-  <div class="flex items-center group text-left">
+  <div class="group/attachment flex items-center text-left">
     <Popover :open="showAudio" @update:open="showAudio = $event">
       <PopoverTrigger as-child>
         <div
-          class="relative w-36 h-28 rounded-md border overflow-hidden cursor-pointer transition-colors"
+          class="relative h-28 w-28 rounded-md border overflow-hidden cursor-pointer transition-colors"
           :class="
             isImage
               ? ''
-              : 'flex flex-col items-center justify-between bg-muted/40 hover:bg-muted p-3'
+              : 'flex flex-col items-center justify-between bg-muted/40 hover:bg-muted p-2'
           "
           @click="onClick"
         >
           <template v-if="isImage">
             <img
-              :src="attachment.thumbnail_url || getThumbFilepath(attachment.url)"
+              :src="
+                thumbFailed
+                  ? attachment.url
+                  : attachment.thumbnail_url || getThumbFilepath(attachment.url)
+              "
               :alt="attachment.name"
               class="w-full h-full object-cover"
-              @error="fallbackToOriginal($event, attachment.url)"
+              @error="thumbFailed = true"
             />
             <div
-              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none can-hover:opacity-0 can-hover:group-hover:opacity-100"
+              class="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-2 pt-1.5 pb-5 bg-gradient-to-b from-black/75 via-black/40 to-transparent transition-opacity pointer-events-none can-hover:opacity-0 can-hover:group-hover/attachment:opacity-100 can-hover:group-focus-within/attachment:opacity-100"
             >
               <div class="min-w-0 flex-1 text-white image-meta">
                 <p class="font-medium text-xs truncate">{{ shortName(attachment.name) }}</p>
@@ -34,7 +38,7 @@
 
           <template v-else>
             <div class="flex-1 flex items-center justify-center">
-              <component :is="fileIcon" class="w-10 h-10" :class="iconColor" />
+              <component :is="fileIcon" class="w-8 h-8" :class="iconColor" />
             </div>
             <div class="w-full text-center">
               <p class="text-xs font-medium text-foreground truncate" :title="attachment.name">
@@ -47,7 +51,7 @@
           <DownloadLink
             v-if="!isImage"
             :url="attachment.url"
-            class="absolute top-1.5 right-1.5 transition-opacity can-hover:opacity-0 can-hover:group-hover:opacity-100"
+            class="absolute top-1.5 right-1.5 transition-opacity can-hover:opacity-0 can-hover:group-hover/attachment:opacity-100 can-hover:group-focus-within/attachment:opacity-100"
           />
         </div>
       </PopoverTrigger>
@@ -62,7 +66,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file'
 import DownloadLink from '@/components/DownloadLink.vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -82,14 +86,16 @@ const props = defineProps({
 const emit = defineEmits(['preview'])
 
 const showAudio = ref(false)
+const thumbFailed = ref(false)
+
+watch(
+  () => props.attachment.url,
+  () => {
+    thumbFailed.value = false
+  }
+)
 
 const shortName = (name) => (name || '').substring(0, 40)
-
-const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
-  event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
-}
 
 const isImage = computed(() => (props.attachment.content_type || '').startsWith('image/'))
 

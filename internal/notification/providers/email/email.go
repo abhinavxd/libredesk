@@ -3,12 +3,13 @@ package email
 import (
 	"math/rand"
 	"net/textproto"
+	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/email"
 	"github.com/abhinavxd/libredesk/internal/inbox/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
-	"github.com/knadh/smtppool"
+	"github.com/knadh/smtppool/v2"
 	"github.com/zerodha/logf"
 )
 
@@ -73,7 +74,7 @@ func (e *Email) prepareEmail(subject, content string, recipients []string, msg n
 	em := smtppool.Email{
 		From:        e.from,
 		To:          recipients,
-		Subject:     subject,
+		Subject:     strings.Join(strings.Fields(subject), " "),
 		Attachments: files,
 		Headers:     textproto.MIMEHeader{},
 	}

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { DialogDescription, useForwardProps } from 'radix-vue'
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -21,7 +21,7 @@ const forwardedProps = useForwardProps(delegatedProps)
 <template>
   <DialogDescription
     v-bind="forwardedProps"
-    :class="cn('text-sm text-muted-foreground', props.class)"
+    :class="cn('ui-description', props.class)"
   >
     <slot />
   </DialogDescription>

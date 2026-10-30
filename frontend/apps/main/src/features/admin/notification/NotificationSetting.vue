@@ -1,10 +1,9 @@
 <template>
   <AdminSplitLayout>
     <template #content>
-      <div :class="{ 'opacity-50 transition-opacity duration-300': isLoading }">
-        <Spinner v-if="isLoading" />
+      <LoadingOverlay :loading="isLoading" reserve-height>
         <NotificationsForm :initial-values="initialValues" :submit-form="submitForm" />
-      </div>
+      </LoadingOverlay>
     </template>
 
     <template #help>
@@ -23,7 +22,7 @@ import NotificationsForm from './NotificationSettingForm.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 
 const initialValues = ref({})

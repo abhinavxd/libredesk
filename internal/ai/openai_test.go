@@ -1,10 +1,12 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -28,7 +30,8 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	lo := logf.New(logf.Opts{})
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
 	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "learned-param-test-model"}
 	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
 
@@ -37,6 +40,10 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}
 	if len(bodies) != 2 {
 		t.Fatalf("first request should take one 400 round trip then retry, got %d requests", len(bodies))
+	}
+
+	if strings.Contains(logs.String(), "level=error") || !strings.Contains(logs.String(), "level=warn") {
+		t.Fatalf("recovered adaptation has incorrect severity: %s", logs.String())
 	}
 
 	// A fresh client must remember the swap and send max_completion_tokens up front.
@@ -98,5 +105,46 @@ func TestEmbeddingTokenLimit(t *testing.T) {
 	}
 	if got := embeddingTokenLimit(models.ProviderConfig{EmbeddingMaxTokens: 512}); got != 512 {
 		t.Fatalf("explicit value should be honored, got %d", got)
+	}
+}
+
+// Gemini 3 returns a thought signature in extra_content on each tool call and rejects the
+// next turn unless the assistant message replays it unchanged.
+func TestToolCallExtraContentRoundTrip(t *testing.T) {
+	const extra = `{"google":{"thought_signature":"c2ln"}}`
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding request body: %v", err)
+		}
+		bodies = append(bodies, body)
+		w.Write([]byte(`{"choices":[{"message":{"content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"search_articles","arguments":"{}"},"extra_content":` + extra + `}]}}]}`))
+	}))
+	defer srv.Close()
+
+	lo := logf.New(logf.Opts{})
+	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "extra-content-test-model"}, &lo, srv.Client())
+	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
+
+	res, err := client.SendChatCompletion(context.Background(), payload)
+	if err != nil {
+		t.Fatalf("first request: %v", err)
+	}
+	payload.Messages = append(payload.Messages,
+		models.ChatMessage{Role: models.RoleAssistant, ToolCalls: res.ToolCalls},
+		models.ChatMessage{Role: models.RoleTool, ToolCallID: "call_1", Content: "[]"},
+	)
+	if _, err := client.SendChatCompletion(context.Background(), payload); err != nil {
+		t.Fatalf("second request: %v", err)
+	}
+
+	toolCall := bodies[1]["messages"].([]any)[1].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)
+	got, err := json.Marshal(toolCall["extra_content"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != extra {
+		t.Fatalf("replayed tool call extra_content = %s, want %s", got, extra)
 	}
 }

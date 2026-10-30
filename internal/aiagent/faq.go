@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"runtime/debug"
 	"slices"
 	"strings"
 
@@ -144,7 +145,7 @@ func (m *Manager) miningWorker(ctx context.Context) {
 func (m *Manager) mineWithRecover(ctx context.Context, convID int) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.lo.Error("recovered from panic in ai agent mining worker", "conversation_id", convID, "panic", r)
+			m.lo.Error("recovered from panic in ai agent mining worker", "conversation_id", convID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	m.mine(ctx, convID)

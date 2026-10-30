@@ -1,8 +1,8 @@
 <template>
   <Sheet :open="isOpen" @update:open="$emit('update:open', $event)">
-    <SheetContent class="!max-w-[60vw] sm:!max-w-[60vw] h-full p-0 flex flex-col">
+    <SheetContent class="w-full !max-w-full lg:!max-w-[60vw] h-full p-0 flex flex-col">
       <div class="flex-1 flex flex-col min-h-0">
-        <div class="flex items-center justify-between p-6 border-b bg-card/50">
+        <div class="flex items-center justify-between p-4 sm:p-6 border-b bg-card/50">
           <div>
             <SheetTitle>
               {{ collection ? t('helpCenter.editCollection') : t('helpCenter.newCollection') }}
@@ -14,14 +14,15 @@
           </div>
         </div>
 
-        <div class="flex-1 flex min-h-0">
-          <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0 overflow-y-auto">
+        <div class="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
+          <div class="min-w-0 flex-1 flex flex-col p-4 sm:p-6 space-y-6 lg:min-h-0 overflow-y-auto">
             <form @submit="onSubmit" novalidate class="space-y-4 flex-1 flex flex-col min-h-0">
               <FormField v-slot="{ componentField }" name="name">
                 <FormItem>
                   <FormControl>
                     <Input
                       ref="nameInput"
+                      :aria-label="t('globals.terms.name')"
                       type="text"
                       :placeholder="t('globals.terms.name')"
                       v-bind="componentField"
@@ -48,10 +49,12 @@
             </form>
           </div>
 
-          <div class="w-72 border-l bg-muted/20 p-6 overflow-y-auto">
+          <div
+            class="w-full border-t bg-muted/20 p-4 sm:p-6 lg:w-72 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-y-auto"
+          >
             <div class="space-y-6">
               <div class="space-y-4">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.action', 2) }}
                 </h3>
 
@@ -88,7 +91,7 @@
               </FormField>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.icon') }}
                 </h3>
                 <FormField v-slot="{ value, handleChange }" name="icon">
@@ -102,7 +105,7 @@
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.language') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="locale">
@@ -125,7 +128,7 @@
               </div>
 
               <div v-if="localeParents.length > 0" class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('helpCenter.parentCollection') }}
                 </h3>
 

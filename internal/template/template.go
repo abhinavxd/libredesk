@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"strings"
 	"sync"
+	texttemplate "text/template"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
@@ -27,13 +29,14 @@ var (
 
 // Manager handles template-related operations.
 type Manager struct {
-	mutex   sync.RWMutex
-	tpls    *template.Template
-	webTpls *template.Template
-	funcMap template.FuncMap
-	q       queries
-	lo      *logf.Logger
-	i18n    *i18n.I18n
+	mutex            sync.RWMutex
+	tpls             *template.Template
+	notificationTpls *template.Template
+	webTpls          *template.Template
+	funcMap          template.FuncMap
+	q                queries
+	lo               *logf.Logger
+	i18n             *i18n.I18n
 }
 
 // queries contains prepared SQL queries.
@@ -54,21 +57,26 @@ func New(lo *logf.Logger, db *sqlx.DB, webTpls *template.Template, tpls *templat
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		return nil, err
 	}
-	return &Manager{
-		mutex:   sync.RWMutex{},
-		tpls:    tpls,
-		webTpls: webTpls,
-		funcMap: funcMap,
-		q:       q,
-		lo:      lo,
-		i18n:    i18n,
-	}, nil
+	m := &Manager{q: q, lo: lo, i18n: i18n}
+	if err := m.Reload(webTpls, tpls, funcMap); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // Update updates a new template with the given name, and body.
 func (m *Manager) Update(id int, t models.Template) (models.Template, error) {
+	if t.IsDefault {
+		t.Type = TypeEmailOutgoing
+	}
+	if err := m.validateOutgoingTemplate(t); err != nil {
+		return models.Template{}, err
+	}
 	var result models.Template
 	if err := m.q.UpdateTemplate.Get(&result, id, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
+		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil /** data **/)
+		}
 		m.lo.Error("error updating template", "error", err)
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -80,10 +88,13 @@ func (m *Manager) Create(t models.Template) (models.Template, error) {
 	if t.IsDefault {
 		t.Type = TypeEmailOutgoing
 	}
+	if err := m.validateOutgoingTemplate(t); err != nil {
+		return models.Template{}, err
+	}
 	var result models.Template
 	if err := m.q.InsertTemplate.Get(&result, t.Name, t.Body, t.IsDefault, t.Subject, t.Type); err != nil {
 		if dbutil.IsUniqueViolationError(err) && t.IsDefault {
-			return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil)
+			return models.Template{}, envelope.NewError(envelope.ConflictError, m.i18n.T("template.defaultTemplateAlreadyExists"), nil /** data **/)
 		}
 		m.lo.Error("error inserting template", "error", err)
 		return models.Template{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -131,6 +142,15 @@ func (m *Manager) Delete(id int) error {
 	return nil
 }
 
+// DefaultOutgoingEmailTemplateContains reports whether the default outgoing email template body contains s.
+func (m *Manager) DefaultOutgoingEmailTemplateContains(s string) bool {
+	t, err := m.getDefaultOutgoingEmailTemplate()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(t.Body, s)
+}
+
 // isBuiltIn returns true if the template is built-in.
 func (m *Manager) isBuiltIn(id int) (bool, error) {
 	var isBuiltIn bool
@@ -171,8 +191,29 @@ func (m *Manager) getByName(name string) (models.Template, error) {
 func (m *Manager) Reload(webTpls, tpls *template.Template, funcMap template.FuncMap) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	var notificationTpls *template.Template
+	if tpls != nil {
+		var err error
+		notificationTpls, err = tpls.Clone()
+		if err != nil {
+			return fmt.Errorf("cloning notification templates: %w", err)
+		}
+	}
 	m.webTpls = webTpls
 	m.tpls = tpls
+	m.notificationTpls = notificationTpls
 	m.funcMap = funcMap
+	return nil
+}
+
+func (m *Manager) validateOutgoingTemplate(t models.Template) error {
+	if t.Type != TypeEmailOutgoing && !t.IsDefault {
+		return nil
+	}
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	if _, err := parseOutgoingTemplate(t.Body, texttemplate.FuncMap(m.funcMap)); err != nil {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("template.invalidOutgoingTemplate", "content", `{{ template "content" . }}`), nil /** data **/)
+	}
 	return nil
 }

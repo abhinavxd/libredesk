@@ -3,8 +3,8 @@
 const stamp = Date.now()
 const templateName = `Cypress Template ${stamp}`
 const renamedTemplate = `Cypress Template ${stamp} edited`
-const templateBody = `Cypress template body ${stamp}`
-const updatedBody = `Cypress template body ${stamp} edited`
+const templateBody = `Cypress template body ${stamp} {{ template "content" . }}`
+const updatedBody = `Cypress template body ${stamp} edited {{ template "content" . }}`
 const listPath = '/admin/templates'
 
 const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(text)

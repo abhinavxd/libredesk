@@ -48,6 +48,22 @@ describe('computeRecipientsFromMessage', () => {
     const contactEmail = 'customer@example.com'
 
     describe('filters inbox email variants', () => {
+        test('removes primary and aliases from recipients', () => {
+            const message = {
+                type: 'incoming',
+                meta: {
+                    from: ['customer@example.com'],
+                    to: ['support@domain.com', 'billing@domain.com'],
+                    cc: ['sales@domain.com', 'other@example.com']
+                }
+            }
+            const result = computeRecipientsFromMessage(message, contactEmail, [
+                'support@domain.com',
+                'billing@domain.com',
+                'sales@domain.com'
+            ])
+            expect(result.cc).toEqual(['other@example.com'])
+        })
         test('removes exact inbox email from recipients', () => {
             const message = {
                 type: 'incoming',

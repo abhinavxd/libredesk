@@ -1,7 +1,7 @@
 <template>
-  <div
-    class="w-full h-screen overflow-y-auto px-6 sm:px-6 md:px-12 lg:px-24 xl:px-24 2xl:px-96 pt-6"
-  >
-    <slot></slot>
+  <div class="w-full min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 pt-6">
+    <div class="mx-auto w-full max-w-4xl">
+      <slot />
+    </div>
   </div>
 </template>

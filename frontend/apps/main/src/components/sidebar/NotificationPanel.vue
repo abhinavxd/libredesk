@@ -2,7 +2,7 @@
   <div class="flex flex-col min-h-[20rem] max-h-[32rem]" role="region" :aria-label="t('globals.terms.notification', 2)">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5 border-b border-border">
-      <h3 class="font-semibold text-sm">{{ t('globals.terms.notification', 2) }}</h3>
+      <h3 class="ui-heading">{{ t('globals.terms.notification', 2) }}</h3>
       <div class="flex items-center gap-1">
         <Button
           v-if="notificationStore.unreadCount > 0"

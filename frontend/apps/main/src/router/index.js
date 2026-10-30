@@ -366,6 +366,30 @@ const routes = [
             ]
           },
           {
+            path: 'whatsapp/templates',
+            meta: { titleKey: 'admin.whatsappTemplates.title' },
+            children: [
+              {
+                path: '',
+                name: 'whatsapp-templates',
+                component: () => import('@main/views/admin/whatsapp/WhatsAppTemplateList.vue')
+              },
+              {
+                path: 'new',
+                name: 'whatsapp-template-new',
+                component: () => import('@main/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue'),
+                meta: { titleKey: 'globals.messages.newTemplate' }
+              },
+              {
+                path: ':id/edit',
+                name: 'whatsapp-template-edit',
+                component: () => import('@main/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue'),
+                props: true,
+                meta: { titleKey: 'globals.messages.edit' }
+              }
+            ]
+          },
+          {
             path: 'notification',
             component: () => import('@main/features/admin/notification/NotificationSetting.vue'),
             meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
@@ -505,7 +529,7 @@ const routes = [
                 name: 'new-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.new' }
+                meta: { titleKey: 'globals.messages.newTemplate' }
               }
             ]
           },
@@ -670,6 +694,23 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: routes
+})
+
+const preloadErrors = new WeakSet()
+const reloadKey = 'libredesk:preload-reload'
+
+window.addEventListener('vite:preloadError', (event) => {
+  preloadErrors.add(event.payload)
+})
+
+router.onError((error, to) => {
+  if (!preloadErrors.has(error) || sessionStorage.getItem(reloadKey) === to.fullPath) return
+  sessionStorage.setItem(reloadKey, to.fullPath)
+  window.location.assign(to.fullPath)
+})
+
+router.afterEach((to, from, failure) => {
+  if (!failure) sessionStorage.removeItem(reloadKey)
 })
 
 router.beforeEach((to, from, next) => {

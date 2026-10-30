@@ -1,16 +1,16 @@
 <template>
-  <Tooltip v-if="priorityName">
+  <Tooltip v-if="priorityName" :disabled="!tooltip">
     <TooltipTrigger asChild>
       <PriorityIcon
         :level="marker.level"
-        :size="13"
+        :size="size"
         class="flex-shrink-0"
         :class="marker.class"
         role="img"
         :aria-label="priorityLabel"
       />
     </TooltipTrigger>
-    <TooltipContent>{{ priorityLabel }}</TooltipContent>
+    <TooltipContent>{{ priorityName }}</TooltipContent>
   </Tooltip>
 </template>
 
@@ -31,6 +31,14 @@ const props = defineProps({
   priority: {
     type: String,
     default: ''
+  },
+  tooltip: {
+    type: Boolean,
+    default: true
+  },
+  size: {
+    type: Number,
+    default: 13
   }
 })
 

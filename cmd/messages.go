@@ -24,6 +24,11 @@ type messageReq struct {
 	Mentions    []cmodels.MentionInput `json:"mentions"`
 	EchoID      string                 `json:"echo_id"`
 	SourceID    string                 `json:"source_id"` // RFC 5322 Message-ID of the inbound message; stored on the created contact message so replies thread on it. Contact sender only.
+	SendFrom    string                 `json:"send_from"`
+
+	// WhatsApp-only. Set TemplateID to send an approved template. Omit for free-form.
+	WhatsAppTemplateID     int               `json:"whatsapp_template_id,omitempty"`
+	WhatsAppTemplateParams map[string]string `json:"whatsapp_template_params,omitempty"`
 }
 
 // handleGetMessages returns messages for a conversation.
@@ -66,6 +71,7 @@ func handleGetMessages(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
+	app.conversation.RenderMessagesArticleReferences(messages)
 	for i := range messages {
 		total = messages[i].Total
 		app.conversation.SignAttachmentURLs(messages[i].Attachments)
@@ -133,6 +139,7 @@ func handleGetMessage(r *fastglue.Request) error {
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
+	app.conversation.RenderArticleReferences(&message)
 	app.conversation.SignAttachmentURLs(message.Attachments)
 	resolveQuotedCIDs(app, &message)
 	resolveAttachmentCIDs(&message, rootURL)
@@ -165,6 +172,7 @@ func handleRetryMessage(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+
 	if msg.SenderType != cmodels.SenderTypeAgent || msg.Status != cmodels.MessageStatusFailed || msg.SenderID != user.ID || msg.ConversationUUID != cuuid {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
@@ -196,7 +204,7 @@ func handleSendMessage(r *fastglue.Request) error {
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling message request", "error", err)
+		app.lo.Debug("error unmarshalling message request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -239,17 +247,16 @@ func handleSendMessage(r *fastglue.Request) error {
 		}
 	}
 
-	// Get media for all attachments, skip any already associated with a model.
-	media, err := getUnassociatedMedia(app, req.Attachments)
+	media, err := getUnassociatedMedia(app, req.Attachments, auser.ID)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return sendErrorEnvelope(r, err)
 	}
 
 	rootURL, _ := app.setting.GetAppRootURL()
 
 	// Create contact message.
 	if req.SenderType == umodels.UserTypeContact {
-		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID)
+		message, err := app.conversation.CreateContactMessage(media, int(conv.ContactID), cuuid, req.Message, cmodels.ContentTypeHTML, false, req.SourceID, auser.ID)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -260,7 +267,7 @@ func handleSendMessage(r *fastglue.Request) error {
 
 	// Send private note.
 	if req.Private {
-		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, req.Message, req.Mentions)
+		message, err := app.conversation.SendPrivateNote(media, user.ID, cuuid, app.conversation.RenderStaffTemplate(cuuid, user.ID, req.Message), req.Mentions)
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
@@ -273,7 +280,16 @@ func handleSendMessage(r *fastglue.Request) error {
 	if req.EchoID != "" {
 		meta["echo_id"] = req.EchoID
 	}
-	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, req.Message, req.To, req.CC, req.BCC, meta)
+	content := req.Message
+	if req.WhatsAppTemplateID > 0 {
+		meta["whatsapp_template_id"] = req.WhatsAppTemplateID
+	} else {
+		content = app.conversation.RenderStaffTemplate(cuuid, user.ID, content)
+	}
+	if len(req.WhatsAppTemplateParams) > 0 {
+		meta["whatsapp_template_params"] = req.WhatsAppTemplateParams
+	}
+	message, err := app.conversation.QueueReply(media, conv.InboxID, user.ID, conv.ContactID, cuuid, content, req.To, req.CC, req.BCC, req.SendFrom, meta)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

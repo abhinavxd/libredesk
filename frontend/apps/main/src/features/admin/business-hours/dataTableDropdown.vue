@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only"></span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="edit(props.role.id)">
         <Pencil class="mr-2 h-4 w-4" />
@@ -45,14 +40,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import { Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -64,12 +59,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
-import api from '../../../api'
-import { useEmitter } from '../../../composables/useEmitter'
+import api from '@/api'
+import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 
 const { t } = useI18n()
 const router = useRouter()

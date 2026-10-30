@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -302,6 +303,9 @@ func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]an
 		if err == nil {
 			return respBytes, nil
 		}
+		if errors.Is(err, context.Canceled) {
+			return nil, err
+		}
 		if !retryable {
 			if adaptations < maxParamAdaptations {
 				if param, ok := adaptUnsupportedParam(body, respBytes); ok {
@@ -350,14 +354,12 @@ func (o *OpenAIClient) doRequest(ctx context.Context, path string, bodyBytes []b
 
 	resp, err := o.client.Do(req)
 	if err != nil {
-		o.lo.Error("error making request to AI provider", "error", err)
 		return nil, 0, true, fmt.Errorf("%w: making HTTP request: %w", ErrProviderUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxProviderResponseBytes))
 	if err != nil {
-		o.lo.Error("error reading AI provider response", "error", err)
 		return nil, 0, true, fmt.Errorf("reading response body: %w", err)
 	}
 	switch {
@@ -367,13 +369,10 @@ func (o *OpenAIClient) doRequest(ctx context.Context, path string, bodyBytes []b
 		o.lo.Error("unauthorized from AI provider (401)", "base_url", o.cfg.BaseURL, "response", string(respBytes))
 		return nil, 0, false, ErrInvalidAPIKey
 	case resp.StatusCode == http.StatusTooManyRequests:
-		o.lo.Error("rate limited by AI provider (429)", "response", string(respBytes))
 		return nil, parseRetryAfter(resp.Header.Get("Retry-After")), true, fmt.Errorf("%w: status %d: %s", ErrRateLimited, resp.StatusCode, string(respBytes))
 	case resp.StatusCode >= 500:
-		o.lo.Error("server error from AI provider", "status", resp.StatusCode, "response", string(respBytes))
 		return nil, 0, true, fmt.Errorf("%w: status %d: %s", ErrProviderUnavailable, resp.StatusCode, string(respBytes))
 	default:
-		o.lo.Error("non-ok response from AI provider", "status", resp.StatusCode, "response", string(respBytes))
 		return respBytes, 0, false, fmt.Errorf("provider API error: status %d: %s", resp.StatusCode, string(respBytes))
 	}
 }

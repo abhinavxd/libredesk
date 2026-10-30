@@ -78,44 +78,53 @@ type Opts struct {
 
 // queries contains prepared SQL queries.
 type queries struct {
-	GetUser                       *sqlx.Stmt `query:"get-user"`
-	GetNotes                      *sqlx.Stmt `query:"get-notes"`
-	GetNote                       *sqlx.Stmt `query:"get-note"`
-	GetUserIDsByRole              *sqlx.Stmt `query:"get-user-ids-by-role"`
-	GetUserByExternalID           *sqlx.Stmt `query:"get-user-by-external-id"`
-	GetUsersCompact               string     `query:"get-users-compact"`
-	GetAgentsCompact              *sqlx.Stmt `query:"get-agents-compact"`
-	GetAgentsCompactByIDs         *sqlx.Stmt `query:"get-agents-compact-by-ids"`
-	UpdateContact                 *sqlx.Stmt `query:"update-contact"`
-	UpdateContactBasicInfo        *sqlx.Stmt `query:"update-contact-basic-info"`
-	UpdateAgent                   *sqlx.Stmt `query:"update-agent"`
-	UpdateCustomAttributes        *sqlx.Stmt `query:"update-custom-attributes"`
-	UpsertCustomAttributes        *sqlx.Stmt `query:"upsert-custom-attributes"`
-	UpdateAvatar                  *sqlx.Stmt `query:"update-avatar"`
-	UpdateAvailability            *sqlx.Stmt `query:"update-availability"`
-	UpdateLastActiveAt            *sqlx.Stmt `query:"update-last-active-at"`
-	UpdateInactiveOffline         *sqlx.Stmt `query:"update-inactive-offline"`
-	GetAvailabilityStatus         *sqlx.Stmt `query:"get-availability-status"`
-	UpdateLastLoginAt             *sqlx.Stmt `query:"update-last-login-at"`
-	SoftDeleteAgent               *sqlx.Stmt `query:"soft-delete-agent"`
-	SetUserPassword               *sqlx.Stmt `query:"set-user-password"`
-	SetResetPasswordToken         *sqlx.Stmt `query:"set-reset-password-token"`
-	SetPassword                   *sqlx.Stmt `query:"set-password"`
-	DeleteNote                    *sqlx.Stmt `query:"delete-note"`
-	InsertAgent                   *sqlx.Stmt `query:"insert-agent"`
-	InsertContactWithExtID        *sqlx.Stmt `query:"insert-contact-with-external-id"`
-	InsertContactNoExtID          *sqlx.Stmt `query:"insert-contact-without-external-id"`
-	InsertContactIfAbsent         *sqlx.Stmt `query:"insert-contact-if-absent"`
-	InsertContact                 *sqlx.Stmt `query:"insert-contact"`
-	GetContactByEmail             *sqlx.Stmt `query:"get-contact-by-email"`
-	GetContactByEmailWithoutExtID *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
-	IsEmailBlocked                *sqlx.Stmt `query:"is-email-blocked"`
-	SetExternalUserID             *sqlx.Stmt `query:"set-external-user-id"`
-	InsertNote                    *sqlx.Stmt `query:"insert-note"`
-	InsertVisitor                 *sqlx.Stmt `query:"insert-visitor"`
-	GetVisitorByEmail             *sqlx.Stmt `query:"get-visitor-by-email"`
-	UpgradeVisitorToContact       *sqlx.Stmt `query:"upgrade-visitor-to-contact"`
-	ToggleEnable                  *sqlx.Stmt `query:"toggle-enable"`
+	GetUser                          *sqlx.Stmt `query:"get-user"`
+	GetNotes                         *sqlx.Stmt `query:"get-notes"`
+	GetNote                          *sqlx.Stmt `query:"get-note"`
+	GetUserIDsByRole                 *sqlx.Stmt `query:"get-user-ids-by-role"`
+	GetUserByExternalID              *sqlx.Stmt `query:"get-user-by-external-id"`
+	GetUsersCompact                  string     `query:"get-users-compact"`
+	GetAgentsCompact                 *sqlx.Stmt `query:"get-agents-compact"`
+	GetAgentsCompactByIDs            *sqlx.Stmt `query:"get-agents-compact-by-ids"`
+	UpdateContact                    *sqlx.Stmt `query:"update-contact"`
+	UpdateContactBasicInfo           *sqlx.Stmt `query:"update-contact-basic-info"`
+	UpdateAgent                      *sqlx.Stmt `query:"update-agent"`
+	UpdateCustomAttributes           *sqlx.Stmt `query:"update-custom-attributes"`
+	UpsertCustomAttributes           *sqlx.Stmt `query:"upsert-custom-attributes"`
+	UpdateAvatar                     *sqlx.Stmt `query:"update-avatar"`
+	UpdateAvailability               *sqlx.Stmt `query:"update-availability"`
+	UpdateLastActiveAt               *sqlx.Stmt `query:"update-last-active-at"`
+	UpdateInactiveOffline            *sqlx.Stmt `query:"update-inactive-offline"`
+	GetAvailabilityStatus            *sqlx.Stmt `query:"get-availability-status"`
+	UpdateLastLoginAt                *sqlx.Stmt `query:"update-last-login-at"`
+	SoftDeleteAgent                  *sqlx.Stmt `query:"soft-delete-agent"`
+	SetUserPassword                  *sqlx.Stmt `query:"set-user-password"`
+	SetResetPasswordToken            *sqlx.Stmt `query:"set-reset-password-token"`
+	SetPassword                      *sqlx.Stmt `query:"set-password"`
+	DeleteNote                       *sqlx.Stmt `query:"delete-note"`
+	InsertAgent                      *sqlx.Stmt `query:"insert-agent"`
+	InsertContactWithExtID           *sqlx.Stmt `query:"insert-contact-with-external-id"`
+	InsertContactNoExtID             *sqlx.Stmt `query:"insert-contact-without-external-id"`
+	InsertContactIfAbsent            *sqlx.Stmt `query:"insert-contact-if-absent"`
+	InsertContact                    *sqlx.Stmt `query:"insert-contact"`
+	GetContactByEmail                *sqlx.Stmt `query:"get-contact-by-email"`
+	GetContactByEmailWithoutExtID    *sqlx.Stmt `query:"get-contact-by-email-without-ext-id"`
+	IsEmailBlocked                   *sqlx.Stmt `query:"is-email-blocked"`
+	SetExternalUserID                *sqlx.Stmt `query:"set-external-user-id"`
+	SetContactPhoneIfMissing         *sqlx.Stmt `query:"set-contact-phone-if-missing"`
+	UpdateContactNameIfDefault       *sqlx.Stmt `query:"update-contact-name-if-default"`
+	GetContactIDByChannelIdentity    *sqlx.Stmt `query:"get-contact-id-by-channel-identity"`
+	GetChannelIdentitiesByContact    *sqlx.Stmt `query:"get-channel-identities-by-contact"`
+	GetChannelIdentity               *sqlx.Stmt `query:"get-channel-identity"`
+	InsertChannelIdentity            *sqlx.Stmt `query:"insert-channel-identity"`
+	UpdateChannelIdentity            *sqlx.Stmt `query:"update-channel-identity"`
+	UpsertContactWithChannelIdentity *sqlx.Stmt `query:"upsert-contact-with-channel-identity"`
+	DeleteOrphanedContact            *sqlx.Stmt `query:"delete-orphaned-contact"`
+	InsertNote                       *sqlx.Stmt `query:"insert-note"`
+	InsertVisitor                    *sqlx.Stmt `query:"insert-visitor"`
+	GetVisitorByEmail                *sqlx.Stmt `query:"get-visitor-by-email"`
+	UpgradeVisitorToContact          *sqlx.Stmt `query:"upgrade-visitor-to-contact"`
+	ToggleEnable                     *sqlx.Stmt `query:"toggle-enable"`
 
 	// API key queries
 	GetUserByAPIKey      *sqlx.Stmt `query:"get-user-by-api-key"`
@@ -150,12 +159,16 @@ func (u *Manager) VerifyPassword(email string, password []byte) (models.User, er
 	var user models.User
 	if err := u.q.GetUser.Get(&user, 0, email, pq.Array([]string{models.UserTypeAgent})); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			u.lo.Warn("password login rejected: invalid credentials")
 			return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 		}
 		u.lo.Error("error fetching user from db", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if err := u.verifyPassword(password, user.Password.String); err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			u.lo.Warn("password login rejected: invalid credentials", "user_id", user.ID)
+		}
 		return user, envelope.NewError(envelope.InputError, u.i18n.T("user.invalidEmailPassword"), nil)
 	}
 	return user, nil
@@ -456,6 +469,7 @@ func (u *Manager) ValidateAPIKey(apiKey, apiSecret string) (models.User, error) 
 		if err == sql.ErrNoRows {
 			return user, envelope.NewError(envelope.UnauthorizedError, u.i18n.T("validation.invalidCredential"), nil)
 		}
+		u.lo.Error("error looking up API key user", "error", err)
 		return user, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -509,19 +523,19 @@ func (u *Manager) GetUserIDsByRole(roleID int) ([]int, error) {
 }
 
 // ChangeSystemUserPassword updates the system user's password with a newly prompted one.
-func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) error {
+func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) (int, error) {
 	// Prompt for password and get hashed password
 	hashedPassword, err := promptAndHashPassword(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Update system user's password in the database.
-	if err := updateSystemUserPassword(db, hashedPassword); err != nil {
-		return fmt.Errorf("error updating system user password: %v", err)
+	id, err := updateSystemUserPassword(db, hashedPassword)
+	if err != nil {
+		return 0, fmt.Errorf("error updating system user password: %v", err)
 	}
-	fmt.Println("password updated successfully. Login with email 'System' and the new password.")
-	return nil
+	return id, nil
 }
 
 // CreateSystemUser creates a system user with the provided password or a random one.
@@ -602,12 +616,13 @@ func promptAndHashPassword(ctx context.Context) ([]byte, error) {
 }
 
 // updateSystemUserPassword updates the password of the system user in the database.
-func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) error {
-	_, err := db.Exec(`UPDATE users SET password = $1 WHERE email = $2`, hashedPassword, models.SystemUserEmail)
+func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) (int, error) {
+	var id int
+	err := db.Get(&id, `UPDATE users SET password = $1 WHERE email = $2 RETURNING id`, hashedPassword, models.SystemUserEmail)
 	if err != nil {
-		return fmt.Errorf("failed to update system user password: %v", err)
+		return 0, fmt.Errorf("failed to update system user password: %v", err)
 	}
-	return nil
+	return id, nil
 }
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.
@@ -628,7 +643,9 @@ func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, orde
 // verifyPassword compares the provided password with the stored password hash.
 func (u *Manager) verifyPassword(pwd []byte, pwdHash string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(pwdHash), pwd); err != nil {
-		u.lo.Error("error verifying password", "error", err)
+		if !errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			u.lo.Error("error verifying password", "error", err)
+		}
 		return fmt.Errorf("error verifying password: %w", err)
 	}
 	return nil

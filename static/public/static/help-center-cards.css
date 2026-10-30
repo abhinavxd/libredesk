@@ -13,7 +13,6 @@
     transition: border-color .15s, background-color .15s;
     scroll-margin-top: 1rem;
 }
-.hc-collection:hover { border-color: var(--hc-accent-line); background: var(--hc-accent-tint); }
 
 a.hc-collection-card { display: flex; text-decoration: none; color: inherit; }
 a.hc-collection-card:hover { text-decoration: none; }
@@ -23,7 +22,6 @@ a.hc-collection-card:hover { text-decoration: none; }
     font-size: 1.05rem; font-weight: 650; letter-spacing: -.012em;
     color: var(--hc-ink); transition: color .15s;
 }
-.hc-collection-card:hover h2, .hc-collection-card:hover h3 { color: var(--hc-accent-ink); }
 /* Column body keeps headings and meta aligned across a row when a card lacks a description. */
 .hc-collection-card .hc-collection-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 /* A grid row is as tall as its tallest card, so one long description stretches the whole row. */
@@ -77,7 +75,6 @@ a.hc-collection-card.hc-icon-center .hc-count { position: static; margin-top: .5
     transition: border-color .15s, background-color .15s;
 }
 .hc-collection-icon.hc-icon-tile svg { width: 1.35rem; height: 1.35rem; }
-.hc-collection-card:hover .hc-icon-tile { border-color: var(--hc-accent-line); background: var(--hc-accent-tint-2); }
 
 .hc-collections.hc-layout-list a.hc-collection-card { flex-direction: row; gap: 1.1rem; align-items: flex-start; text-align: left; }
 .hc-collections.hc-layout-list .hc-card-head { display: contents; }
@@ -99,6 +96,11 @@ a.hc-collection-card.hc-icon-center .hc-count { position: static; margin-top: .5
     font-size: .72rem; font-weight: 700; text-transform: uppercase;
 }
 
+@media (hover: hover) and (pointer: fine) {
+    .hc-collection:hover { border-color: var(--hc-accent-line); background: var(--hc-accent-tint); }
+    .hc-collection-card:hover h2, .hc-collection-card:hover h3 { color: var(--hc-accent-ink); }
+    .hc-collection-card:hover .hc-icon-tile { border-color: var(--hc-accent-line); background: var(--hc-accent-tint-2); }
+}
 @media (max-width: 900px) {
     .hc-collections.hc-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -24,28 +24,30 @@
               </FormItem>
             </FormField>
 
-            <FormField v-slot="{ field }" name="name">
-              <FormItem>
-                <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+            <FormGrid>
+              <FormField v-slot="{ field }" name="name">
+                <FormItem>
+                  <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
 
-            <FormField v-slot="{ field }" name="description">
-              <FormItem>
-                <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
-                <FormControl>
-                  <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            </FormField>
+              <FormField v-slot="{ field }" name="description">
+                <FormItem>
+                  <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
+                  <FormControl>
+                    <Input type="text" placeholder="" v-bind="field" @keydown.enter.prevent />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              </FormField>
+            </FormGrid>
 
             <FormField v-slot="{ componentField, handleInput }" name="type">
-              <FormItem>
+              <FormItem class="max-w-xl">
                 <FormLabel>{{ $t('globals.terms.type') }}</FormLabel>
                 <FormControl>
                   <Select v-bind="componentField" @update:modelValue="handleInput">
@@ -93,7 +95,7 @@
             </div>
           </div>
 
-          <h4 class="text-base font-semibold text-foreground">
+          <h4 class="ui-heading">
             {{ $t('admin.automation.matchTheseRules') }}
           </h4>
 
@@ -135,7 +137,7 @@
             :type="form.values.type"
             :groupIndex="1"
           />
-          <h4 class="text-base font-semibold text-foreground mt-2">
+          <h4 class="ui-heading mt-2">
             {{ $t('admin.automation.performTheseActions') }}
           </h4>
 
@@ -155,21 +157,22 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { onMounted, ref, computed } from 'vue'
 import { Input } from '@shared-ui/components/ui/input'
 import { Button } from '@shared-ui/components/ui/button'
 import RuleBox from '@/features/admin/automation/RuleBox.vue'
 import ActionBox from '@/features/admin/automation/ActionBox.vue'
-import api from '../../../api'
+import api from '@main/api'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from '../../../features/admin/automation/formSchema.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useEmitter } from '../../../composables/useEmitter'
+import { createFormSchema } from '@main/features/admin/automation/formSchema.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { SelectTag } from '@shared-ui/components/ui/select'
-import { OPERATOR } from '../../../constants/filterConfig'
+import { OPERATOR } from '@main/constants/filterConfig'
 import { useI18n } from 'vue-i18n'
 import {
   Select,
@@ -246,7 +249,6 @@ const breadcrumbPageLabel = () => {
   if (props.id > 0) return t('automation.editRule')
   return t('automation.newRule')
 }
-
 
 const isNewForm = computed(() => {
   return props.id ? false : true

@@ -1,16 +1,9 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button
-        variant="ghost"
-        class="w-8 h-8 p-0"
-        v-if="!CONVERSATION_DEFAULT_STATUSES_LIST.includes(props.status.name)"
-      >
-        <span class="sr-only"></span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-      <div v-else class="w-8 h-8 p-0 invisible"></div>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger
+      v-if="!CONVERSATION_DEFAULT_STATUSES_LIST.includes(props.status.name)"
+    />
+    <div v-else class="size-8 invisible"></div>
     <DropdownMenuContent>
       <DropdownMenuItem @click="editStatus">
         <Pencil class="mr-2 h-4 w-4" />
@@ -46,14 +39,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import { Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu/index.js'
 import {
   AlertDialog,
@@ -65,12 +58,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog/index.js'
-import { Button } from '@shared-ui/components/ui/button/index.js'
 import { CONVERSATION_DEFAULT_STATUSES_LIST } from '@/constants/conversation.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import api from '../../../api/index.js'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import api from '@/api/index.js'
 
 const alertOpen = ref(false)
 const emit = useEmitter()

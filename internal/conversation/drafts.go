@@ -19,7 +19,7 @@ func (m *Manager) UpsertConversationDraft(conversationID, userID int, draftType,
 		return draft, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	draft.Content = m.resolveDraftInlineCIDs(conversationID, draft.Content)
+	draft.Content = m.resolveDraftInlineCIDs(conversationID, userID, draft.Content)
 	return draft, nil
 }
 
@@ -30,7 +30,7 @@ func (m *Manager) GetAllUserDrafts(userID int) ([]models.ConversationDraft, erro
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	for i := range drafts {
-		drafts[i].Content = m.resolveDraftInlineCIDs(int(drafts[i].ConversationID), drafts[i].Content)
+		drafts[i].Content = m.resolveDraftInlineCIDs(int(drafts[i].ConversationID), userID, drafts[i].Content)
 	}
 	return drafts, nil
 }
@@ -55,7 +55,6 @@ func (m *Manager) DeleteStaleDrafts(ctx context.Context, retentionPeriod time.Du
 	cutoff := time.Now().Add(-retentionPeriod)
 	res, err := m.q.DeleteStaleDrafts.ExecContext(ctx, cutoff)
 	if err != nil {
-		m.lo.Error("error deleting stale drafts", "error", err)
 		return err
 	}
 
@@ -67,15 +66,15 @@ func (m *Manager) DeleteStaleDrafts(ctx context.Context, retentionPeriod time.Du
 	return nil
 }
 
-// resolveDraftInlineCIDs rewrites inline cid: refs to media URLs, resolving only unattached media or media linked to the draft's own conversation.
-func (m *Manager) resolveDraftInlineCIDs(conversationID int, content string) string {
+// resolveDraftInlineCIDs rewrites inline cid: refs to media URLs, resolving only the user's own unattached uploads or media linked to the draft's own conversation.
+func (m *Manager) resolveDraftInlineCIDs(conversationID, userID int, content string) string {
 	cids := extractInlineContentIDs(content)
 	for _, cid := range cids {
 		uuid := strings.TrimPrefix(cid, "ldsk-")
 		if uuid == "" {
 			continue
 		}
-		media, err := m.mediaStore.GetDraftInlineMedia(uuid, conversationID)
+		media, err := m.mediaStore.GetDraftInlineMedia(uuid, conversationID, userID)
 		if err != nil {
 			continue
 		}

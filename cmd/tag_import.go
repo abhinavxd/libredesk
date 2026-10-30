@@ -32,7 +32,7 @@ func handleImportTags(r *fastglue.Request) error {
 	reader.TrimLeadingSpace = true
 	records, err := reader.ReadAll()
 	if err != nil {
-		app.lo.Error("error parsing CSV", "error", err)
+		app.lo.Debug("tag import rejected: invalid CSV", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidCsvFile"), nil, envelope.InputError)
 	}
 

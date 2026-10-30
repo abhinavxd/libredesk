@@ -161,6 +161,28 @@ describe('Notification Form Schema', () => {
         }
     })
 
+    test('unauthenticated SMTP accepts empty and omitted credentials', () => {
+        for (const credential of ['', undefined]) {
+            expect(() => schema.parse({
+                ...validForm, auth_protocol: 'none', username: credential, password: credential
+            })).not.toThrow()
+        }
+    })
+
+    test('authenticated SMTP requires both credentials', () => {
+        for (const auth_protocol of ['login', 'cram', 'plain']) {
+            for (const field of ['username', 'password']) {
+                for (const credential of ['', undefined]) {
+                    const result = schema.safeParse({ ...validForm, auth_protocol, [field]: credential })
+                    expect(result.success).toBe(false)
+                    expect(result.error.issues).toEqual(expect.arrayContaining([
+                        expect.objectContaining({ path: [field] })
+                    ]))
+                }
+            }
+        }
+    })
+
     test('tls_type missing', () => {
         const { tls_type, ...form } = validForm
         expect(() => schema.parse(form)).toThrow()

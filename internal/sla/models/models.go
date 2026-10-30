@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
@@ -83,14 +84,18 @@ type AppliedSLA struct {
 	ResolutionMetAt         null.Time `db:"resolution_met_at"`
 
 	// Conversation fields.
-	ConversationFirstResponseAt null.Time `db:"conversation_first_response_at"`
-	ConversationResolvedAt      null.Time `db:"conversation_resolved_at"`
-	ConversationUUID            string    `db:"conversation_uuid"`
-	ConversationReferenceNumber string    `db:"conversation_reference_number"`
-	ConversationSubject         string    `db:"conversation_subject"`
-	ConversationAssignedUserID  null.Int  `db:"conversation_assigned_user_id"`
-	ConversationStatus          string    `db:"conversation_status"`
-	ConversationStatusCategory  string    `db:"conversation_status_category"`
+	ConversationFirstResponseAt null.Time                   `db:"conversation_first_response_at"`
+	ConversationResolvedAt      null.Time                   `db:"conversation_resolved_at"`
+	ConversationUUID            string                      `db:"conversation_uuid"`
+	ConversationReferenceNumber string                      `db:"conversation_reference_number"`
+	ConversationSubject         string                      `db:"conversation_subject"`
+	ConversationPriority        null.String                 `db:"conversation_priority"`
+	ConversationInboxName       string                      `db:"conversation_inbox_name"`
+	ConversationInboxChannel    string                      `db:"conversation_inbox_channel"`
+	ConversationContact         cmodels.ConversationContact `db:"conversation_contact"`
+	ConversationAssignedUserID  null.Int                    `db:"conversation_assigned_user_id"`
+	ConversationStatus          string                      `db:"conversation_status"`
+	ConversationStatusCategory  string                      `db:"conversation_status_category"`
 }
 
 type SLAEvent struct {

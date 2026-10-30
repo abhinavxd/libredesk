@@ -2,33 +2,17 @@
   <div class="flex flex-col relative h-full">
     <div ref="threadEl" class="flex-1 overflow-y-auto overscroll-contain [overflow-anchor:none]" @scroll="handleScroll">
       <div ref="contentEl" class="min-h-full px-4 pb-10 relative">
-        <div
-          v-if="showLoadMore"
-          class="text-center mt-3"
-        >
-          <Button
-            size="sm"
-            variant="outline"
-            @click="loadMore"
-            :disabled="conversationStore.messages.fetching"
-            class="max-md:h-11 transition-all duration-200 hover:bg-accent hover:scale-105 active:scale-95"
-          >
-            <Loader2
-              v-if="conversationStore.messages.fetching"
-              size="16"
-              class="mr-2 animate-spin"
-            />
-            <RefreshCw v-else size="16" class="mr-2" />
-            {{ $t('globals.terms.loadMore') }}
-          </Button>
-        </div>
-
         <MessagesSkeleton :count="10" v-if="conversationStore.messages.loading" />
 
-        <TransitionGroup v-else enter-active-class="animate-slide-in" leave-active-class="message-leaving" tag="div">
+        <TransitionGroup
+          v-else
+          :key="conversationStore.current?.uuid"
+          :enter-active-class="loadingOlder ? '' : 'animate-slide-in'"
+          tag="div"
+        >
           <div
             v-for="row in messageRows"
-            :key="row.message.uuid"
+            :key="row.message.render_key || row.message.uuid"
             :data-message-uuid="row.message.uuid"
             :class="[row.spacingClass, { 'my-2': row.message.type === 'activity' }]"
           >
@@ -58,12 +42,22 @@
             </div>
           </div>
         </TransitionGroup>
+        <div ref="readMarkerEl" class="h-px" />
       </div>
 
       <!-- Typing indicator -->
       <div v-if="conversationStore.conversation.isTyping" class="px-4 pb-4">
         <TypingIndicator />
       </div>
+    </div>
+
+    <div
+      v-if="olderSpinner"
+      class="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-background p-2 text-muted-foreground shadow-sm"
+      role="status"
+    >
+      <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+      <span class="sr-only">{{ $t('globals.terms.loading') }}</span>
     </div>
 
     <!-- Sticky container for the scroll arrow -->
@@ -85,12 +79,13 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useElementSize } from '@vueuse/core'
+import { useConversationRead } from '@main/composables/useConversationRead'
 import MessageBubble from './MessageBubble.vue'
 import ActivityMessageBubble from './ActivityMessageBubble.vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { Button } from '@shared-ui/components/ui/button'
-import { RefreshCw, Loader2 } from 'lucide-vue-next'
+import { Loader2 } from 'lucide-vue-next'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
 import DaySeparator from '@shared-ui/components/DaySeparator'
 import { isSameDay } from 'date-fns'
@@ -101,32 +96,73 @@ import { useBulkActionPermissions } from '@main/composables/useBulkActionPermiss
 import MessagesSkeleton from './MessagesSkeleton.vue'
 import { TypingIndicator } from '@shared-ui/components/TypingIndicator'
 import { useStickyScroll } from '@shared-ui/composables'
+import { delayedLoading } from '@main/utils/delayed-loading'
 
 const MENTION_TOP_OFFSET_RATIO = 0.25
 const MENTION_SETTLE_FRAMES = 3
 const MENTION_MAX_ANCHOR_FRAMES = 90
 const HIGHLIGHT_MS = 2500
+const OLDER_MESSAGES_SCROLL_DISTANCE = 48
 
 const route = useRoute()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const threadEl = ref(null)
+const { height: threadHeight } = useElementSize(threadEl)
 const contentEl = ref(null)
+const readMarkerEl = ref(null)
+const readReady = ref(false)
 const emitter = useEmitter()
 const unReadMessages = ref(0)
 const showAssignNudge = ref(false)
+const loadingOlder = ref(false)
+const olderSpinner = ref(false)
+
+watch(
+  () => loadingOlder.value && conversationStore.messages.fetching,
+  (loading, _, onCleanup) => {
+    if (!loading) {
+      olderSpinner.value = false
+      return
+    }
+    const guard = delayedLoading(olderSpinner, 'value', 100 /** delayMs **/, 0 /** minVisibleMs **/)
+    onCleanup(guard.cancel)
+  }
+)
 const { canAssignAgent } = useBulkActionPermissions()
 let currentConversationUUID = ''
 let openScrollDone = false
+
+useConversationRead({
+  root: threadEl,
+  marker: readMarkerEl,
+  conversationUUID: computed(() => conversationStore.current?.uuid),
+  message: computed(() => conversationStore.conversationMessages.findLast(message => message.id > 0)),
+  loading: computed(() => !readReady.value || conversationStore.conversation.loading || conversationStore.messages.loading || conversationStore.messages.fetching || conversationStore.messages.fetchingLatest || conversationStore.hasPendingMessages),
+  acknowledge: (uuid, messageUUID) => conversationStore.updateAssigneeLastSeen(uuid, messageUUID)
+})
 
 const assignToSelf = () => {
   conversationStore.updateAssignee('user', { assignee_id: userStore.userID })
 }
 
-const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(threadEl, contentEl, {
-  onArriveBottom: () => { unReadMessages.value = 0 }
-})
+const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll: handleStickyScroll } =
+  useStickyScroll(threadEl, contentEl, {
+    skipAutoScroll: () => loadingOlder.value,
+    onArriveBottom: () => { unReadMessages.value = 0 }
+  })
+
+const handleScroll = () => {
+  handleStickyScroll()
+  if (
+    openScrollDone &&
+    readReady.value &&
+    threadEl.value?.scrollTop <= OLDER_MESSAGES_SCROLL_DISTANCE
+  ) {
+    loadMore()
+  }
+}
 
 const handleScrollToBottom = () => {
   hasUserScrolled.value = false
@@ -141,16 +177,18 @@ const applyOpenScroll = () => {
   if (targetEl) {
     hasUserScrolled.value = true
     // Messages above the target collapse to max-h after mount, so re-pin until offsetTop stops moving.
+    const anchorConversation = currentConversationUUID
     let lastOffset = -1
     let stableFrames = 0
     let frames = 0
     const anchorToTarget = () => {
-      if (!threadEl.value || !targetEl.isConnected) return
+      if (!threadEl.value || !targetEl.isConnected || anchorConversation !== currentConversationUUID) return
       const offset = targetEl.offsetTop
       scrollToOffset(Math.max(0, offset - threadEl.value.clientHeight * MENTION_TOP_OFFSET_RATIO))
       stableFrames = offset === lastOffset ? stableFrames + 1 : 0
       lastOffset = offset
       if (stableFrames < MENTION_SETTLE_FRAMES && ++frames < MENTION_MAX_ANCHOR_FRAMES) requestAnimationFrame(anchorToTarget)
+      else readReady.value = true
     }
     anchorToTarget()
     targetEl.classList.add('highlight-mention')
@@ -158,6 +196,7 @@ const applyOpenScroll = () => {
   } else {
     hasUserScrolled.value = false
     scrollToBottom()
+    readReady.value = true
   }
 }
 
@@ -194,6 +233,7 @@ watch(
     currentConversationUUID = newUUID
     unReadMessages.value = 0
     openScrollDone = false
+    readReady.value = false
     showAssignNudge.value = false
   }
 )
@@ -247,19 +287,55 @@ const getSpacingClass = (index, groupWithPrev) => {
   return groupWithPrev ? 'mt-1' : 'mt-4'
 }
 
-const showLoadMore = computed(
-  () => conversationStore.currentConversationHasMoreMessages && !conversationStore.messages.loading
-)
-
 const loadMore = async () => {
+  if (
+    loadingOlder.value ||
+    conversationStore.messages.loading ||
+    conversationStore.messages.fetching ||
+    !conversationStore.currentConversationHasMoreMessages
+  ) return
   const thread = threadEl.value
   if (!thread) return
+  const conversationUUID = conversationStore.current?.uuid
+  const previousPage = conversationStore.messages.data.getLastFetchedPage(conversationUUID)
+  const threadTop = thread.getBoundingClientRect().top
+  const anchor = [...thread.querySelectorAll('[data-message-uuid]')].find(
+    element => element.getBoundingClientRect().bottom > threadTop
+  )
+  const anchorTop = anchor?.getBoundingClientRect().top
   const prevHeight = thread.scrollHeight
   const prevTop = thread.scrollTop
-  await conversationStore.fetchNextMessages()
-  await nextTick()
-  thread.scrollTop = thread.scrollHeight - prevHeight + prevTop
+  hasUserScrolled.value = true
+  loadingOlder.value = true
+  try {
+    await conversationStore.fetchNextMessages()
+    await nextTick()
+    if (conversationUUID !== conversationStore.current?.uuid || thread !== threadEl.value) return
+    if (anchor?.isConnected) {
+      scrollToOffset(thread.scrollTop + anchor.getBoundingClientRect().top - anchorTop)
+    } else {
+      scrollToOffset(thread.scrollHeight - prevHeight + prevTop)
+    }
+    if (thread.scrollHeight <= thread.clientHeight) hasUserScrolled.value = false
+  } finally {
+    loadingOlder.value = false
+    if (
+      conversationUUID !== conversationStore.current?.uuid ||
+      conversationStore.messages.data.getLastFetchedPage(conversationUUID) > previousPage
+    ) fillShortThread()
+  }
 }
+
+const fillShortThread = () => {
+  const thread = threadEl.value
+  if (
+    readReady.value &&
+    thread?.clientHeight > 0 &&
+    thread.scrollHeight <= thread.clientHeight
+  ) loadMore()
+}
+
+watch([threadHeight, readReady], fillShortThread, { flush: 'post' })
 
 const messageRows = computed(() => {
   const messages = conversationStore.conversationMessages
@@ -280,13 +356,6 @@ const messageRows = computed(() => {
 </script>
 
 <style scoped>
-/* Leaving messages must be out of flow during a conversation swap, else they shift the target's offsetTop mid-scroll. */
-.message-leaving {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
 /* Highlight via an opacity-faded overlay, not the element's own background, to avoid a text repaint flicker when it ends. */
 .highlight-mention {
   position: relative;

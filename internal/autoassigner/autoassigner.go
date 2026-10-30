@@ -120,7 +120,6 @@ func (e *Engine) reloadBalancer() error {
 
 	err := e.populateTeamBalancer()
 	if err != nil {
-		e.lo.Error("error updating team balancer pool", "error", err)
 		return err
 	}
 	return nil
@@ -245,9 +244,15 @@ func (e *Engine) assignConversations() error {
 					e.lo.Debug("conversation already assigned, skipping", "conversation_uuid", conv.UUID)
 					break
 				}
+				// User went away, was disabled or deleted, or left the team after the pool was last reloaded, try the next one.
+				if errors.Is(err, conversation.ErrAssigneeUnavailable) {
+					e.lo.Debug("user is unavailable, trying next user", "conversation_uuid", conv.UUID, "user_id", userID)
+					continue
+				}
 				e.lo.Error("error assigning conversation", "conversation_uuid", conv.UUID, "user_id", userID, "error", err)
 				continue
 			}
+			e.lo.Info("conversation automatically assigned", "conversation_uuid", conv.UUID, "user_id", userID, "team_id", teamID)
 			break
 		}
 	}

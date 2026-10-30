@@ -3,13 +3,13 @@
     <Card class="bg-card box" id="reset-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
-          <CardTitle class="text-2xl font-bold text-foreground">{{
+          <CardTitle class="ui-display-heading">{{
             t('auth.resetPassword')
           }}</CardTitle>
           <p class="text-sm text-muted-foreground">{{ t('auth.enterEmailForReset') }}</p>
         </div>
 
-        <form @submit.prevent="requestResetAction" class="space-y-3">
+        <form @submit.prevent="requestResetAction" novalidate class="space-y-3">
           <div class="space-y-2">
             <Label for="email" class="text-muted-foreground">{{
               t('globals.terms.email')
@@ -18,6 +18,7 @@
               id="email"
               type="email"
               v-model.trim="resetForm.email"
+              :aria-invalid="emailHasError || undefined"
               :class="{ 'border-destructive': emailHasError }"
             />
           </div>
@@ -58,18 +59,18 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../api'
+import api from '@main/api'
 import { validateEmail } from '@shared-ui/utils/string'
 import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'
 import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
@@ -77,6 +78,7 @@ import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 const errorMessage = ref('')
 const { t } = useI18n()
 const isLoading = ref(false)
+const submitted = ref(false)
 const emitter = useEmitter()
 const router = useRouter()
 const resetForm = ref({
@@ -93,6 +95,7 @@ const validateForm = () => {
 }
 
 const requestResetAction = async () => {
+  submitted.value = true
   if (!validateForm()) return
 
   errorMessage.value = ''
@@ -119,6 +122,12 @@ const requestResetAction = async () => {
 }
 
 const emailHasError = computed(() => {
-  return !validateEmail(resetForm.value.email) && resetForm.value.email !== ''
+  return submitted.value && !validateEmail(resetForm.value.email)
+})
+
+watch(emailHasError, (hasError) => {
+  if (!hasError && errorMessage.value === t('validation.invalidEmail')) {
+    errorMessage.value = ''
+  }
 })
 </script>

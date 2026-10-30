@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/media"
+	"github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/rhnvrm/simples3"
 )
 
@@ -51,7 +52,11 @@ func New(opt Opt) (media.Store, error) {
 	}
 
 	if opt.AccessKey == "" && opt.SecretKey == "" {
-		cl, _ = simples3.NewUsingIAM(opt.Region)
+		var err error
+		cl, err = simples3.NewUsingIAM(opt.Region)
+		if err != nil {
+			return nil, fmt.Errorf("initializing S3 IAM credentials: %w", err)
+		}
 	} else {
 		cl = simples3.New(opt.Region, opt.AccessKey, opt.SecretKey)
 	}
@@ -67,11 +72,13 @@ func New(opt Opt) (media.Store, error) {
 // Put uploads a file to S3 with the specified name, content type, and file content.
 // It returns the name of the file or an error if the upload fails.
 func (c *Client) Put(name string, cType string, file io.ReadSeeker) (string, error) {
+	cType = models.NormalizeContentType(cType)
 	p := simples3.UploadInput{
-		Bucket:      c.opts.Bucket,
-		ContentType: cType,
-		FileName:    name,
-		Body:        file,
+		Bucket:             c.opts.Bucket,
+		ContentType:        cType,
+		ContentDisposition: models.ContentDisposition(cType),
+		FileName:           name,
+		Body:               file,
 		// Paths inside the bucket should not start with /.
 		ObjectKey: c.makeBucketPath(name),
 	}

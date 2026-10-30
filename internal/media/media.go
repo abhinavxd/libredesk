@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -120,7 +119,7 @@ func (m *Manager) UploadAndInsert(srcFilename, contentType, contentID string, mo
 		return models.Media{}, err
 	}
 
-	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private)
+	media, err := m.Insert(disposition, srcFilename, contentType, contentID, modelType, uuid.String(), modelID, fileSize, meta, private, null.Int{} /** uploadedBy **/)
 	if err != nil {
 		m.store.Delete(uuid.String())
 		return models.Media{}, err
@@ -149,9 +148,9 @@ func (m *Manager) Upload(fileName, contentType string, content io.ReadSeeker) (s
 }
 
 // Insert inserts media details into the database and returns the inserted media record.
-func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool) (models.Media, error) {
+func (m *Manager) Insert(disposition null.String, fileName, contentType, contentID string, modelType null.String, uuid string, modelID null.Int, fileSize int, meta []byte, private bool, uploadedBy null.Int) (models.Media, error) {
 	var id int
-	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private).Scan(&id); err != nil {
+	if err := m.queries.Insert.QueryRow(m.store.Name(), fileName, contentType, fileSize, meta, modelID, modelType, disposition, contentID, uuid, private, uploadedBy).Scan(&id); err != nil {
 		m.lo.Error("error inserting media", "error", err, "file_name", fileName, "content_type", contentType, "store", m.store.Name())
 		return models.Media{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -240,10 +239,10 @@ func (m *Manager) GetByContentIDs(contentIDs []string, conversationUUID string) 
 	return out, nil
 }
 
-// GetDraftInlineMedia returns media by UUID only if it's unattached or linked to a message in the given conversation.
-func (m *Manager) GetDraftInlineMedia(uuid string, conversationID int) (models.Media, error) {
+// GetDraftInlineMedia returns media by UUID only if the user uploaded it and it is unattached, or it is linked to a message in the given conversation.
+func (m *Manager) GetDraftInlineMedia(uuid string, conversationID, userID int) (models.Media, error) {
 	var media models.Media
-	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID); err != nil {
+	if err := m.queries.GetDraftInlineMedia.Get(&media, uuid, conversationID, userID); err != nil {
 		if err == sql.ErrNoRows {
 			return media, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMedia"), nil)
 		}
@@ -260,19 +259,11 @@ func (m *Manager) GetBlob(name string) ([]byte, error) {
 
 // GetURL returns the URL for accessing a media file by its name.
 func (m *Manager) GetURL(uuid, contentType, fileName string) string {
-	// Keep some content types inline. SVG excluded.
-	disposition := "attachment"
-	if contentType != "image/svg+xml" &&
-		(strings.HasPrefix(contentType, "image/") ||
-			strings.HasPrefix(contentType, "video/") ||
-			contentType == "application/pdf") {
-		disposition = "inline"
-	}
-	return m.store.GetURL(uuid, disposition, fileName)
+	return m.store.GetURL(uuid, models.ContentDisposition(contentType), fileName)
 }
 
 func (m *Manager) GetURLForDownload(uuid, fileName string) string {
-	return m.store.GetURL(uuid, "attachment", fileName)
+	return m.store.GetURL(uuid, models.DispositionAttachment, fileName)
 }
 
 // GetSignedURL generates a signed URL for secure media access if the store supports it.
@@ -299,7 +290,7 @@ func (m *Manager) GetThumbnailURL(uuid string) string {
 			return u.String()
 		}
 	}
-	return m.store.GetURL(image.ThumbPrefix+uuid, "inline", "")
+	return m.store.GetURL(image.ThumbPrefix+uuid, models.DispositionInline, "" /** fileName **/)
 }
 
 // SignedURLValidator returns the store's signature validator if available.
@@ -309,7 +300,7 @@ func (m *Manager) SignedURLValidator() func(name, sig string, exp int64) bool {
 }
 
 // LinkMessageMediaTx links a message's attachments and inline images to it within the given transaction, stamping a content_id on the inline ones.
-func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string) error {
+func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.Media, inlineUUIDs []string, uploadedBy int) error {
 	if len(media) == 0 && len(inlineUUIDs) == 0 {
 		return nil
 	}
@@ -317,7 +308,7 @@ func (m *Manager) LinkMessageMediaTx(tx *sqlx.Tx, messageID int, media []models.
 	for _, med := range media {
 		ids = append(ids, med.ID)
 	}
-	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs)); err != nil {
+	if _, err := tx.Stmtx(m.queries.LinkMessageMedia).Exec(messageID, pq.Array(ids), pq.Array(inlineUUIDs), uploadedBy); err != nil {
 		m.lo.Error("error linking media to message", "message_id", messageID, "error", err)
 		return fmt.Errorf("linking media to message:%d: %w", messageID, err)
 	}
@@ -337,9 +328,8 @@ func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) 
 // Delete deletes a media file from both the storage backend and the database.
 func (m *Manager) Delete(name string) error {
 	if err := m.store.Delete(name); err != nil {
-		m.lo.Error("error deleting media from store", "error", err)
-		// If the file does not exist, ignore the error.
 		if !errors.Is(err, os.ErrNotExist) {
+			m.lo.Error("error deleting media from store", "name", name, "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 	}
@@ -415,18 +405,10 @@ func (m *Manager) deleteUnlinkedRows(stmt *sqlx.Stmt) error {
 // For generic types, it uses http.DetectContentType (stdlib) as a fast path,
 // falling back to mimetype library for deeper inspection using magic numbers.
 func (m *Manager) detectContentType(sourceContentType string, content io.ReadSeeker) (string, error) {
-	// Set default if empty
-	if sourceContentType == "" {
-		sourceContentType = "application/octet-stream"
-	}
-
-	// Handle "image/svg+xml; charset=utf-8", keep just the type.
-	if mediaType, _, err := mime.ParseMediaType(sourceContentType); err == nil && mediaType != "" {
-		sourceContentType = mediaType
-	}
+	sourceContentType = models.NormalizeContentType(sourceContentType)
 
 	// Trust source unless it's a generic/useless type
-	if sourceContentType != "application/octet-stream" &&
+	if sourceContentType != models.ContentTypeOctetStream &&
 		sourceContentType != "application/data" &&
 		sourceContentType != "application/binary" {
 		m.lo.Debug("detected media content type from trusted source", "detected_type", sourceContentType)
@@ -443,7 +425,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 
 	// If stdlib gives a useful type, use it.
 	// stdlib defaults to application/octet-stream for unknown types.
-	if detected != "application/octet-stream" {
+	if detected != models.ContentTypeOctetStream {
 		content.Seek(0, io.SeekStart)
 		m.lo.Debug("detected media content type using stdlib", "detected_type", detected, "source_type", sourceContentType)
 		return detected, nil
@@ -453,7 +435,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 	content.Seek(0, io.SeekStart)
 	mtype, err := mimetype.DetectReader(content)
 	if err != nil {
-		m.lo.Error("error detecting content type", "error", err)
+		m.lo.Warn("error detecting content type", "error", err)
 		content.Seek(0, io.SeekStart)
 		return sourceContentType, nil
 	}

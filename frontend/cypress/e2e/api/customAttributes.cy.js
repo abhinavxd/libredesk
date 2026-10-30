@@ -74,6 +74,18 @@ describe('API: custom attributes', () => {
     })
   })
 
+  it('rejects keys that collide with automation rule fields', () => {
+    const reserved = ['to', 'previous_status', 'previous_priority', 'previous_assigned_user', 'previous_assigned_team']
+    reserved.forEach((reservedKey) => {
+      create({
+        name: 'X', description: 'd', applies_to: 'contact', key: reservedKey, data_type: 'text', values: []
+      }, { failOnStatusCode: false }).then(({ status, body }) => {
+        expect(status, reservedKey).to.eq(400)
+        expect(body.error_type, reservedKey).to.eq('InputException')
+      })
+    })
+  })
+
   // An omitted values array reaches Postgres as NULL and 500s on the NOT NULL column.
   it.skip('defaults values to an empty array when omitted', () => {
     create({

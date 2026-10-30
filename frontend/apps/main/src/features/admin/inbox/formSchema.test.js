@@ -84,6 +84,20 @@ describe('Email Inbox Form Schema', () => {
         expect(() => schema.parse({ ...validForm, from: '' })).toThrow()
     })
 
+    test('rejects duplicate aliases and the primary address', () => {
+        expect(() => schema.parse({
+            ...validForm,
+            aliases: [
+                { email: 'billing@example.com' },
+                { email: 'BILLING@example.com' }
+            ]
+        })).toThrow()
+        expect(() => schema.parse({
+            ...validForm,
+            aliases: [{ email: 'desk@example.com' }]
+        })).toThrow()
+    })
+
     test('from_name_template defaults to empty string', () => {
         expect(schema.parse(validForm).from_name_template).toBe('')
     })
@@ -231,6 +245,28 @@ describe('Email Inbox Form Schema', () => {
     test('all smtp auth_protocol values accepted', () => {
         for (const auth_protocol of ['login', 'cram', 'plain', 'none']) {
             expect(() => schema.parse(withSmtp({ auth_protocol }))).not.toThrow()
+        }
+    })
+
+    test('unauthenticated SMTP accepts empty and omitted credentials', () => {
+        for (const credential of ['', undefined]) {
+            expect(() => schema.parse(withSmtp({
+                auth_protocol: 'none', username: credential, password: credential
+            }))).not.toThrow()
+        }
+    })
+
+    test('authenticated SMTP requires both credentials', () => {
+        for (const auth_protocol of ['login', 'cram', 'plain']) {
+            for (const field of ['username', 'password']) {
+                for (const credential of ['', undefined]) {
+                    const result = schema.safeParse(withSmtp({ auth_protocol, [field]: credential }))
+                    expect(result.success).toBe(false)
+                    expect(result.error.issues).toEqual(expect.arrayContaining([
+                        expect.objectContaining({ path: ['smtp', field] })
+                    ]))
+                }
+            }
         }
     })
 

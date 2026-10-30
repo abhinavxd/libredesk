@@ -173,9 +173,7 @@ func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 	}
 
 	// Decrypt secret before returning (ignore errors as non-critical)
-	if err := m.decryptWebhook(&result); err != nil {
-		m.lo.Error("error decrypting webhook secret after creation", "webhook_id", result.ID, "error", err)
-	}
+	_ = m.decryptWebhook(&result)
 
 	return result, nil
 }
@@ -208,9 +206,7 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 	}
 
 	// Decrypt secret before returning (ignore errors as non-critical)
-	if err := m.decryptWebhook(&result); err != nil {
-		m.lo.Error("error decrypting webhook secret after update", "webhook_id", result.ID, "error", err)
-	}
+	_ = m.decryptWebhook(&result)
 
 	return result, nil
 }
@@ -266,7 +262,7 @@ func (m *Manager) TriggerEvent(event models.WebhookEvent, data any) {
 		Payload: data,
 	}:
 	default:
-		m.lo.Warn("webhook delivery queue is full, dropping webhook delivery", "event", event, "queue_size", len(m.deliveryQueue))
+		m.lo.Error("webhook delivery queue is full, dropping webhook delivery", "event", event, "queue_size", len(m.deliveryQueue))
 	}
 }
 
@@ -291,7 +287,7 @@ func (m *Manager) TriggerWebhook(webhookID int, event models.WebhookEvent, data 
 		WebhookID: webhookID,
 	}:
 	default:
-		m.lo.Warn("webhook delivery queue is full, dropping webhook delivery", "event", event, "webhook_id", webhookID, "queue_size", len(m.deliveryQueue))
+		m.lo.Error("webhook delivery queue is full, dropping webhook delivery", "event", event, "webhook_id", webhookID, "queue_size", len(m.deliveryQueue))
 	}
 }
 
@@ -395,8 +391,8 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 		"webhook_id", webhook.ID,
 		"url", webhook.URL,
 		"event", task.Event,
-		"payload", string(payloadBytes),
-		"headers", req.Header,
+		"payload_bytes", len(payloadBytes),
+		"header_count", len(req.Header),
 	)
 
 	// Make the request
@@ -433,7 +429,7 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 			"event", task.Event,
 			"url", webhook.URL,
 			"status_code", resp.StatusCode,
-			"response", string(responseBody))
+			"response_bytes", len(responseBody))
 	}
 }
 

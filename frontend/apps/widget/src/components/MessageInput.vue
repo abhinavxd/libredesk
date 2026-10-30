@@ -11,7 +11,9 @@
     <!-- Message Input -->
     <div class="p-2 border-t">
       <!-- Unified Input Container -->
-      <div class="border border-input rounded-md bg-background focus-within:border-secondary">
+      <div
+        class="border border-input rounded-lg bg-background transition-colors duration-150 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring"
+      >
         <!-- Textarea Container -->
         <div class="p-2">
           <Textarea

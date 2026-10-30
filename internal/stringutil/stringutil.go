@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/inbucket/html2text"
 	"github.com/yuin/goldmark"
@@ -31,12 +32,55 @@ var (
 	regexpHyphens         = regexp.MustCompile(`-+`)
 	regexpConvUUID        = regexp.MustCompile(`(?i)\+conv-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[a-f0-9]{4}-[a-f0-9]{12}@`)
 
+	// Italy, San Marino, Côte d'Ivoire and Congo keep the leading 0 in international numbers.
+	trunkZeroKeptDialCodes = map[string]bool{"39": true, "378": true, "225": true, "242": true}
+
 	// markdownRenderer escapes raw HTML in the input; single newlines render as <br>.
 	markdownRenderer = goldmark.New(
 		goldmark.WithExtensions(extension.GFM),
 		goldmark.WithRendererOptions(html.WithHardWraps()),
 	)
 )
+
+// NormalizeWhatsAppPhone strips formatting to the bare digit string Meta uses as the wa_id.
+func NormalizeWhatsAppPhone(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// WhatsAppPhoneForDialCode returns the Meta wa_id digits and whether an explicit international number matches the selected country.
+func WhatsAppPhoneForDialCode(phone, dialCode string) (string, bool) {
+	trimmed := strings.TrimSpace(phone)
+	digits := NormalizeWhatsAppPhone(trimmed)
+	isInternational := strings.HasPrefix(trimmed, "+") || strings.HasPrefix(digits, "00")
+	digits = strings.TrimPrefix(digits, "00")
+	if dialCode == "" {
+		return "", false
+	}
+	if digits == "" {
+		return "", true
+	}
+	national := digits
+	if isInternational {
+		if !strings.HasPrefix(digits, dialCode) {
+			return "", false
+		}
+		national = strings.TrimPrefix(digits, dialCode)
+	}
+	if !trunkZeroKeptDialCodes[dialCode] {
+		national = strings.TrimPrefix(national, "0")
+	}
+	if national == "" {
+		return "", true
+	}
+	return dialCode + national, true
+}
 
 // SanitizeUTF8 removes NUL bytes and replaces invalid UTF-8 byte sequences with the Unicode replacement character.
 func SanitizeUTF8(s string) string {
@@ -45,6 +89,19 @@ func SanitizeUTF8(s string) string {
 	}
 	s = strings.ReplaceAll(s, "\x00", "")
 	return strings.ToValidUTF8(s, "�")
+}
+
+func TruncateUTF8(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+	for maxBytes > 0 && !utf8.RuneStart(s[maxBytes]) {
+		maxBytes--
+	}
+	return s[:maxBytes]
 }
 
 // GenerateSlug generates a URL-friendly slug from a title; a script with no ASCII form falls back to a random slug.
@@ -260,6 +317,11 @@ func ExtractConvUUID(email string) string {
 	return match[6 : len(match)-1]
 }
 
+// RemoveConvPlusAddress strips the +conv-{uuid} tag, e.g. support+conv-{uuid}@domain.com -> support@domain.com.
+func RemoveConvPlusAddress(email string) string {
+	return regexpConvUUID.ReplaceAllString(email, "@")
+}
+
 // ExtractUUID finds and returns the first valid UUID v4 in the given text.
 // Returns empty string if no valid UUID is found.
 func ExtractUUID(text string) string {
@@ -291,6 +353,15 @@ func SplitName(name string) (string, string) {
 		return fields[0], ""
 	}
 	return fields[0], strings.Join(fields[1:], " ")
+}
+
+// CapitalizeFirst uppercases the first letter of s and leaves the rest unchanged.
+func CapitalizeFirst(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + s[size:]
 }
 
 func htmlToText(html string, opts html2text.Options) string {

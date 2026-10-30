@@ -1,14 +1,11 @@
 <template>
   <div>
-    <div class="flex justify-between mb-5">
-      <div class="ml-auto">
-        <Button @click="newRule">{{
-          $t('automation.newRule')
-        }}</Button>
-      </div>
-    </div>
     <div v-if="selectedTab">
-      <AutomationTabs v-model:automationsTab="selectedTab" />
+      <AutomationTabs v-model:automationsTab="selectedTab">
+        <template #actions>
+          <Button type="button" @click="newRule">{{ $t('automation.newRule') }}</Button>
+        </template>
+      </AutomationTabs>
     </div>
   </div>
 </template>

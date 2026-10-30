@@ -1,16 +1,16 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 
 export const createColumns = (t) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-macro', params: { id: row.original.id } },
@@ -23,41 +23,45 @@ export const createColumns = (t) => [
   },
   {
     accessorKey: 'visibility',
+    meta: { compact: true },
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.visibility'))
+      return h('div', null, t('globals.terms.visibility'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('visibility'))
+      return h('div', null, row.getValue('visibility'))
     }
   },
   {
     accessorKey: 'usage_count',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.usage'))
+      return h('div', null, t('globals.terms.usage'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('usage_count'))
+      return h('div', null, row.getValue('usage_count'))
     }
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.updatedAt'))
+      return h('div', null, t('globals.terms.updatedAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('updated_at') })
     }
   },
   {

@@ -1,8 +1,8 @@
 <template>
   <Sheet :open="isOpen" @update:open="$emit('update:open', $event)">
-    <SheetContent class="!max-w-[80vw] sm:!max-w-[80vw] h-full p-0 flex flex-col">
+    <SheetContent class="w-full !max-w-full lg:!max-w-[80vw] h-full p-0 flex flex-col">
       <div class="flex-1 flex flex-col min-h-0">
-        <div class="flex items-center justify-between p-6 border-b bg-card/50">
+        <div class="flex items-center justify-between p-4 sm:p-6 border-b bg-card/50">
           <div>
             <SheetTitle>
               {{
@@ -37,10 +37,10 @@
           </div>
         </div>
 
-        <Spinner v-if="isLoadingArticle" class="flex-1" />
+        <Spinner v-if="isLoadingArticle" :absolute="false" class="flex-1" />
 
-        <div v-else class="flex-1 flex min-h-0">
-          <div class="flex-1 flex flex-col p-6 space-y-6 min-h-0">
+        <div v-else class="flex-1 min-h-0 overflow-y-auto lg:flex lg:overflow-hidden">
+          <div class="min-w-0 flex-1 flex flex-col p-4 sm:p-6 space-y-6 lg:min-h-0">
             <form @submit="onSubmit" novalidate class="space-y-4 flex-1 flex flex-col min-h-0">
               <div ref="toolbarSlot" />
 
@@ -49,6 +49,7 @@
                   <FormControl>
                     <Input
                       ref="titleInput"
+                      :aria-label="t('globals.terms.title')"
                       type="text"
                       :placeholder="t('globals.terms.title')"
                       v-bind="componentField"
@@ -85,10 +86,12 @@
             </form>
           </div>
 
-          <div class="w-80 border-l bg-muted/20 p-6 overflow-y-auto">
+          <div
+            class="w-full border-t bg-muted/20 p-4 sm:p-6 lg:w-80 lg:shrink-0 lg:border-l lg:border-t-0 lg:overflow-y-auto"
+          >
             <div class="space-y-6">
               <div class="space-y-4">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.action', 2) }}
                 </h3>
 
@@ -115,10 +118,10 @@
               </div>
 
               <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.translation', 2) }}
                 </h3>
-                <p class="text-sm text-muted-foreground">
+                <p class="ui-description">
                   {{ t('helpCenter.translationsHint') }}
                 </p>
 
@@ -198,7 +201,7 @@
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.status') }}
                 </h3>
 
@@ -223,11 +226,11 @@
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.collection') }}
                 </h3>
 
-                <p v-if="localeCollections.length === 0" class="text-sm text-muted-foreground">
+                <p v-if="localeCollections.length === 0" class="ui-description">
                   {{ t('helpCenter.noCollectionsInLanguage') }}
                 </p>
                 <Button
@@ -265,7 +268,7 @@
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('helpCenter.writtenBy') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="author_id">
@@ -290,7 +293,7 @@
               </FormField>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('globals.terms.language') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="locale">
@@ -313,7 +316,7 @@
               </div>
 
               <div class="space-y-3">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('helpCenter.excerpt') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="excerpt">
@@ -332,7 +335,7 @@
               </div>
 
               <div class="space-y-3 border-t pt-4">
-                <h3 class="font-medium text-sm text-muted-foreground">
+                <h3 class="ui-heading">
                   {{ t('helpCenter.seo') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="meta_title">
@@ -420,8 +423,8 @@
       </DialogHeader>
 
       <div class="space-y-4">
-        <Spinner v-if="isLoadingLinkable" />
-        <p v-else-if="!linkableArticleItems.length" class="text-sm text-muted-foreground">
+        <Spinner v-if="isLoadingLinkable" :absolute="false" class="py-8" />
+        <p v-else-if="!linkableArticleItems.length" class="ui-description">
           {{ t('helpCenter.noLinkableArticles') }}
         </p>
         <SelectComboBox

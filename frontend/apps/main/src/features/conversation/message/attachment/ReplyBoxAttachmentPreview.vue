@@ -83,7 +83,9 @@ const getAttachmentName = (name) => {
 .attachment-list-move,
 .attachment-list-enter-active,
 .attachment-list-leave-active {
-  transition: all 0.3s ease;
+  transition:
+    opacity 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .attachment-list-enter-from,

@@ -55,6 +55,7 @@ SELECT
     conversations.first_reply_at,
     conversations.last_reply_at,
     conversations.resolved_at,
+    conversations.last_resolved_at,
     conversations.subject,
     conversations.last_message,
     conversations.last_message_at,
@@ -66,6 +67,14 @@ SELECT
     conversations.priority_id,
     conversations.assigned_user_id,
     conversations.assigned_team_id,
+    CASE WHEN assignee.id IS NULL THEN 'null'::json ELSE json_build_object(
+        'id', assignee.id,
+        'first_name', assignee.first_name,
+        'last_name', assignee.last_name,
+        'avatar_url', assignee.avatar_url,
+        'type', assignee.type,
+        'availability_status', assignee.availability_status
+    ) END AS assignee,
     (
     SELECT CASE WHEN COUNT(*) > 9 THEN 10 ELSE COUNT(*) END
     FROM (
@@ -101,6 +110,8 @@ SELECT
     ) ELSE NULL END as mentioned_message_uuid
     FROM conversations
     JOIN users ON contact_id = users.id
+    LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
+        AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
     JOIN inboxes ON inbox_id = inboxes.id  
     LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
     LEFT JOIN conversation_priorities ON priority_id = conversation_priorities.id
@@ -151,6 +162,14 @@ SELECT
     conversations.priority_id,
     conversations.assigned_user_id,
     conversations.assigned_team_id,
+    CASE WHEN assignee.id IS NULL THEN 'null'::json ELSE json_build_object(
+        'id', assignee.id,
+        'first_name', assignee.first_name,
+        'last_name', assignee.last_name,
+        'avatar_url', assignee.avatar_url,
+        'type', assignee.type,
+        'availability_status', assignee.availability_status
+    ) END AS assignee,
     conversation_statuses.name as status,
     conversation_priorities.name as priority,
     as_latest.first_response_deadline_at,
@@ -160,6 +179,8 @@ SELECT
     nxt_resp_event.met_at as next_response_met_at
 FROM conversations
 JOIN users ON contact_id = users.id
+LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
+    AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
 JOIN inboxes ON inbox_id = inboxes.id
 LEFT JOIN conversation_statuses ON status_id = conversation_statuses.id
 LEFT JOIN conversation_priorities ON priority_id = conversation_priorities.id
@@ -186,11 +207,13 @@ SELECT
    c.updated_at,
    c.closed_at,
    c.resolved_at,
+   c.last_resolved_at,
    c.contact_last_seen_at,
    c.inbox_id,
    inb.name as inbox_name,
    COALESCE(inb.from, '') as inbox_mail,
    COALESCE(inb.config->>'reply_to', '') as inbox_reply_to,
+   COALESCE((SELECT jsonb_agg(jsonb_build_object('email', email, 'verification_status', verification_status, 'verified_at', verified_at) ORDER BY position, id) FROM inbox_email_addresses WHERE inbox_id = inb.id AND kind = 'alias'), '[]'::jsonb) AS inbox_aliases,
    COALESCE(inb.channel::TEXT, '') as inbox_channel,
    c.status_id,
    c.priority_id,
@@ -205,6 +228,14 @@ SELECT
    c.snoozed_until,
    c.assigned_user_id,
    c.assigned_team_id,
+   CASE WHEN assignee.id IS NULL THEN 'null'::json ELSE json_build_object(
+       'id', assignee.id,
+       'first_name', assignee.first_name,
+       'last_name', assignee.last_name,
+       'avatar_url', assignee.avatar_url,
+       'type', assignee.type,
+       'availability_status', assignee.availability_status
+   ) END AS assignee,
    c.subject,
    c.contact_id,
    c.sla_policy_id,
@@ -242,17 +273,23 @@ SELECT
    ct.last_active_at as "contact.last_active_at",
    ct.last_login_at as "contact.last_login_at",
    ct.external_user_id as "contact.external_user_id",
+   (SELECT json_agg(json_build_object('channel', cci.channel, 'identifier', cci.identifier))
+      FROM contact_channel_identities cci WHERE cci.contact_id = ct.id) as "contact.channel_identities",
    as_latest.first_response_deadline_at,
    as_latest.resolution_deadline_at,
    as_latest.id as applied_sla_id,
    nxt_resp_event.deadline_at AS next_response_deadline_at,
    nxt_resp_event.met_at as next_response_met_at,
    c.last_continuity_email_sent_at,
+   c.last_inbound_at,
+   (SELECT MAX(c2.last_inbound_at) FROM conversations c2 WHERE c2.contact_id = c.contact_id AND c2.inbox_id = c.inbox_id) AS contact_last_inbound_at,
    csat.rating as csat_rating,
    csat.feedback as csat_feedback,
    csat.response_timestamp as csat_responded_at
 FROM conversations c
 JOIN users ct ON c.contact_id = ct.id
+LEFT JOIN users assignee ON c.assigned_user_id = assignee.id
+    AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
 JOIN inboxes inb ON c.inbox_id = inb.id
 LEFT JOIN LATERAL (
     SELECT rating, feedback, response_timestamp
@@ -311,6 +348,14 @@ SELECT
 FROM users u
 JOIN conversations c ON c.contact_id = u.id
 WHERE c.contact_id = $1
+  AND $5
+  AND (
+       $6
+    OR ($7 AND c.assigned_user_id = $3)
+    OR ($8 AND c.assigned_team_id = ANY($4::int[]))
+    OR ($9 AND c.assigned_team_id = ANY($4::int[]) AND c.assigned_user_id IS NULL)
+    OR ($10 AND c.assigned_user_id IS NULL AND c.assigned_team_id IS NULL)
+  )
 ORDER BY c.created_at DESC
 LIMIT $2;
 
@@ -496,6 +541,9 @@ LIMIT 200;
 -- name: get-conversation-uuid
 SELECT uuid from conversations where id = $1;
 
+-- name: get-conversation-inbox-contact
+SELECT inbox_id, contact_id FROM conversations WHERE uuid = $1;
+
 -- name: update-conversation-assigned-user
 UPDATE conversations
 SET assigned_user_id = $2,
@@ -503,10 +551,23 @@ updated_at = NOW()
 WHERE uuid = $1;
 
 -- name: claim-unassigned-conversation
-UPDATE conversations
-SET assigned_user_id = $2,
-updated_at = NOW()
-WHERE uuid = $1 AND assigned_user_id IS NULL AND assigned_team_id = $3;
+-- Assigns only if the conversation is still unassigned in the team and the user is still an enabled, non-away agent of that team.
+WITH assignee AS (
+    SELECT u.id
+    FROM users u
+    JOIN team_members tm ON tm.user_id = u.id AND tm.team_id = $3
+    WHERE u.id = $2 AND u.deleted_at IS NULL AND u.type = 'agent' AND u.enabled = true
+    AND u.availability_status NOT IN ('away_manual', 'away_and_reassigning')
+),
+claimed AS (
+    UPDATE conversations
+    SET assigned_user_id = $2,
+    updated_at = NOW()
+    WHERE uuid = $1 AND assigned_user_id IS NULL AND assigned_team_id = $3
+    AND EXISTS (SELECT 1 FROM assignee)
+    RETURNING id
+)
+SELECT EXISTS (SELECT 1 FROM assignee), EXISTS (SELECT 1 FROM claimed);
 
 -- name: update-conversation-contact-last-seen
 UPDATE conversations
@@ -527,11 +588,12 @@ WITH new_status AS (
     SELECT id, category FROM conversation_statuses WHERE name = $2
 )
 UPDATE conversations
-SET status_id     = (SELECT id FROM new_status),
-    resolved_at   = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
-    closed_at     = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
-    snoozed_until = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
-    updated_at    = NOW()
+SET status_id        = (SELECT id FROM new_status),
+    resolved_at      = COALESCE(resolved_at, CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() END),
+    last_resolved_at = CASE WHEN (SELECT category FROM new_status) = 'resolved' THEN NOW() ELSE last_resolved_at END,
+    closed_at        = COALESCE(closed_at,   CASE WHEN $2 = 'Closed'                                  THEN NOW() END),
+    snoozed_until    = CASE WHEN $2 = 'Snoozed' THEN $3::timestamptz ELSE NULL END,
+    updated_at       = NOW()
 WHERE uuid = $1;
 
 -- name: get-user-active-conversations-count
@@ -570,10 +632,16 @@ SET priority_id = (SELECT id FROM conversation_priorities WHERE name = $2),
 WHERE uuid = $1;
 
 -- name: upsert-user-last-seen
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-VALUES ($1, (SELECT id FROM conversations WHERE uuid = $2), NOW())
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at, updated_at)
+SELECT $1, c.id, COALESCE(m.created_at, NOW()), clock_timestamp()
+FROM conversations c
+LEFT JOIN conversation_messages m ON m.conversation_id = c.id AND m.uuid = NULLIF($3::text, '')::uuid
+WHERE c.uuid = $2 AND ($3::text = '' OR m.id IS NOT NULL)
 ON CONFLICT (conversation_id, user_id)
-DO UPDATE SET last_seen_at = NOW(), updated_at = NOW();
+DO UPDATE SET
+    last_seen_at = GREATEST(conversation_last_seen.last_seen_at, EXCLUDED.last_seen_at),
+    updated_at = GREATEST(conversation_last_seen.updated_at + INTERVAL '1 microsecond', clock_timestamp())
+RETURNING last_seen_at, (EXTRACT(EPOCH FROM updated_at) * 1000000)::bigint AS read_version;
 
 -- name: update-conversation-last-message
 -- $1=id, $2=uuid, $3=content, $4=sender_type, $5=timestamp, $6=message_type, $7=private, $8=sender_id
@@ -607,6 +675,14 @@ FROM conversation_participants
 INNER JOIN users ON users.id = conversation_participants.user_id
 WHERE conversation_participants.conversation_id = (SELECT id FROM conversations WHERE uuid = $1)
   AND users.type = 'agent'
+  AND EXISTS (
+      SELECT 1 FROM conversation_messages m
+      WHERE m.conversation_id = conversation_participants.conversation_id
+        AND m.sender_id = users.id
+        AND m.sender_type = 'agent'
+        AND m.type = 'outgoing'
+        AND NOT m.private
+  )
   AND users.email != 'System'
   AND users.enabled
   AND users.deleted_at IS NULL;
@@ -800,6 +876,45 @@ and source_id > ''
 ORDER BY id DESC
 LIMIT $2;
 
+-- name: get-previous-messages
+SELECT
+    m.created_at,
+    m.type = 'incoming' AS is_incoming,
+    COALESCE(m.content, '') AS content,
+    COALESCE(m.text_content, '') AS text_content,
+    COALESCE(m.content_type::text, '') AS content_type,
+    u.first_name,
+    COALESCE(u.last_name, '') AS last_name,
+    COALESCE(u.email, '') AS email
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+JOIN users u ON u.id = m.sender_id
+JOIN users ct ON ct.id = c.contact_id
+WHERE m.conversation_id = $1
+AND m.id < $2
+AND m.private = false
+AND m.status != 'failed'
+AND NOT COALESCE((m.meta->>'continuity_email')::boolean, false)
+AND NOT COALESCE((m.meta->>'is_csat')::boolean, false)
+AND (
+    (m.type = 'incoming' AND m.sender_id = c.contact_id)
+    OR (m.type = 'outgoing' AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements_text(COALESCE(m.meta->'to', '[]'::jsonb) || COALESCE(m.meta->'cc', '[]'::jsonb)) AS r(addr)
+        WHERE lower(r.addr) = lower(ct.email)
+    ))
+)
+ORDER BY m.id DESC
+LIMIT $3;
+
+-- name: get-email-sender-message
+SELECT m.type, m.meta
+FROM conversation_messages m
+JOIN conversations c ON c.id = m.conversation_id
+WHERE c.uuid = $1 AND m.private = false AND m.type IN ('incoming', 'outgoing')
+ORDER BY (m.type = 'outgoing') DESC, m.id DESC
+LIMIT 1;
+
 -- name: get-outgoing-pending-messages
 SELECT
     m.id,
@@ -828,11 +943,29 @@ SELECT
     c.uuid as conversation_uuid,
     c.subject,
     c.contact_id as message_receiver_id,
-    c.subject
+    c.subject,
+    c.reference_number
 FROM conversation_messages m
 INNER JOIN conversations c ON c.id = m.conversation_id
 WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
-AND NOT(m.id = ANY($1::INT[]))
+AND NOT (m.conversation_id = ANY($1::INT[]))
+AND NOT EXISTS (
+    SELECT 1
+    FROM conversation_messages earlier
+    WHERE earlier.conversation_id = m.conversation_id
+      AND earlier.status = 'pending'
+      AND earlier.type = 'outgoing'
+      AND earlier.private = false
+      AND earlier.id < m.id
+)
+ORDER BY m.id
+
+-- name: get-csat-messages
+SELECT m.uuid, m.meta, c.uuid AS conversation_uuid
+FROM csat_responses r
+JOIN conversations c ON c.id = r.conversation_id
+JOIN conversation_messages m ON m.conversation_id = c.id
+WHERE r.uuid = $1 AND m.meta->>'csat_uuid' = r.uuid::text;
 
 -- name: get-message
 SELECT
@@ -960,10 +1093,109 @@ FROM conversation_messages
 WHERE source_id = ANY($1::text []);
 
 -- name: update-message-status
-update conversation_messages set status = $1, updated_at = NOW() where uuid = $2;
+UPDATE conversation_messages SET status = $1::message_status, updated_at = NOW()
+WHERE uuid = $2 AND NOT ($1 = 'sent' AND status = 'failed');
+
+-- name: mark-message-pending-for-retry
+-- Keeping the old wamid or provider_status would let a late webhook re-fail the retried row.
+UPDATE conversation_messages m
+SET status = 'pending',
+    source_id = CASE WHEN inb.channel = 'whatsapp' THEN NULL ELSE m.source_id END,
+    meta = COALESCE(m.meta, '{}'::jsonb)
+             - 'provider_status' - 'provider_status_updated_at' - 'provider_sent_at'
+             - 'provider_delivered_at' - 'provider_read_at' - 'provider_failed_at'
+             - 'provider_failure_reason',
+    updated_at = NOW()
+FROM conversations c
+JOIN inboxes inb ON inb.id = c.inbox_id
+WHERE m.uuid = $1 AND c.id = m.conversation_id AND m.status IN ('failed', 'sent');
 
 -- name: update-message-source-id
 UPDATE conversation_messages SET source_id = $1 WHERE id = $2;
+
+-- name: update-message-source-id-by-uuid
+UPDATE conversation_messages SET source_id = $2, updated_at = NOW() WHERE uuid = $1;
+
+-- name: merge-message-meta-by-uuid
+UPDATE conversation_messages m
+SET meta = COALESCE(m.meta, '{}'::jsonb) || $2::jsonb,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.uuid = $1
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.meta;
+
+-- name: apply-whatsapp-message-status
+-- Meta guard is monotonic (rank order) and sticky on failure. The enum status only guards against un-failing a failed message.
+WITH ranks(status, rank) AS (
+  VALUES ('sent', 1), ('delivered', 2), ('read', 3), ('failed', 4)
+)
+UPDATE conversation_messages m
+SET status = CASE WHEN m.status != 'failed' THEN $2::message_status ELSE m.status END,
+    meta = CASE
+      WHEN COALESCE(m.meta->>'provider_status', '') != 'failed'
+       AND COALESCE(
+             (SELECT rank FROM ranks WHERE status = ($3::jsonb)->>'provider_status'),
+             0
+           ) >= COALESCE(
+             (SELECT rank FROM ranks WHERE status = m.meta->>'provider_status'),
+             0
+           )
+      THEN COALESCE(m.meta, '{}'::jsonb) || $3::jsonb
+      ELSE m.meta
+    END,
+    updated_at = NOW()
+FROM conversations c
+WHERE m.source_id = $1
+  AND c.id = m.conversation_id
+RETURNING m.uuid, c.uuid AS conversation_uuid, m.status, m.meta;
+
+-- name: get-whatsapp-read-receipt-target
+SELECT cm.source_id, c.inbox_id
+FROM conversation_messages cm
+JOIN conversations c ON c.id = cm.conversation_id
+JOIN inboxes i ON i.id = c.inbox_id
+WHERE c.uuid = $1
+  AND i.channel = 'whatsapp'
+  AND ($3::text = '' OR cm.created_at <= (SELECT created_at FROM conversation_messages WHERE conversation_id = c.id AND uuid = NULLIF($3::text, '')::uuid))
+  AND cm.type = 'incoming'
+  AND COALESCE(cm.source_id, '') != ''
+  AND cm.created_at > COALESCE(
+        (SELECT last_seen_at FROM conversation_last_seen ls
+         WHERE ls.conversation_id = c.id AND ls.user_id = $2),
+        'epoch'::timestamptz)
+ORDER BY cm.created_at DESC
+LIMIT 1;
+
+-- name: update-conversation-last-inbound-at
+UPDATE conversations
+SET last_inbound_at = GREATEST(last_inbound_at, $2),
+    updated_at = CASE WHEN last_inbound_at IS NULL OR last_inbound_at < $2 THEN NOW() ELSE updated_at END
+WHERE id = $1
+RETURNING contact_id, inbox_id;
+
+-- name: get-contact-window-inbound-at
+SELECT MAX(last_inbound_at) FROM conversations WHERE contact_id = $1 AND inbox_id = $2;
+
+-- name: get-latest-open-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved')
+ORDER BY last_interaction_at DESC NULLS LAST, created_at DESC
+LIMIT 1;
+
+-- name: get-latest-reopenable-conversation-by-contact-inbox
+SELECT id, uuid
+FROM conversations
+WHERE contact_id = $1
+  AND inbox_id = $2
+  AND status_id IN (SELECT id FROM conversation_statuses WHERE category = 'resolved')
+  AND last_resolved_at IS NOT NULL
+  AND last_resolved_at >= NOW() - make_interval(hours => $3)
+ORDER BY last_resolved_at DESC
+LIMIT 1;
 
 -- name: clear-message-handoff-form-pending
 UPDATE conversation_messages
@@ -1086,13 +1318,22 @@ last_msg AS (
     WHERE conversation_id = (SELECT id FROM target)
       AND (meta IS NULL OR NOT COALESCE((meta->>'continuity_email')::boolean, false))
     ORDER BY created_at DESC LIMIT 1
+),
+read_replies AS (
+    UPDATE user_notifications n SET is_read = true, updated_at = NOW()
+    FROM conversation_messages m, conversation_last_seen ls
+    WHERE n.user_id = $1 AND n.conversation_id = (SELECT id FROM target) AND NOT n.is_read
+      AND n.notification_type = ANY($3::user_notification_type[])
+      AND m.id = n.message_id
+      AND ls.user_id = $1 AND ls.conversation_id = n.conversation_id AND ls.last_seen_at >= m.created_at
 )
-INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at)
-SELECT $1, (SELECT id FROM target), ts FROM last_msg
+INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at, updated_at)
+SELECT $1, (SELECT id FROM target), ts, clock_timestamp() FROM last_msg
 ON CONFLICT (conversation_id, user_id)
 DO UPDATE SET
     last_seen_at = EXCLUDED.last_seen_at,
-    updated_at = NOW();
+    updated_at = GREATEST(conversation_last_seen.updated_at + INTERVAL '1 microsecond', clock_timestamp())
+RETURNING last_seen_at, (EXTRACT(EPOCH FROM updated_at) * 1000000)::bigint AS read_version;
 
 -- name: get-active-livechat-conversations-by-agent
 SELECT c.uuid, c.contact_id, c.inbox_id
@@ -1133,6 +1374,13 @@ WHERE uuid = ANY($1::uuid[])
 SELECT uuid::text
 FROM conversations
 WHERE contact_id = $1
+ORDER BY last_message_at DESC NULLS LAST
+LIMIT 200;
+
+-- name: get-conversation-uuids-by-contact-inbox
+SELECT uuid::text
+FROM conversations
+WHERE contact_id = $1 AND inbox_id = $2
 ORDER BY last_message_at DESC NULLS LAST
 LIMIT 200;
 

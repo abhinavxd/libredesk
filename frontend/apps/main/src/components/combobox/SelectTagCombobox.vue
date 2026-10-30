@@ -6,7 +6,11 @@
     :items="items"
     :placeholder="placeholderText"
     :search="searchTags"
-  />
+  >
+    <template v-if="$slots.action" #action>
+      <slot name="action" />
+    </template>
+  </SelectTag>
   <SelectComboBox
     v-else
     v-bind="$attrs"
@@ -63,9 +67,7 @@ const items = computed(() =>
 )
 
 const searchTags = (query) =>
-  props.valueField === 'id'
-    ? tagStore.searchTagOptions(query)
-    : tagStore.searchTagNames(query)
+  props.valueField === 'id' ? tagStore.searchTagOptions(query) : tagStore.searchTagNames(query)
 
 onMounted(tagStore.fetchTags)
 
