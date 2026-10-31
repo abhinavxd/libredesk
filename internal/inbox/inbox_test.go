@@ -176,6 +176,68 @@ func TestInboxEmailAddresses(t *testing.T) {
 	require.Equal(t, imodels.AliasVerificationNotVerified, updated.Aliases[0].VerificationStatus)
 	require.Nil(t, updated.Aliases[0].VerifiedAt)
 
+	updated.Aliases = append(updated.Aliases, imodels.EmailAlias{Email: "verified@example.com"})
+	_, err = mgr.Update(first.ID, updated)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `UPDATE inbox_email_addresses SET verification_status = 'verified', verified_at = NOW() WHERE inbox_id = $1 AND email = 'verified@example.com'`, first.ID)
+	require.NoError(t, err)
+	_, err = mgr.queries.StartAliasVerification.Exec(first.ID, "accounts@example.com", imodels.AliasVerificationPending, "imap-token")
+	require.NoError(t, err)
+	record, err = mgr.GetDBRecord(first.ID)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(record.Config, &newConfig))
+	imapConfig := newConfig.IMAP
+	newConfig.IMAP = nil
+	record.Config, err = json.Marshal(newConfig)
+	require.NoError(t, err)
+	updated, err = mgr.Update(first.ID, record)
+	require.NoError(t, err)
+	require.Equal(t, imodels.AliasVerificationNotVerified, updated.Aliases[0].VerificationStatus)
+	require.Equal(t, imodels.AliasVerificationVerified, updated.Aliases[1].VerificationStatus)
+	require.NotNil(t, updated.Aliases[1].VerifiedAt)
+	sendable, err = SendableEmailAddresses(updated.From, updated.Aliases)
+	require.NoError(t, err)
+	require.Contains(t, sendable, "verified@example.com")
+	require.Error(t, mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com"))
+
+	oauthConfig := newConfig
+	oauthConfig.AuthType = imodels.AuthTypeOAuth2
+	oauthConfig.OAuth = &imodels.OAuthConfig{Provider: "google", ClientID: "client-id"}
+	oauthInbox := record
+	oauthInbox.Config, err = json.Marshal(oauthConfig)
+	require.NoError(t, err)
+	_, err = mgr.Update(first.ID, oauthInbox)
+	require.Error(t, err)
+	oauthInbox.From = "oauth@example.com"
+	oauthInbox.Aliases = nil
+	_, err = mgr.Create(oauthInbox)
+	require.Error(t, err)
+
+	// IMAP turned off while a verification start waits on the inbox lock: the start must see it off.
+	newConfig.IMAP = imapConfig
+	record.Config, err = json.Marshal(newConfig)
+	require.NoError(t, err)
+	_, err = mgr.Update(first.ID, record)
+	require.NoError(t, err)
+	lockTx, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	_, err = lockTx.ExecContext(ctx, `SELECT id FROM inboxes WHERE id = $1 FOR UPDATE`, first.ID)
+	require.NoError(t, err)
+	started := make(chan error, 1)
+	go func() { started <- mgr.StartAliasVerification(ctx, first.ID, "accounts@example.com") }()
+	require.Eventually(t, func() bool {
+		var waiting int
+		return db.GetContext(ctx, &waiting, `SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`) == nil && waiting > 0
+	}, 5*time.Second, 20*time.Millisecond)
+	_, err = lockTx.ExecContext(ctx, `UPDATE inboxes SET config = config - 'imap' WHERE id = $1`, first.ID)
+	require.NoError(t, err)
+	require.NoError(t, lockTx.Commit())
+	require.Error(t, <-started)
+	record, err = mgr.GetDBRecord(first.ID)
+	require.NoError(t, err)
+	require.Equal(t, imodels.AliasVerificationNotVerified, record.Aliases[0].VerificationStatus)
+	updated = record
+
 	updated.Aliases = imodels.EmailAliases{}
 	updated, err = mgr.Update(first.ID, updated)
 	require.NoError(t, err)
