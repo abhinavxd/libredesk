@@ -552,12 +552,15 @@ WHERE uuid = $1;
 
 -- name: claim-unassigned-conversation
 -- Assigns only if the conversation is still unassigned in the team and the user is still an enabled, non-away agent of that team.
+-- Offline agents are also rejected when the team has skip_offline_agents enabled.
 WITH assignee AS (
     SELECT u.id
     FROM users u
     JOIN team_members tm ON tm.user_id = u.id AND tm.team_id = $3
+    JOIN teams t ON t.id = tm.team_id
     WHERE u.id = $2 AND u.deleted_at IS NULL AND u.type = 'agent' AND u.enabled = true
     AND u.availability_status NOT IN ('away_manual', 'away_and_reassigning')
+    AND NOT (t.skip_offline_agents AND u.availability_status = 'offline')
 ),
 claimed AS (
     UPDATE conversations

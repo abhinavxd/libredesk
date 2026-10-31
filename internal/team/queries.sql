@@ -1,5 +1,5 @@
 -- name: get-teams
-SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams order by updated_at desc;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, skip_offline_agents, business_hours_id, sla_policy_id, timezone from teams order by updated_at desc;
 
 -- name: get-teams-compact
 SELECT id, name, emoji from teams where ($1 = '' or name ilike '%' || $1 || '%') order by name limit NULLIF($2, 0) offset $3;
@@ -8,10 +8,10 @@ SELECT id, name, emoji from teams where ($1 = '' or name ilike '%' || $1 || '%')
 SELECT id, name, emoji from teams where id = ANY($1) order by name;
 
 -- name: get-user-teams
-SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams WHERE id IN (SELECT team_id FROM team_members WHERE user_id = $1) order by updated_at desc;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, skip_offline_agents, business_hours_id, sla_policy_id, timezone from teams WHERE id IN (SELECT team_id FROM team_members WHERE user_id = $1) order by updated_at desc;
 
 -- name: get-team
-SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, business_hours_id, sla_policy_id, timezone from teams where id = $1;
+SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, skip_offline_agents, business_hours_id, sla_policy_id, timezone from teams where id = $1;
 
 -- name: get-team-members
 SELECT u.id, t.id as team_id, u.availability_status
@@ -21,10 +21,10 @@ JOIN teams t ON t.id = tm.team_id
 WHERE t.id = $1 AND u.deleted_at IS NULL AND u.type = 'agent' AND u.enabled = true;
 
 -- name: insert-team
-INSERT INTO teams (name, timezone, conversation_assignment_type, business_hours_id, sla_policy_id, emoji, max_auto_assigned_conversations) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO teams (name, timezone, conversation_assignment_type, business_hours_id, sla_policy_id, emoji, max_auto_assigned_conversations, skip_offline_agents) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
 -- name: update-team
-UPDATE teams set name = $2, timezone = $3, conversation_assignment_type = $4, business_hours_id = $5, sla_policy_id = $6, emoji = $7, max_auto_assigned_conversations = $8, updated_at = now() where id = $1 RETURNING *;
+UPDATE teams set name = $2, timezone = $3, conversation_assignment_type = $4, business_hours_id = $5, sla_policy_id = $6, emoji = $7, max_auto_assigned_conversations = $8, skip_offline_agents = $9, updated_at = now() where id = $1 RETURNING *;
 
 -- name: upsert-user-teams
 WITH delete_old_teams AS (

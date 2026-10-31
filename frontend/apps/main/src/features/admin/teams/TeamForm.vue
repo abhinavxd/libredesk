@@ -61,6 +61,17 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField v-slot="{ componentField, handleChange }" name="skip_offline_agents">
+        <FormItem>
+          <SwitchField
+            :title="$t('admin.team.skipOfflineAgents')"
+            :description="$t('admin.team.skipOfflineAgents.description')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
       <FormField v-slot="{ componentField }" name="timezone">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
@@ -140,6 +151,7 @@
 
 <script setup>
 import FormGrid from '@shared-ui/components/FormGrid.vue'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button/index.js'
