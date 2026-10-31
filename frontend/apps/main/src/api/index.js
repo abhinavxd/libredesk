@@ -353,8 +353,8 @@ const sendMessage = (uuid, data) =>
     }
   })
 const getConversation = (uuid) => http.get(`/api/v1/conversations/${uuid}`, { abortOnRoute: true })
-const getConversationTranscript = (uuid) =>
-  http.get(`/api/v1/conversations/${uuid}/transcript`, { responseType: 'blob' })
+const getConversationTranscript = (uuid, format = 'txt') =>
+  http.get(`/api/v1/conversations/${uuid}/transcript`, { params: { format }, responseType: 'blob' })
 const getContactPageVisits = (uuid) => http.get(`/api/v1/conversations/${uuid}/page-visits`, { abortOnRoute: true })
 const getMacrosCompact = (params) => http.get('/api/v1/macros/compact', { params })
 const searchMacros = (params) => http.get('/api/v1/macros/search', { params })
