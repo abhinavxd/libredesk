@@ -565,6 +565,7 @@ CREATE TABLE conversation_tags (
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id);
+CREATE INDEX index_conversation_tags_on_tag_id_and_conversation_id ON conversation_tags (tag_id, conversation_id);
 
 DROP TABLE IF EXISTS csat_responses CASCADE;
 CREATE TABLE csat_responses (

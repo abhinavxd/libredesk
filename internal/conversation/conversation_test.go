@@ -227,6 +227,17 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 			}
 		}
 	}
+	var tags [2]int
+	for n := range tags {
+		if err := db.Get(&tags[n], `INSERT INTO tags (name) VALUES ($1) RETURNING id`, fmt.Sprintf("Tag %d", n)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO conversation_tags (conversation_id, tag_id)
+			SELECT id, $1 FROM conversations WHERE subject::int % $2 = 0`, tags[n], n+2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tagFilter := fmt.Sprintf(`[{"model":"conversations","field":"tags","operator":"contains","value":"[%d,%d,%d]"}]`, tags[0], tags[0], tags[1])
 	closedFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Closed"}]`
 	for _, tt := range []struct {
 		name, listType, order, orderBy, filters string
@@ -241,6 +252,7 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 		{"mentioned", models.MentionedConversations, "desc", "", closedFilter, 1, 16, []string{"64", "60"}},
 		{"date filter", models.AllConversations, "desc", "", `[{"model":"conversations","field":"created_at","operator":"equals","value":"2026-01-01"}]`, 1, 72, []string{"72", "71"}},
 		{"contact filter", models.AllConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"user0@example.com"}]`, 1, 72, []string{"72", "71"}},
+		{"tag union", models.AllConversations, "desc", "", tagFilter, 1, 48, []string{"72", "70"}},
 		{"no filters", models.AllConversations, "", "", "", 1, 72, []string{"72", "71"}},
 		{"last page", models.AllConversations, "desc", "", closedFilter, 32, 64, []string{"2", "1"}},
 		{"past last page", models.AllConversations, "desc", "", closedFilter, 33, 0, nil},

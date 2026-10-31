@@ -929,6 +929,13 @@ ORDER BY (m.type = 'outgoing') DESC, m.id DESC
 LIMIT 1;
 
 -- name: get-outgoing-pending-messages
+WITH pending AS MATERIALIZED (
+    SELECT DISTINCT ON (conversation_id) id
+    FROM conversation_messages
+    WHERE status = 'pending' AND type = 'outgoing' AND private = false
+      AND NOT (conversation_id = ANY($1::INT[]))
+    ORDER BY conversation_id, id
+)
 SELECT
     m.id,
     m.created_at,
@@ -958,19 +965,9 @@ SELECT
     c.contact_id as message_receiver_id,
     c.subject,
     c.reference_number
-FROM conversation_messages m
+FROM pending
+JOIN conversation_messages m ON m.id = pending.id
 INNER JOIN conversations c ON c.id = m.conversation_id
-WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
-AND NOT (m.conversation_id = ANY($1::INT[]))
-AND NOT EXISTS (
-    SELECT 1
-    FROM conversation_messages earlier
-    WHERE earlier.conversation_id = m.conversation_id
-      AND earlier.status = 'pending'
-      AND earlier.type = 'outgoing'
-      AND earlier.private = false
-      AND earlier.id < m.id
-)
 ORDER BY m.id
 
 -- name: get-csat-messages
