@@ -401,7 +401,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		format = "txt"
 	}
 	if format != "txt" && format != "pdf" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("conversation.invalidTranscriptFormat"), nil /* data */, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidValue"), nil /* data */, envelope.InputError)
 	}
 
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
@@ -429,7 +429,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("conversation.transcriptPDFUnsupportedCharacters"), nil /* data */, envelope.InputError)
 			}
 			app.lo.Error("error building PDF transcript", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("conversation.transcriptDownloadFailed"), nil /* data */, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil /* data */, envelope.GeneralError)
 		}
 		contentType = "application/pdf"
 	}
