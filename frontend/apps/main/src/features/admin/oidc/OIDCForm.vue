@@ -53,7 +53,12 @@
         <FormItem>
           <FormLabel>{{ $t('globals.terms.providerURL') }}</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="https://accounts.google.com" v-bind="componentField" />
+            <Input
+              type="text"
+              placeholder="https://accounts.google.com"
+              v-bind="componentField"
+              :disabled="credentialsFromConfig"
+            />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -79,7 +84,12 @@
         <FormItem>
           <FormLabel>{{ $t('globals.terms.clientID') }}</FormLabel>
           <FormControl>
-            <Input type="text" placeholder="" v-bind="componentField" />
+            <Input
+              type="text"
+              placeholder=""
+              v-bind="componentField"
+              :disabled="credentialsFromConfig"
+            />
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -89,8 +99,16 @@
         <FormItem>
           <FormLabel>{{ $t('globals.terms.clientSecret') }}</FormLabel>
           <FormControl>
-            <Input type="password" placeholder="" v-bind="componentField" />
+            <Input
+              type="password"
+              placeholder=""
+              v-bind="componentField"
+              :disabled="credentialsFromConfig"
+            />
           </FormControl>
+          <FormDescription v-if="credentialsFromConfig">
+            {{ $t('admin.sso.credentialsFromConfig') }}
+          </FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -169,8 +187,13 @@ const submitLabel = computed(() => {
   )
 })
 
+// A provider whose secret is set in the server config has its credentials locked here.
+const credentialsFromConfig = computed(() => !!props.initialValues?.client_secret_from_config)
+
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: computed(() =>
+    toTypedSchema(createFormSchema(t, { credentialsFromConfig: credentialsFromConfig.value }))
+  )
 })
 
 const onSubmit = form.handleSubmit((values) => {
