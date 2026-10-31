@@ -388,7 +388,8 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return nil
 	}
 	// A web form can't send as the customer without failing DMARC, so it sends as this inbox with the customer in Reply-To.
-	if customer, ok := e.formCustomer(env); ok {
+	customer, fromReplyTo := e.formCustomer(env)
+	if fromReplyTo {
 		env.From = []imap.Address{customer}
 	}
 	var fromAddress = strings.ToLower(env.From[0].Addr())
@@ -475,12 +476,13 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
-		Channel:  ChannelEmail,
-		InboxID:  inboxID,
-		Contact:  contact,
-		Subject:  env.Subject,
-		SourceID: null.StringFrom(messageID),
-		Meta:     meta,
+		Channel:            ChannelEmail,
+		InboxID:            inboxID,
+		Contact:            contact,
+		ContactFromReplyTo: fromReplyTo,
+		Subject:            env.Subject,
+		SourceID:           null.StringFrom(messageID),
+		Meta:               meta,
 	}
 
 	// Fetch full message body.
@@ -660,7 +662,7 @@ func (e *Email) formCustomer(env *imap.Envelope) (imap.Address, bool) {
 		return imap.Address{}, false
 	}
 	for _, address := range env.ReplyTo {
-		if address.Addr() != "" && !e.ReceivesAddress(address.Addr()) {
+		if address.Addr() != "" && !e.ReceivesAddress(stringutil.RemoveConvPlusAddress(address.Addr())) {
 			return address, true
 		}
 	}
