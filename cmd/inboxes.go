@@ -169,6 +169,47 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	return nil
 }
 
+// requestAppOnlyToken requests a Microsoft client credentials token. Tests replace it.
+var requestAppOnlyToken = oauth.ClientCredentialsToken
+
+// checkAppOnlyCredentials requests a client credentials token so wrong Entra credentials fail on save rather than on
+// the first poll. On update it runs only when the credentials changed, and an empty secret means the stored one.
+// Exchange mailbox permissions are not checked here; they surface on the first IMAP poll.
+func checkAppOnlyCredentials(app *App, configJSON, previousJSON json.RawMessage) error {
+	var cfg imodels.Config
+	if err := json.Unmarshal(configJSON, &cfg); err != nil {
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if !cfg.IsAppOnly() || cfg.OAuth == nil {
+		return nil
+	}
+	creds := *cfg.OAuth
+	if len(previousJSON) > 0 {
+		var previous imodels.Config
+		if err := json.Unmarshal(previousJSON, &previous); err == nil && previous.OAuth != nil {
+			if creds.ClientSecret == "" {
+				creds.ClientSecret = previous.OAuth.ClientSecret
+			}
+			if previous.IsAppOnly() && creds.TenantID == previous.OAuth.TenantID &&
+				creds.ClientID == previous.OAuth.ClientID && creds.ClientSecret == previous.OAuth.ClientSecret {
+				return nil
+			}
+		}
+	}
+	if creds.ClientSecret == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_secret"), nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if _, err := requestAppOnlyToken(ctx, creds.ClientID, creds.ClientSecret, creds.TenantID); err != nil {
+		safeErr := oauth.SafeTokenError(err)
+		app.lo.Error("app-only credential check failed", "error", safeErr)
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.oauth.appOnly.credentialCheckFailed", "error", safeErr.Error()), nil)
+	}
+	return nil
+}
+
 // ensureWhatsAppCSATTemplate reconciles the inbox's reserved CSAT template on Meta. A language change creates a fresh one. Approval arrives via webhook/sync.
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	defer func() {
@@ -200,6 +241,12 @@ func handleCreateInbox(r *fastglue.Request) error {
 
 	if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if inbox.Channel == "email" {
+		if err := checkAppOnlyCredentials(app, inbox.Config, nil); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
 	}
 
 	createdInbox, err := app.inbox.Create(inbox)
@@ -263,6 +310,16 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		}
 		inbox.Config = merged
 		if err := validateWhatsAppCredentials(r, app, inbox); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+
+	if inbox.Channel == "email" {
+		previous, err := app.inbox.GetDBRecord(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		if err := checkAppOnlyCredentials(app, inbox.Config, previous.Config); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}
@@ -664,7 +721,7 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 
 	// Validate email channel config.
 	if inbox.Channel == "email" {
-		if err := validateEmailConfig(app, inbox.Config); err != nil {
+		if err := validateEmailConfig(app, inbox.Config, isUpdate); err != nil {
 			return err
 		}
 	}
@@ -701,19 +758,19 @@ func validateLiveChatSessionDuration(app *App, value string) error {
 }
 
 // validateEmailConfig validates the email inbox configuration.
-func validateEmailConfig(app *App, configJSON json.RawMessage) error {
+func validateEmailConfig(app *App, configJSON json.RawMessage, isUpdate bool) error {
 	var cfg imodels.Config
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
 	// Validate auth_type.
-	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 {
+	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 && cfg.AuthType != imodels.AuthTypeOAuth2App {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
-	// Validate OAuth config if auth_type is oauth2.
-	if cfg.AuthType == imodels.AuthTypeOAuth2 {
+	// Validate OAuth config if auth_type is oauth2 or oauth2_app.
+	if cfg.AuthType == imodels.AuthTypeOAuth2 || cfg.AuthType == imodels.AuthTypeOAuth2App {
 		if cfg.OAuth == nil {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth"), nil)
 		}
@@ -722,6 +779,12 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 		}
 		if cfg.OAuth.ClientID == "" {
 			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_id"), nil)
+		}
+	}
+
+	if cfg.IsAppOnly() {
+		if err := validateAppOnlyConfig(app, cfg, isUpdate); err != nil {
+			return err
 		}
 	}
 
@@ -734,7 +797,7 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPortValue"), nil)
 		}
 		// Validate auth_protocol for password auth.
-		if cfg.AuthType != imodels.AuthTypeOAuth2 {
+		if !cfg.UsesXOAUTH2() {
 			validAuthProtocols := map[string]bool{"": true, "none": true, "plain": true, "login": true, "cram": true}
 			if !validAuthProtocols[cfg.SMTP[i].AuthProtocol] {
 				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
@@ -760,6 +823,34 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 		}
 	}
 
+	return nil
+}
+
+// validateAppOnlyConfig validates a Microsoft client credentials (app-only) email config.
+// The client secret may be empty on update, which keeps the stored one.
+func validateAppOnlyConfig(app *App, cfg imodels.Config, isUpdate bool) error {
+	if cfg.OAuth.Provider != string(oauth.ProviderMicrosoft) {
+		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	switch strings.ToLower(cfg.OAuth.TenantID) {
+	case "":
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.tenant_id"), nil)
+	case "common", "organizations", "consumers":
+		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.oauth.appOnly.tenantRequired"), nil)
+	}
+	if !isUpdate && cfg.OAuth.ClientSecret == "" {
+		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_secret"), nil)
+	}
+	for _, imap := range cfg.IMAP {
+		if imap.Username == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "imap.username"), nil)
+		}
+	}
+	for _, smtp := range cfg.SMTP {
+		if smtp.Username == "" {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "smtp.username"), nil)
+		}
+	}
 	return nil
 }
 

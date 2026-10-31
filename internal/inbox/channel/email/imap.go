@@ -116,7 +116,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	defer client.Logout()
 
 	// Authenticate based on auth type
-	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
+	if e.usesXOAUTH2() {
 		// Refresh OAuth token if needed
 		oauthConfig, _, err := e.refreshOAuthIfNeeded()
 		if err != nil {
