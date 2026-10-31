@@ -522,7 +522,7 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 		// re-check who is assigned instead of trusting the pre-run snapshot.
 		fresh, err := m.convo.GetConversation(conv.ID, "", "")
 		if err == nil && (!fresh.AssignedUserID.Valid || int(fresh.AssignedUserID.Int) != assistant.UserID) {
-			m.recordEvent(assistant.ID, conv.ID, "handoff")
+			m.markHandedOff(conv, assistant)
 			return
 		}
 	}
@@ -532,6 +532,11 @@ func (m *Manager) handoff(conv cmodels.Conversation, assistant models.Assistant,
 			return
 		}
 	}
+	m.markHandedOff(conv, assistant)
+}
+
+func (m *Manager) markHandedOff(conv cmodels.Conversation, assistant models.Assistant) {
+	m.convo.StartWaitingForAgent(conv.UUID)
 	m.recordEvent(assistant.ID, conv.ID, "handoff")
 }
 

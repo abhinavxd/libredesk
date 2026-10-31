@@ -256,35 +256,54 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 			return
 		}
 
-		now := time.Now()
-		nowStr := now.Format(time.RFC3339)
-		wsData := map[string]any{"last_reply_at": nowStr, "waiting_since": nil}
-
-		var isFirstReply bool
-		if err := m.q.UpdateConversationReplyTimestamps.QueryRow(message.ConversationID, now).Scan(&isFirstReply); err != nil {
-			m.lo.Error("error updating conversation reply timestamps", "error", err)
-		} else if isFirstReply {
-			wsData["first_reply_at"] = nowStr
-			// Stamp the first-response SLA immediately.
-			if err := m.slaStore.EvaluateConversationSLA(message.ConversationID); err != nil {
-				m.lo.Error("error evaluating SLA after first reply", "conversation_id", message.ConversationID, "error", err)
-			}
+		sender, err := m.userStore.GetAgentCachedOrLoad(message.SenderID)
+		if err != nil {
+			m.lo.Error("error fetching message sender", "sender_id", message.SenderID, "error", err)
 		}
-
-		// Mark latest SLA event for next response metric as met.
-		metAt, err := m.slaStore.SetLatestSLAEventMetAt(conversation.AppliedSLAID.Int, sla.MetricNextResponse)
-		if err != nil && !errors.Is(err, sla.ErrLatestSLAEventNotFound) {
-			m.lo.Error("error setting next response SLA event `met_at`", "conversation_id", conversation.ID, "metric", sla.MetricNextResponse, "applied_sla_id", conversation.AppliedSLAID.Int, "error", err)
-		} else if !metAt.IsZero() {
-			wsData["next_response_met_at"] = metAt.Format(time.RFC3339)
+		if replyCountsTowardSLA(sender, conversation) {
+			m.recordReply(message, conversation)
+		} else {
+			m.lo.Info("reply from an assistant that no longer handles the conversation does not count toward SLA", "conversation_id", conversation.ID, "sender_id", message.SenderID)
 		}
-
-		m.BroadcastConversationUpdate(message.ConversationUUID, wsData)
 
 		if message.ShouldEvaluateAutomation(systemUser.ID) {
 			m.automation.EvaluateConversationUpdateRulesByID(message.ConversationID, "", amodels.EventConversationMessageOutgoing, umodels.User{ID: message.SenderID})
 		}
 	}
+}
+
+func replyCountsTowardSLA(sender umodels.User, conversation models.Conversation) bool {
+	if sender.Type != umodels.UserTypeAIAssistant {
+		return true
+	}
+	return conversation.AssignedUserID.Valid && int(conversation.AssignedUserID.Int) == sender.ID
+}
+
+func (m *Manager) recordReply(message models.Message, conversation models.Conversation) {
+	now := time.Now()
+	nowStr := now.Format(time.RFC3339)
+	wsData := map[string]any{"last_reply_at": nowStr, "waiting_since": nil}
+
+	var isFirstReply bool
+	if err := m.q.UpdateConversationReplyTimestamps.QueryRow(message.ConversationID, now).Scan(&isFirstReply); err != nil {
+		m.lo.Error("error updating conversation reply timestamps", "error", err)
+	} else if isFirstReply {
+		wsData["first_reply_at"] = nowStr
+		// Stamp the first-response SLA immediately.
+		if err := m.slaStore.EvaluateConversationSLA(message.ConversationID); err != nil {
+			m.lo.Error("error evaluating SLA after first reply", "conversation_id", message.ConversationID, "error", err)
+		}
+	}
+
+	// Mark latest SLA event for next response metric as met.
+	metAt, err := m.slaStore.SetLatestSLAEventMetAt(conversation.AppliedSLAID.Int, sla.MetricNextResponse)
+	if err != nil && !errors.Is(err, sla.ErrLatestSLAEventNotFound) {
+		m.lo.Error("error setting next response SLA event `met_at`", "conversation_id", conversation.ID, "metric", sla.MetricNextResponse, "applied_sla_id", conversation.AppliedSLAID.Int, "error", err)
+	} else if !metAt.IsZero() {
+		wsData["next_response_met_at"] = metAt.Format(time.RFC3339)
+	}
+
+	m.BroadcastConversationUpdate(message.ConversationUUID, wsData)
 }
 
 // BuildTemplateData builds the common template data map for rendering message content variables.
@@ -1698,21 +1717,35 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 			m.aiAgent.HandleConversationEvent(conversation.ID, conversation.AssignedUserID.Int)
 		}
 
-		if conversation.SLAPolicyID.Int == 0 {
-			m.lo.Debug("no SLA policy applied to conversation, skipping next response SLA event creation")
-			return nil
-		}
-		if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {
-			m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
-		} else if !deadline.IsZero() {
-			m.lo.Info("next response SLA event created for conversation", "conversation_id", conversation.ID, "deadline", deadline, "sla_policy_id", conversation.SLAPolicyID.Int)
-			m.BroadcastConversationUpdate(conversationUUID, map[string]any{
-				"next_response_deadline_at": deadline.Format(time.RFC3339),
-				"next_response_met_at":      nil,
-			})
-		}
+		m.startNextResponseSLA(conversation)
 	}
 	return nil
+}
+
+func (m *Manager) StartWaitingForAgent(conversationUUID string) {
+	m.StartConversationWaitingSince(conversationUUID, time.Now())
+	conversation, err := m.GetConversation(0, conversationUUID, "")
+	if err != nil {
+		m.lo.Error("error fetching conversation to start waiting for an agent", "conversation_uuid", conversationUUID, "error", err)
+		return
+	}
+	m.startNextResponseSLA(conversation)
+}
+
+func (m *Manager) startNextResponseSLA(conversation models.Conversation) {
+	if conversation.SLAPolicyID.Int == 0 {
+		m.lo.Debug("no SLA policy applied to conversation, skipping next response SLA event creation")
+		return
+	}
+	if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {
+		m.lo.Error("error creating next response SLA event", "conversation_id", conversation.ID, "error", err)
+	} else if !deadline.IsZero() {
+		m.lo.Info("next response SLA event created for conversation", "conversation_id", conversation.ID, "deadline", deadline, "sla_policy_id", conversation.SLAPolicyID.Int)
+		m.BroadcastConversationUpdate(conversation.UUID, map[string]any{
+			"next_response_deadline_at": deadline.Format(time.RFC3339),
+			"next_response_met_at":      nil,
+		})
+	}
 }
 
 // broadcastMessageToWidgetClients sends a message to widget clients if the conversation belongs to a livechat inbox.
