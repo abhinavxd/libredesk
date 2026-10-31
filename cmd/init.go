@@ -49,6 +49,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/role"
 	"github.com/abhinavxd/libredesk/internal/search"
 	"github.com/abhinavxd/libredesk/internal/setting"
+	smodels "github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/tag"
@@ -677,17 +678,48 @@ func initAutoAssigner(teamManager *team.Manager, userManager *user.Manager, conv
 	return e
 }
 
-// initNotifier initializes the notifier service with available providers.
-func initNotifier() *notifier.Service {
-	smtpCfg := imodels.SMTPConfig{}
-	if err := ko.UnmarshalWithConf("notification.email", &smtpCfg, koanf.UnmarshalConf{Tag: "json"}); err != nil {
-		log.Fatalf("error unmarshalling email notification provider config: %v", err)
+// loadEmailNotificationSettings reads the email notification settings from the database.
+func loadEmailNotificationSettings(settings *setting.Manager) (smodels.EmailNotification, error) {
+	var cfg smodels.EmailNotification
+	out, err := settings.GetByPrefix("notification.email")
+	if err != nil {
+		return cfg, err
 	}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		return cfg, fmt.Errorf("unmarshalling email notification settings: %w", err)
+	}
+	return cfg, nil
+}
 
-	emailNotifier, err := emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
+// buildEmailNotifier builds the email notification provider from the given settings.
+func buildEmailNotifier(cfg smodels.EmailNotification) (*emailnotifier.Email, error) {
+	smtpCfg := imodels.SMTPConfig{
+		Username:          cfg.Username,
+		Password:          cfg.Password,
+		AuthProtocol:      cfg.AuthProtocol,
+		TLSType:           cfg.TLSType,
+		TLSSkipVerify:     cfg.TLSSkipVerify,
+		Host:              cfg.Host,
+		Port:              cfg.Port,
+		HelloHostname:     cfg.HelloHostname,
+		MaxConns:          cfg.MaxConns,
+		MaxMessageRetries: cfg.MaxMsgRetries,
+		IdleTimeout:       cfg.IdleTimeout,
+		PoolWaitTimeout:   cfg.WaitTimeout,
+	}
+	return emailnotifier.New([]imodels.SMTPConfig{smtpCfg}, emailnotifier.Opts{
 		Lo:        initLogger("email-notifier"),
-		FromEmail: ko.String("notification.email.email_address"),
+		FromEmail: cfg.EmailAddress,
 	})
+}
+
+// initNotifier initializes the notifier service with available providers.
+func initNotifier(settings *setting.Manager) *notifier.Service {
+	cfg, err := loadEmailNotificationSettings(settings)
+	if err != nil {
+		log.Fatalf("error loading email notification settings: %v", err)
+	}
+	emailNotifier, err := buildEmailNotifier(cfg)
 	if err != nil {
 		log.Fatalf("error initializing email notifier: %v", err)
 	}
@@ -1280,7 +1312,7 @@ func initImporter(i18n *i18n.I18n) *importer.Importer {
 	})
 }
 
-func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service, checker notifier.DeliveryChecker) *notifier.EmailQueue {
+func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service, checker notifier.DeliveryChecker, enabled bool) *notifier.EmailQueue {
 	q, err := notifier.NewEmailQueue(notifier.EmailQueueOpts{
 		DB:       db,
 		Checker:  checker,
@@ -1290,6 +1322,7 @@ func initNotificationEmailQueue(db *sqlx.DB, outbound *notifier.Service, checker
 	if err != nil {
 		log.Fatalf("error initializing notification email queue: %v", err)
 	}
+	q.SetEnabled(enabled)
 	return q
 }
 
@@ -1315,17 +1348,14 @@ func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18
 }
 
 // initNotifDispatcher initializes the notification dispatcher.
-func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub, emailEnabled bool) *notifier.Dispatcher {
-	providers := []notificationchannels.Provider{
-		notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
-	}
-	if emailEnabled {
-		providers = append(providers, notificationchannels.NewEmail(emailQueue))
-	}
-	providers = append(providers, notificationchannels.NewPush(push))
+func initNotifDispatcher(userNotification *notifier.UserNotificationManager, prefs *notifier.PreferenceManager, push *notifier.PushManager, emailQueue *notifier.EmailQueue, wsHub *ws.Hub) *notifier.Dispatcher {
 	return notifier.NewDispatcher(notifier.DispatcherOpts{
-		Pipeline: notificationchannels.NewPipeline(providers...),
-		Prefs:    prefs,
+		Pipeline: notificationchannels.NewPipeline(
+			notificationchannels.NewInApp(userNotification, wsHub, initLogger("notification-in-app")),
+			notificationchannels.NewEmail(emailQueue),
+			notificationchannels.NewPush(push),
+		),
+		Prefs: prefs,
 	})
 }
 
