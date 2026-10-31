@@ -73,9 +73,19 @@
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="downloadTranscript">
-              {{ t('conversation.downloadTranscript') }}
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {{ t('conversation.downloadTranscript') }}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem @click="downloadTranscript('txt')">
+                  {{ t('globals.terms.plainText') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="downloadTranscript('pdf')">
+                  {{ t('globals.terms.pdf') }}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               v-if="userStore.can(perms.MESSAGES_WRITE_PRIVATE)"
               :disabled="isSummarizing"
@@ -110,6 +120,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
@@ -160,12 +173,12 @@ const snoozedUntilLabel = computed(() =>
     : ''
 )
 
-const downloadTranscript = async () => {
+const downloadTranscript = async (format = 'txt') => {
   const conversation = conversationStore.current
   if (!conversation) return
   try {
-    const response = await api.getConversationTranscript(conversation.uuid)
-    downloadBlobResponse(response, `transcript-${conversation.reference_number}.txt`)
+    const response = await api.getConversationTranscript(conversation.uuid, format)
+    downloadBlobResponse(response, `transcript-${conversation.reference_number}.${format}`)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -213,6 +226,7 @@ const handleUpdateStatus = (status) => {
 
 const paletteActions = {
   [CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT]: downloadTranscript,
+  [CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT_PDF]: () => downloadTranscript('pdf'),
   [CONVERSATION_ACTIONS.SUMMARIZE]: summarize
 }
 const onPaletteAction = (action) => paletteActions[action]?.()

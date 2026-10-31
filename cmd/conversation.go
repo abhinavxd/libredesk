@@ -389,20 +389,27 @@ func handleGetConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conv)
 }
 
-// handleDownloadConversationTranscript sends the conversation transcript as a text file download.
+// handleDownloadConversationTranscript downloads the public transcript as TXT or PDF.
 func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	var (
-		app   = r.Context.(*App)
-		uuid  = r.RequestCtx.UserValue("uuid").(string)
-		auser = r.RequestCtx.UserValue("user").(amodels.User)
+		app    = r.Context.(*App)
+		uuid   = r.RequestCtx.UserValue("uuid").(string)
+		auser  = r.RequestCtx.UserValue("user").(amodels.User)
+		format = string(r.RequestCtx.QueryArgs().Peek("format"))
 	)
+	if format == "" {
+		format = "txt"
+	}
+	if format != "txt" && format != "pdf" {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidValue"), nil /* data */, envelope.InputError)
+	}
 
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	conversation, err := enforceConversationAccess(app, uuid, user)
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -413,12 +420,24 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
-	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
-	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
+	transcript := app.conversation.BuildTranscript(*conv, messages, time.Now() /* downloadedAt */)
+	contentType := "text/plain; charset=utf-8"
+	if format == "pdf" {
+		transcript, err = conversation.BuildTranscriptPDF(transcript)
+		if err != nil {
+			if errors.Is(err, conversation.ErrTranscriptPDFUnsupportedCharacters) {
+				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("conversation.transcriptPDFUnsupportedCharacters"), nil /* data */, envelope.InputError)
+			}
+			app.lo.Error("error building PDF transcript", "error", err)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil /* data */, envelope.GeneralError)
+		}
+		contentType = "application/pdf"
+	}
+	safeRef := stringutil.SanitizeFilename(conv.ReferenceNumber)
+	filename := fmt.Sprintf("transcript-%s.%s", safeRef, format)
 	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
+	r.RequestCtx.SetContentType(contentType)
 	r.RequestCtx.SetBody(transcript)
 	return nil
 }
