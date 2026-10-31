@@ -425,9 +425,6 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	if format == "pdf" {
 		transcript, err = conversation.BuildTranscriptPDF(transcript)
 		if err != nil {
-			if errors.Is(err, conversation.ErrTranscriptPDFUnsupportedCharacters) {
-				return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("conversation.transcriptPDFUnsupportedCharacters"), nil /* data */, envelope.InputError)
-			}
 			app.lo.Error("error building PDF transcript", "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil /* data */, envelope.GeneralError)
 		}

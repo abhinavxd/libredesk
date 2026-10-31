@@ -1,7 +1,6 @@
 package conversation
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,8 +17,6 @@ const (
 	transcriptPDFMargin  = 36.0
 	transcriptLineHeight = 14.0
 )
-
-var ErrTranscriptPDFUnsupportedCharacters = errors.New("transcript contains characters missing from the PDF font")
 
 func (m *Manager) BuildTranscript(conversation models.Conversation, messages []models.Message, downloadedAt time.Time) []byte {
 	var b strings.Builder
@@ -66,10 +63,7 @@ func BuildTranscriptPDF(transcript []byte) ([]byte, error) {
 	var pdf gopdf.GoPdf
 	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
 	pdf.SetMargins(transcriptPDFMargin, transcriptPDFMargin, transcriptPDFMargin, transcriptPDFMargin)
-	missingGlyph := false
-	if err := pdf.AddTTFFontDataWithOption("Go", goregular.TTF, gopdf.TtfOption{
-		OnGlyphNotFound: func(rune) { missingGlyph = true },
-	}); err != nil {
+	if err := pdf.AddTTFFontData("Go", goregular.TTF); err != nil {
 		return nil, err
 	}
 	if err := pdf.SetFont("Go", "" /* style */, 10 /* size */); err != nil {
@@ -86,9 +80,6 @@ func BuildTranscriptPDF(transcript []byte) ([]byte, error) {
 			lines, err = pdf.SplitTextWithWordWrap(paragraph, width)
 			if err != nil {
 				return nil, err
-			}
-			if missingGlyph {
-				return nil, ErrTranscriptPDFUnsupportedCharacters
 			}
 		}
 		for _, line := range lines {
