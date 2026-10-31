@@ -331,6 +331,36 @@ func FuzzProcessMailboxMalformedHeaders(f *testing.F) {
 	})
 }
 
+func TestFormCustomer(t *testing.T) {
+	e := &Email{receiveAddresses: map[string]struct{}{"support@example.com": {}, "help@example.com": {}}}
+	own := imap.Address{Name: "Support", Mailbox: "support", Host: "example.com"}
+	alias := imap.Address{Mailbox: "help", Host: "example.com"}
+	customer := imap.Address{Name: "Taro Yamada", Mailbox: "taro", Host: "customer.example"}
+	other := imap.Address{Mailbox: "someone", Host: "customer.example"}
+	tagged := imap.Address{Mailbox: "support+conv-abc12345-1234-4123-8123-123456789abc", Host: "example.com"}
+
+	for _, tc := range []struct {
+		name    string
+		env     imap.Envelope
+		want    imap.Address
+		matched bool
+	}{
+		{name: "form mail sent as the inbox", env: imap.Envelope{From: []imap.Address{own}, ReplyTo: []imap.Address{customer}}, want: customer, matched: true},
+		{name: "form mail sent as an alias", env: imap.Envelope{From: []imap.Address{alias}, ReplyTo: []imap.Address{customer}}, want: customer, matched: true},
+		{name: "first Reply-To is the inbox", env: imap.Envelope{From: []imap.Address{own}, ReplyTo: []imap.Address{own, customer}}, want: customer, matched: true},
+		{name: "customer mail keeps its sender", env: imap.Envelope{From: []imap.Address{other}, ReplyTo: []imap.Address{customer}}},
+		{name: "own mail without Reply-To", env: imap.Envelope{From: []imap.Address{own}}},
+		{name: "own mail replying to itself", env: imap.Envelope{From: []imap.Address{own}, ReplyTo: []imap.Address{alias}}},
+		{name: "own mail replying to a conversation address", env: imap.Envelope{From: []imap.Address{own}, ReplyTo: []imap.Address{tagged}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, matched := e.formCustomer(&tc.env)
+			require.Equal(t, tc.matched, matched)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestEmail_extractUUIDFromReplyAddress(t *testing.T) {
 	e := &Email{}
 
