@@ -84,8 +84,9 @@ func (e *Email) readMailbox(ctx context.Context, scanInboxSince time.Duration, c
 	e.lo.Debug("email search complete", "mailbox", cfg.Mailbox, "inbox_id", e.Identifier())
 }
 
-// processMailbox processes emails in the specified mailbox.
-func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) error {
+// dialIMAP opens and authenticates an IMAP connection with the inbox's own credentials.
+// The caller owns the returned client and must log it out.
+func (e *Email) dialIMAP(cfg imodels.IMAPConfig) (*imapclient.Client, error) {
 	var (
 		client *imapclient.Client
 		err    error
@@ -107,20 +108,19 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	case "tls":
 		client, err = imapclient.DialTLS(address, imapOptions)
 	default:
-		return fmt.Errorf("unknown IMAP TLS type: %q", cfg.TLSType)
+		return nil, fmt.Errorf("unknown IMAP TLS type: %q", cfg.TLSType)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to connect to IMAP server: %w", err)
+		return nil, fmt.Errorf("failed to connect to IMAP server: %w", err)
 	}
-
-	defer client.Logout()
 
 	// Authenticate based on auth type
 	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
 		// Refresh OAuth token if needed
 		oauthConfig, _, err := e.refreshOAuthIfNeeded()
 		if err != nil {
-			return err
+			client.Logout()
+			return nil, err
 		}
 
 		// Use XOAUTH2 authentication
@@ -130,15 +130,29 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		}
 		if err := client.Authenticate(saslClient); err != nil {
 			e.flagAuthError()
-			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
+			client.Logout()
+			return nil, fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
 		}
 	} else {
 		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
 			e.flagAuthError()
-			return fmt.Errorf("error logging in to the IMAP server: %w", err)
+			client.Logout()
+			return nil, fmt.Errorf("error logging in to the IMAP server: %w", err)
 		}
 	}
 	e.clearAuthError()
+
+	return client, nil
+}
+
+// processMailbox processes emails in the specified mailbox.
+func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) error {
+	client, err := e.dialIMAP(cfg)
+	if err != nil {
+		return err
+	}
+
+	defer client.Logout()
 
 	if _, err := client.Select(cfg.Mailbox, &imap.SelectOptions{ReadOnly: false}).Wait(); err != nil {
 		return fmt.Errorf("error selecting mailbox: %w", err)
