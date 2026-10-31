@@ -256,6 +256,7 @@ const getUser = (id) => http.get(`/api/v1/agents/${id}`)
 const deleteUserAvatar = () => http.delete('/api/v1/agents/me/avatar')
 const getCurrentUser = () => http.get('/api/v1/agents/me')
 const getCurrentUserTeams = () => http.get('/api/v1/agents/me/teams')
+const updateCurrentUserPreferences = (data) => http.put('/api/v1/agents/me/preferences', data)
 const updateCurrentUserAvailability = (data) => http.put('/api/v1/agents/me/availability', data, {
   headers: {
     'Content-Type': 'application/json'
@@ -727,6 +728,7 @@ export default {
   deleteMacro,
   applyMacro,
   updateCurrentUser,
+  updateCurrentUserPreferences,
   updateAssignee,
   updateConversationStatus,
   updateConversationPriority,

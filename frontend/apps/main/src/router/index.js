@@ -175,6 +175,12 @@ const routes = [
             component: () =>
               import('@main/views/account/notifications/NotificationPreferences.vue'),
             meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
+          },
+          {
+            path: 'preferences',
+            name: 'account-preferences',
+            component: () => import('@main/views/account/preferences/PreferencesView.vue'),
+            meta: { titleKey: 'globals.terms.preferences' }
           }
         ]
       },

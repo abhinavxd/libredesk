@@ -92,6 +92,7 @@ type queries struct {
 	UpdateCustomAttributes           *sqlx.Stmt `query:"update-custom-attributes"`
 	UpsertCustomAttributes           *sqlx.Stmt `query:"upsert-custom-attributes"`
 	UpdateAvatar                     *sqlx.Stmt `query:"update-avatar"`
+	UpdatePreferences                *sqlx.Stmt `query:"update-preferences"`
 	UpdateAvailability               *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt               *sqlx.Stmt `query:"update-last-active-at"`
 	UpdateInactiveOffline            *sqlx.Stmt `query:"update-inactive-offline"`
@@ -317,6 +318,15 @@ func (u *Manager) SetExternalUserID(id int, externalUserID string) (bool, error)
 func (u *Manager) UpdateAvatar(id int, path string) error {
 	if _, err := u.q.UpdateAvatar.Exec(id, null.NewString(path, path != "")); err != nil {
 		u.lo.Error("error updating user avatar", "error", err)
+		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	return nil
+}
+
+// UpdatePreferences updates the preferences for a user.
+func (u *Manager) UpdatePreferences(id int, preferences []byte) error {
+	if _, err := u.q.UpdatePreferences.Exec(id, preferences); err != nil {
+		u.lo.Error("error updating user preferences", "error", err)
 		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil

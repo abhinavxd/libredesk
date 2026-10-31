@@ -277,6 +277,11 @@ export const accountNavItems = [
     href: '/account/notifications',
     isTitleKeyPlural: true,
     icon: 'Bell'
+  },
+  {
+    titleKey: 'globals.terms.preferences',
+    href: '/account/preferences',
+    icon: 'SlidersHorizontal'
   }
 ]
 
