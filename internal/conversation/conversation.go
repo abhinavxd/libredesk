@@ -347,6 +347,7 @@ type queries struct {
 	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
 	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                    string     `query:"get-conversations"`
+	GetConversationsPageBase            string     `query:"get-conversations-page-base"`
 	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
@@ -690,7 +691,7 @@ func (c *Manager) GetConversationParticipants(uuid string) ([]models.Conversatio
 	return conv, nil
 }
 
-// GetUnassignedConversations retrieves unassigned conversations.
+// GetUnassignedConversations returns team inbox tickets for round robin assignment.
 func (c *Manager) GetUnassignedConversations() ([]models.Conversation, error) {
 	var conv []models.Conversation
 	if err := c.q.GetUnassignedConversations.Select(&conv); err != nil {
@@ -2051,25 +2052,22 @@ func (c *Manager) getConversationTags(uuid string) ([]string, error) {
 	return tags, nil
 }
 
-// makeConversationsListQuery prepares a SQL query string for conversations list
-// viewingUserID is used as $1 for per-agent unread count calculation
-// $2 is includeMentions bool for conditional mentioned_message_uuid column
-func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []interface{}, error) {
+// makeConversationsListQuery paginates matching tickets before loading details and counts matches independently.
+func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []any, error) {
 	includeMentions := slices.Contains(listTypes, models.MentionedConversations)
 	qArgs := []any{viewingUserID, includeMentions}
 
-	// Set defaults
 	if orderBy == "" {
 		orderBy = "conversations.last_message_at"
 	}
 	if order == "" {
 		order = "DESC"
 	}
+	order = strings.ToUpper(order)
 	if filtersJSON == "" {
 		filtersJSON = "[]"
 	}
 
-	// Validate inputs
 	if pageSize > conversationsListMaxPageSize {
 		pageSize = conversationsListMaxPageSize
 	}
@@ -2078,24 +2076,31 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		return "", nil, fmt.Errorf("no conversation list types specified")
 	}
 
-	// Prepare the conditions based on the list types.
 	conditions, err := appendListTypeConditions(listTypes, viewingUserID, userID, teamIDs, &qArgs)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// Build the base query with list type conditions
 	whereClause := listTypeWhereClause(conditions)
-
-	baseQuery = fmt.Sprintf(baseQuery, whereClause)
-
-	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
+	location := c.FilterLocation()
+	pageBase := fmt.Sprintf(c.q.GetConversationsPageBase, orderBy, whereClause)
+	pageQuery, pageArgs, err := dbutil.BuildPaginatedQuery(pageBase, qArgs, dbutil.PaginationOptions{
 		Order:    order,
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
-		Location: c.FilterLocation(),
+		Location: location,
 	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
+	if err != nil {
+		return "", nil, err
+	}
+
+	countQuery, _, err := dbutil.BuildFilterQuery(pageBase, qArgs, filtersJSON, ListFilterAllowedFields, ListFilterRenderers, location)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return fmt.Sprintf(baseQuery, pageQuery, countQuery, order), pageArgs, nil
 }
 
 // ValidateListFilters structurally validates a conversation view's filters payload.

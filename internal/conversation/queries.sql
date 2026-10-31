@@ -35,8 +35,11 @@ RETURNING id, uuid;
 -- name: get-conversations
 -- $1 = viewing user ID for per-agent unread count
 -- $2 = include mentioned message UUID (true for mentioned inbox, false otherwise)
+WITH page AS MATERIALIZED (
+    %s
+)
 SELECT
-    COUNT(*) OVER() as total,
+    (SELECT COUNT(*) FROM (%s) matching) as total,
     conversations.id,
     conversations.created_at,
     conversations.updated_at,
@@ -108,7 +111,8 @@ SELECT
         ORDER BY cm2.created_at DESC
         LIMIT 1
     ) ELSE NULL END as mentioned_message_uuid
-    FROM conversations
+    FROM page
+    JOIN conversations ON conversations.id = page.id
     JOIN users ON contact_id = users.id
     LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
         AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
@@ -129,6 +133,14 @@ SELECT
         ORDER BY se.created_at DESC
         LIMIT 1
     ) nxt_resp_event ON true
+ORDER BY page.sort_value %s NULLS LAST
+
+-- name: get-conversations-page-base
+SELECT conversations.id, %s AS sort_value
+FROM conversations
+JOIN users ON conversations.contact_id = users.id
+JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
 WHERE 1=1 %s
 
 -- name: get-conversation-list-item
@@ -703,7 +715,8 @@ SELECT
     inb.name as inbox_name
 FROM conversations c
     JOIN inboxes inb ON c.inbox_id = inb.id 
-WHERE assigned_user_id IS NULL AND assigned_team_id IS NOT NULL
+WHERE c.assigned_user_id IS NULL
+  AND c.assigned_team_id IN (SELECT id FROM teams WHERE conversation_assignment_type = 'Round robin')
 ORDER BY c.created_at ASC;
 
 -- name: add-conversation-tags

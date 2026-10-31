@@ -1,4 +1,4 @@
--- name: search-conversations
+-- name: search-conversations-page
 WITH matched_conversations AS (
     SELECT id
     FROM conversations
@@ -10,6 +10,25 @@ WITH matched_conversations AS (
     FROM users
     JOIN conversations ON conversations.contact_id = users.id
     WHERE users.email ILIKE $10 ESCAPE '\'
+)
+SELECT conversations.id
+FROM conversations
+JOIN users ON conversations.contact_id = users.id
+LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
+WHERE conversations.id IN (SELECT id FROM matched_conversations)
+  AND $3
+  AND (
+       $4
+    OR ($5 AND conversations.assigned_user_id = $2)
+    OR ($6 AND conversations.assigned_team_id = ANY($9::int[]))
+    OR ($7 AND conversations.assigned_team_id = ANY($9::int[]) AND conversations.assigned_user_id IS NULL)
+    OR ($8 AND conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL)
+  )
+
+-- name: search-conversations
+WITH page AS MATERIALIZED (
+    %s
 )
 SELECT
     conversations.id,
@@ -38,22 +57,15 @@ SELECT
         (SELECT ARRAY_AGG(tags.name ORDER BY tags.name) FROM conversation_tags JOIN tags ON tags.id = conversation_tags.tag_id WHERE conversation_tags.conversation_id = conversations.id),
         '{}'
     ) AS tags
-FROM conversations
+FROM page
+JOIN conversations ON conversations.id = page.id
 JOIN users ON conversations.contact_id = users.id
 LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
 LEFT JOIN teams ON conversations.assigned_team_id = teams.id
 LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
 LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
 LEFT JOIN conversation_priorities ON conversations.priority_id = conversation_priorities.id
-WHERE conversations.id IN (SELECT id FROM matched_conversations)
-  AND $3
-  AND (
-       $4
-    OR ($5 AND conversations.assigned_user_id = $2)
-    OR ($6 AND conversations.assigned_team_id = ANY($9::int[]))
-    OR ($7 AND conversations.assigned_team_id = ANY($9::int[]) AND conversations.assigned_user_id IS NULL)
-    OR ($8 AND conversations.assigned_user_id IS NULL AND conversations.assigned_team_id IS NULL)
-  )
+ORDER BY %s
 
 -- name: search-messages
 SELECT

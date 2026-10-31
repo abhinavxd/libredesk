@@ -626,10 +626,10 @@ func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) (int, error) {
 }
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.
-func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON, location string) (string, []interface{}, error) {
+func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON, location string) (string, []any, error) {
 	var qArgs []any
 	qArgs = append(qArgs, pq.Array(userTypes))
-	return dbutil.BuildPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
+	return dbutil.BuildCountedPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
 		Order:    order,
 		OrderBy:  orderBy,
 		Page:     page,
@@ -637,7 +637,7 @@ func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, orde
 		Location: location,
 	}, filtersJSON, dbutil.AllowedFields{
 		"users": {"email", "created_at", "updated_at"},
-	}, nil)
+	}, nil /** renderers **/)
 }
 
 // verifyPassword compares the provided password with the stored password hash.

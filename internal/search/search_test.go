@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/search/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/jmoiron/sqlx"
@@ -295,4 +296,60 @@ func insertSearchConversation(t *testing.T, db *sqlx.DB, reference, email, first
 		t.Fatalf("inserting conversation: %v", err)
 	}
 	return conversationID, contactID
+}
+
+func TestConversationSearchFiltersBeforePagination(t *testing.T) {
+	db := testutil.NewDB(t, "search_filtered_pagination")
+	lo := logf.New(logf.Opts{})
+	manager, err := New(Opts{
+		DB: db, Lo: &lo, I18n: testutil.NewI18n(t),
+		FilterLocation: func() string { return "UTC" },
+		FilterFields:   dbutil.AllowedFields{"conversation_statuses": {"name"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email')`); err != nil {
+		t.Fatal(err)
+	}
+	var actor int
+	if err := db.Get(&actor, `INSERT INTO users (type, first_name, last_name) VALUES ('agent', 'Agent', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
+	for n := range 4 {
+		id, _ := insertSearchConversation(t, db, fmt.Sprint(n+100), fmt.Sprintf("contact%d@example.com", n), "Contact", "", "Subject", start.Add(time.Duration(n)*time.Hour))
+		if n < 2 {
+			if _, err := db.Exec(`UPDATE conversations SET assigned_user_id = $1 WHERE id = $2`, actor, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if n > 0 {
+			if _, err := db.Exec(`UPDATE conversations SET status_id = (SELECT id FROM conversation_statuses WHERE name = 'Closed') WHERE id = $1`, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	scope := models.ReadScope{UserID: actor, Read: true, ReadAssigned: true}
+	query := models.Query{Term: "example.com", PageSize: 1}
+	rows, more, cursor, err := manager.Conversations(query, scope)
+	if err != nil || len(rows) != 1 || rows[0].ReferenceNumber != "101" || !more || cursor == "" {
+		t.Fatalf("first accessible page = %+v more=%t cursor=%s err=%v", rows, more, cursor, err)
+	}
+	query.Cursor = cursor
+	rows, more, cursor, err = manager.Conversations(query, scope)
+	if err != nil || len(rows) != 1 || rows[0].ReferenceNumber != "100" || more || cursor != "" {
+		t.Fatalf("last accessible page = %+v more=%t cursor=%s err=%v", rows, more, cursor, err)
+	}
+	query.Cursor = ""
+	query.Filters = `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Open"}]`
+	rows, more, cursor, err = manager.Conversations(query, scope)
+	if err != nil || len(rows) != 1 || rows[0].ReferenceNumber != "100" || more || cursor != "" {
+		t.Fatalf("filtered page = %+v more=%t cursor=%s err=%v", rows, more, cursor, err)
+	}
+	scope.Read = false
+	rows, more, cursor, err = manager.Conversations(query, scope)
+	if err != nil || len(rows) != 0 || more || cursor != "" {
+		t.Fatalf("results without permission = %+v more=%t cursor=%s err=%v", rows, more, cursor, err)
+	}
 }
