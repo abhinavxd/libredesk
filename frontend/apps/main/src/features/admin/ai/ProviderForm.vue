@@ -7,10 +7,10 @@
     <CardContent>
       <form @submit="onSubmit" novalidate class="provider-form space-y-6 w-full">
         <div class="space-y-2">
-          <p class="text-sm font-medium leading-none">{{ t('admin.ai.preset') }}</p>
+          <p class="text-sm font-medium leading-none">{{ i18n._('Preset') }}</p>
           <Select v-model="selectedPreset" @update:modelValue="applyPreset">
             <SelectTrigger>
-              <SelectValue :placeholder="t('globals.terms.custom')" />
+              <SelectValue :placeholder="i18n._('Custom')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="p in presets" :key="p.value" :value="p.value">
@@ -18,13 +18,13 @@
               </SelectItem>
             </SelectContent>
           </Select>
-          <p class="ui-description">{{ t('admin.ai.presetHint') }}</p>
+          <p class="ui-description">{{ i18n._('Pre-fills the base URL and model for a common provider. You can still edit any field.') }}</p>
         </div>
 
         <FormGrid class="provider-grid"
           ><FormField v-slot="{ componentField }" name="model">
             <FormItem>
-              <FormLabel>{{ t('globals.terms.model') }}</FormLabel>
+              <FormLabel>{{ i18n._('Model') }}</FormLabel>
               <FormControl>
                 <Input
                   type="text"
@@ -37,7 +37,7 @@
           </FormField>
           <FormField v-slot="{ componentField }" name="base_url">
             <FormItem>
-              <FormLabel>{{ t('admin.ai.baseUrl') }}</FormLabel>
+              <FormLabel>{{ i18n._('Base URL') }}</FormLabel>
               <FormControl>
                 <Input
                   type="text"
@@ -45,19 +45,19 @@
                   v-bind="componentField"
                 />
               </FormControl>
-              <FormDescription>{{ t('admin.ai.baseUrlHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('OpenAI-compatible API base URL. Leave blank for the OpenAI default.') }}</FormDescription>
               <FormMessage />
             </FormItem> </FormField
         ></FormGrid>
         <FormGrid class="provider-grid">
           <FormField v-slot="{ componentField }" name="api_key">
             <FormItem>
-              <FormLabel>{{ t('globals.terms.apiKey') }}</FormLabel>
+              <FormLabel>{{ i18n.ngettext('API key', 'API keys', 1) }}</FormLabel>
               <FormControl>
                 <Input
                   type="password"
                   autocomplete="new-password"
-                  :placeholder="hasApiKey ? t('admin.ai.apiKeyPlaceholder') : ''"
+                  :placeholder="hasApiKey ? i18n._('Leave blank to remove the saved key') : ''"
                   v-bind="componentField"
                 />
               </FormControl>
@@ -70,21 +70,21 @@
             name="reasoning_effort"
           >
             <FormItem>
-              <FormLabel>{{ t('admin.ai.reasoningEffort') }}</FormLabel>
+              <FormLabel>{{ i18n._('Reasoning effort') }}</FormLabel>
               <FormControl>
                 <Input type="text" placeholder="none" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ t('admin.ai.reasoningEffortHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('Leave blank for most models. Values: \'\'none\'\', \'\'low\'\', \'\'medium\'\' or \'\'high\'\'.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
           <FormField v-if="showEmbeddingFields" v-slot="{ componentField }" name="dimensions">
             <FormItem>
-              <FormLabel>{{ t('admin.ai.dimensions') }}</FormLabel>
+              <FormLabel>{{ i18n._('Dimensions') }}</FormLabel>
               <FormControl>
                 <Input type="number" min="1" step="1" placeholder="1536" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ t('admin.ai.dimensionsHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('Must match the model\'\'s output size (e.g. 1536 for text-embedding-3-small). Existing snippets are re-embedded automatically after you change this.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -93,7 +93,7 @@
           ><FormGrid class="provider-grid"
             ><FormField v-slot="{ componentField }" name="temperature">
               <FormItem>
-                <FormLabel>{{ t('admin.ai.temperature') }}</FormLabel>
+                <FormLabel>{{ i18n._('Temperature') }}</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.1" min="0" max="2" v-bind="componentField" />
                 </FormControl>
@@ -102,7 +102,7 @@
             </FormField>
             <FormField v-slot="{ componentField }" name="max_tokens">
               <FormItem>
-                <FormLabel>{{ t('admin.ai.maxTokens') }}</FormLabel>
+                <FormLabel>{{ i18n._('Max tokens') }}</FormLabel>
                 <FormControl>
                   <Input type="number" min="1" step="1" v-bind="componentField" />
                 </FormControl>
@@ -112,19 +112,19 @@
           </FormGrid>
           <FormField v-slot="{ componentField }" name="instructions">
             <FormItem class="col-span-full">
-              <FormLabel>{{ t('admin.ai.instructions') }}</FormLabel>
+              <FormLabel>{{ i18n._('Custom instructions') }}</FormLabel>
               <FormControl>
                 <Textarea rows="4" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ t('admin.ai.instructionsHint') }}</FormDescription>
+              <FormDescription>{{ i18n._('Added to AI prompts. Use it to set tone and format, e.g. keep replies under 3 sentences.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
           <FormField v-slot="{ componentField, handleChange }" name="vision">
             <FormItem class="col-span-full">
               <SwitchField
-                :title="t('admin.ai.vision')"
-                :description="t('admin.ai.visionHint')"
+                :title="i18n._('Model supports image input')"
+                :description="i18n._('Enable only if the completion model can read images. When on, image attachments from customers are sent to the model. When off, images are never sent.')"
                 :checked="componentField.modelValue"
                 @update:checked="handleChange"
               />
@@ -132,9 +132,9 @@
         ></template>
 
         <div class="flex gap-2">
-          <Button type="submit" :isLoading="formLoading">{{ t('globals.messages.save') }}</Button>
+          <Button type="submit" :isLoading="formLoading">{{ i18n._('Save') }}</Button>
           <Button type="button" variant="secondary" :isLoading="testLoading" @click="onTest">
-            {{ t('admin.ai.testConnection') }}
+            {{ i18n._('Test connection') }}
           </Button>
         </div>
       </form>
@@ -177,7 +177,7 @@ import {
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const props = defineProps({
@@ -188,7 +188,7 @@ const props = defineProps({
   showEmbeddingFields: { type: Boolean, default: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const formLoading = ref(false)
 const testLoading = ref(false)
@@ -293,21 +293,21 @@ const isPositiveInt = (v) => {
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
-      model: z.string({ required_error: t('globals.messages.required') }).min(1, {
-        message: t('globals.messages.required')
+      model: z.string({ required_error: i18n._('{name} Required') }).min(1, {
+        message: i18n._('{name} Required')
       }),
       base_url: z.string().optional(),
       api_key: z.string().optional(),
       instructions: z.string().optional(),
       reasoning_effort: z.string().optional(),
       temperature: numberField().refine((v) => isBlank(v) || inRange(v, 0, 2), {
-        message: t('admin.ai.temperatureRange')
+        message: i18n._('Temperature must be a number between 0 and 2.')
       }),
       max_tokens: numberField().refine((v) => isBlank(v) || isPositiveInt(v), {
-        message: t('admin.ai.positiveNumber')
+        message: i18n._('Enter a whole number greater than 0.')
       }),
       dimensions: numberField().refine((v) => isBlank(v) || isPositiveInt(v), {
-        message: t('admin.ai.positiveNumber')
+        message: i18n._('Enter a whole number greater than 0.')
       }),
       vision: z.boolean().optional()
     })
@@ -385,7 +385,7 @@ const onTest = async () => {
     testLoading.value = true
     await api.testAIConfig(props.type, buildPayload(form.values))
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('admin.ai.testSuccess')
+      description: i18n._('Connection successful. The provider accepted the request.')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -404,7 +404,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     hasApiKey.value = !!values.api_key
     form.setFieldValue('api_key', hasApiKey.value ? '•'.repeat(10) : '')
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

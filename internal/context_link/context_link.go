@@ -17,7 +17,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -29,14 +29,14 @@ var (
 type Manager struct {
 	q             queries
 	lo            *logf.Logger
-	i18n          *i18n.I18n
+	i18n          *gotext.Locale
 	encryptionKey string
 }
 
 type Opts struct {
 	DB            *sqlx.DB
 	Lo            *logf.Logger
-	I18n          *i18n.I18n
+	I18n          *gotext.Locale
 	EncryptionKey string
 }
 
@@ -68,7 +68,7 @@ func (m *Manager) GetAll() ([]models.ContextLink, error) {
 	var links = make([]models.ContextLink, 0)
 	if err := m.q.GetAllContextLinks.Select(&links); err != nil {
 		m.lo.Error("error fetching context links", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.decryptLinks(links)
 	return links, nil
@@ -78,13 +78,13 @@ func (m *Manager) Get(id int) (models.ContextLink, error) {
 	var link models.ContextLink
 	if err := m.q.GetContextLink.Get(&link, id); err != nil {
 		if err == sql.ErrNoRows {
-			return link, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return link, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching context link", "error", err)
-		return link, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return link, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := m.decryptLink(&link); err != nil {
-		return link, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return link, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return link, nil
 }
@@ -93,7 +93,7 @@ func (m *Manager) GetActive() ([]models.ContextLink, error) {
 	var links = make([]models.ContextLink, 0)
 	if err := m.q.GetActiveContextLinks.Select(&links); err != nil {
 		m.lo.Error("error fetching active context links", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return links, nil
 }
@@ -103,15 +103,15 @@ func (m *Manager) Create(link models.ContextLink) (models.ContextLink, error) {
 
 	encryptedSecret, err := m.encryptSecret(link.Secret)
 	if err != nil {
-		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := m.q.InsertContextLink.Get(&result, link.Name, link.URLTemplate, encryptedSecret, link.TokenExpirySeconds, link.IsActive); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.ContextLink{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return models.ContextLink{}, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error inserting context link", "error", err)
-		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := m.decryptLink(&result); err != nil {
@@ -128,20 +128,20 @@ func (m *Manager) Update(id int, link models.ContextLink) (models.ContextLink, e
 		var existingSecret string
 		if err := m.q.GetContextLinkSecret.Get(&existingSecret, id); err != nil {
 			m.lo.Error("error fetching existing context link secret", "id", id, "error", err)
-			return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		encryptedSecret = existingSecret
 	} else if !crypto.IsEncrypted(link.Secret) {
 		var err error
 		encryptedSecret, err = m.encryptSecret(link.Secret)
 		if err != nil {
-			return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
 	if err := m.q.UpdateContextLink.Get(&result, id, link.Name, link.URLTemplate, encryptedSecret, link.TokenExpirySeconds, link.IsActive); err != nil {
 		m.lo.Error("error updating context link", "error", err)
-		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := m.decryptLink(&result); err != nil {
@@ -153,7 +153,7 @@ func (m *Manager) Update(id int, link models.ContextLink) (models.ContextLink, e
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteContextLink.Exec(id); err != nil {
 		m.lo.Error("error deleting context link", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -162,7 +162,7 @@ func (m *Manager) Toggle(id int) (models.ContextLink, error) {
 	var result models.ContextLink
 	if err := m.q.ToggleContextLink.Get(&result, id); err != nil {
 		m.lo.Error("error toggling context link", "error", err)
-		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.ContextLink{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -192,7 +192,7 @@ func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.Conver
 		secret, err := crypto.Decrypt(link.Secret, m.encryptionKey)
 		if err != nil {
 			m.lo.Error("error decrypting context link secret", "id", link.ID, "error", err)
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 
 		now := time.Now()
@@ -214,13 +214,13 @@ func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.Conver
 		plaintext, err := json.Marshal(payload)
 		if err != nil {
 			m.lo.Error("error marshalling token payload", "id", link.ID, "error", err)
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 
 		token, err := crypto.Encrypt(string(plaintext), secret)
 		if err != nil {
 			m.lo.Error("error encrypting token for context link", "id", link.ID, "error", err)
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		// Strip "enc:" prefix. External systems receive just the base64 ciphertext.
 		token = strings.TrimPrefix(token, crypto.EncryptedPrefix)

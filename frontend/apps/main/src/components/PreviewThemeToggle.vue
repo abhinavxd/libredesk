@@ -5,7 +5,7 @@
         value="light"
         class="px-2"
         data-preview-theme="light"
-        :aria-label="$t('globals.terms.light')"
+        :aria-label="i18n._('Light')"
       >
         <Sun class="size-3.5" />
       </TabsTrigger>
@@ -13,7 +13,7 @@
         value="dark"
         class="px-2"
         data-preview-theme="dark"
-        :aria-label="$t('globals.terms.dark')"
+        :aria-label="i18n._('Dark')"
       >
         <Moon class="size-3.5" />
       </TabsTrigger>

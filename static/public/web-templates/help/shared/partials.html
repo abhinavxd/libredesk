@@ -1,8 +1,8 @@
 {{ define "hc-announcement" }}
     {{ if .Data.HelpCenter.AnnouncementHTML }}
-    <div class="hc-announcement" role="region" aria-label="{{ .L.T "globals.terms.announcement" }}" data-hc-announcement="{{ .Data.HelpCenter.AnnouncementKey }}">
+    <div class="hc-announcement" role="region" aria-label="{{ .L.GetD "templates" "Announcement" }}" data-hc-announcement="{{ .Data.HelpCenter.AnnouncementKey }}">
         <p>{{ .Data.HelpCenter.AnnouncementHTML }}{{ if .Data.HelpCenter.Theme.Announcement.LinkURL }} <a href="{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}">{{ if .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ .Data.HelpCenter.Theme.Announcement.LinkLabel }}{{ else }}{{ .Data.HelpCenter.Theme.Announcement.LinkURL }}{{ end }}</a>{{ end }}</p>
-        <button type="button" data-hc-announcement-close aria-label="{{ .L.T "globals.messages.close" }}">
+        <button type="button" data-hc-announcement-close aria-label="{{ .L.GetD "templates" "Close" }}">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke-linecap="round"/></svg>
         </button>
     </div>
@@ -15,7 +15,7 @@
 
 {{ define "hc-lang-switcher" }}
                 <div class="hc-lang" data-hc-lang>
-                    <button type="button" class="hc-lang-btn" aria-expanded="false" aria-label="{{ .L.T "globals.terms.language" }}">
+                    <button type="button" class="hc-lang-btn" aria-expanded="false" aria-label="{{ .L.GetD "templates" "Language" }}">
                         <svg class="hc-lang-globe" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M2.5 10h15M10 2.5c2.5 2.4 2.5 12.6 0 15M10 2.5c-2.5 2.4-2.5 12.6 0 15" stroke-linecap="round"/></svg>
                         <span class="hc-lang-current">{{ .Data.HelpCenter.CurrentLocale }}</span>
                         <svg class="hc-lang-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -27,7 +27,7 @@
 {{ end }}
 
 {{ define "hc-theme-toggle" }}
-                <button type="button" class="hc-theme-btn" data-hc-theme aria-label="{{ .L.T "globals.messages.toggleTheme" }}">
+                <button type="button" class="hc-theme-btn" data-hc-theme aria-label="{{ .L.GetD "templates" "Toggle theme" }}">
                     <svg class="hc-theme-sun" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M10 16.5v2M18.5 10h-2M3.5 10h-2M16 4l-1.4 1.4M5.4 14.6 4 16M16 16l-1.4-1.4M5.4 5.4 4 4" stroke-linecap="round"/></svg>
                     <svg class="hc-theme-moon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M17 11.3A7.5 7.5 0 0 1 8.7 3a7.5 7.5 0 1 0 8.3 8.3Z" stroke-linejoin="round"/></svg>
                 </button>
@@ -37,9 +37,9 @@
 
 {{ define "hc-article-toc" }}
 {{ if not .Data.HelpCenter.Theme.Article.HideToc }}
-<nav class="hc-toc{{ if .Data.TOC }} hc-toc-open{{ end }}" id="hc-toc" aria-label="{{ .L.T "helpCenter.onThisPage" }}"{{ if not .Data.TOC }} hidden{{ end }}>
+<nav class="hc-toc{{ if .Data.TOC }} hc-toc-open{{ end }}" id="hc-toc" aria-label="{{ .L.GetD "templates" "On this page" }}"{{ if not .Data.TOC }} hidden{{ end }}>
     <button class="hc-toc-title" type="button" id="hc-toc-toggle" aria-expanded="{{ if .Data.TOC }}true{{ else }}false{{ end }}" aria-controls="hc-toc-list">
-        {{ .L.T "helpCenter.onThisPage" }}
+        {{ .L.GetD "templates" "On this page" }}
         <svg class="hc-toc-caret" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <ul id="hc-toc-list">{{ range .Data.TOC }}<li><a href="#{{ .ID }}">{{ .Title }}</a></li>{{ end }}</ul>
@@ -49,13 +49,13 @@
 
 {{ define "hc-helpful" }}
 <div class="hc-helpful" id="hc-helpful" role="group" aria-labelledby="hc-helpful-q" data-endpoint="/api/v1/public/help-centers/{{ .Data.HelpCenter.Slug }}/articles/{{ .Data.Article.Slug }}/feedback?locale={{ .Data.Article.Locale }}">
-    <span class="hc-helpful-q" id="hc-helpful-q">{{ .L.T "helpCenter.wasHelpful" }}</span>
+    <span class="hc-helpful-q" id="hc-helpful-q">{{ .L.GetD "templates" "Was this article helpful?" }}</span>
     <div class="hc-helpful-actions">
-        <button type="button" data-helpful="true">{{ .L.T "globals.messages.yes" }}</button>
-        <button type="button" data-helpful="false">{{ .L.T "globals.messages.no" }}</button>
+        <button type="button" data-helpful="true">{{ .L.GetD "templates" "Yes" }}</button>
+        <button type="button" data-helpful="false">{{ .L.GetD "templates" "No" }}</button>
     </div>
-    <span class="hc-helpful-thanks" role="status" hidden>{{ .L.T "helpCenter.feedbackThanks" }}</span>
-    <span class="hc-helpful-error" role="alert" hidden>{{ .L.T "globals.messages.somethingWentWrong" }}</span>
+    <span class="hc-helpful-thanks" role="status" hidden>{{ .L.GetD "templates" "Thanks for your feedback." }}</span>
+    <span class="hc-helpful-error" role="alert" hidden>{{ .L.GetD "templates" "Something went wrong" }}</span>
 </div>
 {{ end }}
 
@@ -76,10 +76,10 @@
         {{ if and $cards.ShowAuthors .Collection.Authors }}
         <span class="hc-card-meta">
             {{ template "hc-avatar-stack" .Collection.Authors }}
-            <span>{{ .Collection.AuthorCount }} {{ $.L.Tc "helpCenter.authors" .Collection.AuthorCount }}{{ if not $cards.HideCount }} &middot; {{ .Collection.ArticleCount }} {{ $.L.Tc "helpCenter.article" .Collection.ArticleCount }}{{ end }}</span>
+            <span>{{ .Collection.AuthorCount }} {{ $.L.GetND "templates" "author" "authors" .Collection.AuthorCount }}{{ if not $cards.HideCount }} &middot; {{ .Collection.ArticleCount }} {{ $.L.GetND "templates" "article" "articles" .Collection.ArticleCount }}{{ end }}</span>
         </span>
         {{ else if not $cards.HideCount }}
-        <span class="hc-count">{{ .Collection.ArticleCount }} {{ $.L.Tc "helpCenter.article" .Collection.ArticleCount }}</span>
+        <span class="hc-count">{{ .Collection.ArticleCount }} {{ $.L.GetND "templates" "article" "articles" .Collection.ArticleCount }}</span>
         {{ end }}
     </div>
 </a>
@@ -124,14 +124,14 @@
     </main>
     {{ if gt (len .Data.LocaleLinks) 1 }}
     <div class="hc-embed-langs">
-        <label for="hc-embed-lang">{{ .L.T "globals.terms.language" }}</label>
+        <label for="hc-embed-lang">{{ .L.GetD "templates" "Language" }}</label>
         <select id="hc-embed-lang">
             {{ range .Data.LocaleLinks }}<option value="{{ .Path }}"{{ if eq .Locale $.Data.HelpCenter.CurrentLocale }} selected{{ end }}>{{ .Locale }}</option>{{ end }}
         </select>
     </div>
     {{ end }}
     <a class="hc-embed-open" data-hc-embed-exit href="{{ .Data.HelpCenter.BaseURL }}{{ if .Data.CanonicalPath }}{{ .Data.CanonicalPath }}{{ else }}{{ .Data.HelpCenter.BasePath }}{{ end }}" target="_blank" rel="noopener noreferrer">
-        {{ .L.T "globals.messages.openInHelpCenter" }}
+        {{ .L.GetD "templates" "Open in help center" }}
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
     </a>
     <script>

@@ -2,10 +2,10 @@
   <form @submit.prevent="createConversation" novalidate class="flex flex-col flex-1 min-h-0">
     <div class="shrink-0">
       <div :class="[ROW_CLASS, 'flex items-center gap-2']">
-        <span :class="ROW_LABEL_CLASS">{{ $t('globals.terms.from') }}</span>
+        <span :class="ROW_LABEL_CLASS">{{ i18n._('From') }}</span>
         <Select v-model="inboxId">
-          <SelectTrigger :class="ROW_INPUT_CLASS" :aria-label="t('globals.terms.inbox')">
-            <SelectValue :placeholder="t('placeholders.selectInbox')" />
+          <SelectTrigger :class="ROW_INPUT_CLASS" :aria-label="i18n.ngettext('Inbox', 'Inboxes', 1)">
+            <SelectValue :placeholder="i18n._('Select inbox')" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -23,12 +23,12 @@
 
       <div :class="ROW_CLASS">
         <div class="flex items-center gap-2">
-          <span :class="ROW_LABEL_CLASS">{{ $t('globals.terms.to') }}</span>
+          <span :class="ROW_LABEL_CLASS">{{ i18n._('To') }}</span>
           <div class="w-fit shrink-0">
             <ComboBox
               v-model="phoneCountryCode"
               :items="allCountries"
-              :placeholder="t('globals.terms.select')"
+              :placeholder="i18n._('Select')"
               :buttonClass="phoneCountryCode ? COUNTRY_CODE_CLASS : `${COUNTRY_CODE_CLASS} text-muted-foreground/60`"
             >
               <template #item="{ item }">
@@ -55,8 +55,8 @@
             v-model="phoneNumber"
             :class="ROW_INPUT_CLASS"
             inputmode="numeric"
-            :aria-label="t('globals.terms.phoneNumber')"
-            :placeholder="t('globals.messages.searchOrEnterNumber')"
+            :aria-label="i18n.ngettext('Phone number', 'Phone numbers', 1)"
+            :placeholder="i18n._('Search or enter a number')"
             @input="handleSearchContacts"
             @keydown="handleSearchKeydown"
             @blur="clearSearchResults"
@@ -91,28 +91,28 @@
       </div>
 
       <div :class="[ROW_CLASS, 'flex items-center gap-2']">
-        <span :class="ROW_LABEL_CLASS">{{ $t('globals.terms.name', 1) }}</span>
+          <span :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Name', 'Names', 1, {}, 'Person name') }}</span>
         <Input
           type="text"
           v-model="firstName"
           :class="ROW_INPUT_CLASS"
-          :placeholder="t('globals.terms.firstName')"
-          :aria-label="t('globals.terms.firstName')"
+          :placeholder="i18n.ngettext('First name', 'First names', 1)"
+          :aria-label="i18n.ngettext('First name', 'First names', 1)"
           :disabled="!!selectedContact"
         />
         <Input
           type="text"
           v-model="lastName"
           :class="ROW_INPUT_CLASS"
-          :placeholder="t('globals.terms.lastName')"
-          :aria-label="t('globals.terms.lastName')"
+          :placeholder="i18n.ngettext('Last name', 'Last names', 1)"
+          :aria-label="i18n.ngettext('Last name', 'Last names', 1)"
           :disabled="!!selectedContact"
         />
       </div>
 
       <div :class="[ROW_CLASS, 'grid grid-cols-1 gap-y-1 py-1 sm:grid-cols-2 sm:gap-4']">
         <div class="flex items-center gap-2 min-w-0">
-          <span :class="ROW_LABEL_CLASS">{{ $t('globals.terms.team', 1) }}</span>
+          <span :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Team', 'Teams', 1) }}</span>
           <SelectTeamCombobox
             v-model="teamId"
             include-none
@@ -120,7 +120,7 @@
           />
         </div>
         <div class="flex items-center gap-2 min-w-0">
-          <span :class="ROW_LABEL_CLASS">{{ $t('globals.terms.agent', 1) }}</span>
+          <span :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Agent', 'Agents', 1) }}</span>
           <SelectAgentCombobox
             v-model="agentId"
             include-none
@@ -141,13 +141,13 @@
           class="shrink-0"
           @click="openExistingConversation"
         >
-          {{ $t('globals.messages.openConversation') }}
+          {{ i18n._('Open conversation') }}
         </Button>
       </AlertDescription>
     </Alert>
 
     <div v-else class="flex-1 flex flex-col min-h-0 px-3 pt-3">
-      <p class="text-sm text-muted-foreground mb-2">{{ $t('globals.terms.template', 1) }}</p>
+      <p class="text-sm text-muted-foreground mb-2">{{ i18n.ngettext('Template', 'Templates', 1) }}</p>
 
       <template v-if="inboxId">
         <WhatsAppTemplatePicker
@@ -169,15 +169,17 @@
 
     <div v-if="!existingConversation?.exists" class="flex justify-end px-3 py-2 shrink-0">
       <Button type="submit" :disabled="!canSubmit || loading" :isLoading="loading">
-        {{ $t('globals.messages.sendTemplate') }}
+        {{ i18n._('Send template') }}
       </Button>
     </div>
   </form>
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import { ref, computed, watch, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { IdCard } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Alert, AlertDescription } from '@shared-ui/components/ui/alert'
@@ -222,7 +224,7 @@ const props = defineProps({
   initialContact: { type: Object, default: null }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
@@ -313,10 +315,10 @@ watch(
 
 const existingConversation = ref(null)
 const existingConversationMessage = computed(() =>
-  t(
+  i18n._(
     existingConversation.value?.uuid
-      ? 'conversation.whatsapp.error.conversationExists'
-      : 'conversation.whatsapp.error.conversationExistsNoAccess'
+      ? msg({ message: 'This contact already has an open conversation in this inbox. Open it to send a template.' })
+      : msg({ message: 'This contact already has an open conversation in this inbox that you cannot access. Ask an agent with access to send the template.' })
   )
 )
 

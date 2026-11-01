@@ -7,7 +7,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -27,14 +27,14 @@ type userChannelPreference struct {
 type PreferenceManager struct {
 	db   *sqlx.DB
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 	q    prefQueries
 }
 
 type PreferenceManagerOpts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // NewPreferenceManager creates a new PreferenceManager.
@@ -82,7 +82,7 @@ func (m *PreferenceManager) GetMatrix(userID int) ([]models.NotificationPreferen
 	var rows []models.NotificationPreference
 	if err := m.q.GetPreferences.Select(&rows, userID); err != nil {
 		m.lo.Error("error fetching notification preferences", "user_id", userID, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	stored := make(map[[2]any]bool, len(rows))
@@ -112,25 +112,25 @@ func (m *PreferenceManager) Update(userID int, prefs []models.NotificationPrefer
 	for _, p := range prefs {
 		if !slices.Contains(models.AgentNotificationTypes, p.NotificationType) ||
 			!slices.Contains(models.NotificationChannels, p.Channel) {
-			return envelope.NewError(envelope.InputError, m.i18n.T("notification.invalidPreference"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Unknown notification type or channel. The preference was not saved."), nil)
 		}
 	}
 
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting notification preference update", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	for _, p := range prefs {
 		if _, err := tx.Stmtx(m.q.UpsertPreference).Exec(userID, p.NotificationType, p.Channel, p.Enabled); err != nil {
 			m.lo.Error("error updating notification preference", "user_id", userID, "type", p.NotificationType, "channel", p.Channel, "error", err)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing notification preference update", "user_id", userID, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

@@ -2,7 +2,7 @@
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-[425px]" @open-auto-focus="focusDateButton">
       <DialogHeader>
-        <DialogTitle>{{ $t('command.pickSnoozeTime') }}</DialogTitle>
+        <DialogTitle>{{ i18n._('Pick a snooze time') }}</DialogTitle>
         <DialogDescription />
       </DialogHeader>
       <div class="grid gap-4 py-4">
@@ -14,7 +14,7 @@
               class="w-full justify-start text-left font-normal"
             >
               <CalendarIcon class="mr-2 h-4 w-4" />
-              {{ selectedDate ? selectedDate : t('globals.terms.pickDate') }}
+              {{ selectedDate ? selectedDate : i18n._('Pick a date') }}
             </Button>
           </PopoverTrigger>
           <PopoverContent class="w-auto p-0">
@@ -26,12 +26,12 @@
           </PopoverContent>
         </Popover>
         <div class="grid gap-2">
-          <Label>{{ $t('globals.terms.time') }}</Label>
+          <Label>{{ i18n._('Time') }}</Label>
           <Input type="time" v-model="selectedTime" />
         </div>
       </div>
       <DialogFooter>
-        <Button @click="snooze">{{ $t('globals.terms.snooze') }}</Button>
+        <Button @click="snooze">{{ i18n._('Snooze') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { CalendarIcon } from 'lucide-vue-next'
 import {
   Dialog,
@@ -64,7 +64,7 @@ defineProps({
 })
 const emit = defineEmits(['update:open'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const conversationStore = useConversationStore()
 const datePickerOpen = ref(false)
@@ -86,7 +86,7 @@ const snooze = () => {
   if (diffMinutes <= 0) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.selectAFutureTime')
+      description: i18n._('Select a future time')
     })
     return
   }

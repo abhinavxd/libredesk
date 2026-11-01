@@ -13,12 +13,12 @@
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-2">
                 <div class="text-sm font-medium">
-                  {{ $t('globals.messages.continueConversation') }}
+                  {{ i18n._('Continue your conversation') }}
                 </div>
               </div>
               <div class="flex gap-2 items-start">
                 <div class="text-sm text-foreground line-clamp-2 flex-1 min-w-0">
-                  {{ lastMessagePreview(conversation.last_message, t) }}
+                  {{ lastMessagePreview(conversation.last_message, i18n) }}
                 </div>
                 <UnreadCountBadge
                   :count="conversation.unread_message_count"
@@ -48,7 +48,7 @@ import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { lastMessagePreview } from '@widget/utils/messagePreview.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   conversation: {
@@ -59,15 +59,15 @@ const props = defineProps({
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
-const { t } = useI18n()
+const i18n = useI18n()
 
 const authorDisplayName = computed(() => {
   const author = props.conversation.last_message.author
-  if (!author) return t('globals.terms.someone')
+  if (!author) return i18n._('Someone')
   if (author.type === 'visitor' || author.type === 'contact') {
-    return t('globals.terms.you')
+    return i18n._('You')
   }
-  return author.first_name || t('globals.terms.someone')
+  return author.first_name || i18n._('Someone')
 })
 
 const continueConversation = async () => {

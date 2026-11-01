@@ -2,7 +2,7 @@
 const MUTED_TEXT_CLASS = 'text-sm text-muted-foreground'
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { buttonVariants } from '@shared-ui/components/ui/button'
 import RuleBox from '@/features/admin/automation/RuleBox.vue'
 import { useCustomAttributeStore } from '@/stores/customAttributes'
@@ -11,7 +11,7 @@ const props = defineProps({
   modelValue: { type: Object, default: () => ({ logical_op: 'AND', rules: [] }) }
 })
 const emit = defineEmits(['update:modelValue'])
-const { t } = useI18n()
+const i18n = useI18n()
 const customAttributeStore = useCustomAttributeStore()
 const group = ref({ logical_op: 'AND', rules: [] })
 const isLoading = ref(true)
@@ -63,17 +63,17 @@ onMounted(async () => {
     @remove-condition="remove"
   />
   <p v-else-if="isLoading" role="status" :class="MUTED_TEXT_CLASS">
-    {{ t('globals.terms.loading') }}
+    {{ i18n._('Loading') }}
   </p>
   <div v-else class="space-y-3 rounded-md border border-dashed p-4">
     <p :class="MUTED_TEXT_CLASS">
-      {{ t('widget.campaignContactAttributesEmpty') }}
+      {{ i18n._('Visibility conditions use contact custom attributes. None are available.') }}
     </p>
     <RouterLink
       :to="{ name: 'custom-attributes' }"
       :class="buttonVariants({ variant: 'link', size: 'sm' })"
     >
-      {{ t('globals.messages.addContactCustomAttribute') }}
+      {{ i18n._('Add contact custom attribute') }}
     </RouterLink>
   </div>
 </template>

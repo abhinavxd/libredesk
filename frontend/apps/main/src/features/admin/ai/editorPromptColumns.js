@@ -1,11 +1,13 @@
+
+
 import { h } from 'vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import dropdown from './editorPromptDropdown.vue'
 
-export const createEditorPromptColumns = (t, { onEdit } = {}) => [
+export const createEditorPromptColumns = (i18n, { onEdit } = {}) => [
   {
     accessorKey: 'title',
-    header: () => h('div', null, t('globals.terms.title')),
+    header: () => h('div', null, i18n._('{count, plural, one {Title} other {Titles}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -26,7 +28,7 @@ export const createEditorPromptColumns = (t, { onEdit } = {}) => [
     accessorKey: 'updated_at',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.updatedAt')),
+    header: () => h('div', null, i18n._('Updated at')),
     cell: ({ row }) =>
       h(TableDate, { value: row.getValue('updated_at') })
   },

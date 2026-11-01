@@ -24,7 +24,7 @@ import { initAudioContext } from '@shared-ui/composables/useNotificationSound.js
 import { hexToHSL, getContrastingHSL } from '@shared-ui/utils/color.js'
 import MainLayout from '@widget/layouts/MainLayout.vue'
 import { useHelpStore } from '@widget/store/help.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useProactiveStore } from '@widget/store/proactive.js'
 import { useReplyPreviews } from '@widget/composables/useReplyPreviews.js'
 import { resolveLanguage } from '@widget/utils/language.js'

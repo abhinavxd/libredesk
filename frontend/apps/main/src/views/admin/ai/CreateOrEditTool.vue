@@ -10,14 +10,14 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.toolsHelp') }}</p>
+      <p>{{ i18n._('Tools let the assistant call your own APIs to fetch or update data while replying. A tool is shared across every assistant granted access to it, and the model decides when to call it from the name and description, so keep those precise.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#tools"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -34,21 +34,21 @@ import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   id: { type: String, required: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const tool = ref({})
 const isLoading = ref(false)
 
 const breadcrumbLinks = [
-  { path: 'ai-tools', label: t('admin.ai.tools') },
-  { path: '', label: props.id ? t('admin.ai.tool.edit') : t('admin.ai.tool.new') }
+  { path: 'ai-tools', label: i18n._('Tools') },
+  { path: '', label: props.id ? i18n._('Edit tool') : i18n._('New tool') }
 ]
 
 const submitForm = async (values) => {
@@ -60,7 +60,7 @@ const submitForm = async (values) => {
       router.push({ name: 'ai-tools' })
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

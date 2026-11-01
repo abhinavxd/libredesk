@@ -1,20 +1,22 @@
 <template>
   <div
     role="toolbar"
-    :aria-label="t('conversation.bulkActions.toolbar')"
+    :aria-label="i18n._('Bulk actions toolbar')"
     class="p-2 flex flex-wrap items-center gap-1 bg-muted/30"
   >
     <Checkbox
       :checked="conversationStore.allSelected"
       @update:checked="toggleSelectAll"
-      :aria-label="t('conversation.bulkActions.selectAll')"
+      :aria-label="i18n._('Select all conversations')"
       class="ml-1 mr-1"
     />
     <span
       class="text-xs font-medium whitespace-nowrap tabular-nums inline-block min-w-20 mr-1"
       aria-live="polite"
     >
-      {{ t('conversation.bulkActions.selected', conversationStore.selectedCount, { count: conversationStore.selectedCount }) }}
+      {{ conversationStore.selectedCount === 0
+        ? i18n._('No conversations selected')
+        : i18n.ngettext('1 selected', '{count} selected', conversationStore.selectedCount) }}
     </span>
 
     <!-- Assign Agent -->
@@ -29,8 +31,8 @@
           variant="ghost"
           size="icon"
           :disabled="bulkLoading"
-          :title="t('actions.assignAgent')"
-          :aria-label="t('actions.assignAgent')"
+          :title="i18n._('Assign agent')"
+          :aria-label="i18n._('Assign agent')"
         >
           <UserPlus class="w-4 h-4" />
         </Button>
@@ -49,8 +51,8 @@
           variant="ghost"
           size="icon"
           :disabled="bulkLoading"
-          :title="t('actions.assignTeam')"
-          :aria-label="t('actions.assignTeam')"
+          :title="i18n._('Assign team')"
+          :aria-label="i18n._('Assign team')"
         >
           <Users class="w-4 h-4" />
         </Button>
@@ -68,8 +70,8 @@
           variant="ghost"
           size="icon"
           :disabled="bulkLoading"
-          :title="t('actions.addTags')"
-          :aria-label="t('actions.addTags')"
+          :title="i18n._('Add tags')"
+          :aria-label="i18n._('Add tags')"
         >
           <Tag class="w-4 h-4" />
         </Button>
@@ -83,8 +85,8 @@
           variant="ghost"
           size="icon"
           :disabled="bulkLoading"
-          :title="t('actions.setStatus')"
-          :aria-label="t('actions.setStatus')"
+          :title="i18n._('Set status')"
+          :aria-label="i18n._('Set status')"
         >
           <CircleDot class="w-4 h-4" />
         </Button>
@@ -106,7 +108,7 @@
       variant="ghost"
       size="icon"
       class="ml-auto"
-      :aria-label="t('conversation.bulkActions.clearSelection')"
+      :aria-label="i18n._('Clear selection')"
       @click="conversationStore.clearSelection()"
     >
       <X class="w-4 h-4" />
@@ -115,7 +117,7 @@
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { UserPlus, Users, Tag, CircleDot, Loader2, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
@@ -133,7 +135,7 @@ import { useBulkActionPermissions } from '@/composables/useBulkActionPermissions
 import { useBulkActions } from '@/composables/useBulkActions'
 
 const conversationStore = useConversationStore()
-const { t } = useI18n()
+const i18n = useI18n()
 const { bulkLoading, bulkAssign, bulkAddTag, bulkUpdateStatus } = useBulkActions()
 
 const { canAssignAgent, canAssignTeam, canUpdateStatus, canUpdateTags } = useBulkActionPermissions()

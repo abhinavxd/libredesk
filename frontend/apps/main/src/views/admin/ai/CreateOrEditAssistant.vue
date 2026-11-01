@@ -17,11 +17,11 @@
             <template #left>
               <TabsList class="w-max justify-start">
                 <TabsTrigger value="settings">{{
-                  t('admin.ai.assistant.tabs.settings')
+                  i18n._('Settings')
                 }}</TabsTrigger>
-                <TabsTrigger value="test">{{ t('admin.ai.assistant.tabs.test') }}</TabsTrigger>
+                <TabsTrigger value="test">{{ i18n.pgettext('Assistant test tab', 'Test') }}</TabsTrigger>
                 <TabsTrigger value="performance">{{
-                  t('admin.ai.assistant.tabs.performance')
+                  i18n.pgettext('Assistant navigation tab', 'Performance')
                 }}</TabsTrigger>
               </TabsList>
             </template>
@@ -38,44 +38,44 @@
           <TabsContent value="test">
             <Card>
               <CardHeader>
-                <CardTitle>{{ t('admin.ai.assistant.preview.title') }}</CardTitle>
+                <CardTitle>{{ i18n._('Test assistant') }}</CardTitle>
               </CardHeader>
               <CardContent class="space-y-4">
                 <Textarea
                   v-model="previewMessage"
                   rows="3"
-                  :placeholder="t('admin.ai.assistant.preview.placeholder')"
+                  :placeholder="i18n._('Type a sample customer message')"
                   @keydown.enter.ctrl.prevent="submitPreview"
                   @keydown.enter.meta.prevent="submitPreview"
                 />
                 <div class="flex items-center justify-end gap-3">
                   <span class="text-xs text-muted-foreground">{{
-                    t('admin.ai.assistant.preview.shortcutHint')
+                    i18n._('Ctrl + Enter to test')
                   }}</span>
                   <Button
                     :isLoading="previewLoading"
                     :disabled="!previewMessage.trim()"
                     @click="runPreview"
                   >
-                    {{ t('admin.ai.assistant.preview.run') }}
+                    {{ i18n.pgettext('Run assistant test', 'Test') }}
                   </Button>
                 </div>
                 <div class="space-y-2">
                   <div class="text-sm font-medium text-foreground">
-                    {{ t('admin.ai.assistant.preview.replyLabel') }}
+                    {{ i18n._('Drafted reply') }}
                   </div>
                   <div
                     class="rounded-md border border-border bg-muted p-3 text-sm whitespace-pre-wrap"
                   >
                     <span v-if="previewReply">{{ previewReply }}</span>
                     <span v-else class="text-muted-foreground">
-                      {{ t('admin.ai.assistant.preview.empty') }}
+                      {{ i18n._('The drafted reply will appear here.') }}
                     </span>
                   </div>
                 </div>
                 <div v-if="previewReferences.length" class="space-y-2">
                   <div class="text-sm font-medium text-foreground">
-                    {{ t('globals.terms.articleReference', 2) }}
+                    {{ i18n.ngettext('Article reference', 'Article references', 2) }}
                   </div>
                   <ul class="space-y-1">
                     <li v-for="source in previewReferences" :key="source.id">
@@ -94,7 +94,7 @@
                 </div>
                 <div v-if="previewSources.length" class="space-y-2">
                   <div class="text-sm font-medium text-foreground">
-                    {{ t('admin.ai.assistant.preview.sources') }}
+                    {{ i18n._('Knowledge used') }}
                   </div>
                   <div class="rounded-md border border-border p-3 space-y-1">
                     <div
@@ -107,8 +107,8 @@
                         <span class="ml-2 text-xs text-muted-foreground">
                           {{
                             source.type === 'help_article'
-                              ? t('globals.terms.article')
-                              : t('admin.ai.snippets', 1)
+                              ? i18n.ngettext('Article', 'Articles', 1)
+                              : i18n.ngettext('Snippet', 'Snippets', 1)
                           }}
                         </span>
                       </span>
@@ -125,7 +125,7 @@
           <TabsContent value="performance">
             <Card>
               <CardHeader class="flex flex-row items-center justify-between space-y-0">
-                <CardTitle>{{ t('admin.ai.assistant.stats.title') }}</CardTitle>
+                <CardTitle>{{ i18n.pgettext('Assistant statistics heading', 'Performance') }}</CardTitle>
                 <div class="flex gap-1">
                   <Button
                     v-for="option in rangeOptions"
@@ -135,7 +135,7 @@
                     :disabled="statsLoading"
                     @click="selectRange(option)"
                   >
-                    {{ t('globals.messages.nDays', { days: option }) }}
+                    {{ i18n._('{days} days', { days: option }) }}
                   </Button>
                 </div>
               </CardHeader>
@@ -160,20 +160,22 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.assistantsHelp') }}</p>
+      <p>{{ i18n._('Assistants reply to conversations you route to them with an automation rule, and hand off to a human when they can\'\'t help. Each one has its own persona, instructions and tools, and they all read from the same knowledge base.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#assistants"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -190,13 +192,13 @@ import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useAIAssistantStore } from '@/stores/aiAssistant'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   id: { type: String, required: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const aiAssistantStore = useAIAssistantStore()
@@ -235,55 +237,55 @@ const tiles = computed(() => {
   const trends = s.trends ?? {}
   const hasCsat = (s.csat_count ?? 0) > 0
   const tile = (label, value, deltaRaw, unit, increaseIsGood) => {
-    const base = { label: t(label), value, delta: null }
+    const base = { label: i18n._(label), value, delta: null }
     if (deltaRaw === undefined || deltaRaw === null) return base
     return { ...base, delta: deltaRaw, ...buildDelta(deltaRaw, unit, increaseIsGood) }
   }
   return [
     tile(
-      'admin.ai.assistant.stats.conversations',
+      msg({ message: 'Conversations' }),
       fmtNumber(s.conversations),
       trends.conversations,
       'percent',
       true
     ),
-    tile('admin.ai.assistant.stats.replies', fmtNumber(s.replies), trends.replies, 'percent', true),
+    tile(msg({ message: 'Replies' }), fmtNumber(s.replies), trends.replies, 'percent', true),
     tile(
-      'admin.ai.assistant.stats.resolutionRate',
+      msg({ message: 'Resolution rate' }),
       fmtPercent(s.resolution_rate),
       trends.resolution_rate,
       'point',
       true
     ),
     tile(
-      'admin.ai.assistant.stats.handoffRate',
+      msg({ message: 'Handoff rate' }),
       fmtPercent(s.handoff_rate),
       trends.handoff_rate,
       'point',
       false
     ),
     tile(
-      'admin.ai.assistant.stats.reopenRate',
+      msg({ message: 'Reopen rate' }),
       fmtPercent(s.reopen_rate),
       trends.reopen_rate,
       'point',
       false
     ),
-    tile('admin.ai.assistant.stats.depth', fmtDecimal(s.depth), null),
+    tile(msg({ message: 'Replies per conversation' }), fmtDecimal(s.depth), null),
     tile(
-      'admin.ai.assistant.stats.csat',
+      msg({ message: 'CSAT average' }),
       hasCsat ? fmtDecimal(s.csat_avg) : '-',
       hasCsat ? trends.csat_avg : null,
       'point',
       true
     ),
-    tile('admin.ai.assistant.stats.csatPositive', hasCsat ? fmtPercent(s.csat_positive) : '-', null)
+    tile(msg({ message: 'CSAT positive' }), hasCsat ? fmtPercent(s.csat_positive) : '-', null)
   ]
 })
 
 const breadcrumbLinks = [
-  { path: 'ai-assistants', label: t('admin.ai.assistants') },
-  { path: '', label: props.id ? t('admin.ai.assistant.edit') : t('admin.ai.assistant.new') }
+  { path: 'ai-assistants', label: i18n._('Assistants') },
+  { path: '', label: props.id ? i18n._('Edit assistant') : i18n._('New assistant') }
 ]
 
 const submitForm = async (values) => {
@@ -296,7 +298,7 @@ const submitForm = async (values) => {
     }
     aiAssistantStore.invalidate()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

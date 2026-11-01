@@ -55,12 +55,12 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useInboxStore } from '@/stores/inbox'
 
 const emitter = useEmitter()
 const inboxStore = useInboxStore()
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 const isLoading = ref(false)
 const inbox = ref({})
@@ -69,8 +69,8 @@ let verificationPollTimer = null
 let isUnmounted = false
 const availableLanguages = ref([])
 const breadcrumbLinks = [
-  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('inbox.edit') }
+  { path: 'inbox-list', label: i18n._('{count, plural, one {Inbox} other {Inboxes}}', 2) },
+  { path: '', label: i18n._('Edit inbox') }
 ]
 
 const submitForm = (values) => {
@@ -151,7 +151,7 @@ const updateInbox = async (payload) => {
     setAliasVerificationState(response.data.data?.aliases || [])
     await inboxStore.fetchInboxes(true /* force */)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

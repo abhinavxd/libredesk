@@ -8,16 +8,16 @@
               <Dialog v-model:open="dialogOpen">
                 <DialogTrigger as-child @click="newStatus">
                   <Button class="ml-auto">
-                    {{ $t('status.new') }}
+                    {{ i18n._('New status') }}
                   </Button>
                 </DialogTrigger>
                 <DialogContent class="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>
-                      {{ isEditing ? $t('status.edit') : $t('status.new') }}
+                      {{ isEditing ? i18n._('Edit status') : i18n._('New status') }}
                     </DialogTitle>
                     <DialogDescription>
-                      {{ $t('admin.conversationStatus.name.description') }}
+                      {{ i18n._('Set status name. Click save when you\'\'re done.') }}
                     </DialogDescription>
                   </DialogHeader>
                   <StatusForm @submit.prevent="onSubmit">
@@ -25,7 +25,7 @@
                       <DialogFooter class="mt-10">
                         <Button type="submit" :isLoading="isLoading" :disabled="isLoading">
                           {{
-                            isEditing ? $t('globals.messages.save') : $t('globals.messages.create')
+                            isEditing ? i18n._('Save') : i18n._('Create')
                           }}
                         </Button>
                       </DialogFooter>
@@ -39,7 +39,7 @@
             <DataTable
               v-model:search="searchTerm"
               :searchable="false"
-              :columns="createColumns(t, { onEdit: editStatus })"
+              :columns="createColumns(i18n, { onEdit: editStatus })"
               :data="statuses"
               :loading="isLoading"
             />
@@ -48,7 +48,7 @@
       </template>
 
       <template #help>
-        <p>{{ $t('admin.status.help') }}</p>
+        <p>{{ i18n._('Create custom conversation statuses to extend default workflow.') }}</p>
       </template>
     </AdminSplitLayout>
   </div>
@@ -79,11 +79,11 @@ import { createFormSchema } from '@/features/admin/status/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const statuses = ref([])
 const emit = useEmitter()
@@ -112,7 +112,7 @@ onUnmounted(() => {
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const editStatus = (item) => {
@@ -150,7 +150,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     dialogOpen.value = false
     getStatuses()
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {

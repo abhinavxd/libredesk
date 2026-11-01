@@ -3,7 +3,7 @@
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
         <DialogTitle>
-          {{ editor?.isActive('link') ? $t('editor.editLinkUrl') : $t('editor.addLinkUrl') }}
+          {{ editor?.isActive('link') ? i18n._('Edit link URL') : i18n._('Add link URL') }}
         </DialogTitle>
         <DialogDescription></DialogDescription>
       </DialogHeader>
@@ -12,8 +12,8 @@
           <Input
             v-model="linkUrl"
             type="text"
-            :placeholder="$t('placeholders.enterUrl')"
-            :aria-label="$t('placeholders.enterUrl')"
+            :placeholder="i18n._('Enter URL')"
+            :aria-label="i18n._('Enter URL')"
             @keydown.enter.prevent="setLink"
           />
           <div v-if="allowButton" class="flex items-center gap-2">
@@ -23,7 +23,7 @@
               @update:checked="(v) => (linkAsButton = v)"
             />
             <Label for="link-as-button" class="font-normal cursor-pointer">
-              {{ $t('editor.displayAsButton') }}
+              {{ i18n._('Display as button') }}
             </Label>
           </div>
         </div>
@@ -34,10 +34,10 @@
             @click="unsetLink"
             v-if="editor?.isActive('link')"
           >
-            {{ $t('actions.removeLink') }}
+            {{ i18n._('Remove link') }}
           </Button>
           <Button type="submit">
-            {{ $t('globals.messages.save') }}
+            {{ i18n._('Save') }}
           </Button>
         </DialogFooter>
       </form>

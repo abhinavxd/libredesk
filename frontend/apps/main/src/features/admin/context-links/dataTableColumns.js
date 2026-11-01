@@ -1,14 +1,16 @@
+
+
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge'
 
-export const createColumns = (t) => [
+export const createColumns = (i18n) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t('globals.terms.name'))
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
     },
     cell: function ({ row }) {
       return h(
@@ -28,7 +30,7 @@ export const createColumns = (t) => [
   {
     accessorKey: 'url_template',
     header: function () {
-      return h('div', null, t('contextLink.urlTemplate'))
+      return h('div', null, i18n._('URL template'))
     },
     cell: function ({ row }) {
       const url = row.getValue('url_template')
@@ -39,7 +41,7 @@ export const createColumns = (t) => [
     accessorKey: 'is_active',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) => {
       const isActive = row.getValue('is_active')
       return h('div', null, [
@@ -49,7 +51,7 @@ export const createColumns = (t) => [
             variant: isActive ? 'success' : 'secondary',
             class: 'text-xs'
           },
-          () => (isActive ? t('globals.terms.active') : t('globals.terms.inactive'))
+          () => (isActive ? i18n._('Active') : i18n._('{count, plural, one {Inactive} other {Inactives}}'))
         )
       ])
     }
@@ -59,7 +61,7 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })

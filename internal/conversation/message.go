@@ -398,7 +398,7 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
 	if err != nil {
 		m.lo.Error("error generating messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
@@ -407,12 +407,12 @@ func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSiz
 	defer tx.Rollback()
 	if err != nil {
 		m.lo.Error("error preparing get messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := tx.Select(&messages, query, qArgs...); err != nil {
 		m.lo.Error("error fetching conversations", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	return messages, pageSize, nil
@@ -449,7 +449,7 @@ func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			m.lo.Error("error fetching message", "uuid", uuid, "error", err)
 		}
-		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return message, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Generate signed URLs for attachments.
@@ -548,7 +548,7 @@ func (m *Manager) GetLatestOpenConversationForContact(contactID, inboxID int) (i
 			return 0, "", err
 		}
 		m.lo.Error("error fetching open conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
-		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return row.ID, row.UUID, nil
 }
@@ -564,7 +564,7 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 			return 0, "", err
 		}
 		m.lo.Error("error fetching reopenable conversation for contact", "contact_id", contactID, "inbox_id", inboxID, "error", err)
-		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return row.ID, row.UUID, nil
 }
@@ -572,7 +572,7 @@ func (m *Manager) GetReopenableConversationForContact(contactID, inboxID, window
 func (m *Manager) MarkMessageAsPending(uuid string) error {
 	if _, err := m.q.MarkMessagePendingForRetry.Exec(uuid); err != nil {
 		m.lo.Error("error marking message as pending", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorSendingMessage"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Error sending message"), nil)
 	}
 	conversationUUID, _ := m.getConversationUUIDFromMessageUUID(uuid)
 	m.BroadcastMessageUpdate(conversationUUID, uuid, map[string]any{"status": models.MessageStatusPending})
@@ -670,7 +670,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	if !inboxRecord.Enabled {
-		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
+		return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Get("Inbox is disabled"), nil)
 	}
 
 	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
@@ -700,17 +700,17 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 			metaMap["bcc"] = bcc
 		}
 		if len(to) == 0 {
-			return message, envelope.NewError(envelope.GeneralError, m.i18n.Ts("globals.messages.empty", "name", "`to`"), nil)
+			return message, envelope.NewError(envelope.GeneralError, m.i18n.Get("%[1]s empty", "`to`"), nil)
 		}
 		sourceID, err = stringutil.GenerateEmailMessageID(conversationUUID, inboxRecord.From)
 		if err != nil {
 			m.lo.Error("error generating source message id", "error", err)
-			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	case inbox.ChannelWhatsApp:
 		// Meta accepts one media per message, so a multi-attachment reply must be sent as separate messages.
 		if len(media) > 1 {
-			return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.T("conversation.whatsapp.error.oneAttachment"), nil)
+			return models.Message{}, envelope.NewError(envelope.InputError, m.i18n.Get("WhatsApp takes one file per message. Send the files one at a time."), nil)
 		}
 		// Reject unsendable media here. Meta's upload endpoint enforces the same caps and would only fail after the message is queued.
 		for _, md := range media {
@@ -733,7 +733,7 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	metaJSON, err := json.Marshal(metaMap)
 	if err != nil {
 		m.lo.Error("error marshalling message meta map to JSON", "error", err)
-		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Message{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Insert the message into the database
@@ -763,7 +763,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error beginning message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -774,7 +774,7 @@ func (m *Manager) InsertMessage(message *models.Message) error {
 
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing message insert transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	m.AfterMessageInsert(message, inlineUUIDs)
@@ -810,11 +810,11 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
 		m.lo.Error("error inserting message in db", "inbox_id", message.InboxID, "conversation_uuid", message.ConversationUUID, "source_id", message.SourceID.String, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := m.mediaStore.LinkMessageMediaTx(tx, message.ID, message.Media, inlineUUIDs, message.UploadUserID); err != nil {
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return inlineUUIDs, nil
 }
@@ -840,7 +840,7 @@ func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []stri
 			case len(message.Media) > 0:
 				lastMessage = m.getMediaPreview(message.Media[0])
 			case len(inlineUUIDs) > 0:
-				lastMessage = m.i18n.T("globals.terms.image")
+				lastMessage = m.i18n.Get("Image")
 			}
 		}
 
@@ -935,7 +935,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 	content, err := m.getMessageActivityContent(activityType, newValue, actor.FullName())
 	if err != nil {
 		m.lo.Error("error could not generate activity content", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Store the activity type structurally so callers can filter activities without parsing i18n content.
@@ -955,7 +955,7 @@ func (m *Manager) InsertConversationActivity(activityType, conversationUUID, new
 
 	if err := m.InsertMessage(&message); err != nil {
 		m.lo.Error("error inserting activity message", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -997,7 +997,7 @@ func (m *Manager) getMessageActivityContent(activityType, newValue, actorName st
 	case models.ActivityParticipantAdded:
 		content = fmt.Sprintf("%s joined the conversation", newValue)
 	case models.ActivityCSATNotSent:
-		content = m.i18n.T("conversation.whatsapp.csatNotSent")
+		content = m.i18n.Get("CSAT survey was not sent. The WhatsApp reply window is closed.")
 	default:
 		return "", fmt.Errorf("invalid activity type %s", activityType)
 	}
@@ -1293,10 +1293,10 @@ func (m *Manager) GetConversationByMessageID(id int) (models.Conversation, error
 	var conversation = models.Conversation{}
 	if err := m.q.GetConversationByMessageID.Get(&conversation, id); err != nil {
 		if err == sql.ErrNoRows {
-			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundConversation"), nil)
+			return conversation, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Conversation not found"), nil)
 		}
 		m.lo.Error("error fetching message from DB", "error", err)
-		return conversation, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return conversation, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return conversation, nil
 }
@@ -1754,13 +1754,13 @@ func (m *Manager) getMediaPreview(media mmodels.Media) string {
 	contentType := media.ContentType
 	switch {
 	case strings.HasPrefix(contentType, "image/"):
-		return m.i18n.T("globals.terms.image")
+		return m.i18n.Get("Image")
 	case strings.HasPrefix(contentType, "video/"):
-		return m.i18n.T("globals.terms.video")
+		return m.i18n.Get("Video")
 	case strings.HasPrefix(contentType, "audio/"):
-		return m.i18n.T("globals.terms.audio")
+		return m.i18n.Get("Audio")
 	default:
-		return m.i18n.T("globals.terms.file")
+		return m.i18n.Get("File")
 	}
 }
 
@@ -1847,13 +1847,13 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 	sendable, err := inbox.SendableEmailAddresses(inboxRecord.From, inboxRecord.Aliases)
 	if err != nil {
 		m.lo.Error("error resolving inbox sender addresses", "inbox_id", inboxRecord.ID, "error", err)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if requested != "" {
 		normalized, err := inbox.NormalizeEmailAddress(requested)
 		if err != nil || !slices.Contains(sendable, normalized) {
-			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidEmail"), nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.Get("Invalid email address"), nil)
 		}
 		return normalized, nil
 	}
@@ -1861,7 +1861,7 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 	var latest models.Message
 	if err := m.q.GetEmailSenderMessage.Get(&latest, conversationUUID); err != nil && err != sql.ErrNoRows {
 		m.lo.Error("error fetching latest message for sender address", "conversation_uuid", conversationUUID, "error", err)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	previous := latest.SendFrom()
 	if latest.Type == models.MessageIncoming {

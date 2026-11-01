@@ -3,15 +3,15 @@
 {{ define "classic-site-header" }}
 {{ template "hc-head" . }}
 <body>
-    <a class="hc-skip-link" href="#hc-main">{{ .L.T "helpCenter.skipToContent" }}</a>
+    <a class="hc-skip-link" href="#hc-main">{{ .L.GetD "templates" "Skip to main content" }}</a>
     {{ template "hc-announcement" . }}
     <header class="hc-top">
-        <nav class="hc-nav" aria-label="{{ .L.T "globals.terms.main" }}">
+        <nav class="hc-nav" aria-label="{{ .L.GetD "templates" "Main" }}">
             <a class="hc-brand" href="{{ .Data.HelpCenter.BasePath }}">
                 {{ if .Data.HelpCenter.LogoURL }}<img class="hc-logo-light" src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ if .Data.HelpCenter.LogoURLDark }}<img class="hc-logo-dark" src="{{ .Data.HelpCenter.LogoURLDark }}" alt="{{ .Data.HelpCenter.Name }}" />{{ end }}{{ else }}<span class="hc-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
             </a>
             {{ if or .Data.HelpCenter.NavLinks (gt (len .Data.HelpCenter.AvailableLocales) 1) .Data.HelpCenter.ShowThemeToggle }}
-            <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.T "globals.terms.menu" }}">
+            <button type="button" class="hc-nav-toggle" data-hc-nav-toggle aria-expanded="false" aria-controls="hc-nav-links" aria-label="{{ .L.GetD "templates" "Menu" }}">
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke-linecap="round"/></svg>
             </button>
             <div class="hc-nav-links" id="hc-nav-links">
@@ -29,10 +29,10 @@
             <h1>{{ $heroText }}</h1>
             {{ if .Data.HelpCenter.TaglineHTML }}<p class="hc-hero-tagline">{{ .Data.HelpCenter.TaglineHTML }}</p>{{ end }}
             {{ end }}
-            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ $.L.T "helpCenter.noResults" }}" data-hc-results-one="{{ $.L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ $.L.Tc "helpCenter.resultsCount" 2 }}">
+            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ $.L.GetD "templates" "No articles matched your search. Try fewer or different words." }}" data-hc-results="{{ HelpSearchLabels $.L }}">
                 {{ template "hc-search-icon" "hc-search-icon" }}
-                <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ $.L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ $.L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
-                <button type="submit">{{ $.L.T "globals.terms.search" }}</button>
+                <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ $.L.GetD "templates" "Search articles..." }}" aria-label="{{ $.L.GetD "templates" "Search articles..." }}" autocomplete="off" />
+                <button type="submit">{{ $.L.GetD "templates" "Search" }}</button>
             </form>
         </div>
     </header>
@@ -47,7 +47,7 @@
         <div class="hc-footer-inner">
             {{ if .Data.HelpCenter.FooterTaglineHTML }}<p class="hc-footer-tagline">{{ .Data.HelpCenter.FooterTaglineHTML }}</p>{{ end }}
             {{ if .Data.HelpCenter.Theme.FooterLinks }}
-            <nav class="hc-footer-links" aria-label="{{ $.L.T "globals.terms.footer" }}">
+            <nav class="hc-footer-links" aria-label="{{ $.L.GetD "templates" "Footer" }}">
                 {{ range .Data.HelpCenter.Theme.FooterLinks }}<a href="{{ .URL }}">{{ .Label }}</a>{{ end }}
             </nav>
             {{ end }}
@@ -56,7 +56,7 @@
                 {{ range .Data.HelpCenter.Theme.SocialLinks }}<a href="{{ .URL }}" target="_blank" rel="noreferrer" aria-label="{{ .Platform }}">{{ template "hc-social-icon" .Platform }}</a>{{ end }}
             </div>
             {{ end }}
-            <p class="hc-footer-powered">{{ $.L.T "helpCenter.poweredBy" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
+            <p class="hc-footer-powered">{{ $.L.GetD "templates" "Powered by" }} <a target="_blank" rel="noreferrer" href="https://libredesk.io/">libredesk</a></p>
         </div>
     </footer>
     {{ template "hc-shared-behavior" }}

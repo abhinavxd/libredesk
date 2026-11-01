@@ -7,7 +7,7 @@
           v-if="isMobile"
           variant="ghost"
           class="w-11 h-11 lg:w-8 lg:h-8 p-0 shrink-0 -ml-2 lg:-ml-1"
-          :aria-label="t('globals.messages.back')"
+          :aria-label="i18n._('Back')"
           @click="goBackToList"
         >
           <ChevronLeft class="w-4 h-4" />
@@ -21,7 +21,7 @@
           type="button"
           variant="ghost"
           :class="MOBILE_ICON_BUTTON_CLASS"
-          :aria-label="t('copilot.details')"
+          :aria-label="i18n._('Details')"
           :aria-expanded="detailsOpen"
           @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
         >
@@ -36,7 +36,7 @@
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            {{ t('conversation.snoozedUntil', { time: snoozedUntilLabel }) }}
+            {{ i18n._('Snoozed until {time}', { time: snoozedUntilLabel }) }}
           </TooltipContent>
         </Tooltip>
         <DropdownMenu>
@@ -67,21 +67,21 @@
             <Button
               variant="ghost"
               :class="MOBILE_ICON_BUTTON_CLASS"
-              :aria-label="t('globals.messages.moreActions')"
+              :aria-label="i18n._('More actions')"
             >
               <MoreHorizontal class="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem @click="downloadTranscript">
-              {{ t('conversation.downloadTranscript') }}
+              {{ i18n._('Download transcript') }}
             </DropdownMenuItem>
             <DropdownMenuItem
               v-if="userStore.can(perms.MESSAGES_WRITE_PRIVATE)"
               :disabled="isSummarizing"
               @click="summarize"
             >
-              {{ t('conversation.summarize') }}
+              {{ i18n._('Summarize with AI') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -124,7 +124,7 @@ import { useCommandPalette } from '@main/features/command/useCommandPalette'
 import { SNOOZE_COMMAND } from '@main/features/command/providers/useConversationCommands'
 import { CONVERSATION_DEFAULT_STATUSES } from '@main/constants/conversation'
 import { useEmitter } from '@main/composables/useEmitter'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import api from '@main/api'
@@ -134,7 +134,7 @@ const conversationStore = useConversationStore()
 const userStore = useUserStore()
 const emitter = useEmitter()
 const palette = useCommandPalette()
-const { t } = useI18n()
+const i18n = useI18n()
 const route = useRoute()
 const router = useRouter()
 const isMobile = useIsMobile()
@@ -187,11 +187,11 @@ const summarize = async () => {
     isSummarizing.value = true
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'info',
-      description: t('conversation.summarizing')
+      description: i18n._('Summarizing conversation with AI. This may take a few seconds.')
     })
     await api.aiSummarizeConversation({ conversation_uuid: conversation.uuid })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('conversation.summarizeAdded')
+      description: i18n._('Summary added to the conversation as a private note.')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

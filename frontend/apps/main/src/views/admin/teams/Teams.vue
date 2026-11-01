@@ -5,8 +5,8 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.team.help.description') }}</p>
-      <p>{{ $t('admin.team.help.detail') }}</p>
+      <p>{{ i18n._('Configure team settings including working hours and SLA policies.') }}</p>
+      <p>{{ i18n._('Manage agent auto-assignment limits and more.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>

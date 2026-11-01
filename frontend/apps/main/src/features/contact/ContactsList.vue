@@ -7,8 +7,8 @@
         <SearchInput
           class="min-w-0 flex-1 max-w-sm"
           v-model="searchTerm"
-          :placeholder="$t('contact.searchByEmail')"
-          :clear-label="$t('globals.messages.clearSearch')"
+          :placeholder="i18n._('Search by email')"
+          :clear-label="i18n._('Clear search')"
           @update:model-value="fetchContactsDebounced"
         />
 
@@ -20,7 +20,7 @@
               variant="outline"
               size="icon"
               class="size-9"
-              :aria-label="$t('globals.messages.sortBy')"
+              :aria-label="i18n._('Sort by')"
             >
               <ArrowDownWideNarrow size="18" class="text-muted-foreground cursor-pointer" />
             </Button>
@@ -33,9 +33,9 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectItem :value="'users.created_at'">{{
-                  $t('globals.terms.createdAt')
+                  i18n._('Created at')
                 }}</SelectItem>
-                <SelectItem :value="'users.email'">{{ $t('globals.terms.email') }}</SelectItem>
+                <SelectItem :value="'users.email'">{{ i18n.ngettext('Email', 'Emails', 1) }}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -45,8 +45,8 @@
                 <SelectValue :placeholder="orderByDirection" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem :value="'asc'">{{ $t('globals.terms.ascending') }}</SelectItem>
-                <SelectItem :value="'desc'">{{ $t('globals.terms.descending') }}</SelectItem>
+                <SelectItem :value="'asc'">{{ i18n._('Ascending') }}</SelectItem>
+                <SelectItem :value="'desc'">{{ i18n._('Descending') }}</SelectItem>
               </SelectContent>
             </Select>
           </PopoverContent>
@@ -59,7 +59,7 @@
           class="flex items-center h-8 ml-auto"
           @click="showCreateDialog = true"
         >
-          {{ $t('contact.new') }}
+          {{ i18n._('New contact') }}
         </Button>
       </div>
 
@@ -101,8 +101,8 @@
                   <Badge v-if="contact.type" variant="secondary" class="text-xs px-1.5 py-0">
                     {{
                       contact.type === 'visitor'
-                        ? $t('contact.type.visitor')
-                        : $t('contact.type.contact')
+                        ? i18n.pgettext('Contact type', 'Visitor')
+                        : i18n.pgettext('Contact type', 'Contact')
                     }}
                   </Badge>
                 </div>
@@ -121,7 +121,7 @@
           </Card>
         </router-link>
         <div v-if="contacts.length === 0" class="flex items-center justify-center w-full h-32">
-          <p class="text-lg text-muted-foreground">{{ $t('contact.noContactsFound') }}</p>
+          <p class="text-lg text-muted-foreground">{{ i18n._('No contacts found') }}</p>
         </div>
       </template>
     </div>

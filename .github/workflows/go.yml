@@ -36,5 +36,18 @@ jobs:
       - name: Install dependencies
         run: go get -v ./...
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Install GNU Gettext
+        run: sudo apt-get update && sudo apt-get install -y gettext
+
       - name: Run tests
         run: make test

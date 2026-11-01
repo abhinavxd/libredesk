@@ -1,11 +1,11 @@
 <template>
   <form @submit="onSubmit" novalidate class="space-y-8 w-full">
     <fieldset class="workspace-fields min-w-0">
-      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.workspace') }}</legend>
+      <legend :class="SECTION_HEADING_CLASS">{{ i18n._('Workspace') }}</legend>
       <FormGrid class="workspace-grid">
         <FormField v-slot="{ field }" name="site_name">
           <FormItem>
-            <FormLabel>{{ t('admin.general.siteName') }}</FormLabel>
+            <FormLabel>{{ i18n._('Site name') }}</FormLabel>
             <FormControl>
               <Input type="text" v-bind="field" />
             </FormControl>
@@ -16,7 +16,7 @@
         <FormField v-slot="{ field }" name="root_url">
           <FormItem>
             <FormLabel>
-              {{ t('globals.terms.rootURL') }}
+              {{ i18n._('Root URL') }}
             </FormLabel>
             <FormControl>
               <Input type="text" v-bind="field" />
@@ -26,11 +26,11 @@
         </FormField>
         <FormField v-slot="{ componentField }" name="lang">
           <FormItem>
-            <FormLabel>{{ t('globals.terms.language') }}</FormLabel>
+            <FormLabel>{{ i18n.ngettext('Language', 'Languages', 1) }}</FormLabel>
             <FormControl>
               <Select v-bind="componentField" :modelValue="componentField.modelValue">
                 <SelectTrigger>
-                  <SelectValue :placeholder="t('admin.general.language.placeholder')" />
+                  <SelectValue :placeholder="i18n.pgettext('Application language setting', 'Select language')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -52,12 +52,12 @@
         <FormField v-slot="{ componentField }" name="timezone">
           <FormItem>
             <FormLabel>
-              {{ t('globals.terms.timezone') }}
+              {{ i18n.ngettext('Timezone', 'Timezones', 1) }}
             </FormLabel>
             <FormControl>
               <Select v-bind="componentField">
                 <SelectTrigger>
-                  <SelectValue :placeholder="t('admin.general.timezone.placeholder')" />
+                  <SelectValue :placeholder="i18n._('Select timezone')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -75,12 +75,12 @@
         <FormField v-slot="{ componentField }" name="business_hours_id">
           <FormItem>
             <FormLabel>
-              {{ t('globals.terms.businessHour', 2) }}
+              {{ i18n.ngettext('Business hour', 'Business hours', 2) }}
             </FormLabel>
             <FormControl>
               <Select v-bind="componentField">
                 <SelectTrigger>
-                  <SelectValue :placeholder="t('admin.general.businessHours.placeholder')" />
+                  <SelectValue :placeholder="i18n._('Select business hours')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -98,8 +98,8 @@
       <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
         <FormItem class="mt-5">
           <SwitchField
-            :title="t('admin.general.showConversationSubject')"
-            :description="t('admin.general.showConversationSubject.description')"
+            :title="i18n._('Show subject in conversation list')"
+            :description="i18n._('Display the conversation subject line in the conversation list when available.')"
             :checked="componentField.modelValue"
             @update:checked="handleChange"
           />
@@ -107,11 +107,11 @@
       </FormField>
     </fieldset>
     <fieldset class="min-w-0">
-      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.branding') }}</legend>
+      <legend :class="SECTION_HEADING_CLASS">{{ i18n._('Branding') }}</legend>
       <FormGrid>
         <FormField v-slot="{ field }" name="logo_url" :value="props.initialValues.logo_url">
           <FormItem>
-            <FormLabel>{{ t('globals.terms.logoUrl') }}</FormLabel>
+            <FormLabel>{{ i18n._('Logo URL') }}</FormLabel>
             <FormControl>
               <Input type="text" v-bind="field" />
             </FormControl>
@@ -120,7 +120,7 @@
         </FormField>
         <FormField v-slot="{ field }" name="favicon_url" :value="props.initialValues.favicon_url">
           <FormItem>
-            <FormLabel>{{ t('admin.general.faviconURL') }}</FormLabel>
+            <FormLabel>{{ i18n._('Favicon URL') }}</FormLabel>
             <FormControl>
               <Input type="text" v-bind="field" />
             </FormControl>
@@ -130,7 +130,7 @@
       </FormGrid>
     </fieldset>
     <fieldset class="min-w-0">
-      <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.file', 2) }}</legend>
+      <legend :class="SECTION_HEADING_CLASS">{{ i18n.ngettext('File', 'Files', 2) }}</legend>
       <FormGrid>
         <FormField
           v-slot="{ field }"
@@ -139,13 +139,13 @@
         >
           <FormItem>
             <FormLabel>
-              {{ t('admin.general.maxAllowedFileUploadSize') }}
+              {{ i18n._('Max allowed file upload size') }}
             </FormLabel>
             <FormControl>
               <Input type="number" placeholder="10" v-bind="field" />
             </FormControl>
             <FormDescription>
-              {{ t('admin.general.maxAllowedFileUploadSize.description') }}
+              {{ i18n._('Max allowed file upload size in MB.') }}
             </FormDescription>
             <FormMessage />
           </FormItem>
@@ -153,7 +153,7 @@
         <FormField name="allowed_file_upload_extensions" v-slot="{ componentField, handleChange }">
           <FormItem>
             <FormLabel>
-              {{ t('admin.general.allowedFileUploadExtensions') }}
+              {{ i18n._('Allowed file upload extensions') }}
             </FormLabel>
             <FormControl>
               <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
@@ -165,7 +165,7 @@
               </TagsInput>
             </FormControl>
             <FormDescription>
-              {{ t('admin.general.allowedFileUploadExtensions.description') }}
+              {{ i18n._('Use `*` to permit all file types. For example: `jpg, png, pdf`') }}
             </FormDescription>
             <FormMessage />
           </FormItem>
@@ -215,12 +215,12 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { timeZones } from '@main/constants/timezones.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import api from '@main/api/index.js'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const businessHours = ref({})
 const formLoading = ref(false)
 const props = defineProps({
@@ -247,9 +247,9 @@ const props = defineProps({
   }
 })
 
-const submitLabel = props.submitLabel || t('globals.messages.save')
+const submitLabel = props.submitLabel || i18n._('Save')
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 onMounted(() => {
@@ -277,7 +277,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     formLoading.value = true
     await props.submitForm(values)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

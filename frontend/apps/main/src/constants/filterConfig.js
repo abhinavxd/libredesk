@@ -1,3 +1,5 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
 export const LOGIC = {
     AND: 'AND',
     OR: 'OR'
@@ -34,13 +36,13 @@ export const OPERATOR = {
 
 // operatorLabel returns a clearer display label for operators whose meaning is ambiguous with
 // multiple values (contains = matches ANY of the values). Other operators display as-is.
-const OPERATOR_LABEL_KEYS = {
-    [OPERATOR.CONTAINS]: 'filter.containsAnyOf',
-    [OPERATOR.NOT_CONTAINS]: 'filter.containsNoneOf'
+const OPERATOR_MESSAGES = {
+    [OPERATOR.CONTAINS]: msg({ message: 'contains any of' }),
+    [OPERATOR.NOT_CONTAINS]: msg({ message: 'contains none of' })
 }
-export const operatorLabel = (op, t) => {
-    const key = OPERATOR_LABEL_KEYS[op]
-    return key ? t(key) : op
+export const operatorLabel = (op, i18n) => {
+    const message = OPERATOR_MESSAGES[op]
+    return message ? i18n._(message) : op
 }
 
 export const FIELD_OPERATORS = {

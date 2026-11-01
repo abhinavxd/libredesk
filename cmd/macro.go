@@ -23,7 +23,7 @@ func handleGetMacros(r *fastglue.Request) error {
 	for i, m := range macros {
 		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
 			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 	}
 	return r.SendEnvelope(macros)
@@ -43,7 +43,7 @@ func handleGetMacrosCompact(r *fastglue.Request) error {
 	for i, m := range macros {
 		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
 			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 	}
 	return r.SendEnvelope(macros)
@@ -60,7 +60,7 @@ func handleSearchMacros(r *fastglue.Request) error {
 	switch view {
 	case "", models.VisibleWhenReplying, models.VisibleWhenStartingConversation, models.VisibleWhenAddingPrivateNote:
 	default:
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
@@ -73,7 +73,7 @@ func handleSearchMacros(r *fastglue.Request) error {
 	for i, m := range macros {
 		if macros[i].Actions, err = decorateMacroActions(app, m.Actions); err != nil {
 			app.lo.Error("error decorating macro actions", "macro_id", m.ID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 		}
 	}
 	return r.SendEnvelope(macros)
@@ -86,7 +86,7 @@ func handleGetMacro(r *fastglue.Request) error {
 		id, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	macro, err := app.macro.Get(id)
@@ -96,7 +96,7 @@ func handleGetMacro(r *fastglue.Request) error {
 
 	if macro.Actions, err = decorateMacroActions(app, macro.Actions); err != nil {
 		app.lo.Error("error decorating macro actions", "macro_id", id, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(macro)
@@ -110,7 +110,7 @@ func handleCreateMacro(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&macro, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateMacro(app, macro); err != nil {
@@ -159,7 +159,7 @@ func handleDeleteMacro(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.macro.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -187,7 +187,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if allowed, err := app.authz.EnforceConversationAccess(user, conversation); err != nil || !allowed {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.Get("Permission denied"), nil))
 	}
 
 	macro, err := app.macro.Get(id)
@@ -198,7 +198,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 	// Decode incoming actions.
 	if err := r.Decode(&incomingActions, "json"); err != nil {
 		app.lo.Debug("macro request rejected: invalid actions JSON", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), err.Error(), envelope.InputError)
 	}
 
 	// Make sure no duplicate action types are present.
@@ -206,7 +206,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 	for _, act := range incomingActions {
 		if actionTypes[act.Type] {
 			app.lo.Warn("duplicate action types found in macro apply apply request", "action", act.Type, "user_id", user.ID)
-			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("macro.duplicateActionsNotAllowed"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Duplicate actions not allowed"), nil, envelope.InputError)
 		}
 		actionTypes[act.Type] = true
 	}
@@ -215,11 +215,12 @@ func handleApplyMacro(r *fastglue.Request) error {
 	for _, act := range incomingActions {
 		if !isMacroActionAllowed(act.Type) {
 			app.lo.Warn("action not allowed in macro", "action", act.Type, "user_id", user.ID)
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Ts("macro.actionNotAllowed", "name", act.Type), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("%[1]s action not allowed",
+				act.Type), nil, envelope.PermissionError)
 		}
 		if !hasActionPermission(act.Type, user.Permissions) {
 			app.lo.Warn("no permission to execute macro action", "action", act.Type, "user_id", user.ID)
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("macro.permissionDenied"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Permission denied for some macro actions"), nil, envelope.PermissionError)
 		}
 	}
 
@@ -232,7 +233,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 	}
 
 	if len(incomingActions) > 0 && successCount == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("macro.couldNotApply"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Could not apply macro"), nil, envelope.GeneralError)
 	}
 
 	// Increment usage count.
@@ -240,12 +241,12 @@ func handleApplyMacro(r *fastglue.Request) error {
 
 	if successCount < len(incomingActions) {
 		return r.SendJSON(fasthttp.StatusMultiStatus, map[string]interface{}{
-			"message": app.i18n.T("macro.partiallyApplied"),
+			"message": app.i18n.Get("Macro partially applied"),
 		})
 	}
 
 	return r.SendJSON(fasthttp.StatusOK, map[string]interface{}{
-		"message": app.i18n.T("macro.applied"),
+		"message": app.i18n.Get("Macro applied"),
 	})
 }
 
@@ -321,21 +322,21 @@ func setDisplayValues(app *App, actions []autoModels.RuleAction) error {
 // validateMacro validates an incoming macro.
 func validateMacro(app *App, macro models.Macro) error {
 	if macro.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 
 	if len(macro.VisibleWhen) == 0 {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`visible_when`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`visible_when`"), nil)
 	}
 
 	var act []autoModels.RuleAction
 	if err := json.Unmarshal(macro.Actions, &act); err != nil {
 		app.lo.Error("error unmarshalling macro actions", "error", err)
-		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 	}
 	for _, a := range act {
 		if len(a.Value) == 0 {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", a.Type), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", a.Type), nil)
 		}
 	}
 	return nil

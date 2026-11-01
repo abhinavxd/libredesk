@@ -256,7 +256,8 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 	if err := t.m.storePendingOTP(t.conv.UUID, code, email); err != nil {
 		return "", err
 	}
-	body := t.m.i18n.Ts("ai.agent.verificationEmailBody", "code", code)
+	body := t.m.i18n.Get("Your verification code is %[1]s. It expires in 10 minutes. If you did not request this, you can ignore this email.",
+		code)
 	// Livechat inboxes can't send email, so those fall back to the notification email channel.
 	var sendErr error
 	if t.conv.InboxChannel == channelEmail {
@@ -264,13 +265,13 @@ func (t *sendEmailVerificationTool) Execute(ctx context.Context, args string) (s
 		// landing in a separate one the customer might reply to.
 		subject := t.conv.Subject.String
 		if subject == "" {
-			subject = t.m.i18n.T("ai.agent.verificationEmailSubject")
+			subject = t.m.i18n.Get("Your verification code")
 		}
 		sendErr = t.m.convo.SendTransientEmail(t.conv.InboxID, t.conv.ID, t.conv.UUID, []string{email}, subject, body)
 	} else {
 		msg := notifier.Message{
 			RecipientEmails: []string{email},
-			Subject:         t.m.i18n.T("ai.agent.verificationEmailSubject"),
+			Subject:         t.m.i18n.Get("Your verification code"),
 			Content:         body,
 			Provider:        notifier.ProviderEmail,
 		}

@@ -17,13 +17,14 @@ func handleImportAgents(r *fastglue.Request) error {
 
 	file, err := r.RequestCtx.FormFile("file")
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.file}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			app.i18n.Get("File")), nil, envelope.InputError)
 	}
 
 	fileContent, err := file.Open()
 	if err != nil {
 		app.lo.Error("error opening uploaded file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	defer fileContent.Close()
 
@@ -32,11 +33,11 @@ func handleImportAgents(r *fastglue.Request) error {
 	records, err := reader.ReadAll()
 	if err != nil {
 		app.lo.Debug("agent import rejected: invalid CSV", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidCsvFile"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Invalid CSV file"), nil, envelope.InputError)
 	}
 
 	if len(records) < 2 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("importer.csvMustContainHeadersAndData"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("CSV must contain headers and at least one data row"), nil, envelope.InputError)
 	}
 
 	err = app.importer.Submit("agents", func() error {
@@ -44,7 +45,7 @@ func handleImportAgents(r *fastglue.Request) error {
 	})
 
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("importer.importAlreadyInProgress"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.Get("Import already in progress"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(true)
@@ -99,9 +100,7 @@ func processAgentImport(app *App, records [][]string) error {
 	// Initialize import
 	total := len(records) - 1
 	app.importer.UpdateCounts("agents", total, 0, 0)
-	app.importer.AddLog("agents", app.i18n.Ts("importer.startingImport",
-		"count", fmt.Sprintf("%d", total),
-		"type", "agents"))
+	app.importer.AddLog("agents", app.i18n.Get("Starting import of %[1]s %[2]s", fmt.Sprintf("%d", total), "agents"))
 
 	// Process each row
 	for i, record := range records[1:] {
@@ -131,18 +130,16 @@ func processAgentImport(app *App, records [][]string) error {
 		}
 		if len(missing) > 0 {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.missingFields",
-				"row", rowStr,
-				"fields", strings.Join(missing, ", ")))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s: Error - missing required fields: %[2]s",
+				rowStr,
+				strings.Join(missing, ", ")))
 			continue
 		}
 
 		// Validate email format
 		if !stringutil.ValidEmail(email) {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.invalidEmail",
-				"row", rowStr,
-				"email", email))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s: Error - invalid email format: %[2]s", rowStr, email))
 			continue
 		}
 
@@ -150,19 +147,19 @@ func processAgentImport(app *App, records [][]string) error {
 		roles := parseList(rolesStr)
 		if len(roles) == 0 {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.roleRequired",
-				"row", rowStr,
-				"email", email))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - at least one role required",
+				rowStr,
+				email))
 			continue
 		}
 
 		invalidRoles := findInvalid(roles, validRoles)
 		if len(invalidRoles) > 0 {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.invalidRoles",
-				"row", rowStr,
-				"email", email,
-				"roles", strings.Join(invalidRoles, ", ")))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - invalid role(s): %[3]s",
+				rowStr,
+				email,
+				strings.Join(invalidRoles, ", ")))
 			continue
 		}
 
@@ -172,10 +169,10 @@ func processAgentImport(app *App, records [][]string) error {
 			invalidTeams := findInvalid(teams, validTeams)
 			if len(invalidTeams) > 0 {
 				app.importer.UpdateCounts("agents", 0, 0, 1)
-				app.importer.AddLog("agents", app.i18n.Ts("importer.invalidTeams",
-					"row", rowStr,
-					"email", email,
-					"teams", strings.Join(invalidTeams, ", ")))
+				app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - invalid team(s): %[3]s",
+					rowStr,
+					email,
+					strings.Join(invalidTeams, ", ")))
 				continue
 			}
 		}
@@ -183,9 +180,9 @@ func processAgentImport(app *App, records [][]string) error {
 		// Check if agent already exists
 		if _, err := app.user.GetAgent(0, email); err == nil {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.emailExists",
-				"row", rowStr,
-				"email", email))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - email already exists",
+				rowStr,
+				email))
 			continue
 		}
 
@@ -193,10 +190,10 @@ func processAgentImport(app *App, records [][]string) error {
 		agent, err := app.user.CreateAgent(firstName, lastName, email, roles)
 		if err != nil {
 			app.importer.UpdateCounts("agents", 0, 0, 1)
-			app.importer.AddLog("agents", app.i18n.Ts("importer.errorCreating",
-				"row", rowStr,
-				"email", email,
-				"error", err.Error()))
+			app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - failed to create agent: %[3]s",
+				rowStr,
+				email,
+				err.Error()))
 			continue
 		}
 
@@ -204,27 +201,27 @@ func processAgentImport(app *App, records [][]string) error {
 		if len(teams) > 0 {
 			if err := app.team.UpsertUserTeams(agent.ID, teams); err != nil {
 				app.importer.UpdateCounts("agents", 0, 0, 1)
-				app.importer.AddLog("agents", app.i18n.Ts("importer.errorAssigningTeams",
-					"row", rowStr,
-					"email", email,
-					"error", err.Error()))
+				app.importer.AddLog("agents", app.i18n.Get("Row %[1]s (%[2]s): Error - team assignment failed: %[3]s",
+					rowStr,
+					email,
+					err.Error()))
 				continue
 			}
 		}
 
 		app.importer.UpdateCounts("agents", 0, 1, 0)
-		app.importer.AddLog("agents", app.i18n.Ts("importer.createdAgent",
-			"row", rowStr,
-			"name", agent.FullName(),
-			"email", agent.Email.String))
+		app.importer.AddLog("agents", app.i18n.Get("Row %[1]s: Created agent %[2]s (%[3]s)",
+			rowStr,
+			agent.FullName(),
+			agent.Email.String))
 	}
 
 	// Final summary
 	status, _ := app.importer.GetStatus("agents")
-	app.importer.AddLog("agents", app.i18n.Ts("importer.importComplete",
-		"success", fmt.Sprintf("%d", status.Success),
-		"total", fmt.Sprintf("%d", status.Total),
-		"errors", fmt.Sprintf("%d", status.Errors)))
+	app.importer.AddLog("agents", app.i18n.Get("Import completed: %[1]s of %[2]s successful, %[3]s failed",
+		fmt.Sprintf("%d", status.Success),
+		fmt.Sprintf("%d", status.Total),
+		fmt.Sprintf("%d", status.Errors)))
 
 	return nil
 }

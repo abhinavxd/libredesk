@@ -7,9 +7,9 @@
           <SearchInput
             ref="inputRef"
             v-model="term"
-            :placeholder="$t('search.searchBy')"
-            :aria-label="$t('globals.terms.search')"
-            :clear-label="$t('globals.messages.clearSearch')"
+            :placeholder="i18n._('Search by reference number, contact email address or messages in conversations.')"
+            :aria-label="i18n._('Search')"
+            :clear-label="i18n._('Clear search')"
             input-class="h-12 text-base"
             :loading="loading"
           />
@@ -20,7 +20,7 @@
         <div class="pt-4">
           <div v-if="error" class="py-16 text-center space-y-4">
             <p class="text-destructive">{{ error }}</p>
-            <Button type="button" @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
+            <Button type="button" @click="search"> {{ i18n._('Try again') }} </Button>
           </div>
           <SearchResults
             v-else-if="searchPerformed"
@@ -41,7 +41,7 @@
             v-else-if="term.length < MIN_SEARCH_LENGTH"
             class="py-16 text-center text-sm text-muted-foreground"
           >
-            {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
+            {{ i18n._('Please enter at least {length} characters to search.', { length: MIN_SEARCH_LENGTH }) }}
           </p>
         </div>
       </div>

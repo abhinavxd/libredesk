@@ -34,7 +34,7 @@
         :filter-function="passThroughFilter"
       >
         <CommandInput :placeholder="placeholder" :loading="searching" />
-        <CommandEmpty v-if="!searching">{{ t('globals.messages.noResultsFound') }}</CommandEmpty>
+        <CommandEmpty v-if="!searching">{{ i18n._('No results found') }}</CommandEmpty>
         <CommandList>
           <CommandGroup>
             <CommandItem
@@ -62,7 +62,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { CaretSortIcon, CheckIcon } from '@radix-icons/vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import {
   Command,
@@ -104,7 +104,7 @@ const props = defineProps({
 
 const modelValue = defineModel({ type: Array, default: () => [] })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const open = ref(false)
 const searchTerm = ref('')
 const passThroughFilter = (values) => values

@@ -1,10 +1,10 @@
 <template>
   <div :class="{ 'flex flex-col min-h-0': fill }">
     <p v-if="isFetching" class="py-2 text-sm text-muted-foreground">
-      {{ $t('globals.terms.loading') }}
+      {{ i18n._('Loading') }}
     </p>
     <p v-else-if="!approvedTemplates.length" class="py-2 text-sm text-muted-foreground">
-      {{ $t('conversation.whatsapp.noApprovedTemplates') }}
+      {{ i18n._('No approved templates yet. Create and submit one from Admin then WhatsApp templates.') }}
     </p>
 
     <div v-else-if="!selectedTemplate" :class="fill ? 'flex flex-col flex-1 min-h-0' : ''">
@@ -13,7 +13,7 @@
         <Input
           ref="searchInputRef"
           v-model="search"
-          :placeholder="$t('globals.terms.search')"
+          :placeholder="i18n._('Search')"
           class="px-8"
         />
         <button
@@ -31,7 +31,7 @@
           v-if="!filteredTemplates.length"
           class="flex h-full items-center justify-center text-center text-sm text-muted-foreground"
         >
-          {{ $t('globals.messages.noResultsFound') }}
+          {{ i18n._('No results found') }}
         </p>
         <div v-else class="space-y-2">
           <button
@@ -56,7 +56,7 @@
         <div class="flex items-center justify-between gap-2 mb-2">
           <div class="font-mono text-sm">{{ selectedTemplate.name }}</div>
           <Button type="button" variant="ghost" size="sm" @click="$emit('back')">
-            {{ $t('globals.messages.back') }}
+            {{ i18n._('Back') }}
           </Button>
         </div>
         <div class="text-sm whitespace-pre-wrap text-muted-foreground">{{ renderedPreview }}</div>

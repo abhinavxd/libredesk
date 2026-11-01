@@ -7,6 +7,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/httputil"
+	"github.com/abhinavxd/libredesk/internal/locales"
 	"github.com/abhinavxd/libredesk/internal/setting/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/valyala/fasthttp"
@@ -26,7 +27,7 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 	var settings map[string]interface{}
 	if err := json.Unmarshal(out, &settings); err != nil {
 		app.lo.Error("error unmarshalling settings", "err", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	// Set the app.update to the settings, adding `app` prefix to the key to match the settings structure in db.
 	settings["app.update"] = app.update
@@ -45,7 +46,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 
 	// Trim whitespace from string fields.
@@ -59,7 +60,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Trim whitespace and trailing slash from root URL.
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 	if !httputil.IsValidHTTPURL(req.RootURL) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.general.rootURL.valid"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Root URL should be a valid URL"), nil, envelope.InputError)
 	}
 
 	app.Lock()
@@ -73,7 +74,7 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
 		app.lo.Error("error reloading settings", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 
 	// Check if language changed and reload i18n if needed.
@@ -81,14 +82,18 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	newLang := ko.String("app.lang")
 	if oldLang != newLang {
 		app.lo.Info("language changed, reloading i18n", "old_lang", oldLang, "new_lang", newLang)
-		app.i18n = initI18n(app.fs)
+		if err := locales.ReloadCatalogs(app.i18n, newLang); err != nil {
+			app.Unlock()
+			app.lo.Error("error reloading i18n", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
+		}
 		app.lo.Info("reloaded i18n", "old_lang", oldLang, "new_lang", newLang)
 	}
 	app.Unlock()
 
 	if err := reloadTemplates(app); err != nil {
 		app.lo.Error("error reloading templates", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 
 	if strings.TrimRight(oldRootURL, "/") != req.RootURL {
@@ -113,7 +118,7 @@ func handleGetEmailNotificationSettings(r *fastglue.Request) error {
 	// Unmarshal and filter out password.
 	if err := json.Unmarshal(out, &notif); err != nil {
 		app.lo.Error("error decoding notification settings", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	if notif.Password != "" {
 		notif.Password = strings.Repeat(stringutil.PasswordDummy, 10)
@@ -130,7 +135,7 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 
 	// Trim whitespace from string fields (Password intentionally NOT trimmed).
@@ -148,12 +153,12 @@ func handleUpdateEmailNotificationSettings(r *fastglue.Request) error {
 
 	if err := json.Unmarshal(out, &cur); err != nil {
 		app.lo.Error("error decoding notification settings", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 
 	// Make sure it's a valid from email address.
 	if _, err := mail.ParseAddress(req.EmailAddress); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidFromAddress"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`"), nil, envelope.InputError)
 	}
 
 	// Retain current password if not changed.

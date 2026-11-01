@@ -3,7 +3,7 @@
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <span class="text-sm text-muted-foreground tabular-nums">
-          {{ t('globals.messages.pageNofTotal', { page, total: totalPages }) }}
+          {{ i18n._('Page {page} of {total}', { page, total: totalPages }) }}
         </span>
         <Select :model-value="perPage" @update:model-value="handlePerPageChange">
           <SelectTrigger class="h-8 w-[70px]">
@@ -17,13 +17,13 @@
         </Select>
       </div>
 
-      <nav class="flex items-center gap-1" :aria-label="t('globals.terms.pagination')">
+      <nav class="flex items-center gap-1" :aria-label="i18n._('Pagination')">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           :class="EDGE_PAGE_BUTTON_CLASS"
-          :aria-label="t('globals.messages.firstPage')"
+          :aria-label="i18n._('First page')"
           :disabled="page <= 1"
           @click="goToPage(1)"
         >
@@ -34,7 +34,7 @@
           variant="ghost"
           size="sm"
           :class="PAGE_BUTTON_CLASS"
-          :aria-label="t('globals.messages.previousPage')"
+          :aria-label="i18n._('Previous page')"
           :disabled="page <= 1"
           @click="goToPage(page - 1)"
         >
@@ -54,7 +54,7 @@
               v-else
               type="button"
               @click="goToPage(pageNumber)"
-              :aria-label="`${t('globals.terms.page')} ${pageNumber}`"
+              :aria-label="`${i18n.ngettext('Page', 'Pages', 1)} ${pageNumber}`"
               :aria-current="pageNumber === page ? 'page' : undefined"
               class="h-7 min-w-7 px-2 rounded-md text-sm font-medium transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               :class="
@@ -73,7 +73,7 @@
           variant="ghost"
           size="sm"
           :class="PAGE_BUTTON_CLASS"
-          :aria-label="t('globals.messages.nextPage')"
+          :aria-label="i18n._('Next page')"
           :disabled="page >= totalPages"
           @click="goToPage(page + 1)"
         >
@@ -84,7 +84,7 @@
           variant="ghost"
           size="sm"
           :class="EDGE_PAGE_BUTTON_CLASS"
-          :aria-label="t('globals.messages.lastPage')"
+          :aria-label="i18n._('Last page')"
           :disabled="page >= totalPages"
           @click="goToPage(totalPages)"
         >
@@ -109,7 +109,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { getVisiblePages } from '@main/utils/pagination'
 
 const props = defineProps({
@@ -121,7 +121,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:page', 'update:perPage'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const visiblePages = computed(() => getVisiblePages(props.page, props.totalPages))
 

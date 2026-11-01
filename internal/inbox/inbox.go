@@ -22,7 +22,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -115,7 +115,7 @@ type Manager struct {
 	queries       queries
 	inboxes       map[int]Inbox
 	lo            *logf.Logger
-	i18n          *i18n.I18n
+	i18n          *gotext.Locale
 	receivers     map[int]receiverState
 	msgStore      MessageStore
 	usrStore      UserStore
@@ -149,7 +149,7 @@ type queries struct {
 }
 
 // New returns a new inbox manager.
-func New(lo *logf.Logger, db *sqlx.DB, i18n *i18n.I18n, encryptionKey string) (*Manager, error) {
+func New(lo *logf.Logger, db *sqlx.DB, i18n *gotext.Locale, encryptionKey string) (*Manager, error) {
 	var q queries
 	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
 		return nil, err
@@ -205,29 +205,29 @@ func (m *Manager) GetDBRecord(identifier any) (imodels.Inbox, error) {
 	if strings.Contains(str, "-") {
 		if err := m.queries.GetInboxByUUID.Get(&inbox, str); err != nil {
 			if err == sql.ErrNoRows {
-				return inbox, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundInbox"), nil)
+				return inbox, envelope.NewError(envelope.InputError, m.i18n.Get("Inbox not found"), nil)
 			}
 			m.lo.Error("error fetching inbox", "error", err)
-			return inbox, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return inbox, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	} else {
 		id, err := strconv.Atoi(str)
 		if err != nil {
-			return inbox, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundInbox"), nil)
+			return inbox, envelope.NewError(envelope.InputError, m.i18n.Get("Inbox not found"), nil)
 		}
 		if err := m.queries.GetInbox.Get(&inbox, id); err != nil {
 			if err == sql.ErrNoRows {
-				return inbox, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundInbox"), nil)
+				return inbox, envelope.NewError(envelope.InputError, m.i18n.Get("Inbox not found"), nil)
 			}
 			m.lo.Error("error fetching inbox", "error", err)
-			return inbox, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return inbox, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
 	decryptedConfig, err := m.decryptInboxConfig(inbox.Config)
 	if err != nil {
 		m.lo.Error("error decrypting inbox config", "identifier", identifier, "error", err)
-		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	inbox.Config = decryptedConfig
 
@@ -241,7 +241,7 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 	var inboxes = make([]imodels.Inbox, 0)
 	if err := m.queries.GetAll.Select(&inboxes); err != nil {
 		m.lo.Error("error fetching inboxes", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Decrypt sensitive fields in each inbox config
@@ -249,7 +249,7 @@ func (m *Manager) GetAll() ([]imodels.Inbox, error) {
 		decryptedConfig, err := m.decryptInboxConfig(inboxes[i].Config)
 		if err != nil {
 			m.lo.Error("error decrypting inbox config", "id", inboxes[i].ID, "error", err)
-			return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		inboxes[i].Config = decryptedConfig
 
@@ -293,7 +293,7 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
 	if err != nil {
 		m.lo.Error("error encrypting inbox config", "error", err)
-		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	tx, err := m.db.Beginx()
@@ -405,7 +405,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		return imodels.Inbox{}, m.persistenceError("decrypting inbox config", err)
 	}
 	if inbox.Channel != current.Channel {
-		return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.badRequest"), nil)
+		return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("Bad request"), nil)
 	}
 	var primary string
 	if current.Channel == ChannelEmail {
@@ -439,22 +439,22 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
 			m.lo.Error("error unmarshalling current config", "id", id, "error", err)
-			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		if len(inbox.Config) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", "`config`"), nil)
 		}
 		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
 			m.lo.Error("error unmarshalling update config", "id", id, "error", err)
-			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 
 		if len(updateCfg.IMAP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("Empty IMAP config"), nil)
 		}
 
 		if len(updateCfg.SMTP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptySMTP"), nil)
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("Empty SMTP config"), nil)
 		}
 
 		// Preserve existing IMAP passwords if update has empty password
@@ -513,7 +513,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	encryptedConfig, err := m.encryptInboxConfig(inbox.Config)
 	if err != nil {
 		m.lo.Error("error encrypting inbox config", "error", err)
-		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	var updatedInbox imodels.Inbox
@@ -582,14 +582,14 @@ func (m *Manager) MergeWhatsAppSecrets(current, update json.RawMessage) (json.Ra
 	var currentCfg, updateCfg map[string]any
 	if err := json.Unmarshal(current, &currentCfg); err != nil {
 		m.lo.Error("error unmarshalling current whatsapp config", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if len(update) == 0 {
-		return nil, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+		return nil, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", "`config`"), nil)
 	}
 	if err := json.Unmarshal(update, &updateCfg); err != nil {
 		m.lo.Error("error unmarshalling whatsapp update config", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	for _, fieldName := range []string{"access_token", "app_secret", "webhook_verify_token"} {
 		val, _ := updateCfg[fieldName].(string)
@@ -611,7 +611,7 @@ func (m *Manager) MergeWhatsAppSecrets(current, update json.RawMessage) (json.Ra
 func (m *Manager) Toggle(ctx context.Context, id int) (imodels.Inbox, error) {
 	if _, err := m.queries.Toggle.ExecContext(ctx, id); err != nil {
 		m.lo.Error("error toggling inbox", "error", err)
-		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return m.GetDBRecord(id)
 }
@@ -620,7 +620,7 @@ func (m *Manager) Toggle(ctx context.Context, id int) (imodels.Inbox, error) {
 func (m *Manager) SoftDelete(id int) error {
 	if _, err := m.queries.SoftDelete.Exec(id); err != nil {
 		m.lo.Error("error deleting inbox", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -631,11 +631,11 @@ func (m *Manager) normalizeEmailAddresses(from string, aliases imodels.EmailAlia
 	case err == nil:
 		return primary, normalized, nil
 	case errors.Is(err, ErrDuplicateAddress):
-		return "", nil, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+		return "", nil, envelope.NewError(envelope.InputError, m.i18n.Get("Already exists"), nil)
 	case errors.Is(err, ErrInvalidAliasAddress):
-		return "", nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidEmail"), nil)
+		return "", nil, envelope.NewError(envelope.InputError, m.i18n.Get("Invalid email address"), nil)
 	default:
-		return "", nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidFromAddress"), nil)
+		return "", nil, envelope.NewError(envelope.InputError, m.i18n.Get("Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`"), nil)
 	}
 }
 
@@ -643,7 +643,7 @@ func (m *Manager) normalizeEmailAddresses(from string, aliases imodels.EmailAlia
 func (m *Manager) StartAliasVerification(ctx context.Context, id int, address string) error {
 	normalized, err := NormalizeEmailAddress(address)
 	if err != nil {
-		return envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidEmail"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Invalid email address"), nil)
 	}
 	inbox, err := m.GetDBRecord(id)
 	if err != nil {
@@ -651,21 +651,21 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	}
 	idx := slices.IndexFunc(inbox.Aliases, func(alias imodels.EmailAlias) bool { return strings.EqualFold(alias.Email, normalized) })
 	if idx < 0 {
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.inbox.aliases.saveBeforeVerify"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Save the inbox first to verify this alias."), nil)
 	}
 	runtimeInbox, err := m.Get(id)
 	if err != nil {
-		return envelope.NewError(envelope.InputError, m.i18n.T("status.disabledInbox"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Inbox is disabled"), nil)
 	}
 	emailInbox, ok := runtimeInbox.(EmailInbox)
 	if !ok {
 		m.lo.Error("inbox does not support alias verification", "inbox_id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	token, err := stringutil.RandomAlphanumeric(48)
 	if err != nil {
 		m.lo.Error("error generating alias verification token", "inbox_id", id, "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := m.queries.StartAliasVerification.ExecContext(ctx, id, normalized, imodels.AliasVerificationPending, token); err != nil {
 		return m.persistenceError("starting alias verification", err)
@@ -719,7 +719,7 @@ func (m *Manager) insertEmailAddresses(tx *sqlx.Tx, inboxID int, primary string,
 
 func (m *Manager) persistenceError(action string, err error) error {
 	m.lo.Error("inbox persistence error", "action", action, "error", err)
-	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 }
 
 // UpdateConfig updates only the config field of an inbox in the DB.

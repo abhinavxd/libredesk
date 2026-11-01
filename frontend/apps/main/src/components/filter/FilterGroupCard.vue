@@ -2,12 +2,12 @@
   <div class="space-y-3 rounded-lg border border-border bg-muted/30 p-3" data-cy="filter-group">
     <div class="flex items-center justify-between gap-3 border-b border-border pb-2">
       <div class="flex items-center gap-2 text-sm font-medium text-foreground">
-        <span>{{ t('admin.automation.matchTheseRules') }}</span>
+        <span>{{ i18n._('Match these rules') }}</span>
         <ConnectorToggle :modelValue="group.logic" mode="all-any" @update:modelValue="setLogic" />
       </div>
       <CloseButton
         v-if="canRemove"
-        :aria-label="t('filter.removeGroup')"
+        :aria-label="i18n._('Remove group')"
         :onClose="() => emit('remove')"
       >
         <Trash2 class="w-4 h-4" />
@@ -31,7 +31,7 @@
       @click.stop="addCondition"
     >
       <Plus class="w-3 h-3 mr-1" />
-      {{ t('actions.addCondition') }}
+      {{ i18n._('Add condition') }}
     </Button>
   </div>
 </template>
@@ -39,7 +39,7 @@
 <script setup>
 import { Button } from '@shared-ui/components/ui/button'
 import { Plus, Trash2 } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import CloseButton from '@/components/button/CloseButton.vue'
 import FilterRow from '@/components/filter/FilterRow.vue'
 import ConnectorToggle from '@/components/filter/ConnectorToggle.vue'
@@ -51,7 +51,7 @@ defineProps({
 })
 const emit = defineEmits(['remove'])
 const group = defineModel('modelValue', { required: true })
-const { t } = useI18n()
+const i18n = useI18n()
 
 const setLogic = (logic) => {
   group.value = { ...group.value, logic }

@@ -19,7 +19,7 @@
                   <NotificationBell />
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p>{{ t('globals.terms.notification', 2) }}</p>
+                  <p>{{ i18n.ngettext('Notification', 'Notifications', 2) }}</p>
                 </TooltipContent>
               </Tooltip>
             </SidebarMenuItem>
@@ -115,7 +115,7 @@ import Sidebar from '@main/components/sidebar/Sidebar.vue'
 import Command from '@/features/command/CommandBox.vue'
 import CreateConversation from '@/features/conversation/CreateConversation.vue'
 import { hasNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRoute } from 'vue-router'
 import {
   Sidebar as ShadcnSidebar,
@@ -178,7 +178,7 @@ const openCreateConversationDialog = ref(hasSavedDraft)
 const createConversationContact = ref(null)
 const createConversationMinimized = ref(hasSavedDraft)
 const createConversationRef = ref(null)
-const { t } = useI18n()
+const i18n = useI18n()
 const notificationStore = useNotificationStore()
 const aiPromptStore = useAiPromptStore()
 const pushNotifications = usePushNotifications()
@@ -259,7 +259,7 @@ const deleteView = async (view) => {
     await api.deleteView(view.id)
     emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'view' })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.deletedSuccessfully')
+      description: i18n._('Deleted successfully')
     })
   } catch (err) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

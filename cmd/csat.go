@@ -6,6 +6,7 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	"github.com/leonelquinteros/gotext"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
@@ -33,7 +34,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if err != nil {
 		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
+				"ErrorMessage": app.i18n.Get("Page not found"),
 			},
 		})
 	}
@@ -41,8 +42,8 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if csat.ResponseTimestamp.Valid {
 		return renderCSATPage(r, "info", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"Title":   app.i18n.T("globals.messages.thankYou"),
-				"Message": app.i18n.T("csat.thankYouMessage"),
+				"Title":   app.i18n.Get("Thank you!"),
+				"Message": app.i18n.Get("We appreciate you taking the time to submit your feedback."),
 			},
 		})
 	}
@@ -51,14 +52,14 @@ func handleShowCSAT(r *fastglue.Request) error {
 	if err != nil {
 		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
+				"ErrorMessage": app.i18n.Get("Page not found"),
 			},
 		})
 	}
 
 	return renderCSATPage(r, "csat", map[string]interface{}{
 		"Data": map[string]interface{}{
-			"Title": app.i18n.T("csat.pageTitle"),
+			"Title": app.i18n.Get("Rate your interaction with us"),
 			"CSAT": map[string]interface{}{
 				"UUID": csat.UUID,
 			},
@@ -77,11 +78,11 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 		uuid = r.RequestCtx.UserValue("uuid").(string)
 	)
 
-	rating, feedback, metaJSON, errKey := validateCSATForm(r)
-	if errKey != "" {
+	rating, feedback, metaJSON, errMessage := validateCSATForm(r, app.i18n)
+	if errMessage != "" {
 		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": app.i18n.T(errKey),
+				"ErrorMessage": errMessage,
 			},
 		})
 	}
@@ -89,7 +90,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 	if err := app.conversation.UpdateCSATResponse(uuid, rating, feedback, metaJSON); err != nil {
 		// Surface only known, user-safe messages; never leak raw driver errors
 		// (e.g. a malformed UUID triggers a Postgres syntax error string).
-		msg := app.i18n.T("globals.messages.somethingWentWrong")
+		msg := app.i18n.Get("Something went wrong")
 		if e, ok := err.(envelope.Error); ok {
 			msg = e.Error()
 		}
@@ -102,8 +103,8 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 
 	return renderCSATPage(r, "info", map[string]interface{}{
 		"Data": map[string]interface{}{
-			"Title":   app.i18n.T("globals.messages.thankYou"),
-			"Message": app.i18n.T("csat.thankYouMessage"),
+			"Title":   app.i18n.Get("Thank you!"),
+			"Message": app.i18n.Get("We appreciate you taking the time to submit your feedback."),
 		},
 	})
 }
@@ -119,7 +120,7 @@ func handleShowCSATWidget(r *fastglue.Request) error {
 	if err != nil {
 		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
-				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
+				"ErrorMessage": app.i18n.Get("Page not found"),
 			},
 		})
 	}
@@ -169,8 +170,8 @@ func handleSubmitCSATResponse(r *fastglue.Request) error {
 }
 
 // validateCSATForm parses and validates the CSAT form submission.
-// Returns rating (0 if not provided), trimmed feedback, meta JSON, and error message key if invalid.
-func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string) {
+// Returns rating (0 if not provided), trimmed feedback, meta JSON, and a translated error if invalid.
+func validateCSATForm(r *fastglue.Request, locale *gotext.Locale) (int, string, json.RawMessage, string) {
 	var (
 		feedback = string(r.RequestCtx.FormValue("feedback"))
 		rating   int
@@ -180,14 +181,14 @@ func validateCSATForm(r *fastglue.Request) (int, string, json.RawMessage, string
 	if rs := string(r.RequestCtx.FormValue("rating")); rs != "" {
 		v, err := strconv.Atoi(rs)
 		if err != nil || v < 1 || v > 5 {
-			return 0, "", nil, "globals.messages.somethingWentWrong"
+			return 0, "", nil, locale.Get("Something went wrong")
 		}
 		rating = v
 	}
 
 	// At least one of rating or feedback must be provided.
 	if rating == 0 && feedback == "" {
-		return 0, "", nil, "csat.pleaseFillRequired"
+		return 0, "", nil, locale.Get("Please provide a rating or feedback.")
 	}
 
 	feedback = truncateFeedback(feedback)

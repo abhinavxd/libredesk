@@ -197,25 +197,27 @@ func handleChatInit(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Debug("error unmarshalling chat init request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if req.Message == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			app.i18n.Get("Message")), nil, envelope.InputError)
 	}
 	if len(req.Message) > maxChatMessageLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Must be at most %[1]s characters",
+			strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	config, err := getWidgetConfig(r)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	initialConfig := resolveInitialChatConfig(config, getWidgetIsVisitor(r))
 
@@ -270,7 +272,7 @@ func handleChatInit(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 		app.lo.Error("error creating conversation", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error sending message"), nil, envelope.GeneralError)
 	}
 
 	message := cmodels.Message{
@@ -287,10 +289,10 @@ func handleChatInit(r *fastglue.Request) error {
 		// Clean up conversation if message insert fails.
 		if err := app.conversation.DeleteConversation(conversationUUID); err != nil {
 			app.lo.Error("error deleting conversation after message insert failure", "conversation_uuid", conversationUUID, "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error sending message"), nil, envelope.GeneralError)
 		}
 		app.lo.Error("error inserting initial message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error sending message"), nil, envelope.GeneralError)
 	}
 
 	// Process post-message hooks for the new conversation and initial message.
@@ -301,7 +303,7 @@ func handleChatInit(r *fastglue.Request) error {
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
 	if err != nil {
 		app.lo.Error("error fetching created conversation", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Build response with conversation and messages and add business hours info.
@@ -339,7 +341,8 @@ func handleChatUpdateLastSeen(r *fastglue.Request) error {
 	)
 
 	if conversationUUID == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.conversation}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			app.i18n.Get("Conversation")), nil, envelope.InputError)
 	}
 
 	_, conversation, err := getContactConversation(r, conversationUUID)
@@ -362,42 +365,50 @@ func handleAuthExchange(r *fastglue.Request) error {
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	config, err := getWidgetConfig(r)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	var req struct {
 		JWT string `json:"jwt"`
 	}
 	if err := r.Decode(&req, "json"); err != nil || req.JWT == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "jwt"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			"jwt"), nil, envelope.InputError)
 	}
 
 	// Verify the customer-generated JWT.
 	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
 	if err != nil {
 		app.lo.Warn("widget authentication rejected: invalid JWT", "inbox_id", inbox.ID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	if claims.ExternalUserID == "" || len(claims.ExternalUserID) > maxExternalUserIDLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "external_user_id"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			"external_user_id"), nil, envelope.InputError)
 	}
 	if claims.Email == "" || len(claims.Email) > maxEmailLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "email"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			"email"), nil, envelope.InputError)
 	}
 	if claims.FirstName == "" || len(claims.FirstName) > maxNameLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "first_name"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			"first_name"), nil, envelope.InputError)
 	}
 	if len(claims.LastName) > maxNameLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.name}", "max", strconv.Itoa(maxNameLength)), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+			app.i18n.Get("Name"),
+			strconv.Itoa(maxNameLength)), nil, envelope.InputError)
 	}
 	if len(claims.PhoneNumber) > maxPhoneNumberLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.phoneNumber}", "max", strconv.Itoa(maxPhoneNumberLength)), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+			app.i18n.Get("Phone number"),
+			strconv.Itoa(maxPhoneNumberLength)), nil, envelope.InputError)
 	}
 	// Country code is cosmetic - drop an invalid one instead of failing the whole exchange.
 	if len(claims.PhoneNumberCountryCode) > maxPhoneCountryCodeLength {
@@ -408,7 +419,7 @@ func handleAuthExchange(r *fastglue.Request) error {
 	contactID, err := resolveOrCreateExternalContact(app, claims)
 	if err != nil {
 		app.lo.Error("error resolving contact during auth exchange", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Save custom attributes from JWT.
@@ -448,7 +459,7 @@ func handleAuthExchange(r *fastglue.Request) error {
 	token, err := generateSessionToken(app, contactID, inbox.ID, false, claims.ExternalUserID, sessionTTL)
 	if err != nil {
 		app.lo.Error("error generating session token", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	return sendSession(token)
 }
@@ -459,12 +470,12 @@ func handleWidgetAuthMe(r *fastglue.Request) error {
 
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
+		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.Get("Unauthorized"), nil, envelope.UnauthorizedError)
 	}
 
 	u, err := app.user.Get(contactID, "", []string{umodels.UserTypeContact, umodels.UserTypeVisitor})
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	return r.SendEnvelope(map[string]any{
@@ -508,20 +519,20 @@ func handleGetConversations(r *fastglue.Request) error {
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Fetch conversations for the contact and convert to ChatConversation format.
 	chatConversations, err := app.conversation.GetContactChatConversations(contactID, inbox.ID)
 	if err != nil {
 		app.lo.Error("error fetching conversations for contact", "contact_id", contactID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	unreadMessages, err := app.conversation.GetContactUnreadPreviewMessages(contactID, inbox.ID, 3)
 	if err != nil {
@@ -552,14 +563,16 @@ func handleChatSendMessage(r *fastglue.Request) error {
 
 	if err := r.Decode(&req, "json"); err != nil {
 		app.lo.Debug("error unmarshalling chat message request", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if req.Message == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.message}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			app.i18n.Get("Message")), nil, envelope.InputError)
 	}
 	if len(req.Message) > maxChatMessageLength {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Must be at most %[1]s characters",
+			strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
 
 	senderID, conversation, err := getContactConversation(r, conversationUUID)
@@ -585,7 +598,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	}
 	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message", "conversation_uuid", conversationUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error sending message"), nil, envelope.GeneralError)
 	}
 
 	return sendChatMessageResponse(app, r, message.UUID)
@@ -599,7 +612,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 		req              handoffFormReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 	contactID, conversation, err := getContactConversation(r, conversationUUID)
 	if err != nil {
@@ -607,11 +620,11 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	}
 	config, err := getWidgetConfig(r)
 	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	config = config.ResolvePreChatForm(getWidgetIsVisitor(r))
 	if !config.PreChatForm.Enabled || !config.PreChatForm.HandoffOnly {
-		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.Get("This handoff is no longer pending. Send a new message if you still need a human."), nil, envelope.ConflictError)
 	}
 	config.PreChatForm.Fields, _ = filterPreChatFormFields(config.PreChatForm.Fields, app)
 	if err := validateRequiredFormFields(req.FormData, config, app); err != nil {
@@ -650,7 +663,7 @@ func handleChatSubmitHandoffForm(r *fastglue.Request) error {
 	}
 	if err := app.aiAgent.CompleteHandoff(conversation); err != nil {
 		app.lo.Error("error completing AI handoff form", "conversation_uuid", conversation.UUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.T("ai.agent.handoffFormUnavailable"), nil, envelope.ConflictError)
+		return r.SendErrorEnvelope(fasthttp.StatusConflict, app.i18n.Get("This handoff is no longer pending. Send a new message if you still need a human."), nil, envelope.ConflictError)
 	}
 	return r.SendEnvelope(true)
 }
@@ -662,13 +675,14 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Error("error parsing form data.", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error parsing request"), nil, envelope.GeneralError)
 	}
 
 	// Get conversation UUID from form data
 	conversationValues, convOk := form.Value["conversation_uuid"]
 	if !convOk || len(conversationValues) == 0 || conversationValues[0] == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.conversation}"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s Required",
+			app.i18n.Get("Conversation")), nil, envelope.InputError)
 	}
 	conversationUUID := conversationValues[0]
 
@@ -684,23 +698,23 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Make sure file upload is enabled for the inbox.
 	config, err := getWidgetConfig(r)
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	if !config.Features.FileUpload {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("status.disabledFileUpload"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("File Upload is disabled"), nil, envelope.InputError)
 	}
 
 	files, ok := form.File["files"]
 	if !ok || len(files) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundFile"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("File not found"), nil, envelope.InputError)
 	}
 
 	fileHeader := files[0]
 	file, err := fileHeader.Open()
 	if err != nil {
 		app.lo.Error("error reading uploaded file", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	defer file.Close()
 
@@ -711,7 +725,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	srcExt := strings.TrimPrefix(strings.ToLower(filepath.Ext(srcFileName)), ".")
 
 	if srcFileSize <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileEmpty"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("This file is 0 bytes, so it will not be attached."), nil, envelope.InputError)
 	}
 
 	// Check file size
@@ -720,7 +734,8 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 		app.lo.Debug("widget upload rejected: file exceeds size limit", "size_mb", bytesToMegabytes(srcFileSize), "max_allowed_mb", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
 			fasthttp.StatusRequestEntityTooLarge,
-			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
+			app.i18n.Get("File size too large, please upload a file less than %[1]s",
+				fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
 			nil,
 			envelope.GeneralError,
 		)
@@ -728,13 +743,13 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 
 	// Make sure the file extension is allowed.
 	if !slices.Contains(consts.AllowedUploadFileExtensions, "*") && !slices.Contains(consts.AllowedUploadFileExtensions, srcExt) {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("media.fileTypeNotAllowed"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("File type not allowed"), nil, envelope.InputError)
 	}
 
 	fileContent, err := io.ReadAll(file)
 	if err != nil {
 		app.lo.Error("error reading file content", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	message := cmodels.Message{
@@ -761,7 +776,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Process the incoming message with attachment.
 	if message, err = app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
 		app.lo.Error("error processing incoming message with attachment", "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.errorSendingMessage"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Error sending message"), nil, envelope.GeneralError)
 	}
 
 	return sendChatMessageResponse(app, r, message.UUID)
@@ -773,7 +788,7 @@ func sendChatMessageResponse(app *App, r *fastglue.Request, messageUUID string) 
 	message, err := app.conversation.GetMessage(messageUUID)
 	if err != nil {
 		app.lo.Error("error fetching inserted message", "message_uuid", messageUUID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	app.conversation.SignAvatarURL(&message.Author.AvatarURL)
@@ -804,13 +819,13 @@ func getContactConversation(r *fastglue.Request, conversationUUID string) (int, 
 	contactID, err := getWidgetContactID(r)
 	if err != nil {
 		app.lo.Error("error getting contact ID from middleware context", "error", err)
-		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
 		app.lo.Error("error getting inbox from middleware context", "error", err)
-		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	conversation, err := app.conversation.GetConversation(0, conversationUUID, "")
@@ -821,7 +836,7 @@ func getContactConversation(r *fastglue.Request, conversationUUID string) (int, 
 
 	if conversation.ContactID != contactID || conversation.InboxID != inbox.ID {
 		app.lo.Warn("widget conversation access denied: contact or inbox does not match", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
-		return 0, cmodels.Conversation{}, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
+		return 0, cmodels.Conversation{}, envelope.NewError(envelope.PermissionError, app.i18n.Get("Permission denied"), nil)
 	}
 
 	return contactID, conversation, nil
@@ -915,13 +930,13 @@ func createVisitorContact(app *App, formData map[string]any, config livechat.Con
 
 	if err := app.user.CreateVisitor(&visitor); err != nil {
 		app.lo.Error("error creating visitor contact", "error", err)
-		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	token, err := generateSessionToken(app, visitor.ID, inbox.ID, true, "", defaultSessionTTL)
 	if err != nil {
 		app.lo.Error("error generating session token for visitor", "error", err)
-		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return umodels.User{}, "", nil, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	return visitor, token, formConvoAttrs, nil
@@ -1268,35 +1283,46 @@ func validateFormData(app *App, formData map[string]any, config livechat.Config,
 		case "name":
 			finalName = resolveFormField(formData, field.Key, exName)
 			if field.Required && finalName == "" {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.name}"), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required",
+					app.i18n.Get("Name")), nil)
 			}
 			if len(finalName) > maxNameLength {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.name}", "max", strconv.Itoa(maxNameLength)), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+					app.i18n.Get("Name"),
+					strconv.Itoa(maxNameLength)), nil)
 			}
 
 		case "email":
 			finalEmail = resolveFormField(formData, field.Key, exEmail)
 			if field.Required && finalEmail == "" {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.email}"), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required",
+					app.i18n.Get("Email")), nil)
 			}
 			if len(finalEmail) > maxEmailLength {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.email}", "max", strconv.Itoa(maxEmailLength)), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+					app.i18n.Get("Email"),
+					strconv.Itoa(maxEmailLength)), nil)
 			}
 			if finalEmail != "" && !stringutil.ValidEmail(finalEmail) {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("Invalid email address"), nil)
 			}
 
 		case fieldTypePhone:
 			finalPhone = resolveFormField(formData, field.Key, exPhone)
 			finalPhoneCountryCode = resolveFormField(formData, field.Key+phoneCountryCodeSuffix, exPhoneCountryCode)
 			if field.Required && (finalPhone == "" || finalPhoneCountryCode == "") {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "{globals.terms.phoneNumber}"), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required",
+					app.i18n.Get("Phone number")), nil)
 			}
 			if len(finalPhone) > maxPhoneNumberLength {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.phoneNumber}", "max", strconv.Itoa(maxPhoneNumberLength)), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+					app.i18n.Get("Phone number"),
+					strconv.Itoa(maxPhoneNumberLength)), nil)
 			}
 			if len(finalPhoneCountryCode) > maxPhoneCountryCodeLength {
-				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.countryCode}", "max", strconv.Itoa(maxPhoneCountryCodeLength)), nil)
+				return "", "", "", "", envelope.NewError(envelope.InputError, app.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+					app.i18n.Get("Country code"),
+					strconv.Itoa(maxPhoneCountryCodeLength)), nil)
 			}
 			if finalPhone == "" {
 				finalPhoneCountryCode = ""
@@ -1314,7 +1340,7 @@ func validateRequiredFormFields(formData map[string]any, config livechat.Config,
 		}
 		value, exists := formData[field.Key]
 		if !exists || !isFormFieldValuePresent(field, value) {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", field.Label), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required", field.Label), nil)
 		}
 	}
 	return nil
@@ -1450,14 +1476,14 @@ func canReply(r *fastglue.Request, conversation cmodels.Conversation) error {
 	app := r.Context.(*App)
 	lcConfig, err := getWidgetConfig(r)
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil)
 	}
 	preventReply := lcConfig.Visitors.PreventReplyToClosedConversation
 	if !getWidgetIsVisitor(r) {
 		preventReply = lcConfig.Users.PreventReplyToClosedConversation
 	}
 	if preventReply {
-		return envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationClosed"), nil)
+		return envelope.NewError(envelope.PermissionError, app.i18n.Get("This conversation has been closed"), nil)
 	}
 	return nil
 }

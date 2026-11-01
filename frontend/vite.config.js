@@ -5,6 +5,7 @@ import autoprefixer from 'autoprefixer'
 import tailwind from 'tailwindcss'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { lingui } from './lingui.plugin'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -97,7 +98,7 @@ export default defineConfig(({ mode, command }) => {
             'icons': ['lucide-vue-next', '@radix-icons/vue'],
             'utils': ['@vueuse/core', 'clsx', 'tailwind-merge', 'class-variance-authority'],
             'forms': ['vee-validate', '@vee-validate/zod', 'zod'],
-            'misc': ['axios', 'date-fns', 'mitt', 'qs', 'vue-i18n'],
+            'misc': ['axios', 'date-fns', 'mitt', 'qs', '@lingui/core'],
             // Main-app-only chunks - widget doesn't use these libraries.
             ...(!isWidget && {
               'charts': ['@unovis/ts', '@unovis/vue'],
@@ -119,7 +120,7 @@ export default defineConfig(({ mode, command }) => {
         },
       },
     },
-    plugins: [vue()],
+    plugins: [vue(), lingui()],
     // `root` is the app dir, which would hide the tests living in the other app and in shared-ui.
     test: {
       dir: path.resolve(__dirname),

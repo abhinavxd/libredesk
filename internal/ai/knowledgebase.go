@@ -62,7 +62,7 @@ func (m *Manager) GetKnowledgeBaseItems() ([]models.KnowledgeBaseItem, error) {
 	items := make([]models.KnowledgeBaseItem, 0)
 	if err := m.q.GetKnowledgeBaseItems.Select(&items); err != nil {
 		m.lo.Error("error fetching knowledge base items", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return items, nil
 }
@@ -71,20 +71,22 @@ func (m *Manager) GetKnowledgeBaseItem(id int) (models.KnowledgeBaseItem, error)
 	var item models.KnowledgeBaseItem
 	if err := m.q.GetKnowledgeBaseItem.Get(&item, id); err != nil {
 		if err == sql.ErrNoRows {
-			return item, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return item, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching knowledge base item", "error", err)
-		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return item, nil
 }
 
 func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL string, enabled bool) (models.KnowledgeBaseItem, error) {
 	if strings.TrimSpace(title) == "" {
-		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.title")), nil)
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty",
+			m.i18n.Get("Title")), nil)
 	}
 	if strings.TrimSpace(content) == "" {
-		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty",
+			m.i18n.Get("Content")), nil)
 	}
 	if source == "" {
 		source = models.KnowledgeSourceManual
@@ -92,7 +94,7 @@ func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL stri
 	var item models.KnowledgeBaseItem
 	if err := m.q.InsertKnowledgeBaseItem.Get(&item, models.KnowledgeTypeSnippet, title, content, enabled, source, sourceURL); err != nil {
 		m.lo.Error("error creating knowledge base item", "error", err)
-		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexItem(snippetSource{m}, snippetItem(item))
 	return item, nil
@@ -100,18 +102,20 @@ func (m *Manager) CreateKnowledgeBaseItem(title, content, source, sourceURL stri
 
 func (m *Manager) UpdateKnowledgeBaseItem(id int, title, content string, enabled bool) (models.KnowledgeBaseItem, error) {
 	if strings.TrimSpace(title) == "" {
-		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.title")), nil)
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty",
+			m.i18n.Get("Title")), nil)
 	}
 	if strings.TrimSpace(content) == "" {
-		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
+		return models.KnowledgeBaseItem{}, envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty",
+			m.i18n.Get("Content")), nil)
 	}
 	var item models.KnowledgeBaseItem
 	if err := m.q.UpdateKnowledgeBaseItem.Get(&item, id, title, content, enabled); err != nil {
 		if err == sql.ErrNoRows {
-			return item, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return item, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error updating knowledge base item", "error", err)
-		return item, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return item, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexItem(snippetSource{m}, snippetItem(item))
 	return item, nil
@@ -129,7 +133,7 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{})
 	if err != nil {
 		m.lo.Error("error beginning knowledge base delete transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer func() {
 		_ = tx.Rollback()
@@ -137,15 +141,15 @@ func (m *Manager) DeleteKnowledgeBaseItem(id int) error {
 
 	if _, err := tx.Stmtx(m.q.DeleteKnowledgeBaseItem).Exec(id); err != nil {
 		m.lo.Error("error deleting knowledge base item", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := tx.Stmtx(m.q.DeleteEmbeddingsBySource).Exec(models.SourceSnippet, id); err != nil {
 		m.lo.Error("error deleting snippet embeddings", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing knowledge base delete transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.index.removeSource(models.SourceSnippet, id)
 	return nil

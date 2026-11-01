@@ -3,12 +3,12 @@
     <!-- Submitted CSAT -->
     <div v-if="isSubmitted && hasResponse">
       <div class="text-xs text-muted-foreground mb-2">
-        {{ t('globals.terms.feedback', 1) }}
+        {{ i18n.ngettext('Feedback', 'Feedbacks', 1) }}
       </div>
 
       <div v-if="csatResponse.rating" class="flex items-center gap-2 mb-2">
         <span class="text-lg">{{ csatRatingEmoji(csatResponse.rating) }}</span>
-        <span class="text-sm font-medium">{{ t(csatRatingTextKey(csatResponse.rating)) }}</span>
+        <span class="text-sm font-medium">{{ i18n._(csatRatingMessage(csatResponse.rating)) }}</span>
         <span class="text-xs text-muted-foreground">{{ csatResponse.rating }}/5</span>
       </div>
 
@@ -21,17 +21,17 @@
     </div>
 
     <span v-else-if="!isSubmitted" class="text-xs text-muted-foreground italic">
-      {{ t('globals.terms.awaitingResponse') }}
+      {{ i18n._('Awaiting Response') }}
     </span>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { csatRatingEmoji, csatRatingTextKey } from '@shared-ui/utils/csat.js'
+import { useI18n } from '@shared-ui/i18n'
+import { csatRatingEmoji, csatRatingMessage } from '@shared-ui/utils/csat.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const props = defineProps({
   message: {

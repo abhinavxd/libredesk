@@ -7,7 +7,7 @@
       <template #footer>
         <div class="flex space-x-3">
           <Button type="submit" :isLoading="formLoading">
-            {{ isNewForm ? t('globals.messages.create') : t('globals.messages.save') }}
+            {{ isNewForm ? i18n._('Create') : i18n._('Save') }}
           </Button>
         </div>
       </template>
@@ -25,14 +25,14 @@ import { Button } from '@shared-ui/components/ui/button'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRouter } from 'vue-router'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from '@/features/admin/context-links/formSchema.js'
 
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)
 const formLoading = ref(false)
@@ -45,7 +45,7 @@ const props = defineProps({
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     name: '',
     url_template: '',
@@ -67,7 +67,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -82,8 +82,8 @@ const onSubmit = form.handleSubmit(async (values) => {
 const isNewForm = computed(() => !props.id)
 
 const breadcrumbLinks = [
-  { path: 'context-link-list', label: t('globals.terms.contextLink') },
-  { path: '', label: props.id ? t('globals.messages.edit') : t('globals.messages.new') }
+  { path: 'context-link-list', label: i18n._('{count, plural, one {Context link} other {Context links}}') },
+  { path: '', label: props.id ? i18n._('Edit') : i18n.pgettext('New context link', 'New') }
 ]
 
 onMounted(async () => {

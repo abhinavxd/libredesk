@@ -21,7 +21,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/volatiletech/null/v9"
@@ -146,7 +146,7 @@ type Manager struct {
 	db      *sqlx.DB
 	q       queries
 	lo      *logf.Logger
-	i18n    *i18n.I18n
+	i18n    *gotext.Locale
 	indexer ArticleIndexer
 }
 
@@ -154,7 +154,7 @@ type Manager struct {
 type Opts struct {
 	DB      *sqlx.DB
 	Lo      *logf.Logger
-	I18n    *i18n.I18n
+	I18n    *gotext.Locale
 	Indexer ArticleIndexer
 }
 
@@ -242,7 +242,7 @@ func (m *Manager) GetAllHelpCenters() ([]models.HelpCenter, error) {
 	var helpCenters = make([]models.HelpCenter, 0)
 	if err := m.q.GetAllHelpCenters.Select(&helpCenters); err != nil {
 		m.lo.Error("error fetching help centers", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	for i := range helpCenters {
 		fillThemeDefaults(&helpCenters[i])
@@ -255,7 +255,7 @@ func (m *Manager) GetActiveHelpCenters() ([]models.HelpCenter, error) {
 	var helpCenters = make([]models.HelpCenter, 0)
 	if err := m.q.GetActiveHelpCenters.Select(&helpCenters); err != nil {
 		m.lo.Error("error fetching active help centers", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	for i := range helpCenters {
 		fillThemeDefaults(&helpCenters[i])
@@ -268,10 +268,10 @@ func (m *Manager) GetHelpCenterByID(id int) (models.HelpCenter, error) {
 	var hc models.HelpCenter
 	if err := m.q.GetHelpCenterByID.Get(&hc, id); err != nil {
 		if err == sql.ErrNoRows {
-			return hc, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return hc, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching help center", "error", err, "id", id)
-		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return hc, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	fillThemeDefaults(&hc)
 	return hc, nil
@@ -282,10 +282,10 @@ func (m *Manager) GetHelpCenterBySlug(slug string) (models.HelpCenter, error) {
 	var hc models.HelpCenter
 	if err := m.q.GetHelpCenterBySlug.Get(&hc, slug); err != nil {
 		if err == sql.ErrNoRows {
-			return hc, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return hc, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching help center by slug", "error", err, "slug", slug)
-		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return hc, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	fillThemeDefaults(&hc)
 	return hc, nil
@@ -312,10 +312,10 @@ func (m *Manager) CreateHelpCenter(req HelpCenterRequest) (models.HelpCenter, er
 	}
 	if err := m.q.InsertHelpCenter.Get(&hc, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return hc, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error creating help center", "error", err)
-		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return hc, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return hc, nil
 }
@@ -368,10 +368,10 @@ func (m *Manager) UpdateHelpCenter(id int, req HelpCenterRequest) (models.HelpCe
 	}
 	if err := m.q.UpdateHelpCenter.Get(&hc, id, req.Name, req.Slug, req.PageTitle, req.MetaDescription, req.CustomCSS, req.CustomJS, req.DefaultLocale, req.AllowedLocales, req.Theme, req.CustomDomain, req.Template, req.LivechatInboxID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return hc, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return hc, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error updating help center", "error", err, "id", id)
-		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return hc, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return hc, nil
 }
@@ -381,7 +381,7 @@ func (m *Manager) ToggleHelpCenterActive(id int) (models.HelpCenter, error) {
 	var hc models.HelpCenter
 	if err := m.q.ToggleHelpCenter.Get(&hc, id); err != nil {
 		m.lo.Error("error toggling help center active status", "error", err, "id", id)
-		return hc, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return hc, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	// A paused help center 404s publicly, so its articles must leave the AI index too.
 	m.reindexHelpCenterArticles(id)
@@ -409,7 +409,7 @@ func (m *Manager) DeleteHelpCenter(id int) error {
 	articleIDs := m.articleIDsFor(m.q.GetHelpCenterArticleIDs, id)
 	if _, err := m.q.DeleteHelpCenter.Exec(id); err != nil {
 		m.lo.Error("error deleting help center", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.removeArticleEmbeddings(articleIDs)
 	return nil
@@ -420,7 +420,7 @@ func (m *Manager) GetCollectionsByHelpCenter(helpCenterID int) ([]models.Collect
 	var collections = make([]models.Collection, 0)
 	if err := m.q.GetCollectionsByHelpCenter.Select(&collections, helpCenterID); err != nil {
 		m.lo.Error("error fetching collections", "error", err, "help_center_id", helpCenterID)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return collections, nil
 }
@@ -430,10 +430,10 @@ func (m *Manager) GetCollectionByID(id int) (models.Collection, error) {
 	var collection models.Collection
 	if err := m.q.GetCollectionByID.Get(&collection, id); err != nil {
 		if err == sql.ErrNoRows {
-			return collection, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return collection, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching collection", "error", err, "id", id)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return collection, nil
 }
@@ -455,7 +455,7 @@ func (m *Manager) CreateCollection(helpCenterID int, req CollectionRequest) (mod
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	if err := m.lockHelpCenter(tx, helpCenterID); err != nil {
@@ -473,14 +473,14 @@ func (m *Manager) CreateCollection(helpCenterID int, req CollectionRequest) (mod
 	req.Slug = slug
 	if err := tx.Stmtx(m.q.InsertCollection).Get(&collection, helpCenterID, req.Slug, req.ParentID, req.Locale, req.Name, req.Description, req.Icon, req.SortOrder, req.IsPublished); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return collection, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return collection, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error creating collection", "error", err)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing collection create", "error", err)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return collection, nil
 }
@@ -499,7 +499,7 @@ func (m *Manager) UpdateCollection(id int, req CollectionRequest) (models.Collec
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 
@@ -518,10 +518,10 @@ func (m *Manager) UpdateCollection(id int, req CollectionRequest) (models.Collec
 		var hasContent bool
 		if err := tx.Stmtx(m.q.CollectionHasContent).Get(&hasContent, id); err != nil {
 			m.lo.Error("error checking collection content", "error", err, "id", id)
-			return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		if hasContent {
-			return collection, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.localeChangeHasContent"), nil)
+			return collection, envelope.NewError(envelope.InputError, m.i18n.Get("This collection contains articles or sub-collections in its current language. Changing the language would hide them from the help center. Move them out first."), nil)
 		}
 	}
 	if req.ParentID != nil {
@@ -531,14 +531,14 @@ func (m *Manager) UpdateCollection(id int, req CollectionRequest) (models.Collec
 	}
 	if err := tx.Stmtx(m.q.UpdateCollection).Get(&collection, id, req.Slug, req.ParentID, req.Locale, req.Name, req.Description, req.Icon, req.SortOrder, req.IsPublished); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return collection, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return collection, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error updating collection", "error", err, "id", id)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing collection update", "error", err, "id", id)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	// A hidden or re-parented collection can take its articles out of reach, and the AI only
 	// cites reachable ones.
@@ -551,18 +551,18 @@ func (m *Manager) UpdateCollectionSortOrders(helpCenterID int, orders map[int]in
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	for id, order := range orders {
 		if _, err := tx.Stmtx(m.q.UpdateCollectionSortOrder).Exec(id, helpCenterID, order); err != nil {
 			m.lo.Error("error updating collection sort order", "error", err, "id", id)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing collection sort orders", "error", err, "help_center_id", helpCenterID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -572,7 +572,7 @@ func (m *Manager) ToggleCollectionPublished(id int) (models.Collection, error) {
 	var collection models.Collection
 	if err := m.q.ToggleCollectionPublished.Get(&collection, id); err != nil {
 		m.lo.Error("error toggling collection published status", "error", err, "id", id)
-		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	// Publishing state decides whether the articles below are reachable, and only reachable
 	// articles may be indexed for the AI agent.
@@ -600,7 +600,7 @@ func (m *Manager) DeleteCollection(id int) error {
 	articleIDs := m.articleIDsFor(m.q.GetSubtreeArticleIDs, id)
 	if _, err := m.q.DeleteCollection.Exec(id); err != nil {
 		m.lo.Error("error deleting collection", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.removeArticleEmbeddings(articleIDs)
 	return nil
@@ -634,10 +634,10 @@ func (m *Manager) GetArticleByID(id int) (models.Article, error) {
 	var article models.Article
 	if err := m.q.GetArticleByID.Get(&article, id); err != nil {
 		if err == sql.ErrNoRows {
-			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching article", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return article, nil
 }
@@ -646,7 +646,7 @@ func (m *Manager) GetArticleTranslations(id int) ([]models.ArticleTranslation, e
 	var translations = make([]models.ArticleTranslation, 0)
 	if err := m.q.GetArticleTranslations.Select(&translations, id); err != nil {
 		m.lo.Error("error fetching article translations", "error", err, "id", id)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return translations, nil
 }
@@ -655,7 +655,7 @@ func (m *Manager) GetArticleTranslations(id int) ([]models.ArticleTranslation, e
 func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Article, error) {
 	var article models.Article
 	if !isValidArticleStatus(req.Status) {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidStatus"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("Article status must be draft or published."), nil)
 	}
 	if err := m.validateSlug(req.Slug); err != nil {
 		return article, err
@@ -684,7 +684,7 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 			return article, err
 		}
 		if sourceCollection.HelpCenterID != targetCollection.HelpCenterID {
-			return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+			return article, envelope.NewError(envelope.InputError, m.i18n.Get("That collection belongs to another help center. Pick a collection in this help center."), nil)
 		}
 		translationGroupID = source.TranslationGroupID
 	}
@@ -694,7 +694,7 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	if err := m.lockHelpCenterByCollection(tx, collectionID); err != nil {
@@ -709,14 +709,14 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 	req.Excerpt = strings.TrimSpace(req.Excerpt)
 	if err := tx.Stmtx(m.q.InsertArticle).Get(&article, collectionID, req.AuthorID, req.CreatedBy, req.Slug, req.Locale, req.Title, req.Content, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.SortOrder, req.Status, req.AIEnabled, translationGroupID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error creating article", "error", err)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing article create", "error", err)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexArticle(article.ID)
 	return article, nil
@@ -726,7 +726,7 @@ func (m *Manager) CreateArticle(collectionID int, req ArticleRequest) (models.Ar
 func (m *Manager) UpdateArticle(id int, req ArticleRequest) (models.Article, error) {
 	var article models.Article
 	if !isValidArticleStatus(req.Status) {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidStatus"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("Article status must be draft or published."), nil)
 	}
 	if err := m.validateSlug(req.Slug); err != nil {
 		return article, err
@@ -758,7 +758,7 @@ func (m *Manager) UpdateArticle(id int, req ArticleRequest) (models.Article, err
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	if err := m.lockHelpCenterByCollection(tx, collectionID); err != nil {
@@ -767,21 +767,21 @@ func (m *Manager) UpdateArticle(id int, req ArticleRequest) (models.Article, err
 	var slugTaken bool
 	if err := tx.Stmtx(m.q.OtherArticleSlugExists).Get(&slugTaken, collectionID, req.Slug, req.Locale, id); err != nil {
 		m.lo.Error("error checking article slug uniqueness", "error", err, "id", id, "slug", req.Slug)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if slugTaken {
-		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 	}
 	if err := tx.Stmtx(m.q.UpdateArticle).Get(&article, id, req.Slug, req.Locale, req.Title, req.Content, req.SortOrder, req.Status, req.AIEnabled, req.CollectionID, req.Excerpt, req.MetaTitle, req.MetaDescription, req.MetaImageURL, req.AuthorID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error updating article", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing article update", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexArticle(article.ID)
 	return article, nil
@@ -795,7 +795,7 @@ func (m *Manager) MoveArticle(id, collectionID int) (models.Article, error) {
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	if err := m.lockHelpCenterByCollection(tx, collectionID); err != nil {
@@ -804,10 +804,10 @@ func (m *Manager) MoveArticle(id, collectionID int) (models.Article, error) {
 	var existing models.Article
 	if err := tx.Stmtx(m.q.GetArticleByID).Get(&existing, id); err != nil {
 		if err == sql.ErrNoRows {
-			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching article", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	get := m.lockedCollectionGetter(tx)
 	source, err := get(existing.CollectionID)
@@ -819,26 +819,26 @@ func (m *Manager) MoveArticle(id, collectionID int) (models.Article, error) {
 		return article, err
 	}
 	if target.HelpCenterID != source.HelpCenterID {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("That collection belongs to another help center. Pick a collection in this help center."), nil)
 	}
 	if target.Locale != existing.Locale {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.collectionLocaleMismatch"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("The collection is in a different language than the article. Pick a collection in the article's language."), nil)
 	}
 	var slugTaken bool
 	if err := tx.Stmtx(m.q.OtherArticleSlugExists).Get(&slugTaken, collectionID, existing.Slug, existing.Locale, id); err != nil {
 		m.lo.Error("error checking article slug uniqueness", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if slugTaken {
-		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 	}
 	if err := tx.Stmtx(m.q.MoveArticleToCollection).Get(&article, id, collectionID); err != nil {
 		m.lo.Error("error moving article", "error", err, "id", id, "collection_id", collectionID)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing article move", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexArticle(article.ID)
 	return article, nil
@@ -849,18 +849,18 @@ func (m *Manager) UpdateArticleSortOrders(collectionID int, orders map[int]int) 
 	tx, err := m.db.Beginx()
 	if err != nil {
 		m.lo.Error("error starting transaction", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer tx.Rollback()
 	for id, order := range orders {
 		if _, err := tx.Stmtx(m.q.UpdateArticleSortOrder).Exec(id, collectionID, order); err != nil {
 			m.lo.Error("error updating article sort order", "error", err, "id", id)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		m.lo.Error("error committing article sort orders", "error", err, "collection_id", collectionID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -869,11 +869,11 @@ func (m *Manager) UpdateArticleSortOrders(collectionID int, orders map[int]int) 
 func (m *Manager) UpdateArticleStatus(id int, status string) (models.Article, error) {
 	var article models.Article
 	if !isValidArticleStatus(status) {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidStatus"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("Article status must be draft or published."), nil)
 	}
 	if err := m.q.UpdateArticleStatus.Get(&article, id, status); err != nil {
 		m.lo.Error("error updating article status", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	m.reindexArticle(article.ID)
 	return article, nil
@@ -884,7 +884,7 @@ func (m *Manager) GetLinkableArticles(helpCenterID int, excludeLocale string) ([
 	var articles = make([]models.LinkableArticle, 0)
 	if err := m.q.GetLinkableArticles.Select(&articles, helpCenterID, excludeLocale); err != nil {
 		m.lo.Error("error fetching linkable articles", "error", err, "help_center_id", helpCenterID)
-		return articles, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return articles, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return articles, nil
 }
@@ -893,7 +893,7 @@ func (m *Manager) GetLinkableArticles(helpCenterID int, excludeLocale string) ([
 func (m *Manager) LinkArticleTranslation(id, translationOfID int) (models.Article, error) {
 	var article models.Article
 	if id == translationOfID {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.cannotLinkArticleToItself"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("An article cannot be its own translation."), nil)
 	}
 	source, err := m.GetArticleByID(translationOfID)
 	if err != nil {
@@ -912,33 +912,33 @@ func (m *Manager) LinkArticleTranslation(id, translationOfID int) (models.Articl
 		return article, err
 	}
 	if sourceCollection.HelpCenterID != targetCollection.HelpCenterID {
-		return article, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCollection"), nil)
+		return article, envelope.NewError(envelope.InputError, m.i18n.Get("That collection belongs to another help center. Pick a collection in this help center."), nil)
 	}
 	var siblings int
 	if err := m.q.CountTranslationSiblings.Get(&siblings, target.TranslationGroupID, target.ID); err != nil {
 		m.lo.Error("error counting translation siblings", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if siblings > 0 {
-		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("That article is already part of another set of translations. Unlink it there first."), nil)
 	}
 	var localeTaken bool
 	if err := m.q.LocaleInTranslationGroup.Get(&localeTaken, source.TranslationGroupID, target.Locale); err != nil {
 		m.lo.Error("error checking translation group locale", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if localeTaken {
-		return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+		return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("This article already has a translation in that language."), nil)
 	}
 	if err := m.q.LinkArticleTranslation.Get(&article, id, source.TranslationGroupID); err != nil {
 		if err == sql.ErrNoRows {
-			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.articleAlreadyTranslated"), nil)
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("That article is already part of another set of translations. Unlink it there first."), nil)
 		}
 		if dbutil.IsUniqueViolationError(err) {
-			return article, envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.localeAlreadyTranslated"), nil)
+			return article, envelope.NewError(envelope.ConflictError, m.i18n.Get("This article already has a translation in that language."), nil)
 		}
 		m.lo.Error("error linking article translation", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return article, nil
 }
@@ -948,10 +948,10 @@ func (m *Manager) UnlinkArticleTranslation(id int) (models.Article, error) {
 	var article models.Article
 	if err := m.q.UnlinkArticleTranslation.Get(&article, id); err != nil {
 		if err == sql.ErrNoRows {
-			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error unlinking article translation", "error", err, "id", id)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return article, nil
 }
@@ -960,7 +960,7 @@ func (m *Manager) UnlinkArticleTranslation(id int) (models.Article, error) {
 func (m *Manager) DeleteArticle(id int) error {
 	if _, err := m.q.DeleteArticle.Exec(id); err != nil {
 		m.lo.Error("error deleting article", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if m.indexer != nil {
 		if err := m.indexer.RemoveHelpArticleEmbeddings(id); err != nil {
@@ -979,7 +979,7 @@ func (m *Manager) GetHelpCenterTree(helpCenterID int, locale string) (models.Tre
 	rows, err := m.q.GetHelpCenterTreeData.Query(helpCenterID, locale)
 	if err != nil {
 		m.lo.Error("error fetching tree data", "error", err, "help_center_id", helpCenterID)
-		return models.TreeResponse{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.TreeResponse{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer rows.Close()
 
@@ -995,7 +995,7 @@ func (m *Manager) GetPublicTree(helpCenter models.HelpCenter, locale string) (mo
 	rows, err := m.q.GetPublicTreeData.Query(helpCenter.ID, locale)
 	if err != nil {
 		m.lo.Error("error fetching public tree data", "error", err, "help_center_id", helpCenter.ID)
-		return models.TreeResponse{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.TreeResponse{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	defer rows.Close()
 
@@ -1013,7 +1013,7 @@ func (m *Manager) GetArticleReferences(ids []int) ([]models.ArticleReference, er
 	}
 	if err := m.q.GetArticleReferences.Select(&references, pq.Array(ids)); err != nil {
 		m.lo.Error("error fetching article references", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return references, nil
 }
@@ -1023,10 +1023,10 @@ func (m *Manager) GetPublishedArticle(helpCenterSlug, articleSlug, locale string
 	var article models.Article
 	if err := m.q.GetPublishedArticleBySlug.Get(&article, helpCenterSlug, articleSlug, locale); err != nil {
 		if err == sql.ErrNoRows {
-			return article, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return article, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching published article", "error", err, "help_center_slug", helpCenterSlug, "article_slug", articleSlug)
-		return article, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return article, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return article, nil
 }
@@ -1035,7 +1035,7 @@ func (m *Manager) GetPublishedArticleTranslations(helpCenterSlug string, article
 	var translations = make([]models.ArticleTranslation, 0)
 	if err := m.q.GetPublishedArticleTranslations.Select(&translations, helpCenterSlug, articleID); err != nil {
 		m.lo.Error("error fetching article translations", "error", err, "help_center_slug", helpCenterSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return translations, nil
 }
@@ -1045,7 +1045,7 @@ func (m *Manager) GetPopularArticles(helpCenterSlug, locale string, limit int) (
 	var articles = make([]models.Article, 0)
 	if err := m.q.GetPublishedArticles.Select(&articles, helpCenterSlug, locale, limit); err != nil {
 		m.lo.Error("error fetching popular articles", "error", err, "help_center_slug", helpCenterSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return articles, nil
 }
@@ -1055,7 +1055,7 @@ func (m *Manager) GetPublishedArticlesByCollection(collectionID, excludeArticleI
 	var articles = make([]models.Article, 0)
 	if err := m.q.GetPublishedArticlesByCollection.Select(&articles, collectionID, excludeArticleID, locale, limit); err != nil {
 		m.lo.Error("error fetching collection articles", "error", err, "collection_id", collectionID)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return articles, nil
 }
@@ -1065,7 +1065,7 @@ func (m *Manager) GetPublishedCollectionLocales(helpCenterSlug, collectionSlug s
 	var locales = make([]string, 0)
 	if err := m.q.GetPublishedCollectionLocales.Select(&locales, helpCenterSlug, collectionSlug); err != nil {
 		m.lo.Error("error fetching collection locales", "error", err, "help_center_slug", helpCenterSlug, "collection_slug", collectionSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return locales, nil
 }
@@ -1081,7 +1081,7 @@ func (m *Manager) SearchPublishedArticles(helpCenterSlug, query, locale string, 
 	tsQuery := prefixTSQuery(query)
 	if err := m.q.SearchPublishedArticles.Select(&articles, helpCenterSlug, dbutil.ContainsPattern(query), limit, locale, tsQuery); err != nil {
 		m.lo.Error("error searching published articles", "error", err, "help_center_slug", helpCenterSlug)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return articles, nil
 }
@@ -1103,7 +1103,7 @@ func (m *Manager) IncrementPublishedArticleView(helpCenterSlug, articleSlug, loc
 func (m *Manager) RecordArticleFeedback(articleID int, isHelpful bool) error {
 	if _, err := m.q.InsertArticleFeedback.Exec(articleID, isHelpful); err != nil {
 		m.lo.Error("error recording article feedback", "error", err, "article_id", articleID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -1127,11 +1127,11 @@ func (m *Manager) GetInsights(helpCenterID, limit int) (models.Insights, error) 
 	insights.NoResultSearch = make([]models.SearchTermStat, 0)
 	if err := m.q.GetTopSearchTerms.Select(&insights.TopSearches, helpCenterID, limit, searchLogRetentionDays); err != nil {
 		m.lo.Error("error fetching top search terms", "error", err, "help_center_id", helpCenterID)
-		return insights, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return insights, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if err := m.q.GetNoResultSearchTerms.Select(&insights.NoResultSearch, helpCenterID, limit, searchLogRetentionDays); err != nil {
 		m.lo.Error("error fetching no-result search terms", "error", err, "help_center_id", helpCenterID)
-		return insights, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return insights, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return insights, nil
 }
@@ -1167,7 +1167,7 @@ func (m *Manager) scanTree(rows *sql.Rows) ([]models.TreeCollection, error) {
 		)
 		if err := rows.Scan(&itemType, &id, &createdAt, &updatedAt, &helpCenterID, &slug, &parentID, &locale, &name, &description, &icon, &sortOrder, &isPublished, &collectionID, &title, &content, &status, &viewCount, &aiEnabled, &authorName, &authorAvatar); err != nil {
 			m.lo.Error("error scanning tree data", "error", err)
-			return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 
 		switch itemType {
@@ -1238,7 +1238,7 @@ func (m *Manager) scanTree(rows *sql.Rows) ([]models.TreeCollection, error) {
 	}
 	if err := rows.Err(); err != nil {
 		m.lo.Error("error iterating tree data", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	var buildTree func(parentID *int, depth int) []models.TreeCollection
@@ -1324,10 +1324,10 @@ func (m *Manager) lockedCollectionGetter(tx *sqlx.Tx) collectionGetter {
 		var collection models.Collection
 		if err := tx.Stmtx(m.q.GetCollectionByIDForUpdate).Get(&collection, id); err != nil {
 			if err == sql.ErrNoRows {
-				return collection, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+				return collection, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 			}
 			m.lo.Error("error locking collection", "error", err, "id", id)
-			return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return collection, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		return collection, nil
 	}
@@ -1342,17 +1342,17 @@ func (m *Manager) validateCollectionParent(tx *sqlx.Tx, parentID, selfID, helpCe
 	currentID := parentID
 	for {
 		if currentID == selfID {
-			return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidParent"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("A collection cannot be its own parent."), nil)
 		}
 		parent, err := get(currentID)
 		if err != nil {
 			return err
 		}
 		if parent.HelpCenterID != helpCenterID {
-			return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidParent"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("A collection cannot be its own parent."), nil)
 		}
 		if parent.Locale != locale {
-			return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.parentLocaleMismatch"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("The parent collection is in a different language. Pick a parent in the same language as this collection."), nil)
 		}
 		if parent.ParentID == nil {
 			break
@@ -1360,7 +1360,7 @@ func (m *Manager) validateCollectionParent(tx *sqlx.Tx, parentID, selfID, helpCe
 		currentID = *parent.ParentID
 		depth++
 		if depth > maxCollectionDepth {
-			return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.maxDepthReached"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Collections can be nested up to 3 levels. Choose a higher-level parent."), nil)
 		}
 	}
 	if selfID == 0 {
@@ -1371,7 +1371,7 @@ func (m *Manager) validateCollectionParent(tx *sqlx.Tx, parentID, selfID, helpCe
 		return err
 	}
 	if depth+subtreeDepth-1 > maxCollectionDepth {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.maxDepthReached"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Collections can be nested up to 3 levels. Choose a higher-level parent."), nil)
 	}
 	return nil
 }
@@ -1381,7 +1381,7 @@ func (m *Manager) collectionSubtreeDepth(tx *sqlx.Tx, id int) (int, error) {
 	var depth int
 	if err := tx.Stmtx(m.q.GetCollectionSubtreeDepth).Get(&depth, id); err != nil {
 		m.lo.Error("error fetching collection subtree depth", "error", err, "id", id)
-		return 0, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return depth, nil
 }
@@ -1391,10 +1391,10 @@ func (m *Manager) lockHelpCenter(tx *sqlx.Tx, id int) error {
 	var hcID int
 	if err := tx.Stmtx(m.q.LockHelpCenter).Get(&hcID, id); err != nil {
 		if err == sql.ErrNoRows {
-			return envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error locking help center", "error", err, "id", id)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -1404,10 +1404,10 @@ func (m *Manager) lockHelpCenterByCollection(tx *sqlx.Tx, collectionID int) erro
 	var hcID int
 	if err := tx.Stmtx(m.q.LockHelpCenterByCollection).Get(&hcID, collectionID); err != nil {
 		if err == sql.ErrNoRows {
-			return envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error locking help center", "error", err, "collection_id", collectionID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -1419,7 +1419,7 @@ func (m *Manager) validateArticleCollectionLocale(collectionID int, locale strin
 		return err
 	}
 	if collection.Locale != locale {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.collectionLocaleMismatch"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The collection is in a different language than the article. Pick a collection in the article's language."), nil)
 	}
 	return nil
 }
@@ -1432,10 +1432,10 @@ func (m *Manager) validateArticleAuthor(authorID *int64) error {
 	var ok bool
 	if err := m.q.UserIsAuthorAssignable.Get(&ok, *authorID); err != nil {
 		m.lo.Error("error checking article author", "error", err, "author_id", *authorID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if !ok {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidAuthor"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The selected author is not an agent or AI assistant. Pick a different author."), nil)
 	}
 	return nil
 }
@@ -1447,7 +1447,7 @@ func (m *Manager) uniqueCollectionSlug(tx *sqlx.Tx, helpCenterID int, slug, loca
 		var exists bool
 		if err := tx.Stmtx(m.q.CollectionSlugExists).Get(&exists, helpCenterID, candidate, locale); err != nil {
 			m.lo.Error("error checking collection slug uniqueness", "error", err, "slug", candidate)
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		if !exists {
 			return candidate, nil
@@ -1463,7 +1463,7 @@ func (m *Manager) uniqueArticleSlug(tx *sqlx.Tx, collectionID int, slug, locale 
 		var exists bool
 		if err := tx.Stmtx(m.q.ArticleSlugExistsInHelpCenter).Get(&exists, collectionID, candidate, locale); err != nil {
 			m.lo.Error("error checking article slug uniqueness", "error", err, "slug", candidate)
-			return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		if !exists {
 			return candidate, nil
@@ -1475,7 +1475,7 @@ func (m *Manager) uniqueArticleSlug(tx *sqlx.Tx, collectionID int, slug, locale 
 // validateSlug rejects slugs whose charset would break /hc/ URLs.
 func (m *Manager) validateSlug(slug string) error {
 	if !slugRe.MatchString(slug) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidSlug"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This slug is not allowed. Use a different slug."), nil)
 	}
 	return nil
 }
@@ -1483,7 +1483,7 @@ func (m *Manager) validateSlug(slug string) error {
 // validateHelpCenterSlug rejects malformed slugs and slugs that collide with public help center routes.
 func (m *Manager) validateHelpCenterSlug(slug string) error {
 	if !slugRe.MatchString(slug) || slices.Contains(reservedSlugs, slug) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidSlug"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This slug is not allowed. Use a different slug."), nil)
 	}
 	return nil
 }
@@ -1499,7 +1499,9 @@ func (m *Manager) validateHelpCenterLengths(req HelpCenterRequest) error {
 		{"meta_description", req.MetaDescription, maxMetaDescLen},
 	} {
 		if utf8.RuneCountInString(f.value) > f.max {
-			return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.fieldTooLong", "field", f.name, "max", strconv.Itoa(f.max)), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("`%[1]s` must be at most %[2]s characters.",
+				f.name,
+				strconv.Itoa(f.max)), nil)
 		}
 	}
 	return nil
@@ -1509,7 +1511,7 @@ func (m *Manager) validateHelpCenterLengths(req HelpCenterRequest) error {
 func (m *Manager) validateLocales(defaultLocale string, allowed json.RawMessage) error {
 	for _, l := range append(parseLocales(allowed), defaultLocale) {
 		if _, ok := supportedLocales[strings.TrimSpace(l)]; !ok {
-			return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidLocale"), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Invalid language code. Use a code like en or en-US."), nil)
 		}
 	}
 	return nil
@@ -1534,11 +1536,12 @@ func (m *Manager) validateLocalesRetained(helpCenterID int, allowed json.RawMess
 	var inUse []string
 	if err := m.q.GetLocalesInUse.Select(&inUse, helpCenterID); err != nil {
 		m.lo.Error("error fetching help center locales in use", "error", err, "help_center_id", helpCenterID)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	for _, l := range dropped {
 		if slices.Contains(inUse, l) {
-			return envelope.NewError(envelope.InputError, m.i18n.Ts("helpCenter.localeInUse", "locale", l), nil)
+			return envelope.NewError(envelope.InputError, m.i18n.Get("Language %[1]s still has collections or articles. Removing it would hide them from the public site with no way to reach them. Move or delete that content first.",
+				l), nil)
 		}
 	}
 	return nil
@@ -1552,7 +1555,7 @@ func (m *Manager) validateCustomDomain(domain string, excludeID int) error {
 	u, err := url.Parse(domain)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
 		u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidCustomDomain"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Enter the domain's root URL starting with https://, with no path or trailing slash, e.g. https://help.example.com."), nil)
 	}
 	helpCenters, err := m.GetAllHelpCenters()
 	if err != nil {
@@ -1567,7 +1570,7 @@ func (m *Manager) validateCustomDomain(domain string, excludeID int) error {
 			continue
 		}
 		if strings.EqualFold(other.Hostname(), u.Hostname()) {
-			return envelope.NewError(envelope.ConflictError, m.i18n.T("helpCenter.customDomainInUse"), nil)
+			return envelope.NewError(envelope.ConflictError, m.i18n.Get("Another help center already uses this domain. Visitors on it would see that help center. Remove the domain there first or pick a different one."), nil)
 		}
 	}
 	return nil
@@ -1580,7 +1583,7 @@ func (m *Manager) validateHelpCenterServesLocale(helpCenterID int, locale string
 		return err
 	}
 	if !slices.Contains(parseLocales(hc.AllowedLocales), locale) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.localeNotSupported"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("This language is not one of the help center's supported languages. Content saved in it will not appear on the public site. Add the language to the help center first."), nil)
 	}
 	return nil
 }
@@ -1620,7 +1623,7 @@ func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterR
 	theme, err := normalizeTheme(req.Theme)
 	if err != nil {
 		m.lo.Debug("error normalizing help center theme", "error", err)
-		return req, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidTheme"), nil)
+		return req, envelope.NewError(envelope.InputError, m.i18n.Get("These appearance settings could not be read. Reload the page and try again."), nil)
 	}
 	req.Theme = theme
 	return req, nil

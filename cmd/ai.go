@@ -72,7 +72,7 @@ func handleAICompletion(r *fastglue.Request) error {
 		req = aiCompletionReq{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	resp, err := app.ai.Completion(r.RequestCtx, req.PromptKey, req.Content)
 	if err != nil {
@@ -95,7 +95,7 @@ func handleGetAIPrompt(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	p, err := app.ai.GetPromptByID(id)
 	if err != nil {
@@ -110,7 +110,7 @@ func handleCreateAIPrompt(r *fastglue.Request) error {
 		req promptReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	p, err := app.ai.CreatePrompt(req.Title, req.Content)
 	if err != nil {
@@ -126,10 +126,10 @@ func handleUpdateAIPrompt(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	p, err := app.ai.UpdatePrompt(id, req.Title, req.Content)
 	if err != nil {
@@ -142,7 +142,7 @@ func handleDeleteAIPrompt(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.ai.DeletePrompt(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -169,7 +169,7 @@ func handleUpdateAIConfig(r *fastglue.Request) error {
 		req          aimodels.ProviderConfig
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if err := app.ai.UpdateProviderConfig(providerType, req); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -185,7 +185,7 @@ func handleTestAIConfig(r *fastglue.Request) error {
 		req          aimodels.ProviderConfig
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if err := app.ai.TestProviderConfig(providerType, req); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -207,7 +207,7 @@ func handleGetAITool(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	tool, err := app.ai.GetTool(id)
 	if err != nil {
@@ -222,7 +222,7 @@ func handleCreateAITool(r *fastglue.Request) error {
 		req aiToolReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	toolInput := req.Tool
 	toolInput.RequiresAgentApproval = req.RequiresAgentApproval == nil || *req.RequiresAgentApproval
@@ -240,10 +240,10 @@ func handleUpdateAITool(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	toolInput := req.Tool
 	if req.RequiresAgentApproval == nil {
@@ -266,7 +266,7 @@ func handleDeleteAITool(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.ai.DeleteTool(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -290,7 +290,7 @@ func handleCreateAISnippet(r *fastglue.Request) error {
 		req snippetReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	item, err := app.ai.CreateKnowledgeBaseItem(req.Title, req.Content, aimodels.KnowledgeSourceManual, "", req.Enabled)
 	if err != nil {
@@ -306,10 +306,10 @@ func handleUpdateAISnippet(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	item, err := app.ai.UpdateKnowledgeBaseItem(id, req.Title, req.Content, req.Enabled)
 	if err != nil {
@@ -325,7 +325,7 @@ func handleImportAISnippetFromURL(r *fastglue.Request) error {
 		req snippetImportReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	item, err := app.ai.ImportKnowledgeBaseFromURL(r.RequestCtx, req.URL)
 	if err != nil {
@@ -338,7 +338,7 @@ func handleDeleteAISnippet(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.ai.DeleteKnowledgeBaseItem(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -353,7 +353,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		req generateReplyReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
@@ -387,7 +387,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."), nil))
 	}
 	if resp.Status == aimodels.AgentRunCompleted {
 		resp.Content = stringutil.Markdown2HTML(resp.Content)
@@ -402,27 +402,27 @@ func handleAISummarizeConversation(r *fastglue.Request) error {
 		req summarizeReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if req.ConversationUUID == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	transcript := conversationTranscript(app, req.ConversationUUID)
 	if strings.TrimSpace(transcript) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.summarizeEmptyConversation"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("There are no messages to summarize yet."), nil))
 	}
 	summary, err := app.ai.Summarize(r.RequestCtx, transcript)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 	if strings.TrimSpace(summary) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."), nil))
 	}
 	auser := r.RequestCtx.UserValue("user").(amodels.User)
-	note := "**" + app.i18n.T("ai.summaryNoteTitle") + "**\n\n" + summary
+	note := "**" + app.i18n.Get("AI summary") + "**\n\n" + summary
 	if _, err := app.conversation.SendPrivateNote(nil, auser.ID, req.ConversationUUID, stringutil.Markdown2HTML(note), nil); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -436,10 +436,10 @@ func handleAISuggestTags(r *fastglue.Request) error {
 		req suggestTagsReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if req.ConversationUUID == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -447,7 +447,7 @@ func handleAISuggestTags(r *fastglue.Request) error {
 
 	transcript := conversationTranscript(app, req.ConversationUUID)
 	if strings.TrimSpace(transcript) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.tagSuggestEmptyConversation"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("There are no messages to suggest tags from yet."), nil))
 	}
 
 	suggestions, err := app.ai.SuggestTags(r.RequestCtx, transcript)
@@ -464,11 +464,11 @@ func handleAICopilot(r *fastglue.Request) error {
 		req copilotReq
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	req.Message = strings.TrimSpace(req.Message)
 	if req.Message == "" || req.ConversationUUID == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
 	if err != nil {
@@ -484,7 +484,7 @@ func handleAICopilot(r *fastglue.Request) error {
 	if req.AssistantID > 0 {
 		assistant, err := app.aiAgent.GetAssistant(req.AssistantID)
 		if err != nil || !assistant.Enabled {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.assistantUnavailable"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("The selected assistant is unavailable. It may have been removed or disabled. Pick another assistant or use the default Copilot."), nil))
 		}
 		persona = aiagent.BuildCopilotPersona(assistant)
 	}
@@ -511,7 +511,7 @@ func handleAICopilot(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."), nil))
 	}
 	if resp.Status == aimodels.AgentRunCompleted {
 		if err := app.ai.SaveCopilotMessage(conv.ID, auser.ID, aimodels.RoleUser, req.Message); err != nil {
@@ -546,7 +546,7 @@ func handleGetCopilotMessages(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	uuid := string(r.RequestCtx.QueryArgs().Peek("conversation_uuid"))
 	if uuid == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	conv, err := enforceAIConversationAccess(r, uuid)
 	if err != nil {
@@ -578,7 +578,7 @@ func handleClearCopilotMessages(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	uuid := string(r.RequestCtx.QueryArgs().Peek("conversation_uuid"))
 	if uuid == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	conv, err := enforceAIConversationAccess(r, uuid)
 	if err != nil {
@@ -628,7 +628,7 @@ func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResul
 			return aimodels.AgentRunResult{}, err
 		}
 		if conv.ID != scope.ConversationID {
-			return aimodels.AgentRunResult{}, envelope.NewError(envelope.PermissionError, app.i18n.T("ai.toolApprovalUnavailable"), nil)
+			return aimodels.AgentRunResult{}, envelope.NewError(envelope.PermissionError, app.i18n.Get("This tool request cannot be approved for this conversation. Run the AI action again to create a new request."), nil)
 		}
 	}
 	resp, resumedScope, err := app.ai.ResumeAgentRun(r.RequestCtx, runID, auser.ID, approved)
@@ -636,7 +636,7 @@ func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResul
 		return aimodels.AgentRunResult{}, err
 	}
 	if resp.Status == aimodels.AgentRunCompleted && strings.TrimSpace(resp.Content) == "" {
-		return aimodels.AgentRunResult{}, envelope.NewError(envelope.GeneralError, app.i18n.T("ai.emptyResponse"), nil)
+		return aimodels.AgentRunResult{}, envelope.NewError(envelope.GeneralError, app.i18n.Get("The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."), nil)
 	}
 	if resp.Status == aimodels.AgentRunCompleted {
 		if resumedScope.Surface == aimodels.ToolInvocationCopilot {

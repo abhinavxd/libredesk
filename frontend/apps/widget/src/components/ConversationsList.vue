@@ -1,7 +1,7 @@
 <template>
   <div>
     <div v-if="chatStore.isLoadingConversations" class="py-8">
-      <Spinner size="md" :absolute="false" :text="$t('globals.terms.loading')" />
+      <Spinner size="md" :absolute="false" :text="i18n._('Loading')" />
     </div>
 
     <div
@@ -9,7 +9,7 @@
       class="flex flex-col items-center justify-center py-12 px-4"
     >
       <MessageCircleDashed class="w-10 h-10 text-muted-foreground mb-4" />
-      <h4 class="text-sm text-muted-foreground mb-2">{{ $t('globals.messages.noMessagesYet') }}</h4>
+      <h4 class="text-sm text-muted-foreground mb-2">{{ i18n._('No messages yet') }}</h4>
     </div>
 
     <div v-else>
@@ -37,7 +37,7 @@
             </div>
             <div class="flex items-center gap-2">
               <p class="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                {{ lastMessagePreview(conversation.last_message, t) }}
+                {{ lastMessagePreview(conversation.last_message, i18n) }}
               </p>
               <UnreadCountBadge :count="conversation.unread_message_count" class="flex-shrink-0" />
             </div>
@@ -52,7 +52,7 @@
 <script setup>
 import { onMounted } from 'vue'
 import { MessageCircleDashed, ChevronRight } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useChatStore } from '@widget/store/chat.js'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
@@ -64,7 +64,7 @@ import { lastMessagePreview } from '@widget/utils/messagePreview.js'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
-const { t } = useI18n()
+const i18n = useI18n()
 
 function isUserMessage(author) {
   return author?.type === 'contact' || author?.type === 'visitor'
@@ -77,7 +77,7 @@ function getInitial(name) {
 function getSenderLabel(author) {
   if (!author) return ''
   if (isUserMessage(author)) {
-    return t('globals.terms.you')
+    return i18n._('You')
   }
   return author.first_name || ''
 }

@@ -10,14 +10,14 @@
         class="mb-5 ui-description"
         role="status"
       >
-        {{ $t('admin.whatsappTemplates.error.editUnavailable') }}
+        {{ i18n._('This template cannot be edited here in its current state or format. Sync templates from Meta, or edit it in WhatsApp Manager.') }}
       </p>
       <form @submit="onSubmit" class="w-full">
         <fieldset :disabled="isFetching || isLoading || editUnavailable" class="space-y-6">
           <FormGrid>
             <FormField v-slot="{ componentField, handleChange, meta }" name="inbox_id">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.inbox') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Inbox', 'Inboxes', 1) }}</FormLabel>
                 <FormControl>
                   <Select
                     :modelValue="componentField.modelValue"
@@ -25,7 +25,7 @@
                     :disabled="isEditing"
                   >
                     <SelectTrigger>
-                      <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+                      <SelectValue :placeholder="i18n._('Select inbox')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
@@ -40,7 +40,7 @@
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="category">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.category') }}</FormLabel>
+                <FormLabel>{{ i18n._('Category') }}</FormLabel>
                 <FormControl>
                   <Select
                     :modelValue="componentField.modelValue"
@@ -58,7 +58,7 @@
                   </Select>
                 </FormControl>
                 <FormDescription>{{
-                  $t('admin.whatsappTemplates.category.description')
+                  i18n._('Category affects approval time and pricing.')
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -66,7 +66,7 @@
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="name">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
@@ -77,7 +77,7 @@
                   />
                 </FormControl>
                 <FormDescription>{{
-                  $t('globals.messages.lowercaseLettersNumbersUnderscoresOnly')
+                  i18n._('Use lowercase letters, numbers, and underscores only.')
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -85,18 +85,18 @@
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="language">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.language') }}</FormLabel>
+                <FormLabel>{{ i18n.ngettext('Language', 'Languages', 1) }}</FormLabel>
                 <FormControl>
                   <ComboBox
                     :modelValue="componentField.modelValue"
                     @update:modelValue="(v) => handleChange(v, meta.validated)"
                     :disabled="isEditing"
                     :items="WHATSAPP_TEMPLATE_LANGUAGES"
-                    :placeholder="$t('globals.terms.search')"
+                    :placeholder="i18n._('Search')"
                   />
                 </FormControl>
                 <FormDescription>{{
-                  $t('admin.whatsappTemplates.language.description')
+                  i18n._('Must match the language of the text, or Meta rejects the template.')
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -104,12 +104,12 @@
           </FormGrid>
 
           <div :class="SECTION_CLASS">
-            <h3 class="ui-heading">{{ $t('globals.terms.header') }}</h3>
+            <h3 class="ui-heading">{{ i18n.ngettext('Header', 'Headers', 1) }}</h3>
 
             <div class="max-w-xl">
               <FormField v-slot="{ componentField, handleChange, meta }" name="header_type">
                 <FormItem>
-                  <FormLabel>{{ $t('globals.terms.headerType') }}</FormLabel>
+                  <FormLabel>{{ i18n._('Header type') }}</FormLabel>
                   <FormControl>
                     <Select
                       :modelValue="componentField.modelValue"
@@ -136,7 +136,7 @@
               name="header_content"
             >
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.headerText') }}</FormLabel>
+                <FormLabel>{{ i18n._('Header text') }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
@@ -145,7 +145,7 @@
                   />
                 </FormControl>
                 <FormDescription>{{
-                  $t('admin.whatsappTemplates.headerText.description')
+                  i18n._(literalExampleMessage1)
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -153,11 +153,11 @@
           </div>
 
           <div :class="SECTION_CLASS">
-            <h3 class="ui-heading">{{ $t('globals.terms.body') }}</h3>
+            <h3 class="ui-heading">{{ i18n._('Body') }}</h3>
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="body_content">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.bodyText') }}</FormLabel>
+                <FormLabel>{{ i18n._('Body text') }}</FormLabel>
                 <FormControl>
                   <Textarea
                     rows="4"
@@ -166,7 +166,7 @@
                   />
                 </FormControl>
                 <FormDescription>{{
-                  $t('admin.whatsappTemplates.bodyText.description')
+                  i18n._(literalExampleMessage2)
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -174,7 +174,7 @@
 
             <FormField v-slot="{ componentField, handleChange, meta }" name="footer_content">
               <FormItem>
-                <FormLabel>{{ $t('globals.terms.footer') }}</FormLabel>
+                <FormLabel>{{ i18n._('Footer') }}</FormLabel>
                 <FormControl>
                   <Input
                     type="text"
@@ -184,7 +184,7 @@
                   />
                 </FormControl>
                 <FormDescription>{{
-                  $t('globals.messages.maxLength', { max: 60 })
+                  i18n._('Must be at most {max} characters', { max: 60 })
                 }}</FormDescription>
                 <FormMessage />
               </FormItem>
@@ -192,9 +192,9 @@
           </div>
 
           <div v-if="placeholders.length" :class="SECTION_CLASS">
-            <h3 class="ui-heading">{{ $t('globals.terms.sampleValue', 2) }}</h3>
+            <h3 class="ui-heading">{{ i18n.ngettext('Sample value', 'Sample values', 2) }}</h3>
             <p class="text-xs text-muted-foreground">
-              {{ $t('admin.whatsappTemplates.sampleValues.description') }}
+              {{ i18n._('Meta requires example values for each placeholder. These are only used during approval and never sent to contacts.') }}
             </p>
             <div v-for="key in placeholders" :key="key" class="grid grid-cols-3 gap-3 items-start">
               <label :for="`sample-${key}`" class="text-sm font-mono pt-2">{{
@@ -204,7 +204,7 @@
                 <Input
                   v-model="sampleValues[key]"
                   :id="`sample-${key}`"
-                  :placeholder="$t('globals.terms.sampleValue')"
+                  :placeholder="i18n.ngettext('Sample value', 'Sample values', 1)"
                 />
                 <p v-if="sampleErrors[key]" class="text-sm text-destructive mt-1">
                   {{ sampleErrors[key] }}
@@ -215,7 +215,7 @@
 
           <div :class="SECTION_CLASS">
             <div class="flex items-center justify-between">
-              <h3 class="ui-heading">{{ $t('globals.terms.button', 2) }}</h3>
+              <h3 class="ui-heading">{{ i18n.ngettext('Button', 'Buttons', 2) }}</h3>
               <Button
                 type="button"
                 variant="outline"
@@ -224,7 +224,7 @@
                 @click="addButton"
               >
                 <Plus class="size-4" />
-                {{ $t('globals.messages.addButton') }}
+                {{ i18n._('Add button') }}
               </Button>
             </div>
 
@@ -234,7 +234,7 @@
               class="grid grid-cols-12 gap-2 items-start"
             >
               <Select v-model="btn.type">
-                <SelectTrigger class="col-span-4" :aria-label="$t('globals.terms.type')">
+                <SelectTrigger class="col-span-4" :aria-label="i18n.ngettext('Type', 'Types', 1)">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -243,21 +243,21 @@
               </Select>
               <Input
                 v-model="btn.text"
-                :placeholder="$t('globals.terms.title')"
-                :aria-label="$t('globals.terms.title')"
+                :placeholder="i18n.ngettext('Title', 'Titles', 1)"
+                :aria-label="i18n.ngettext('Title', 'Titles', 1)"
                 class="col-span-3"
               />
               <Input
                 v-if="btn.type === 'URL'"
                 v-model="btn.url"
-                :aria-label="$t('globals.terms.url', 1)"
+                :aria-label="i18n.ngettext('URL', 'URLs', 1)"
                 placeholder="https://example.com/"
                 class="col-span-4"
               />
               <Input
                 v-else-if="btn.type === 'PHONE_NUMBER'"
                 v-model="btn.phone_number"
-                :aria-label="$t('globals.terms.phoneNumber', 1)"
+                :aria-label="i18n.ngettext('Phone number', 'Phone numbers', 1)"
                 placeholder="+1234567890"
                 class="col-span-4"
               />
@@ -267,7 +267,7 @@
                 variant="ghost"
                 size="sm"
                 class="col-span-1"
-                :aria-label="$t('globals.messages.delete')"
+                :aria-label="i18n._('Delete')"
                 @click="removeButton(idx)"
               >
                 <X class="size-4" />
@@ -284,10 +284,10 @@
             :is-loading="isLoading"
             :disabled="isLoading || isFetching || editUnavailable"
           >
-            {{ $t('admin.whatsappTemplates.submit') }}
+            {{ i18n._('Submit to Meta') }}
           </Button>
           <Button type="button" variant="outline" @click="cancel">
-            {{ $t('globals.messages.cancel') }}
+            {{ i18n._('Cancel') }}
           </Button>
         </div>
       </form>
@@ -297,7 +297,7 @@
       <div class="space-y-4">
         <div class="space-y-1">
           <p class="text-sm font-medium text-foreground">
-            {{ isEditing ? $t('globals.messages.edit') : $t('globals.messages.newTemplate') }}
+            {{ isEditing ? i18n._('Edit') : i18n._('New template') }}
           </p>
           <a
             href="https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
@@ -305,7 +305,7 @@
             rel="noopener noreferrer"
             class="link-style text-sm"
           >
-            {{ $t('globals.terms.learnMore') }}
+            {{ i18n._('Learn more') }}
           </a>
         </div>
       </div>
@@ -314,6 +314,12 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
+const literalExampleMessage1 = msg({ message: 'Optional. Add one placeholder - \'{{1}}\' or a named one like \'{{order_id}}\' - matching the style used in the body, if the header text changes per message.' })
+const literalExampleMessage2 = msg({ message: 'Add placeholders for values you fill in when sending - either numbered (\'{{1}}\', \'{{2}}\') or named (\'{{order_id}}\'), but don\'\'t mix the two styles in one template. Example: Hi \'{{1}}\', your order \'{{2}}\' is now \'{{3}}\'.' })
+
+
 import FormGrid from '@shared-ui/components/FormGrid.vue'
 const SECTION_CLASS = 'box p-4 space-y-4'
 
@@ -321,7 +327,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Plus, X } from 'lucide-vue-next'
 import {
   FormControl,
@@ -364,7 +370,7 @@ import {
 
 const props = defineProps({ id: { type: String, default: null } })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const route = useRoute()
 const inboxStore = useInboxStore()
@@ -381,10 +387,10 @@ const sampleValues = reactive({})
 const buttons = ref([])
 
 const breadcrumbLinks = computed(() => [
-  { path: 'whatsapp-templates', label: t('admin.whatsappTemplates.title') },
+  { path: 'whatsapp-templates', label: i18n._('WhatsApp templates') },
   {
     path: '',
-    label: isEditing.value ? t('globals.messages.edit') : t('globals.messages.newTemplate')
+    label: isEditing.value ? i18n._('Edit') : i18n._('New template')
   }
 ])
 
@@ -393,7 +399,7 @@ const whatsappInboxes = computed(() =>
 )
 
 const form = useForm({
-  validationSchema: computed(() => toTypedSchema(createFormSchema(t))),
+  validationSchema: computed(() => toTypedSchema(createFormSchema(i18n))),
   initialValues: {
     inbox_id: Number(route.query.inbox_id) || null,
     name: '',
@@ -449,12 +455,12 @@ const validateButtons = () => {
   buttons.value.forEach((b, idx) => {
     if (isButtonEmpty(b)) return
     let missing = ''
-    if (!b.text?.trim()) missing = t('globals.terms.title')
-    else if (b.type === 'URL' && !b.url?.trim()) missing = t('globals.terms.url', 1)
+    if (!b.text?.trim()) missing = i18n._('{count, plural, one {Title} other {Titles}}')
+    else if (b.type === 'URL' && !b.url?.trim()) missing = i18n._('{count, plural, one {URL} other {URLs}}', 1)
     else if (b.type === 'PHONE_NUMBER' && !b.phone_number?.trim())
-      missing = t('globals.terms.phoneNumber', 1)
+      missing = i18n._('{count, plural, one {Phone number} other {Phone numbers}}', 1)
     if (missing) {
-      buttonErrors[idx] = t('globals.messages.required', { name: missing })
+      buttonErrors[idx] = i18n._('{name} Required', { name: missing })
       ok = false
     }
   })
@@ -466,7 +472,7 @@ const validateSampleValues = () => {
   let ok = true
   for (const key of placeholders.value) {
     if (!(sampleValues[key] || '').trim()) {
-      sampleErrors[key] = t('globals.messages.required', { name: placeholderLabel(key) })
+      sampleErrors[key] = i18n._('{name} Required', { name: placeholderLabel(key) })
       ok = false
     }
   }
@@ -505,7 +511,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       await api.createWhatsAppTemplate(payload)
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('admin.whatsappTemplates.submitted')
+      description: i18n._('Template submitted to Meta. Approval usually takes a few minutes.')
     })
     router.push({ name: 'whatsapp-templates', query: { inbox_id: values.inbox_id } })
   } catch (error) {

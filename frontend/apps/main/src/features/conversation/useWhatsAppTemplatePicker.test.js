@@ -3,7 +3,7 @@ import { effectScope, nextTick } from 'vue'
 import { useWhatsAppTemplatePicker } from './useWhatsAppTemplatePicker'
 import api from '@main/api'
 
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }))
+vi.mock('@shared-ui/i18n', () => ({ useI18n: () => ({ _: (key) => key }) }))
 vi.mock('@main/composables/useEmitter', () => ({ useEmitter: () => ({ emit: vi.fn() }) }))
 vi.mock('@main/api', () => ({ default: { getWhatsAppTemplates: vi.fn() } }))
 

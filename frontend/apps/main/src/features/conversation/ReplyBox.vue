@@ -4,7 +4,7 @@
   >
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('ai.toolApprovalTitle') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Review tool request') }}</AlertDialogTitle>
         <AlertDialogDescription as="div">
           <ToolApprovalDetails v-if="pendingToolApproval" :approval="pendingToolApproval" />
         </AlertDialogDescription>
@@ -16,10 +16,10 @@
           :disabled="isGenerating"
           @click="resolveGenerateToolApproval(false)"
         >
-          {{ $t('globals.messages.reject') }}
+          {{ i18n._('Reject') }}
         </Button>
         <Button type="button" :disabled="isGenerating" @click="resolveGenerateToolApproval(true)">
-          {{ $t('globals.messages.approveAndRun') }}
+          {{ i18n._('Approve and run') }}
         </Button>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -28,19 +28,19 @@
   <AlertDialog :open="showContactEmailWarning" @update:open="showContactEmailWarning = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('replyBox.contactEmailMissing') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Contact email not in recipients') }}</AlertDialogTitle>
         <AlertDialogDescription>
           {{
-            $t('replyBox.contactEmailMissingDescription', {
+            i18n._('The contact\'\'s email ({email}) is not included in to, cc, or bcc. The contact won\'\'t receive this reply.', {
               email: conversationStore.current?.contact?.email
             })
           }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction @click="processSend(true, true, deferredStatus)">{{
-          $t('replyBox.sendAnyway')
+          i18n._('Send anyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -49,15 +49,15 @@
   <AlertDialog :open="showMissingTagsWarning" @update:open="showMissingTagsWarning = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('replyBox.missingTagsTitle') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('No tags on this conversation') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('replyBox.missingTagsDescription') }}
+          {{ i18n._('This conversation has no tags. Tagging helps with reporting and triage. You can still send without tagging.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction @click="processSend(false, true, deferredStatus)">{{
-          $t('replyBox.sendAnyway')
+          i18n._('Send anyway')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -126,8 +126,8 @@
         <span v-else class="truncate text-muted-foreground">
           {{
             messageType === 'private_note'
-              ? $t('globals.terms.privateNote')
-              : $t('globals.terms.reply')
+              ? i18n.ngettext('Private note', 'Private notes', 1)
+              : i18n.ngettext('Reply', 'Replies', 1)
           }}
         </span>
         <span
@@ -193,7 +193,7 @@ import { WHATSAPP_CHANNEL, isWhatsAppWindowOpen } from '@main/features/conversat
 import { useUserStore } from '@main/stores/user'
 import { useDraftManager } from '@main/composables/useDraftManager'
 import api from '@main/api'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useNotificationStore } from '@main/stores/notification'
@@ -220,7 +220,7 @@ import ReplyBoxContent from '@/features/conversation/ReplyBoxContent.vue'
 import { UserTypeAgent } from '@/constants/user'
 import { permissions as perms } from '@main/constants/permissions.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const conversationStore = useConversationStore()
 const notificationStore = useNotificationStore()
 const inboxStore = useInboxStore()
@@ -283,7 +283,7 @@ function validateWhatsAppFiles(files) {
     if (file.size > maxMB * 1024 * 1024) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('conversation.whatsapp.fileSizeExceeded', {
+        description: i18n._('{name} exceeds the {size} MB limit for this file type on WhatsApp.', {
           name: file.name,
           size: Math.floor(maxMB)
         })
@@ -535,7 +535,7 @@ const processSend = async (
     if (!isWhatsAppWindowOpen(conversationStore.current)) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('conversation.whatsapp.error.windowClosed')
+        description: i18n._('The 24-hour reply window has closed. Send an approved template instead.')
       })
       return
     }
@@ -546,7 +546,7 @@ const processSend = async (
     if (!to.value.trim()) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
-        description: t('replyBox.toRequired')
+        description: i18n._('At least one recipient is required in the To field.')
       })
       return
     }

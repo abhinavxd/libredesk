@@ -20,20 +20,20 @@ import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useSharedViewStore } from '@/stores/sharedView'
 
 const sharedView = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
 const sharedViewStore = useSharedViewStore()
 
 const breadcrumbLinks = [
-  { path: 'shared-view-list', label: t('globals.terms.sharedView', 2) },
-  { path: '', label: t('sharedView.editSharedView') }
+  { path: 'shared-view-list', label: i18n._('{count, plural, one {Shared view} other {Shared views}}', 2) },
+  { path: '', label: i18n._('Edit shared view') }
 ]
 
 const submitForm = (values) => {
@@ -49,7 +49,7 @@ const updateSharedView = async (payload) => {
     await sharedViewStore.refresh()
 
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

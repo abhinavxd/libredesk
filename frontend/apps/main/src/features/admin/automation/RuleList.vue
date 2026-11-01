@@ -8,23 +8,23 @@
         >
           {{ rule.name }}
         </router-link>
-        <Badge v-if="rule.enabled">{{ $t('globals.terms.enabled') }}</Badge>
-        <Badge v-else variant="secondary">{{ $t('globals.terms.disabled') }}</Badge>
+        <Badge v-if="rule.enabled">{{ i18n._('Enabled') }}</Badge>
+        <Badge v-else variant="secondary">{{ i18n._('Disabled') }}</Badge>
       </div>
       <DropdownMenu>
         <DataTableActionTrigger />
         <DropdownMenuContent>
           <DropdownMenuItem @click="navigateToEditRule(rule.id)">
             <Pencil class="mr-2 h-4 w-4" />
-            <span>{{ $t('globals.messages.edit') }}</span>
+            <span>{{ i18n._('Edit') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem @click="$emit('toggle-rule', rule.id)" v-if="rule.enabled">
             <PowerOff class="mr-2 h-4 w-4" />
-            <span>{{ $t('globals.messages.disable') }}</span>
+            <span>{{ i18n._('Disable') }}</span>
           </DropdownMenuItem>
           <DropdownMenuItem @click="$emit('toggle-rule', rule.id)" v-else>
             <Power class="mr-2 h-4 w-4" />
-            <span>{{ $t('globals.messages.enable') }}</span>
+            <span>{{ i18n._('Enable') }}</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -32,7 +32,7 @@
             @click="() => (alertOpen = true)"
           >
             <Trash class="mr-2 h-4 w-4" />
-            <span>{{ $t('globals.messages.delete') }}</span>
+            <span>{{ i18n._('Delete') }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -43,15 +43,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('automation.deletionConfirmation') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this automation rule.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          $t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

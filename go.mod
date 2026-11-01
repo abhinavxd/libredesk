@@ -18,7 +18,6 @@ require (
 	github.com/inbucket/html2text v1.0.0
 	github.com/jhillyerd/enmime/v2 v2.4.1
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/knadh/go-i18n v0.1.0
 	github.com/knadh/goyesql/v2 v2.2.0
 	github.com/knadh/koanf/parsers/json v0.1.0
 	github.com/knadh/koanf/parsers/toml v0.1.0
@@ -30,6 +29,7 @@ require (
 	github.com/knadh/koanf/v2 v2.1.1
 	github.com/knadh/smtppool/v2 v2.3.1
 	github.com/knadh/stuffbin v1.3.0
+	github.com/leonelquinteros/gotext v1.7.2
 	github.com/lib/pq v1.10.9
 	github.com/mackee/go-readability v0.3.1
 	github.com/microcosm-cc/bluemonday v1.0.27

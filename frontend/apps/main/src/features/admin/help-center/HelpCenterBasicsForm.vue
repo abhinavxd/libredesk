@@ -3,7 +3,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" @input="generateSlug" />
           </FormControl>
@@ -13,18 +13,18 @@
 
       <FormField v-slot="{ componentField }" name="slug">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.slug') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Slug', 'Slugs', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" @input="markSlugEdited" />
           </FormControl>
-          <FormDescription>{{ t('helpCenter.slugHint') }}</FormDescription>
+          <FormDescription>{{ i18n._('Used in the help center URL.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
 
       <FormField v-slot="{ componentField }" name="page_title">
         <FormItem class="col-span-full">
-          <FormLabel>{{ t('helpCenter.pageTitle') }}</FormLabel>
+          <FormLabel>{{ i18n._('Page title') }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
@@ -35,25 +35,25 @@
 
     <FormField v-slot="{ componentField }" name="template">
       <FormItem>
-        <FormLabel>{{ t('globals.terms.template') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Template', 'Templates', 1, {}, 'Help center layout') }}</FormLabel>
         <FormControl>
           <RadioGroup v-bind="componentField">
             <div class="flex flex-col space-y-2">
               <div class="flex items-start space-x-3">
                 <RadioGroupItem id="hc-template-classic" value="classic" class="mt-1" />
                 <Label for="hc-template-classic" class="font-normal cursor-pointer">
-                  <span class="block font-medium">{{ t('helpCenter.templates.classic') }}</span>
+                  <span class="block font-medium">{{ i18n._('Classic') }}</span>
                   <span class="block text-muted-foreground">{{
-                    t('helpCenter.templates.classicHint')
+                    i18n._('Landing page layout with a hero banner, a large search bar and collection cards.')
                   }}</span>
                 </Label>
               </div>
               <div class="flex items-start space-x-3">
                 <RadioGroupItem id="hc-template-docs" value="docs" class="mt-1" />
                 <Label for="hc-template-docs" class="font-normal cursor-pointer">
-                  <span class="block font-medium">{{ t('helpCenter.templates.docs') }}</span>
+                  <span class="block font-medium">{{ i18n._('Docs') }}</span>
                   <span class="block text-muted-foreground">{{
-                    t('helpCenter.templates.docsHint')
+                    i18n._('Documentation layout with a top navigation bar, a sidebar listing collections and quick search (Ctrl+K).')
                   }}</span>
                 </Label>
               </div>
@@ -66,10 +66,10 @@
 
     <div class="flex justify-end space-x-2 pt-4">
       <Button type="button" variant="outline" @click="$emit('cancel')">
-        {{ t('globals.messages.cancel') }}
+        {{ i18n._('Cancel') }}
       </Button>
       <Button type="submit" :isLoading="isLoading">
-        {{ t('globals.messages.create') }}
+        {{ i18n._('Create') }}
       </Button>
     </div>
   </form>
@@ -93,7 +93,7 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
 import { createHelpCenterBasicsSchema } from './helpCenterFormSchema.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const props = defineProps({
   submitForm: {
@@ -108,10 +108,10 @@ const props = defineProps({
 
 defineEmits(['cancel'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const form = useForm({
-  validationSchema: toTypedSchema(createHelpCenterBasicsSchema(t)),
+  validationSchema: toTypedSchema(createHelpCenterBasicsSchema(i18n)),
   initialValues: { name: '', slug: '', page_title: '', template: 'classic' }
 })
 

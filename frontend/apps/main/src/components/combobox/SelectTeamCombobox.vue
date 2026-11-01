@@ -24,7 +24,7 @@
 
 <script setup>
 import { computed, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useTeamStore } from '@/stores/team'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
@@ -54,14 +54,14 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const teamStore = useTeamStore()
 
-const placeholderText = computed(() => props.placeholder || t('placeholders.selectTeam'))
+const placeholderText = computed(() => props.placeholder || i18n._('Select team'))
 
 const items = computed(() => {
   const prepended = props.includeNone
-    ? [{ value: 'none', label: t('globals.terms.none') }, ...props.prependItems]
+    ? [{ value: 'none', label: i18n.pgettext('No assigned team', 'None') }, ...props.prependItems]
     : props.prependItems
   return [...prepended, ...teamStore.options]
 })

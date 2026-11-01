@@ -11,7 +11,7 @@
         {{ if $showAuthor }}
         {{ if .Data.Article.AuthorAvatar }}<img class="hc-avatar hcd-byline-avatar" src="{{ .Data.Article.AuthorAvatar }}" alt="" loading="lazy" />{{ else }}<span class="hc-avatar hc-avatar-initial hcd-byline-avatar">{{ .Data.AuthorInitial }}</span>{{ end }}
         {{ end }}
-        <span>{{ if $showAuthor }}<span class="hcd-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ .L.T "globals.terms.lastUpdated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
+        <span>{{ if $showAuthor }}<span class="hcd-author">{{ .Data.Article.AuthorName }}</span> &middot; {{ end }}{{ .L.GetD "templates" "Last updated" }} <time class="hc-date" datetime="{{ .Data.ModifiedTime }}">{{ .Data.Article.UpdatedAt.Format "Jan 2, 2006" }}</time></span>
     </div>
     <div class="hc-article-body hcd-article-body">
         {{ template "hc-article-toc" . }}
@@ -24,7 +24,7 @@
 
     {{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
     <aside class="hcd-related">
-        <h2>{{ .L.T "helpCenter.relatedArticles" }}</h2>
+        <h2>{{ .L.GetD "templates" "Related articles" }}</h2>
         {{ template "docs-article-rows" (map "Articles" .Data.Related "Base" .Data.HelpCenter.BasePath) }}
     </aside>
     {{ end }}

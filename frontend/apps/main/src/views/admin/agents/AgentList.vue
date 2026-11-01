@@ -3,7 +3,6 @@
     <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
       <template #actions>
         <Importer
-          entity-key="globals.terms.agent"
           :upload-fn="api.importAgents"
           :get-status-fn="api.getAgentImportStatus"
           @import-complete="getData"
@@ -16,12 +15,12 @@
               <div>Bob,Test,bob@example.com,"Agent,Admin",Support</div>
             </div>
             <p class="text-xs mt-2 text-muted-foreground">
-              {{ $t('importer.agentCaseSensitiveNote') }}
+              {{ i18n._('Roles and teams must match exactly (case-sensitive)') }}
             </p>
           </template>
         </Importer>
         <router-link :to="{ name: 'new-agent' }">
-          <Button>{{ $t('agent.new') }}</Button>
+          <Button>{{ i18n._('New agent') }}</Button>
         </router-link>
       </template>
     </AdminToolbar>
@@ -29,7 +28,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="data"
         :loading="isLoading"
       />
@@ -48,13 +47,13 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import Importer from '@/components/importer/Importer.vue'
 import api from '@/api'
 
 const isLoading = ref(false)
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const data = ref([])
 const emitter = useEmitter()
 

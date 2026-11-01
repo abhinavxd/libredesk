@@ -11,7 +11,7 @@ defineProps({
 <template>
   <Alert variant="destructive" v-if="errorMessage" :class="{ 'border-0': !border }">
     <TriangleAlert class="w-4 h-4" aria-hidden="true" />
-    <AlertTitle>{{ $t('globals.terms.error') }}</AlertTitle>
+    <AlertTitle>{{ i18n.ngettext('Error', 'Errors', 1) }}</AlertTitle>
     <AlertDescription>
       {{ errorMessage }}
     </AlertDescription>

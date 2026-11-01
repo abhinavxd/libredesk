@@ -17,7 +17,7 @@
               @remove="onRemove"
               :src="contact.avatar_url || ''"
               :initials="getInitials"
-              :label="t('globals.messages.upload')"
+              :label="i18n._('Upload')"
             />
 
             <div class="flex gap-2 justify-start items-center">
@@ -27,19 +27,19 @@
               <Badge v-if="contact.type" variant="secondary">
                 {{
                   contact.type === 'visitor'
-                    ? $t('contact.type.visitor')
-                    : $t('contact.type.contact')
+                    ? i18n.pgettext('Contact type', 'Visitor')
+                    : i18n.pgettext('Contact type', 'Contact')
                 }}
               </Badge>
               <Badge v-if="!contact.enabled" variant="destructive" class="gap-1">
                 <ShieldOffIcon size="12" />
-                {{ t('globals.terms.blocked') }}
+                {{ i18n._('Blocked') }}
               </Badge>
               <DropdownMenu v-if="canOpenActionsMenu">
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" class="h-7 w-7">
                     <MoreVerticalIcon class="h-4 w-4" />
-                    <span class="sr-only">{{ t('globals.terms.openMenu') }}</span>
+                    <span class="sr-only">{{ i18n._('Open menu') }}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" class="w-[200px]">
@@ -50,7 +50,7 @@
                   >
                     <ShieldOffIcon v-if="contact.enabled" class="mr-2" size="15" />
                     <ShieldCheckIcon v-else class="mr-2" size="15" />
-                    {{ t(contact.enabled ? 'globals.messages.block' : 'globals.messages.unblock') }}
+                    {{ contact.enabled ? i18n._('Block') : i18n._('Unblock') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     v-if="userStore.can('contacts:export')"
@@ -58,7 +58,7 @@
                     @click="exportContact"
                   >
                     <DownloadIcon class="mr-2" size="15" />
-                    {{ t('globals.messages.exportData') }}
+                    {{ i18n._('Export data') }}
                   </DropdownMenuItem>
                   <template v-if="userStore.can('contacts:delete')">
                     <DropdownMenuSeparator />
@@ -67,7 +67,7 @@
                       @click="showDeleteConfirmation = true"
                     >
                       <Trash2Icon class="mr-2" size="15" />
-                      {{ t('contact.deleteContact') }}
+                      {{ i18n._('Delete contact') }}
                     </DropdownMenuItem>
                   </template>
                 </DropdownMenuContent>
@@ -97,7 +97,7 @@
 
             <div class="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CalendarIcon size="14" class="flex-shrink-0" />
-              {{ $t('globals.terms.createdOn') }}
+              {{ i18n._('Created on') }}
               {{ contact.created_at ? format(new Date(contact.created_at), 'PPP') : 'N/A' }}
             </div>
           </div>
@@ -115,19 +115,19 @@
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {{ contact?.enabled ? t('contact.blockContact') : t('contact.unblockContact') }}
+              {{ contact?.enabled ? i18n._('Block contact') : i18n._('Unblock contact') }}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {{ contact?.enabled ? t('contact.blockConfirm') : t('contact.unblockConfirm') }}
+              {{ contact?.enabled ? i18n._('Are you sure you want to block this contact? They won\'\'t be able to chat, and incoming emails from their address will be rejected. This also blocks incoming emails from any other contacts that use the same email.') : i18n._('Are you sure you want to unblock this contact? They can chat again, and incoming emails from their address will be accepted.') }}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
             <AlertDialogAction
               :variant="contact?.enabled ? 'destructive' : 'default'"
               @click="confirmToggleBlock"
             >
-              {{ contact?.enabled ? t('globals.messages.block') : t('globals.messages.unblock') }}
+              {{ contact?.enabled ? i18n._('Block') : i18n._('Unblock') }}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -139,13 +139,13 @@
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{{ t('contact.deleteContact') }}</AlertDialogTitle>
-            <AlertDialogDescription>{{ t('contact.deleteConfirm') }}</AlertDialogDescription>
+            <AlertDialogTitle>{{ i18n._('Delete contact') }}</AlertDialogTitle>
+            <AlertDialogDescription>{{ i18n._('Are you sure you want to delete this contact? All their conversations, messages, notes, and attachments will be permanently deleted. This cannot be undone.') }}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" @click="confirmDelete">
-              {{ t('globals.messages.delete') }}
+              {{ i18n._('Delete') }}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -158,7 +158,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { format } from 'date-fns'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { AvatarUpload } from '@shared-ui/components/ui/avatar'
@@ -205,7 +205,7 @@ import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const route = useRoute()
 const router = useRouter()
@@ -217,7 +217,7 @@ const userStore = useUserStore()
 const contactStore = useContactStore()
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const canOpenActionsMenu = computed(
@@ -228,8 +228,8 @@ const canOpenActionsMenu = computed(
 )
 
 const breadcrumbLinks = [
-  { path: 'contacts', label: t('globals.terms.contact', 2) },
-  { path: '', label: t('contact.editContact') }
+  { path: 'contacts', label: i18n._('{count, plural, one {Contact} other {Contacts}}', 2) },
+  { path: '', label: i18n._('Edit contact') }
 ]
 
 const paletteActions = {
@@ -281,7 +281,7 @@ async function toggleBlock() {
     })
     await fetchContact()
     emitToast(
-      contact.value.enabled ? t('contact.unblockedSuccessfully') : t('contact.blockedSuccessfully')
+      contact.value.enabled ? i18n._('Contact unblocked successfully') : i18n._('Contact blocked successfully')
     )
   } catch (err) {
     showError(err)
@@ -293,7 +293,7 @@ async function confirmDelete() {
   try {
     formLoading.value = true
     await api.deleteContact(contact.value.id)
-    emitToast(t('globals.messages.deletedSuccessfully'))
+    emitToast(i18n._('Deleted successfully'))
     router.push({ name: 'contacts' })
   } catch (err) {
     showError(err)
@@ -316,7 +316,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     formLoading.value = true
     await api.updateContact(contact.value.id, { ...values })
     await fetchContact()
-    emitToast(t('globals.messages.savedSuccessfully'))
+    emitToast(i18n._('Changes saved'))
   } catch (err) {
     showError(err)
   } finally {
@@ -339,7 +339,7 @@ async function onUpload(file) {
     const { data } = await api.updateContact(contact.value.id, formData)
     contact.value.avatar_url = data.avatar_url
     form.setFieldValue('avatar_url', data.avatar_url)
-    emitToast(t('toast.avatarUpdated'))
+    emitToast(i18n._('Avatar updated successfully'))
     fetchContact()
   } catch (err) {
     showError(err)

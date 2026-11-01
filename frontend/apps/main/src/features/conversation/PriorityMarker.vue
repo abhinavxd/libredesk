@@ -18,7 +18,7 @@
 import { computed } from 'vue'
 import PriorityIcon from '@shared-ui/components/icons/PriorityIcon.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const PRIORITY_MARKERS = {
   low: { level: 1, class: 'text-muted-foreground' },
@@ -42,11 +42,11 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const priorityName = computed(() => (props.priority || '').trim())
 
 const marker = computed(() => PRIORITY_MARKERS[priorityName.value.toLowerCase()] || UNKNOWN_MARKER)
 
-const priorityLabel = computed(() => `${t('globals.terms.priority', 1)}: ${priorityName.value}`)
+const priorityLabel = computed(() => `${i18n._('{count, plural, one {Priority} other {Priorities}}', 1)}: ${priorityName.value}`)
 </script>

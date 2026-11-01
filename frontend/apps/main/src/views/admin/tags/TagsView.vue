@@ -6,7 +6,6 @@
           <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
             <template #actions>
               <Importer
-                entity-key="globals.terms.tag"
                 :upload-fn="api.importTags"
                 :get-status-fn="api.getTagImportStatus"
                 @import-complete="getTags"
@@ -24,18 +23,18 @@
               </Importer>
               <Dialog v-model:open="dialogOpen">
                 <DialogTrigger as-child @click="newTag">
-                  <Button>{{ t('tag.new') }}</Button>
+                  <Button>{{ i18n._('New tag') }}</Button>
                 </DialogTrigger>
                 <DialogContent class="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle class="mb-1">
-                      {{ isEditing ? t('tag.edit') : t('tag.new') }}
+                      {{ isEditing ? i18n._('Edit tag') : i18n._('New tag') }}
                     </DialogTitle>
                     <DialogDescription>
                       {{
                         isEditing
-                          ? t('admin.conversationTags.edit.description')
-                          : t('admin.conversationTags.new.description')
+                          ? i18n._('Change the tag name. Click save when you\'\'re done.')
+                          : i18n._('Set tag name. Click save when you\'\'re done.')
                       }}
                     </DialogDescription>
                   </DialogHeader>
@@ -43,7 +42,7 @@
                     <template #footer>
                       <DialogFooter class="mt-10">
                         <Button type="submit">{{
-                          isEditing ? t('globals.messages.save') : t('globals.messages.create')
+                          isEditing ? i18n._('Save') : i18n._('Create')
                         }}</Button>
                       </DialogFooter>
                     </template>
@@ -56,7 +55,7 @@
             <DataTable
               v-model:search="searchTerm"
               :searchable="false"
-              :columns="createColumns(t, { onEdit: editTag })"
+              :columns="createColumns(i18n, { onEdit: editTag })"
               :data="tags"
               :loading="isLoading"
             />
@@ -65,7 +64,7 @@
       </template>
 
       <template #help>
-        <p>{{ $t('admin.tag.help') }}</p>
+        <p>{{ i18n._('Tags can be used to filter conversations and as conditions in automations.') }}</p>
       </template>
     </AdminSplitLayout>
   </div>
@@ -97,12 +96,12 @@ import { createFormSchema } from '@/features/admin/tags/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import Importer from '@/components/importer/Importer.vue'
 import api from '@/api/index.js'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const tags = ref([])
 const emitter = useEmitter()
@@ -131,7 +130,7 @@ onUnmounted(() => {
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const editTag = (item) => {
@@ -166,7 +165,7 @@ const onSubmit = form.handleSubmit(async (values) => {
     dialogOpen.value = false
     getTags()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

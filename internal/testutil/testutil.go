@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 
 	_ "github.com/lib/pq"
 )
@@ -60,14 +60,10 @@ func NewDB(t *testing.T, name string) *sqlx.DB {
 	return db
 }
 
-// NewI18n loads the en-US translations.
-func NewI18n(t *testing.T) *i18n.I18n {
+// NewI18n uses English source messages without a catalog.
+func NewI18n(t *testing.T) *gotext.Locale {
 	t.Helper()
-	mgr, err := i18n.NewFromFile(filepath.Join(repoRoot(t), "i18n", "en-US.json"))
-	if err != nil {
-		t.Fatalf("loading i18n: %v", err)
-	}
-	return mgr
+	return gotext.NewLocale("", "en_US")
 }
 
 // JSONKeys returns the set of top-level keys in v's JSON encoding.

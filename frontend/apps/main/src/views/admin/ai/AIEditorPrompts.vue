@@ -6,13 +6,13 @@
           <template #actions>
             <Dialog v-model:open="dialogOpen">
               <DialogTrigger as-child @click="newPrompt">
-                <Button>{{ t('admin.ai.editorPrompt.new') }}</Button>
+                <Button>{{ i18n._('New editor prompt') }}</Button>
               </DialogTrigger>
               <DialogContent class="sm:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>
                     {{
-                      isEditing ? t('admin.ai.editorPrompt.edit') : t('admin.ai.editorPrompt.new')
+                      isEditing ? i18n._('Edit editor prompt') : i18n._('New editor prompt')
                     }}
                   </DialogTitle>
                 </DialogHeader>
@@ -28,7 +28,7 @@
         <DataTable
           v-model:search="searchTerm"
           :searchable="false"
-          :columns="createEditorPromptColumns(t, { onEdit: editPrompt })"
+          :columns="createEditorPromptColumns(i18n, { onEdit: editPrompt })"
           :data="prompts"
           :loading="isLoading"
         />
@@ -36,7 +36,7 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.editorPromptsHelp') }}</p>
+      <p>{{ i18n._('Editor prompts are the AI actions agents can run on their draft from the reply box, such as fixing grammar or changing tone.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>
@@ -62,12 +62,12 @@ import { createEditorPromptColumns } from '@/features/admin/ai/editorPromptColum
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 import { useAiPromptStore } from '@main/stores/aiPrompt'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const aiPromptStore = useAiPromptStore()
 const { prompts } = storeToRefs(aiPromptStore)
@@ -139,7 +139,7 @@ const submitPrompt = async (values) => {
     dialogOpen.value = false
     await refreshPrompts()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

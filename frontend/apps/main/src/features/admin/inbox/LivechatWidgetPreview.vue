@@ -20,7 +20,7 @@
             <div class="flex items-center p-2 border-b border-border gap-3 shrink-0">
               <button
                 type="button"
-                :aria-label="$t('globals.messages.back')"
+                :aria-label="i18n._('Back')"
                 :class="BACK_BUTTON_CLASS"
                 @click="view = 'messages'"
               >
@@ -34,13 +34,13 @@
                 </div>
                 <div class="flex flex-col">
                   <h3 class="text-base font-bold leading-tight">
-                    {{ config.brand_name || $t('globals.terms.name') }}
+                    {{ config.brand_name || i18n.ngettext('Name', 'Names', 1) }}
                   </h3>
                   <p class="text-xs text-muted-foreground flex items-center gap-1">
                     <template v-if="replyExpectation">{{ replyExpectation }}</template>
                     <template v-else>
                       <span class="inline-block w-2 h-2 rounded-full bg-success"></span>
-                      {{ $t('globals.terms.online', 1) }}
+                      {{ i18n.ngettext('Online', 'Online', 1) }}
                     </template>
                   </p>
                 </div>
@@ -75,7 +75,7 @@
                       <div
                         class="flex items-center gap-2 px-3 rounded-l-md border border-r-0 border-input text-sm text-muted-foreground"
                       >
-                        <span>{{ $t('globals.terms.select') }}</span>
+                        <span>{{ i18n._('Select') }}</span>
                         <ChevronDown :size="14" class="opacity-50" />
                       </div>
                       <Input
@@ -100,10 +100,10 @@
                 </div>
                 <div class="space-y-2">
                   <label class="text-sm font-medium">
-                    {{ $t('globals.terms.message', 1) }}<span class="text-destructive"> *</span>
+                    {{ i18n.ngettext('Message', 'Messages', 1) }}<span class="text-destructive"> *</span>
                   </label>
                   <Textarea
-                    :placeholder="$t('globals.terms.typeMessage')"
+                    :placeholder="i18n._('Type your message...')"
                     rows="3"
                     readonly
                     class="resize-none"
@@ -112,7 +112,7 @@
               </div>
               <div class="p-4 border-t border-border shrink-0">
                 <Button type="button" class="w-full">{{
-                  $t('widget.prechatForm.startChat')
+                  i18n._('Start chat')
                 }}</Button>
               </div>
             </template>
@@ -164,7 +164,7 @@
                       {{ m.content }}
                     </div>
                     <div v-if="m.type === 'agent'" class="text-[10px] text-muted-foreground mt-1">
-                      {{ config.brand_name || $t('globals.terms.name') }}
+                      {{ config.brand_name || i18n.ngettext('Name', 'Names', 1) }}
                     </div>
                   </div>
                 </template>
@@ -176,7 +176,7 @@
                   <div class="border border-input rounded-md bg-background">
                     <div class="p-2">
                       <textarea
-                        :placeholder="$t('globals.terms.typeMessage')"
+                        :placeholder="i18n._('Type your message...')"
                         rows="1"
                         readonly
                         class="w-full resize-none border-0 bg-transparent p-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
@@ -267,7 +267,7 @@
                           class="h-10 w-full justify-between px-2"
                           @click="view = 'help'"
                         >
-                          {{ $t('widget.searchArticles') }}
+                          {{ i18n._('Search for help') }}
                           <Search class="size-4" aria-hidden="true" />
                         </Button>
                         <Button
@@ -293,7 +293,7 @@
                         />
                         <CardContent class="p-4 text-sm">
                           <div class="font-semibold leading-snug">
-                            {{ item.title || $t('globals.terms.announcement') }}
+                            {{ item.title || i18n.ngettext('Announcement', 'Announcements', 1) }}
                           </div>
                           <div
                             v-if="item.description"
@@ -330,27 +330,27 @@
                   <button
                     v-if="helpCollection"
                     type="button"
-                    :aria-label="$t('globals.messages.back')"
+                    :aria-label="i18n._('Back')"
                     :class="BACK_BUTTON_CLASS"
                     @click="helpPath.pop()"
                   >
                     <ArrowLeft :size="16" />
                   </button>
-                  <h3 class="font-medium truncate">{{ $t('globals.terms.help') }}</h3>
+                  <h3 class="font-medium truncate">{{ i18n._('Help') }}</h3>
                 </header>
                 <div class="relative p-3 border-b border-border shrink-0">
                   <Search
                     class="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
                   />
-                  <Input class="pl-10" :placeholder="$t('widget.searchArticles')" readonly />
+                  <Input class="pl-10" :placeholder="i18n._('Search for help')" readonly />
                 </div>
                 <div class="flex-1 min-h-0 overflow-y-auto">
                   <p
                     v-if="!helpCollections.length && !helpArticles.length"
                     class="p-4 text-sm text-muted-foreground"
                   >
-                    {{ $t('widget.noArticles') }}
+                    {{ i18n._('No published articles yet.') }}
                   </p>
                   <HelpCollectionList
                     v-else
@@ -365,7 +365,7 @@
               <div v-else class="h-full flex flex-col relative">
                 <div class="flex items-center justify-center p-4 border-b border-border shrink-0">
                   <h3 class="text-base font-semibold text-foreground">
-                    {{ $t('globals.terms.message', 2) }}
+                    {{ i18n.ngettext('Message', 'Messages', 2) }}
                   </h3>
                 </div>
                 <div class="flex-1 overflow-y-auto pb-20">
@@ -382,7 +382,7 @@
                       </div>
                       <div class="flex-1 min-w-0">
                         <div class="text-sm font-medium text-foreground mb-0.5">
-                          {{ config.brand_name || $t('globals.terms.name') }}
+                          {{ config.brand_name || i18n.ngettext('Name', 'Names', 1) }}
                         </div>
                         <p class="text-sm text-muted-foreground truncate">
                           {{ sampleLastMessage }}
@@ -413,7 +413,7 @@
                 @click="view = 'home'"
               >
                 <House class="w-5 h-5" aria-hidden="true" />
-                <span class="text-xs font-medium">{{ $t('globals.terms.home') }}</span>
+                <span class="text-xs font-medium">{{ i18n._('Home') }}</span>
               </button>
               <button
                 type="button"
@@ -424,7 +424,7 @@
                 @click="view = 'messages'"
               >
                 <MessagesSquare class="w-5 h-5" aria-hidden="true" />
-                <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
+                <span class="text-xs font-medium">{{ i18n.ngettext('Message', 'Messages', 2) }}</span>
               </button>
               <button
                 v-if="showHelpTab"
@@ -436,7 +436,7 @@
                 @click="view = 'help'"
               >
                 <CircleQuestionMark class="w-5 h-5" aria-hidden="true" />
-                <span class="text-xs font-medium">{{ $t('globals.terms.help') }}</span>
+                <span class="text-xs font-medium">{{ i18n._('Help') }}</span>
               </button>
             </div>
           </template>
@@ -471,7 +471,7 @@
     <!-- Launcher -->
     <button
       type="button"
-      :aria-label="open ? $t('globals.messages.closeChat') : $t('globals.messages.openChat')"
+      :aria-label="open ? i18n._('Close chat') : i18n._('Open chat')"
       class="absolute flex items-center justify-center rounded-full transition-transform motion-safe:can-hover:hover:scale-105"
       :style="launcherStyle"
       @click="open = !open"
@@ -504,7 +504,7 @@ const PREVIEW_NAV_TAB_CLASS = 'flex w-full flex-col items-center justify-center 
 import { computed, ref, watch } from 'vue'
 import PoweredBy from '@shared-ui/components/PoweredBy.vue'
 import { useElementSize } from '@vueuse/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card, CardContent } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
@@ -547,7 +547,7 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const open = ref(true)
 const headerRef = ref(null)
@@ -645,22 +645,22 @@ const canStartFromMessages = computed(
 )
 
 const startButtonText = computed(
-  () => userTypeConfig.value.start_conversation_button_text || t('globals.messages.sendUsMessage')
+  () => userTypeConfig.value.start_conversation_button_text || i18n._('Send us a message')
 )
 const messagesButtonText = computed(
   () =>
     userTypeConfig.value.start_conversation_button_text ||
-    t('globals.messages.startNewConversation')
+    i18n._('Start new conversation')
 )
 
 const sampleMessages = computed(() => [
   {
     id: 1,
     type: 'agent',
-    content: parsedIntroduction.value || t('globals.messages.sendUsMessage')
+    content: parsedIntroduction.value || i18n._('Send us a message')
   },
-  { id: 2, type: 'user', content: t('admin.inbox.livechat.preview.sampleUserMessage') },
-  { id: 3, type: 'agent', content: t('admin.inbox.livechat.preview.sampleAgentReply') }
+  { id: 2, type: 'user', content: i18n._('Hi! How do I get started?') },
+  { id: 3, type: 'agent', content: i18n._('Happy to help, could you share a few details?') }
 ])
 const sampleLastMessage = computed(
   () => sampleMessages.value[sampleMessages.value.length - 1].content

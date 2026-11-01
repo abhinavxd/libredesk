@@ -2,7 +2,7 @@
 {{ template "classic-header" . }}
 
 {{ if .Data.Query }}
-<h1 class="hc-page-title">{{ $.L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
+<h1 class="hc-page-title">{{ $.L.GetD "templates" "Results for" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
 {{ if .Data.Results }}
 <ul class="hc-results">
     {{ range .Data.Results }}
@@ -13,11 +13,11 @@
     {{ end }}
 </ul>
 {{ else }}
-<p class="hc-empty">{{ $.L.T "helpCenter.noResults" }}</p>
+<p class="hc-empty">{{ $.L.GetD "templates" "No articles matched your search. Try fewer or different words." }}</p>
 {{ end }}
 {{ else }}
-<h1 class="hc-page-title">{{ $.L.T "globals.terms.search" }}</h1>
-<p class="hc-empty">{{ $.L.T "globals.messages.startTypingToSearch" }}</p>
+<h1 class="hc-page-title">{{ $.L.GetD "templates" "Search" }}</h1>
+<p class="hc-empty">{{ $.L.GetD "templates" "Start typing to search..." }}</p>
 {{ end }}
 
 {{ template "classic-footer" . }}

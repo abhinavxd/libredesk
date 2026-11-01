@@ -43,21 +43,21 @@
           <Toggle
             :class="ICON_BUTTON_CLASS"
             variant="outline"
-            :aria-label="$t('globals.messages.attachFile')"
+            :aria-label="i18n._('Attach file')"
             @click="triggerFileUpload"
             :pressed="false"
           >
             <Paperclip class="h-4 w-4" />
           </Toggle>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('globals.messages.attachFile') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Attach file') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
           <Toggle
             :class="ICON_BUTTON_CLASS"
             variant="outline"
-            :aria-label="$t('globals.messages.addEmoji')"
+            :aria-label="i18n._('Add emoji')"
             ref="emojiTriggerRef"
             @click="toggleEmojiPicker"
             :pressed="isEmojiPickerVisible"
@@ -65,35 +65,35 @@
             <Smile class="h-4 w-4" />
           </Toggle>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('globals.messages.addEmoji') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Add emoji') }}</TooltipContent>
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
           <Toggle
             :class="[ICON_BUTTON_CLASS, 'md:hidden']"
             variant="outline"
-            :aria-label="$t('actions.applyMacro')"
+            :aria-label="i18n._('Apply macro')"
             @click="openMacroPicker"
             :pressed="false"
           >
             <Zap class="h-4 w-4" />
           </Toggle>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('actions.applyMacro') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Apply macro') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="showWhatsAppTemplate">
         <TooltipTrigger as-child>
           <Toggle
             :class="ICON_BUTTON_CLASS"
             variant="outline"
-            :aria-label="$t('globals.messages.sendTemplate')"
+            :aria-label="i18n._('Send template')"
             @click="openTemplatePicker"
             :pressed="false"
           >
             <WhatsAppIcon class="h-4 w-4" />
           </Toggle>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('globals.messages.sendTemplate') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Send template') }}</TooltipContent>
       </Tooltip>
       <Tooltip v-if="showGenerateReply">
         <TooltipTrigger as-child>
@@ -102,14 +102,14 @@
             variant="outline"
             :pressed="false"
             :disabled="isGenerating"
-            :aria-label="$t('replyBox.generateReply')"
+            :aria-label="i18n._('Generate reply')"
             @click="emit('generateReply')"
           >
             <Loader2 v-if="isGenerating" class="h-4 w-4 animate-spin" />
             <Sparkles v-else class="h-4 w-4" />
           </Toggle>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('replyBox.generateReply') }}</TooltipContent>
+        <TooltipContent>{{ i18n._('Generate reply') }}</TooltipContent>
       </Tooltip>
     </div>
     <div class="ml-auto flex items-center rounded-md shadow-sm">
@@ -120,7 +120,7 @@
         :isLoading="isSending"
         v-if="showSendButton"
       >
-        {{ $t('globals.messages.send') }}
+        {{ i18n._('Send') }}
       </Button>
       <DropdownMenu v-if="showSendButton">
         <DropdownMenuTrigger as-child>
@@ -132,7 +132,7 @@
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DropdownMenuLabel>{{ $t('replyBox.sendAndSetAs') }}</DropdownMenuLabel>
+          <DropdownMenuLabel>{{ i18n._('Send and set as') }}</DropdownMenuLabel>
           <DropdownMenuItem
             v-for="status in conversationStore.statusOptionsNoSnooze"
             :key="status.value"

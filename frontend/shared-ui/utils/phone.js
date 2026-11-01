@@ -18,24 +18,24 @@ export const defaultCountryCode = () => {
   return countryFromTimezone() || countryFromLanguage() || DEFAULT_COUNTRY_CODE
 }
 
-export const phoneNumberSchema = (t, required = false) => {
+export const phoneNumberSchema = (i18n, required = false) => {
   let schema = z.string().max(PHONE_NUMBER_MAX, {
-    message: t('globals.messages.maxLength', { max: PHONE_NUMBER_MAX })
+    message: i18n._('Must be at most {max} characters', { max: PHONE_NUMBER_MAX })
   })
   if (required) {
-    schema = schema.min(1, { message: t('globals.messages.required') })
+    schema = schema.min(1, { message: i18n._('{name} Required') })
   }
   return schema.refine((val) => !val || PHONE_NUMBER_REGEX.test(val), {
-    message: t('validation.invalidPhone')
+    message: i18n._('Invalid phone number')
   })
 }
 
-export const countryCodeSchema = (t, required = false) => {
+export const countryCodeSchema = (i18n, required = false) => {
   let schema = z.string().max(PHONE_COUNTRY_CODE_MAX, {
-    message: t('globals.messages.maxLength', { max: PHONE_COUNTRY_CODE_MAX })
+    message: i18n._('Must be at most {max} characters', { max: PHONE_COUNTRY_CODE_MAX })
   })
   if (required) {
-    schema = schema.min(1, { message: t('globals.messages.required') })
+    schema = schema.min(1, { message: i18n._('{name} Required') })
   }
   return schema
 }

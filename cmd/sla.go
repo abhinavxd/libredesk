@@ -29,7 +29,7 @@ func handleGetSLA(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	sla, err := app.sla.Get(id)
@@ -47,7 +47,7 @@ func handleCreateSLA(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&sla, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateSLA(app, &sla); err != nil {
@@ -71,11 +71,11 @@ func handleUpdateSLA(r *fastglue.Request) error {
 
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&sla, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateSLA(app, &sla); err != nil {
@@ -97,7 +97,7 @@ func handleDeleteSLA(r *fastglue.Request) error {
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err = app.sla.Delete(id); err != nil {
@@ -110,38 +110,39 @@ func handleDeleteSLA(r *fastglue.Request) error {
 // validateSLA validates the SLA policy and returns an envelope.Error if any validation fails.
 func validateSLA(app *App, sla *smodels.SLAPolicy) error {
 	if sla.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 	if sla.FirstResponseTime.String == "" && sla.NextResponseTime.String == "" && sla.ResolutionTime.String == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "At least one of `first_response_time`, `next_response_time`, or `resolution_time` must be provided."), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty",
+			"At least one of `first_response_time`, `next_response_time`, or `resolution_time` must be provided."), nil)
 	}
 
 	// Validate notifications if any.
 	for _, n := range sla.Notifications {
 		if n.Type == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`type`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`type`"), nil)
 		}
 		if n.TimeDelayType == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`time_delay_type`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`time_delay_type`"), nil)
 		}
 		if n.Metric == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`metric`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`metric`"), nil)
 		}
 		if n.TimeDelayType != "immediately" {
 			if n.TimeDelay == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`time_delay`"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`time_delay`"), nil)
 			}
 			// Validate time delay duration.
 			td, err := time.ParseDuration(n.TimeDelay)
 			if err != nil {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 			}
 			if td.Minutes() < 1 {
-				return envelope.NewError(envelope.InputError, app.i18n.T("sla.minimumDurationOneMinute"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Duration must be at least 1 minute."), nil)
 			}
 		}
 		if len(n.Recipients) == 0 {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`recipients`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`recipients`"), nil)
 		}
 	}
 
@@ -149,10 +150,10 @@ func validateSLA(app *App, sla *smodels.SLAPolicy) error {
 	if sla.FirstResponseTime.String != "" {
 		frt, err := time.ParseDuration(sla.FirstResponseTime.String)
 		if err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 		}
 		if frt.Minutes() < 1 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("sla.minimumDurationOneMinute"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Duration must be at least 1 minute."), nil)
 		}
 	}
 
@@ -160,16 +161,16 @@ func validateSLA(app *App, sla *smodels.SLAPolicy) error {
 	if sla.ResolutionTime.String != "" {
 		rt, err := time.ParseDuration(sla.ResolutionTime.String)
 		if err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 		}
 		if rt.Minutes() < 1 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("sla.minimumDurationOneMinute"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Duration must be at least 1 minute."), nil)
 		}
 		// Compare with first response time if both are present.
 		if sla.FirstResponseTime.String != "" {
 			frt, _ := time.ParseDuration(sla.FirstResponseTime.String)
 			if frt > rt {
-				return envelope.NewError(envelope.InputError, app.i18n.T("sla.firstResponseTimeAfterResolution"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("First response time cannot be after resolution time"), nil)
 			}
 		}
 	}
@@ -178,10 +179,10 @@ func validateSLA(app *App, sla *smodels.SLAPolicy) error {
 	if sla.NextResponseTime.String != "" {
 		nrt, err := time.ParseDuration(sla.NextResponseTime.String)
 		if err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 		}
 		if nrt.Minutes() < 1 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("sla.minimumDurationOneMinute"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Duration must be at least 1 minute."), nil)
 		}
 	}
 

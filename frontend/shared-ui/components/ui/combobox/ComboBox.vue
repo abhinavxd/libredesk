@@ -22,7 +22,7 @@
     <PopoverContent class="p-0" :align="align">
       <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
         <CommandInput class="h-9" :placeholder="placeholder" :loading="searching" />
-        <CommandEmpty v-if="!searching">{{ $t('globals.messages.notFound') }}</CommandEmpty>
+        <CommandEmpty v-if="!searching">{{ i18n._('Not found') }}</CommandEmpty>
         <CommandList>
           <CommandGroup>
             <CommandItem

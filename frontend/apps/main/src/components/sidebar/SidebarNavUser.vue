@@ -47,7 +47,7 @@
         <div class="space-y-2">
           <!-- Dark-mode toggle -->
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">{{ t('navigation.darkMode') }}</span>
+            <span class="text-muted-foreground">{{ i18n._('Dark Mode') }}</span>
             <Switch
               :checked="mode === 'dark'"
               @update:checked="(val) => (mode = val ? 'dark' : 'light')"
@@ -57,7 +57,7 @@
           <div class="border-t border-border pt-3 space-y-3">
             <!-- Away toggle -->
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">{{ t('navigation.away') }}</span>
+              <span class="text-muted-foreground">{{ i18n.pgettext('Conversation navigation', 'Away') }}</span>
               <Switch
                 :checked="
                   ['away_manual', 'away_and_reassigning'].includes(
@@ -71,7 +71,7 @@
             </div>
             <!-- Reassign toggle -->
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">{{ t('navigation.reassignReplies') }}</span>
+              <span class="text-muted-foreground">{{ i18n._('Reassign replies') }}</span>
               <Switch
                 :checked="userStore.user.availability_status === 'away_and_reassigning'"
                 @update:checked="
@@ -87,27 +87,27 @@
       <DropdownMenuGroup>
         <DropdownMenuItem @click.prevent="router.push({ name: 'account' })">
           <CircleUserRound size="18" class="mr-2" />
-          {{ t('globals.terms.account') }}
+          {{ i18n.ngettext('Account', 'Accounts', 1) }}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuItem @click="shortcutsDialog.show">
           <Keyboard size="18" class="mr-2" />
-          {{ t('navigation.keyboardShortcuts') }}
+          {{ i18n._('Keyboard shortcuts') }}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="logout">
         <LogOut size="18" class="mr-2" />
-        {{ t('navigation.logout') }}
+        {{ i18n._('Logout') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,7 +134,7 @@ const isMobile = useIsMobile()
 const mode = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const shortcutsDialog = useKeyboardShortcutsDialog()
 const logout = useLogout()
 </script>

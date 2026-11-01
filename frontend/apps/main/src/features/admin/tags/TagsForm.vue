@@ -2,7 +2,7 @@
     <form>
         <FormField v-slot="{ componentField }" name="name">
             <FormItem>
-                <FormLabel>{{$t('globals.terms.name')}}</FormLabel>
+                <FormLabel>{{i18n.ngettext('Name', 'Names', 1)}}</FormLabel>
                 <FormControl>
                     <Input type="text" placeholder="billing" v-bind="componentField" />
                 </FormControl>

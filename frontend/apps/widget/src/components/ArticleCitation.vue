@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { BookOpen } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
@@ -11,7 +11,7 @@ defineProps({
   href: { type: String, required: true }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const open = ref(false)
 const articleLink = ref(null)
 let hoverOpened = false
@@ -73,7 +73,7 @@ onBeforeUnmount(cancelClose)
     >
       <span class="flex items-center gap-1 text-muted-foreground">
         <BookOpen class="h-3 w-3" aria-hidden="true" />
-        {{ t('globals.terms.helpCenterArticle') }}
+        {{ i18n.ngettext('Help center article', 'Help center articles', 1) }}
       </span>
       <Button
         ref="articleLink"

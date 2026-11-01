@@ -1,13 +1,15 @@
+
+
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
 import TableDate from '@main/components/table/TableDate.vue'
 
-export const createOutgoingEmailTableColumns = (t) => [
+export const createOutgoingEmailTableColumns = (i18n) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t('globals.terms.name'))
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
     },
     cell: function ({ row }) {
       return h('div', null,
@@ -25,7 +27,7 @@ export const createOutgoingEmailTableColumns = (t) => [
     accessorKey: 'is_default',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.default')),
+    header: () => h('div', null, i18n._('Default')),
     cell: ({ row }) => {
       const isDefault = row.getValue('is_default')
 
@@ -43,7 +45,7 @@ export const createOutgoingEmailTableColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })
@@ -67,11 +69,11 @@ export const createOutgoingEmailTableColumns = (t) => [
 ]
 
 
-export const createEmailNotificationTableColumns = (t) => [
+export const createEmailNotificationTableColumns = (i18n) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t('globals.terms.name'))
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}'))
     },
     cell: function ({ row }) {
       return h('div', null,
@@ -91,7 +93,7 @@ export const createEmailNotificationTableColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })

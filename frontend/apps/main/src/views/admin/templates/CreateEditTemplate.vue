@@ -20,11 +20,11 @@ import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useEmitter } from '../../../composables/useEmitter'
 
 const template = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
@@ -45,10 +45,10 @@ const submitForm = async (values) => {
     let toastDescription = ''
     if (props.id) {
       await api.updateTemplate(props.id, values)
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
     } else {
       await api.createTemplate(values)
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
       router.push({ name: 'template-list' })
       emitter.emit(EMITTER_EVENTS.REFRESH_LIST, {
         model: 'templates'
@@ -68,11 +68,11 @@ const submitForm = async (values) => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? i18n._('Edit') : i18n.pgettext('New message template', 'New')
 }
 
 const breadcrumbLinks = [
-  { path: 'template-list', label: t('globals.terms.template') },
+  { path: 'template-list', label: i18n._('{count, plural, one {Template} other {Templates}}') },
   { path: '', label: breadCrumLabel() }
 ]
 

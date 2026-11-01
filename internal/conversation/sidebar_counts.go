@@ -79,7 +79,7 @@ func (c *Manager) fillStandardSidebarCounts(ctx context.Context, out *models.Sid
 
 	if err := c.q.GetSidebarStandardCounts.GetContext(ctx, &row, userID); err != nil {
 		c.lo.Error("error fetching sidebar standard counts", "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	if slices.Contains(permissions, authzModels.PermConversationsReadAssigned) {
@@ -107,7 +107,7 @@ func (c *Manager) getViewCounts(ctx context.Context, userID int, teamIDs []int, 
 	query, qArgs, err := c.makeViewCountsQuery(userID, teamIDs, listTypes, views)
 	if err != nil {
 		c.lo.Error("error making view counts query", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	var rows []struct {
@@ -116,7 +116,7 @@ func (c *Manager) getViewCounts(ctx context.Context, userID int, teamIDs []int, 
 	}
 	if err := c.db.SelectContext(ctx, &rows, query, qArgs...); err != nil {
 		c.lo.Error("error fetching view counts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, c.i18n.Get("Something went wrong"), nil)
 	}
 
 	for _, row := range rows {

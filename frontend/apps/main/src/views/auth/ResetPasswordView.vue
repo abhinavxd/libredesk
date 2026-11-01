@@ -4,15 +4,15 @@
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="ui-display-heading">{{
-            t('auth.resetPassword')
+            i18n._('Reset password')
           }}</CardTitle>
-          <p class="text-sm text-muted-foreground">{{ t('auth.enterEmailForReset') }}</p>
+          <p class="text-sm text-muted-foreground">{{ i18n._('Enter your email to receive a password reset link.') }}</p>
         </div>
 
         <form @submit.prevent="requestResetAction" novalidate class="space-y-3">
           <div class="space-y-2">
             <Label for="email" class="text-muted-foreground">{{
-              t('globals.terms.email')
+              i18n.ngettext('Email', 'Emails', 1)
             }}</Label>
             <Input
               id="email"
@@ -32,9 +32,9 @@
               <div
                 class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
               ></div>
-              {{ t('globals.messages.sending') }}
+              {{ i18n._('Sending...') }}
             </span>
-            <span v-else>{{ t('auth.sendResetLink') }}</span>
+            <span v-else>{{ i18n._('Send Reset Link') }}</span>
           </Button>
         </form>
 
@@ -50,7 +50,7 @@
             to="/"
             class="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            {{ t('auth.backToLogin') }}
+            {{ i18n._('Back to login') }}
           </router-link>
         </div>
       </CardContent>
@@ -72,11 +72,11 @@ import { Input } from '@shared-ui/components/ui/input'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { Label } from '@shared-ui/components/ui/label'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 
 const errorMessage = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const submitted = ref(false)
 const emitter = useEmitter()
@@ -87,7 +87,7 @@ const resetForm = ref({
 
 const validateForm = () => {
   if (!validateEmail(resetForm.value.email)) {
-    errorMessage.value = t('validation.invalidEmail')
+    errorMessage.value = i18n._('Invalid email address')
     applyTemporaryClass('reset-password-container', 'animate-shake')
     return false
   }
@@ -106,7 +106,7 @@ const requestResetAction = async () => {
       email: resetForm.value.email
     })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('auth.checkEmailForReset')
+      description: i18n._('Check your email for the password reset link.')
     })
     router.push({ name: 'login' })
   } catch (err) {
@@ -126,7 +126,7 @@ const emailHasError = computed(() => {
 })
 
 watch(emailHasError, (hasError) => {
-  if (!hasError && errorMessage.value === t('validation.invalidEmail')) {
+  if (!hasError && errorMessage.value === i18n._('Invalid email address')) {
     errorMessage.value = ''
   }
 })

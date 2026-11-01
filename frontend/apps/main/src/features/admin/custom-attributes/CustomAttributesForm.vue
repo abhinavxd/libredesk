@@ -3,7 +3,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -14,7 +14,7 @@
 
       <FormField v-slot="{ componentField }" name="key">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.key') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Key', 'Keys', 1) }}</FormLabel>
           <FormControl>
             <Input
               type="text"
@@ -29,7 +29,7 @@
 
       <FormField v-slot="{ componentField }" name="applies_to">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.appliesTo') }}</FormLabel>
+          <FormLabel>{{ i18n._('Applies to') }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField" :modelValue="componentField.modelValue">
               <SelectTrigger>
@@ -38,10 +38,10 @@
               <SelectContent>
                 <SelectGroup>
                   <SelectItem value="contact">
-                    {{ $t('globals.terms.contact') }}
+                    {{ i18n.ngettext('Contact', 'Contacts', 1) }}
                   </SelectItem>
                   <SelectItem value="conversation">
-                    {{ $t('globals.terms.conversation') }}
+                    {{ i18n.ngettext('Conversation', 'Conversations', 1) }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -54,7 +54,7 @@
 
       <FormField v-slot="{ componentField }" name="data_type">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.type') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Type', 'Types', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField" :disabled="!!(form.values.id && form.values.id > 0)">
               <SelectTrigger>
@@ -79,7 +79,7 @@
 
       <FormField v-slot="{ componentField }" name="description">
         <FormItem class="col-span-full">
-          <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Description', 'Descriptions', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
@@ -92,7 +92,7 @@
     <FormField name="values" v-slot="{ componentField, handleChange }">
       <FormItem v-show="form.values.data_type === 'list'">
         <FormLabel>
-          {{ $t('globals.terms.listValues') }}
+          {{ i18n._('List values') }}
         </FormLabel>
         <FormControl>
           <TagsInput :modelValue="componentField.modelValue" @update:modelValue="handleChange">
@@ -112,13 +112,13 @@
       <FormField name="regex" v-slot="{ componentField }">
         <FormItem v-show="form.values.data_type === 'text'">
           <FormLabel>
-            {{ $t('globals.terms.regex') }} ({{ $t('globals.terms.optional') }})
+            {{ i18n.ngettext('Regex', 'Regexes', 1) }} ({{ i18n.ngettext('Optional', 'Optionals', 1) }})
           </FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
           <FormDescription>
-            {{ $t('admin.customAttributes.regex.description') }} e.g. ^[a-zA-Z]*$</FormDescription
+            {{ i18n._('Regex to validate the value of this custom attribute. Leave empty to skip validation.') }} e.g. ^[a-zA-Z]*$</FormDescription
           >
           <FormMessage />
         </FormItem>
@@ -127,13 +127,13 @@
       <FormField name="regex_hint" v-slot="{ componentField }">
         <FormItem v-show="form.values.data_type === 'text'">
           <FormLabel>
-            {{ $t('globals.terms.regexHint') }} ({{ $t('globals.terms.optional') }})
+            {{ i18n._('Regex hint') }} ({{ i18n.ngettext('Optional', 'Optionals', 1) }})
           </FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
           <FormDescription>
-            {{ $t('admin.customAttributes.regexHint.description') }}
+            {{ i18n._('Regex pattern hint.') }}
           </FormDescription>
           <FormMessage />
         </FormItem>

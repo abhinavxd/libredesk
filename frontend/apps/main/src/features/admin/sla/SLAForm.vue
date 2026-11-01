@@ -3,7 +3,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -13,7 +13,7 @@
 
       <FormField v-slot="{ componentField }" name="description">
         <FormItem>
-          <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Description', 'Descriptions', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -25,7 +25,7 @@
       <FormGrid class="sla-duration-grid">
         <FormField v-slot="{ componentField }" name="first_response_time">
           <FormItem>
-            <FormLabel>{{ t('admin.sla.firstResponseTime') }}</FormLabel>
+            <FormLabel>{{ i18n._('First response time') }}</FormLabel>
             <FormControl>
               <Input type="text" placeholder="6h" v-bind="componentField" />
             </FormControl>
@@ -35,7 +35,7 @@
 
         <FormField v-slot="{ componentField }" name="resolution_time">
           <FormItem>
-            <FormLabel>{{ t('admin.sla.resolutionTime') }}</FormLabel>
+            <FormLabel>{{ i18n._('Resolution time') }}</FormLabel>
             <FormControl>
               <Input type="text" placeholder="24h" v-bind="componentField" />
             </FormControl>
@@ -45,7 +45,7 @@
 
         <FormField v-slot="{ componentField }" name="next_response_time">
           <FormItem>
-            <FormLabel>{{ t('admin.sla.nextResponseTime') }}</FormLabel>
+            <FormLabel>{{ i18n._('Next response time') }}</FormLabel>
             <FormControl>
               <Input type="text" placeholder="30m" v-bind="componentField" />
             </FormControl>
@@ -54,7 +54,7 @@
         </FormField>
       </FormGrid>
       <p :id="durationHintId" class="ui-description">
-        {{ t('globals.messages.golangDurationHoursMinutes') }}
+        {{ i18n._('Duration in hours or minutes. Example: 1h, 30m, 1h30m') }}
       </p>
     </fieldset>
 
@@ -63,20 +63,20 @@
       <div class="flex flex-wrap items-start justify-between gap-3 pb-3 border-b">
         <div class="space-y-1">
           <h3 class="ui-heading">
-            {{ t('admin.sla.alertConfiguration') }}
+            {{ i18n._('Alert configuration') }}
           </h3>
           <p class="ui-description">
-            {{ t('admin.sla.alertConfiguration.description') }}
+            {{ i18n._('Set up alert triggers and recipients') }}
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" @click="addNotification('breach')">
             <Plus class="w-4 h-4" />
-            {{ t('admin.sla.addBreachAlert') }}
+            {{ i18n._('Add breach alert') }}
           </Button>
           <Button type="button" variant="outline" size="sm" @click="addNotification('warning')">
             <Plus class="w-4 h-4" />
-            {{ t('admin.sla.addWarningAlert') }}
+            {{ i18n._('Add warning alert') }}
           </Button>
         </div>
       </div>
@@ -110,7 +110,7 @@
               <div class="min-w-0 space-y-1">
                 <h4 class="ui-subheading">
                   {{
-                    notification.type === 'warning' ? t('admin.sla.warning') : t('admin.sla.breach')
+                    notification.type === 'warning' ? i18n.pgettext('SLA warning threshold', 'Warning') : i18n._('Breach')
                   }}
                 </h4>
               </div>
@@ -119,7 +119,7 @@
               type="button"
               variant="ghost"
               size="icon"
-              :aria-label="t('globals.terms.remove')"
+              :aria-label="i18n._('Remove')"
               @click.prevent="removeNotification(index)"
               class="h-8 w-8 shrink-0 text-muted-foreground"
             >
@@ -131,23 +131,23 @@
               <div class="min-w-0 space-y-5">
                 <FormField :name="`notifications.${index}.metric`" v-slot="{ componentField }">
                   <FormItem>
-                    <FormLabel>{{ t('globals.terms.slaMetric') }}</FormLabel>
+                    <FormLabel>{{ i18n.ngettext('SLA metric', 'SLA metrics', 1) }}</FormLabel>
                     <FormControl>
                       <Select v-bind="componentField">
                         <SelectTrigger>
-                          <SelectValue :placeholder="t('sla.selectMetric')" />
+                          <SelectValue :placeholder="i18n._('Select SLA metric')" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem value="all">{{ t('globals.messages.all') }}</SelectItem>
+                            <SelectItem value="all">{{ i18n._('All') }}</SelectItem>
                             <SelectItem value="first_response">{{
-                              t('admin.sla.firstResponseTime')
+                              i18n._('First response time')
                             }}</SelectItem>
                             <SelectItem value="next_response">{{
-                              t('admin.sla.nextResponseTime')
+                              i18n._('Next response time')
                             }}</SelectItem>
                             <SelectItem value="resolution">{{
-                              t('admin.sla.resolutionTime')
+                              i18n._('Resolution time')
                             }}</SelectItem>
                           </SelectGroup>
                         </SelectContent>
@@ -161,15 +161,15 @@
                   v-slot="{ componentField, handleChange, meta }"
                 >
                   <FormItem>
-                    <FormLabel>{{ t('admin.sla.alertRecipients') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Alert recipients') }}</FormLabel>
                     <FormControl>
                       <SelectAgentCombobox
                         multiple
                         exclude-ai-assistants
                         :prepend-items="[
-                          { label: t('admin.sla.assignedUser'), value: 'assigned_user' }
+                          { label: i18n._('Assigned user'), value: 'assigned_user' }
                         ]"
-                        :placeholder="t('globals.messages.startTypingToSearch')"
+                        :placeholder="i18n._('Start typing to search...')"
                         :model-value="componentField.modelValue"
                         @update:model-value="(value) => handleChange(value, meta.validated)"
                       />
@@ -185,7 +185,7 @@
                   v-slot="{ componentField }"
                 >
                   <FormItem>
-                    <FormLabel>{{ t('admin.sla.triggerTiming') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Trigger timing') }}</FormLabel>
                     <FormControl>
                       <Select v-bind="componentField">
                         <SelectTrigger>
@@ -194,10 +194,10 @@
                         <SelectContent>
                           <SelectGroup>
                             <SelectItem value="immediately">{{
-                              t('admin.sla.immediatelyOnBreach')
+                              i18n._('Immediately on breach')
                             }}</SelectItem>
                             <SelectItem value="after">{{
-                              t('admin.sla.afterSpecificDuration')
+                              i18n._('After specific duration')
                             }}</SelectItem>
                           </SelectGroup>
                         </SelectContent>
@@ -215,8 +215,8 @@
                     <FormLabel>
                       {{
                         notification.type === 'warning'
-                          ? t('admin.sla.advanceWarning')
-                          : t('admin.sla.followUpDelay')
+                          ? i18n._('Advance warning')
+                          : i18n._('Follow up delay')
                       }}
                     </FormLabel>
                     <FormControl>
@@ -243,7 +243,7 @@
         class="flex flex-col items-center justify-center p-8 space-y-3 rounded-md bg-muted/30 border border-dashed"
       >
         <Bell class="w-8 h-8 text-muted-foreground" />
-        <p class="ui-description">{{ t('admin.sla.noAlertsConfigured') }}</p>
+        <p class="ui-description">{{ i18n._('No alerts configured') }}</p>
       </div>
     </div>
 
@@ -277,7 +277,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
 import { Input } from '@shared-ui/components/ui/input'
 
@@ -305,13 +305,13 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.initialValues.id ? t('globals.messages.save') : t('globals.messages.create'))
+    (props.initialValues.id ? i18n._('Save') : i18n._('Create'))
   )
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     name: '',
     description: '',

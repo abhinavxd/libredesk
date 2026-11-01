@@ -1,16 +1,17 @@
+
+
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import TeamDataTableDropdown from '@/features/admin/teams/TeamDataTableDropdown.vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { getI18n } from '@/i18n'
 
-const t = () => getI18n().global.t
-
 export const columns = [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', null, t()('globals.terms.name', 1))
+      const i18n = getI18n().global
+      return h('div', null, i18n._('{count, plural, one {Name} other {Names}}', 1))
     },
     cell: function ({ row }) {
       const emoji = row.original.emoji
@@ -29,7 +30,8 @@ export const columns = [
     accessorKey: 'created_at',
     meta: { compact: true },
     header: function () {
-      return h('div', null, t()('globals.terms.createdAt'))
+      const i18n = getI18n().global
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })
@@ -39,7 +41,8 @@ export const columns = [
     accessorKey: 'updated_at',
     meta: { compact: true },
     header: function () {
-      return h('div', null, t()('globals.terms.updatedAt'))
+      const i18n = getI18n().global
+      return h('div', null, i18n._('Updated at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('updated_at') })

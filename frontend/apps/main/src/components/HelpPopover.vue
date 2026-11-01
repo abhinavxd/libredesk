@@ -6,7 +6,7 @@
         variant="ghost"
         size="icon"
         class="size-7 text-muted-foreground"
-        :aria-label="$t('globals.terms.help')"
+        :aria-label="i18n._('Help')"
       >
         <CircleHelp aria-hidden="true" />
       </Button>
@@ -21,6 +21,9 @@
 import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { CircleHelp } from 'lucide-vue-next'
+import { useI18n } from '@shared-ui/i18n'
+
+const i18n = useI18n()
 
 defineProps({
   text: {

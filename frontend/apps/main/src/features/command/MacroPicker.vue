@@ -24,7 +24,7 @@
             </div>
             <div v-else-if="replyContent" class="space-y-2">
               <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {{ $t('command.replyPreview') }}
+                {{ i18n._('Reply Preview') }}
               </p>
               <Letter
                 :key="highlightedMacro?.value"
@@ -36,7 +36,7 @@
 
             <div v-if="otherActions.length > 0" class="space-y-2">
               <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {{ $t('globals.terms.action', 2) }}
+                {{ i18n.ngettext('Action', 'Actions', 2) }}
               </p>
               <div class="grid gap-2 sm:grid-cols-2">
                 <div
@@ -59,7 +59,7 @@
               class="flex min-h-40 flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/20"
             >
               <p class="text-sm text-muted-foreground">
-                {{ $t('command.selectAMacro') }}
+                {{ i18n._('Select a macro to view details') }}
               </p>
             </div>
           </div>
@@ -70,11 +70,13 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
+
 const MACRO_VALUE_PREFIX = 'macro.'
 const CONTENT_PREVIEW_DELAY = 150
 
 import { computed, ref, watch, onUnmounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useDebounceFn } from '@vueuse/core'
 import { Letter } from 'vue-letter'
 import { Users, User, Pin, Rocket, Tags } from 'lucide-vue-next'
@@ -101,7 +103,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['applied'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const conversationStore = useConversationStore()
 const macroStore = useMacroStore()
@@ -151,19 +153,19 @@ const otherActions = computed(
     ) || []
 )
 
-const ACTION_LABEL_KEYS = {
-  assign_user: 'actions.assignAgent',
-  assign_team: 'actions.assignTeam',
-  set_status: 'actions.setStatus',
-  set_priority: 'actions.setPriority',
-  add_tags: 'actions.addTags',
-  set_tags: 'actions.setTags',
-  remove_tags: 'actions.removeTags'
+const ACTION_MESSAGES = {
+  assign_user: msg({ message: 'Assign agent' }),
+  assign_team: msg({ message: 'Assign team' }),
+  set_status: msg({ message: 'Set status' }),
+  set_priority: msg({ message: 'Set priority' }),
+  add_tags: msg({ message: 'Add tags' }),
+  set_tags: msg({ message: 'Set tags' }),
+  remove_tags: msg({ message: 'Remove tags' })
 }
 
 const actionLabel = (action) => {
   const values = action.display_value.length > 0 ? action.display_value : action.value
-  return `${t(ACTION_LABEL_KEYS[action.type])}: ${values.join(', ')}`
+  return `${i18n._(ACTION_MESSAGES[action.type])}: ${values.join(', ')}`
 }
 
 const onSelect = async (event, macro) => {

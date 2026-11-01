@@ -2,7 +2,7 @@
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle>{{ t('navigation.keyboardShortcuts') }}</DialogTitle>
+        <DialogTitle>{{ i18n._('Keyboard shortcuts') }}</DialogTitle>
       </DialogHeader>
       <div class="mt-2 space-y-6">
         <div v-for="group in groups" :key="group.title" class="space-y-3">
@@ -35,7 +35,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared-ui/components/ui/dialog'
 
 defineProps({
@@ -46,7 +46,7 @@ defineProps({
 })
 defineEmits(['update:open'])
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const mod = isMac ? '⌘' : 'Ctrl'
@@ -54,37 +54,37 @@ const alt = isMac ? '⌥' : 'Alt'
 
 const groups = computed(() => [
   {
-    title: t('globals.terms.general'),
+    title: i18n._('General'),
     items: [
-      { label: t('shortcuts.openCommandBar'), keys: [mod, 'K'] },
-      { label: t('navigation.keyboardShortcuts'), keys: [mod, '/'] },
-      { label: t('conversation.newConversation'), keys: [alt, 'C'] }
+      { label: i18n._('Open command bar'), keys: [mod, 'K'] },
+      { label: i18n._('Keyboard shortcuts'), keys: [mod, '/'] },
+      { label: i18n._('New conversation'), keys: [alt, 'C'] }
     ]
   },
   {
-    title: t('globals.terms.conversation', 2),
+    title: i18n._('{count, plural, one {Conversation} other {Conversations}}', 2),
     items: [
-      { label: t('shortcuts.previousConversation'), keys: [alt, 'J'] },
-      { label: t('shortcuts.nextConversation'), keys: [alt, 'K'] },
-      { label: t('globals.terms.snooze'), keys: [alt, 'Z'] },
-      { label: t('actions.setPriority'), keys: [alt, 'P'] },
-      { label: t('actions.assignAgent'), keys: [alt, 'A'] },
-      { label: t('command.switchToReply'), keys: [alt, 'R'] },
-      { label: t('command.switchToPrivateNote'), keys: [alt, 'N'] },
-      { label: t('conversation.bulkActions.selectConversation'), keys: [alt, 'X'] },
-      { label: t('globals.terms.resolve'), keys: [alt, 'E'] },
-      { label: t('globals.terms.reopen'), keys: [alt, 'O'] }
+      { label: i18n._('Previous conversation'), keys: [alt, 'J'] },
+      { label: i18n._('Next conversation'), keys: [alt, 'K'] },
+      { label: i18n._('Snooze'), keys: [alt, 'Z'] },
+      { label: i18n._('Set priority'), keys: [alt, 'P'] },
+      { label: i18n._('Assign agent'), keys: [alt, 'A'] },
+      { label: i18n._('Switch to reply'), keys: [alt, 'R'] },
+      { label: i18n._('Switch to private note'), keys: [alt, 'N'] },
+      { label: i18n._('Select conversation'), keys: [alt, 'X'] },
+      { label: i18n._('Resolve'), keys: [alt, 'E'] },
+      { label: i18n._('Reopen'), keys: [alt, 'O'] }
     ]
   },
   {
-    title: t('shortcuts.replyEditor'),
+    title: i18n._('Reply editor'),
     items: [
-      { label: t('actions.openMacros'), keys: [mod, 'M'] },
-      { label: t('shortcuts.toggleReplyType'), keys: [mod, 'P'] },
-      { label: t('shortcuts.minimizeReplyBox'), keys: [alt, 'M'] },
-      { label: t('actions.sendReply'), keys: ['Ctrl', 'Enter'] },
-      { label: t('globals.terms.bold'), keys: [mod, 'B'] },
-      { label: t('globals.terms.italic'), keys: [mod, 'I'] }
+      { label: i18n._('Open macros'), keys: [mod, 'M'] },
+      { label: i18n._('Switch between reply and private note'), keys: [mod, 'P'] },
+      { label: i18n._('Minimize reply box'), keys: [alt, 'M'] },
+      { label: i18n._('Send reply'), keys: ['Ctrl', 'Enter'] },
+      { label: i18n._('Bold'), keys: [mod, 'B'] },
+      { label: i18n._('Italic'), keys: [mod, 'I'] }
     ]
   }
 ])

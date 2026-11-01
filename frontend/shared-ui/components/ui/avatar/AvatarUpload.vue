@@ -41,7 +41,7 @@
     <Dialog :open="showCropper" @update:open="!$event && closeCropper()">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle class="text-xl">{{ t('account.cropAvatar') }}</DialogTitle>
+          <DialogTitle class="text-xl">{{ i18n._('Crop avatar') }}</DialogTitle>
           <DialogDescription />
         </DialogHeader>
 
@@ -58,9 +58,9 @@
 
         <DialogFooter class="sm:justify-end">
           <Button type="button" variant="secondary" @click="closeCropper">
-            {{ t('globals.messages.cancel') }}
+            {{ i18n._('Cancel') }}
           </Button>
-          <Button type="button" @click="applyCrop">{{ t('globals.messages.save') }}</Button>
+          <Button type="button" @click="applyCrop">{{ i18n._('Save') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -69,7 +69,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Avatar, AvatarImage, AvatarFallback } from '.'
 import { X } from 'lucide-vue-next'
 import VuePictureCropper, { cropper } from 'vue-picture-cropper'
@@ -97,7 +97,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['upload', 'remove'])
-const { t } = useI18n()
+const i18n = useI18n()
 const fileInput = ref(null)
 const showCropper = ref(false)
 const cropSource = ref('')

@@ -16,13 +16,13 @@ const urlRe = /^(?:https?:\/\/[^"'()\s\\<>;{}]+|\/(?!\/)[^"'()\s\\<>;{}]*)$/
 // Mirrors hexColorRe on the backend, which discards anything else on save.
 const hexColorRe = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
 
-export const createHelpCenterBasicsSchema = (t) =>
-  createBaseSchema(t).pick({ name: true, slug: true, page_title: true, template: true })
+export const createHelpCenterBasicsSchema = (i18n) =>
+  createBaseSchema(i18n).pick({ name: true, slug: true, page_title: true, template: true })
 
-export const createHelpCenterFormSchema = (t) =>
-  createBaseSchema(t)
+export const createHelpCenterFormSchema = (i18n) =>
+  createBaseSchema(i18n)
     .refine((v) => v.allowed_locales.includes(v.default_locale), {
-      message: t('helpCenter.defaultLocaleNotAllowed'),
+      message: i18n._('The default language is not in the help center\'\'s languages. Add it to the list or pick another default.'),
       path: ['default_locale']
     })
     // The banner is dropped on save when its text is blank, taking any link with it.
@@ -33,30 +33,30 @@ export const createHelpCenterFormSchema = (t) =>
         return !a.link_label?.trim() && !a.link_url?.trim()
       },
       {
-        message: t('helpCenter.announcementTextRequired'),
+        message: i18n._('The announcement needs text. A link on its own is not shown.'),
         path: ['theme', 'announcement', 'text']
       }
     )
 
-const createBaseSchema = (t) => {
+const createBaseSchema = (i18n) => {
   const optionalURL = z
     .string()
-    .refine((v) => !v || urlRe.test(v), t('helpCenter.invalidURL'))
+    .refine((v) => !v || urlRe.test(v), i18n._('Enter a full URL starting with https:// or a path starting with /.'))
     .optional()
 
   const optionalHexColor = z
     .string()
-    .refine((v) => !v || hexColorRe.test(v), t('validation.invalidColor'))
+    .refine((v) => !v || hexColorRe.test(v), i18n._('Invalid color'))
     .optional()
 
   const linkArray = z
     .array(
       z.object({
-        label: z.string().min(1, t('globals.messages.required')),
+        label: z.string().min(1, i18n._('{name} Required')),
         url: z
           .string()
-          .min(1, t('globals.messages.required'))
-          .regex(urlRe, t('helpCenter.invalidURL'))
+          .min(1, i18n._('{name} Required'))
+          .regex(urlRe, i18n._('Enter a full URL starting with https:// or a path starting with /.'))
       })
     )
     .optional()
@@ -65,35 +65,35 @@ const createBaseSchema = (t) => {
     name: z
       .string()
       .trim()
-      .min(1, t('globals.messages.required'))
-      .refine(withinLength(MAX_NAME), t('globals.messages.maxLength', { max: MAX_NAME })),
+      .min(1, i18n._('{name} Required'))
+      .refine(withinLength(MAX_NAME), i18n._('Must be at most {max} characters', { max: MAX_NAME })),
     slug: z
       .string()
       .trim()
-      .min(1, t('globals.messages.required'))
-      .max(200, t('helpCenter.invalidSlug'))
-      .regex(/^[a-z0-9_-]+$/, t('helpCenter.invalidSlug')),
+      .min(1, i18n._('{name} Required'))
+      .max(200, i18n._('This slug is not allowed. Use a different slug.'))
+      .regex(/^[a-z0-9_-]+$/, i18n._('This slug is not allowed. Use a different slug.')),
     page_title: z
       .string()
       .trim()
-      .min(1, t('globals.messages.required'))
+      .min(1, i18n._('{name} Required'))
       .refine(
         withinLength(MAX_PAGE_TITLE),
-        t('globals.messages.maxLength', { max: MAX_PAGE_TITLE })
+        i18n._('Must be at most {max} characters', { max: MAX_PAGE_TITLE })
       ),
     template: z.enum(['docs', 'classic']).default('classic'),
     meta_description: z
       .string()
       .refine(
         withinLength(MAX_META_DESCRIPTION),
-        t('globals.messages.maxLength', { max: MAX_META_DESCRIPTION })
+        i18n._('Must be at most {max} characters', { max: MAX_META_DESCRIPTION })
       )
       .optional(),
     custom_domain: z
       .string()
       .refine(
         (v) => !v || /^https?:\/\/[^"'()\s\\<>;{}/]+$/.test(v),
-        t('helpCenter.invalidCustomDomain')
+        i18n._('Enter the domain\'\'s root URL starting with https://, with no path or trailing slash, e.g. https://help.example.com.')
       )
       .optional(),
     livechat_inbox_id: z.string().optional(),
@@ -101,17 +101,17 @@ const createBaseSchema = (t) => {
     custom_js: z.string().optional(),
     default_locale: z
       .string()
-      .min(1, t('globals.messages.required'))
-      .regex(localeRe, t('helpCenter.invalidLocale'))
+      .min(1, i18n._('{name} Required'))
+      .regex(localeRe, i18n._('Invalid language code. Use a code like en or en-US.'))
       .default('en'),
     allowed_locales: z
       .array(
         z
           .string()
-          .min(1, t('globals.messages.required'))
-          .regex(localeRe, t('helpCenter.invalidLocale'))
+          .min(1, i18n._('{name} Required'))
+          .regex(localeRe, i18n._('Invalid language code. Use a code like en or en-US.'))
       )
-      .min(1, t('globals.messages.required'))
+      .min(1, i18n._('{name} Required'))
       .default(['en']),
     theme: z
       .object({
@@ -171,11 +171,11 @@ const createBaseSchema = (t) => {
         social_links: z
           .array(
             z.object({
-              platform: z.string().min(1, t('globals.messages.required')),
+              platform: z.string().min(1, i18n._('{name} Required')),
               url: z
                 .string()
-                .min(1, t('globals.messages.required'))
-                .regex(urlRe, t('helpCenter.invalidURL'))
+                .min(1, i18n._('{name} Required'))
+                .regex(urlRe, i18n._('Enter a full URL starting with https:// or a path starting with /.'))
             })
           )
           .optional(),

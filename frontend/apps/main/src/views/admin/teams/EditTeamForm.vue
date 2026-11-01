@@ -21,9 +21,9 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const team = ref({})
 const emitter = useEmitter()
@@ -31,8 +31,8 @@ const formLoading = ref(false)
 const isLoading = ref(false)
 
 const breadcrumbLinks = [
-  { path: 'team-list', label: t('globals.terms.team', 2) },
-  { path: '', label: t('globals.messages.edit') }
+  { path: 'team-list', label: i18n._('{count, plural, one {Team} other {Teams}}', 2) },
+  { path: '', label: i18n._('Edit') }
 ]
 
 const props = defineProps({
@@ -51,7 +51,7 @@ const updateTeam = async (payload) => {
     formLoading.value = true
     await api.updateTeam(team.value.id, payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

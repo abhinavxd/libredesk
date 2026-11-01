@@ -10,15 +10,15 @@
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="flex items-center gap-3">
             <span class="text-sm text-muted-foreground">
-              {{ $t('globals.terms.lastUpdated') }}: {{ lastUpdateFormatted }}
+              {{ i18n._('Last updated') }}: {{ lastUpdateFormatted }}
             </span>
             <template v-if="autoRefreshPaused">
               <Separator orientation="vertical" class="h-4" />
               <span class="text-sm text-muted-foreground">{{
-                $t('report.autoRefreshPaused')
+                i18n._('Auto-refresh paused')
               }}</span>
               <Button size="sm" variant="outline" :disabled="isLoading" @click="manualRefresh">
-                {{ $t('globals.terms.refresh') }}
+                {{ i18n._('Refresh') }}
               </Button>
             </template>
           </div>
@@ -31,7 +31,7 @@
               :disabled="isLoading"
               @click="selectRange(option)"
             >
-              {{ $t('globals.messages.nDays', { days: option }) }}
+              {{ i18n._('{days} days', { days: option }) }}
             </Button>
             <Separator orientation="vertical" class="h-6 mx-1" />
             <Button
@@ -40,12 +40,12 @@
               :disabled="isLoading"
               @click="enableCustom"
             >
-              {{ $t('globals.terms.custom') }}
+              {{ i18n._('Custom') }}
             </Button>
             <Input
               v-if="isCustom"
               v-model="customDays"
-              :aria-label="$t('report.customRangeDays')"
+              :aria-label="i18n._('Custom range in days')"
               type="number"
               min="1"
               max="365"
@@ -61,14 +61,14 @@
         <div :class="REPORT_ROW_CLASS">
           <Card
             class="flex-1"
-            :title="$t('report.openConversations')"
+            :title="i18n._('Open conversations')"
             :counts="cardCounts"
             :labels="conversationCountLabels"
             size="large"
           />
           <Card
             class="flex-1"
-            :title="$t('report.agentStatus')"
+            :title="i18n._('Agent status')"
             :counts="agentStatusCounts"
             :labels="agentStatusLabels"
             size="large"
@@ -79,52 +79,52 @@
         <div :class="REPORT_ROW_CLASS">
           <!-- CSAT Card -->
           <div class="flex-1 box p-5">
-            <p class="ui-heading mb-4">{{ $t('report.csat.cardTitle') }}</p>
+            <p class="ui-heading mb-4">{{ i18n._('Customer satisfaction') }}</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{ formatRating(csatData.average_rating) }}</span>
-                <span class="metric-label">{{ $t('report.csat.avgRating') }}</span>
+                <span class="metric-label">{{ i18n._('Avg Rating') }}</span>
               </div>
               <div class="metric-item">
                 <span class="metric-value">{{ formatPercent(csatData.response_rate) }}</span>
-                <span class="metric-label">{{ $t('report.csat.responseRate') }}</span>
+                <span class="metric-label">{{ i18n._('Response Rate') }}</span>
               </div>
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(csatData.total_responses || 0)
                 }}</span>
-                <span class="metric-label">{{ $t('report.csat.responses') }}</span>
+                <span class="metric-label">{{ i18n._('Responses') }}</span>
               </div>
             </div>
           </div>
 
           <!-- Message Volume Card -->
           <div class="flex-1 box p-5">
-            <p class="ui-heading mb-4">{{ $t('report.messages.cardTitle') }}</p>
+            <p class="ui-heading mb-4">{{ i18n._('Message volume') }}</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(messageVolumeData.total_messages || 0)
                 }}</span>
-                <span class="metric-label">{{ $t('report.messages.total') }}</span>
+                <span class="metric-label">{{ i18n._('Total') }}</span>
               </div>
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(messageVolumeData.incoming_messages || 0)
                 }}</span>
-                <span class="metric-label">{{ $t('report.messages.incoming') }}</span>
+                <span class="metric-label">{{ i18n._('Incoming') }}</span>
               </div>
               <div class="metric-item">
                 <span class="metric-value">{{
                   formatCompactNumber(messageVolumeData.outgoing_messages || 0)
                 }}</span>
-                <span class="metric-label">{{ $t('report.messages.outgoing') }}</span>
+                <span class="metric-label">{{ i18n._('Outgoing') }}</span>
               </div>
               <div class="metric-item">
                 <span class="metric-value">{{
                   messageVolumeData.messages_per_conversation || 0
                 }}</span>
-                <span class="metric-label">{{ $t('report.messages.perConversation') }}</span>
+                <span class="metric-label">{{ i18n._('Per Conversation') }}</span>
               </div>
             </div>
           </div>
@@ -132,99 +132,99 @@
 
         <!-- Row 3: SLA Card with Compliance Percentages -->
         <div class="w-full box p-5">
-          <p class="ui-heading mb-4">{{ $t('report.sla.cardTitle') }}</p>
+          <p class="ui-heading mb-4">{{ i18n._('SLA performance') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- First Response -->
             <div class="space-y-4">
-              <p class="ui-subheading text-center">{{ $t('report.sla.firstResponse') }}</p>
+              <p class="ui-subheading text-center">{{ i18n._('First Response') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.first_response_compliance_percent || 0 }}%</span
                 >
-                <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
+                <span class="metric-label">{{ i18n._('Compliance') }}</span>
               </div>
               <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.first_response_met_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.met') }}</p>
+                  <p class="metric-label">{{ i18n._('Met') }}</p>
                 </div>
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.first_response_breached_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.breached') }}</p>
+                  <p class="metric-label">{{ i18n._('Breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
                 <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_first_response_time_sec
                 }}</span>
-                <p class="metric-label">{{ $t('report.sla.avgFirstResp') }}</p>
+                <p class="metric-label">{{ i18n._('Avg First Response Time') }}</p>
               </div>
             </div>
 
             <!-- Next Response -->
             <div class="space-y-4 border-y py-6 md:border-y-0 md:border-x md:px-8 md:py-0">
-              <p class="ui-subheading text-center">{{ $t('report.sla.nextResponse') }}</p>
+              <p class="ui-subheading text-center">{{ i18n._('Next Response') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.next_response_compliance_percent || 0 }}%</span
                 >
-                <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
+                <span class="metric-label">{{ i18n._('Compliance') }}</span>
               </div>
               <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.next_response_met_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.met') }}</p>
+                  <p class="metric-label">{{ i18n._('Met') }}</p>
                 </div>
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.next_response_breached_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.breached') }}</p>
+                  <p class="metric-label">{{ i18n._('Breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
                 <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_next_response_time_sec
                 }}</span>
-                <p class="metric-label">{{ $t('report.sla.avgNextResp') }}</p>
+                <p class="metric-label">{{ i18n._('Avg Next Response Time') }}</p>
               </div>
             </div>
 
             <!-- Resolution -->
             <div class="space-y-4">
-              <p class="ui-subheading text-center">{{ $t('report.sla.resolution') }}</p>
+              <p class="ui-subheading text-center">{{ i18n._('Resolution') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.resolution_compliance_percent || 0 }}%</span
                 >
-                <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
+                <span class="metric-label">{{ i18n._('Compliance') }}</span>
               </div>
               <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.resolution_met_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.met') }}</p>
+                  <p class="metric-label">{{ i18n._('Met') }}</p>
                 </div>
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-destructive">{{
                     slaCounts.resolution_breached_count || 0
                   }}</span>
-                  <p class="metric-label">{{ $t('report.sla.breached') }}</p>
+                  <p class="metric-label">{{ i18n._('Breached') }}</p>
                 </div>
               </div>
               <div class="text-center pt-2">
                 <span class="text-lg font-medium tabular-nums">{{
                   formattedSlaCounts.avg_resolution_time_sec
                 }}</span>
-                <p class="metric-label">{{ $t('report.sla.avgResolution') }}</p>
+                <p class="metric-label">{{ i18n._('Avg Resolution Time') }}</p>
               </div>
             </div>
           </div>
@@ -232,13 +232,13 @@
 
         <!-- Row 4: Tag Distribution -->
         <div class="w-full box p-5">
-          <p class="ui-heading mb-4">{{ $t('report.tags.cardTitle') }}</p>
+          <p class="ui-heading mb-4">{{ i18n._('Tag distribution') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Tagged percentage metric -->
             <div class="metric-item justify-center p-4">
               <span class="metric-value">{{ tagDistributionData.tagged_percentage || 0 }}%</span>
-              <span class="metric-label mt-2">{{ $t('report.tags.tagged') }}</span>
+              <span class="metric-label mt-2">{{ i18n._('Tagged') }}</span>
               <span class="text-sm text-muted-foreground mt-1">
                 {{ tagDistributionData.tagged_conversations || 0 }} /
                 {{
@@ -250,7 +250,7 @@
 
             <!-- Top tags list -->
             <div class="space-y-3">
-              <p class="ui-subheading mb-3 text-left">{{ $t('report.tags.topTags') }}</p>
+              <p class="ui-subheading mb-3 text-left">{{ i18n._('Top Tags') }}</p>
               <div
                 v-for="tag in (tagDistributionData.top_tags || []).slice(0, 5)"
                 :key="tag.tag_id"
@@ -260,7 +260,7 @@
                 <span class="text-sm font-semibold">{{ formatCompactNumber(tag.count) }}</span>
               </div>
               <p v-if="!tagDistributionData.top_tags?.length" class="text-sm text-muted-foreground">
-                {{ $t('report.noTagsFound') }}
+                {{ i18n._('No tags found') }}
               </p>
             </div>
           </div>
@@ -268,7 +268,7 @@
 
         <!-- Row 5: Line Chart -->
         <div class="box w-full p-5">
-          <p class="ui-heading mb-4">{{ $t('report.chart.title') }}</p>
+          <p class="ui-heading mb-4">{{ i18n._('Conversation trends') }}</p>
           <LineChart :data="processedLineData" />
         </div>
       </div>
@@ -292,11 +292,11 @@ import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input'
 import { Separator } from '@shared-ui/components/ui/separator'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@main/api'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const lastUpdate = ref(new Date())
 const rangeOptions = [7, 30, 90]
@@ -406,17 +406,17 @@ const formattedSlaCounts = computed(() => ({
 const lastUpdateFormatted = computed(() => lastUpdate.value.toLocaleTimeString())
 
 const conversationCountLabels = computed(() => ({
-  open: t('globals.terms.open'),
-  awaiting_response: t('globals.terms.awaitingResponse'),
-  unassigned: t('globals.terms.unassigned'),
-  pending: t('report.awaitingFirstReply')
+  open: i18n._('Open'),
+  awaiting_response: i18n._('Awaiting Response'),
+  unassigned: i18n._('Unassigned'),
+  pending: i18n._('Awaiting First Reply')
 }))
 
 const agentStatusLabels = computed(() => ({
-  agents_online: t('globals.terms.online'),
-  agents_offline: t('globals.terms.offline'),
-  agents_away: t('globals.terms.away'),
-  agents_reassigning: t('globals.messages.reassigning')
+  agents_online: i18n._('{count, plural, one {Online} other {Online}}'),
+  agents_offline: i18n._('{count, plural, one {Offline} other {Offline}}'),
+  agents_away: i18n._('{count, plural, one {Away} other {Away}}'),
+  agents_reassigning: i18n._('Reassigning')
 }))
 
 const processedLineData = computed(() => {
@@ -427,20 +427,20 @@ const processedLineData = computed(() => {
   new_conversations.forEach((item) => {
     dateMap.set(item.date, {
       date: item.date,
-      [t('report.chart.newConversations')]: item.count,
-      [t('report.chart.resolvedConversations')]: 0
+      [i18n._('New conversations')]: item.count,
+      [i18n._('Resolved conversations')]: 0
     })
   })
 
   resolved_conversations.forEach((item) => {
     const existing = dateMap.get(item.date)
     if (existing) {
-      existing[t('report.chart.resolvedConversations')] = item.count
+      existing[i18n._('Resolved conversations')] = item.count
     } else {
       dateMap.set(item.date, {
         date: item.date,
-        [t('report.chart.newConversations')]: 0,
-        [t('report.chart.resolvedConversations')]: item.count
+        [i18n._('New conversations')]: 0,
+        [i18n._('Resolved conversations')]: item.count
       })
     }
   })

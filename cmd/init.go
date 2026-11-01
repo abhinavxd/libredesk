@@ -36,6 +36,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	whatsappChannel "github.com/abhinavxd/libredesk/internal/inbox/channel/whatsapp"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/locales"
 	"github.com/abhinavxd/libredesk/internal/macro"
 	"github.com/abhinavxd/libredesk/internal/media"
 	fs "github.com/abhinavxd/libredesk/internal/media/stores/localfs"
@@ -61,7 +62,6 @@ import (
 	whatsappTemplate "github.com/abhinavxd/libredesk/internal/whatsapp/template"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
 	kjson "github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/confmap"
@@ -71,6 +71,7 @@ import (
 	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
+	"github.com/leonelquinteros/gotext"
 	_ "github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	flag "github.com/spf13/pflag"
@@ -193,7 +194,7 @@ func initFS(staticDir string) stuffbin.FileSystem {
 			// Running in local/dev mode, use the local filesystem.
 			// Only include frontend dirs if they exist (frontend build is optional in dev).
 			colorlog.Red("binary unstuff failed, using local filesystem for static files")
-			files := []string{"i18n", "static"}
+			files := []string{"static"}
 			for _, d := range []string{"frontend/dist/main", "frontend/dist/widget"} {
 				if _, err := os.Stat(d); err == nil {
 					files = append(files, d)
@@ -277,7 +278,7 @@ func initSettings(db *sqlx.DB) *setting.Manager {
 }
 
 // initUser inits user manager.
-func initUser(i18n *i18n.I18n, DB *sqlx.DB) *user.Manager {
+func initUser(i18n *gotext.Locale, DB *sqlx.DB) *user.Manager {
 	mgr, err := user.New(i18n, user.Opts{
 		DB: DB,
 		Lo: initLogger("user_manager"),
@@ -290,7 +291,7 @@ func initUser(i18n *i18n.I18n, DB *sqlx.DB) *user.Manager {
 
 // initConversations inits conversation manager.
 func initConversations(
-	i18n *i18n.I18n,
+	i18n *gotext.Locale,
 	sla *sla.Manager,
 	status *status.Manager,
 	priority *priority.Manager,
@@ -327,7 +328,7 @@ func initConversations(
 }
 
 // initTag inits tag manager.
-func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
+func initTag(db *sqlx.DB, i18n *gotext.Locale) *tag.Manager {
 	var lo = initLogger("tag_manager")
 	mgr, err := tag.New(tag.Opts{
 		DB:   db,
@@ -341,7 +342,7 @@ func initTag(db *sqlx.DB, i18n *i18n.I18n) *tag.Manager {
 }
 
 // initViews inits view manager.
-func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
+func initView(db *sqlx.DB, i18n *gotext.Locale) *view.Manager {
 	var lo = initLogger("view_manager")
 	m, err := view.New(view.Opts{
 		DB:   db,
@@ -355,7 +356,7 @@ func initView(db *sqlx.DB, i18n *i18n.I18n) *view.Manager {
 }
 
 // initMacro inits macro manager.
-func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
+func initMacro(db *sqlx.DB, i18n *gotext.Locale) *macro.Manager {
 	var lo = initLogger("macro")
 	m, err := macro.New(macro.Opts{
 		DB:   db,
@@ -369,7 +370,7 @@ func initMacro(db *sqlx.DB, i18n *i18n.I18n) *macro.Manager {
 }
 
 // initBusinessHours inits business hours manager.
-func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
+func initBusinessHours(db *sqlx.DB, i18n *gotext.Locale) *businesshours.Manager {
 	var lo = initLogger("business-hours")
 	m, err := businesshours.New(businesshours.Opts{
 		DB:   db,
@@ -383,7 +384,7 @@ func initBusinessHours(db *sqlx.DB, i18n *i18n.I18n) *businesshours.Manager {
 }
 
 // initSLA inits SLA manager.
-func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, template *tmpl.Manager, userManager *user.Manager, i18n *i18n.I18n, dispatcher *notifier.Dispatcher) *sla.Manager {
+func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, businessHours *businesshours.Manager, template *tmpl.Manager, userManager *user.Manager, i18n *gotext.Locale, dispatcher *notifier.Dispatcher) *sla.Manager {
 	var lo = initLogger("sla")
 	m, err := sla.New(sla.Opts{
 		DB:   db,
@@ -397,7 +398,7 @@ func initSLA(db *sqlx.DB, teamManager *team.Manager, settings *setting.Manager, 
 }
 
 // initCSAT inits CSAT manager.
-func initCSAT(db *sqlx.DB, i18n *i18n.I18n) *csat.Manager {
+func initCSAT(db *sqlx.DB, i18n *gotext.Locale) *csat.Manager {
 	var lo = initLogger("csat")
 	m, err := csat.New(csat.Opts{
 		DB:   db,
@@ -432,7 +433,7 @@ func getCustomStaticDir() string {
 }
 
 // initTemplates inits template manager.
-func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *i18n.I18n) *tmpl.Manager {
+func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *gotext.Locale) *tmpl.Manager {
 	var (
 		lo      = initLogger("template")
 		funcMap = getTmplFuncs(consts, i18n, fs)
@@ -454,7 +455,7 @@ func initTemplate(db *sqlx.DB, fs stuffbin.FileSystem, consts *constants, i18n *
 }
 
 // getTmplFuncs returns the template functions.
-func getTmplFuncs(consts *constants, i18n *i18n.I18n, fs stuffbin.FileSystem) template.FuncMap {
+func getTmplFuncs(consts *constants, i18n *gotext.Locale, fs stuffbin.FileSystem) template.FuncMap {
 	lucideIcons := loadLucideIcons(fs)
 	return template.FuncMap{
 		"LucideIcon": func(name string) template.HTML {
@@ -480,6 +481,16 @@ func getTmplFuncs(consts *constants, i18n *i18n.I18n, fs stuffbin.FileSystem) te
 		},
 		"SiteName": func() string {
 			return consts.SiteName
+		},
+		// Resolve all typeahead plural forms on the server, including languages
+		// with more than two forms. This script belongs to the Go-rendered site.
+		"HelpSearchLabels": func(locale *gotext.Locale) (string, error) {
+			labels := make([]string, publicSearchLimit+1)
+			for n := range labels {
+				labels[n] = locale.GetND("templates", "%d result", "%d results", n, n)
+			}
+			data, err := json.Marshal(labels)
+			return string(data), err
 		},
 		"L": func() any {
 			return i18n
@@ -561,7 +572,7 @@ func parseWebTemplates(funcMap template.FuncMap, fs stuffbin.FileSystem) (*templ
 }
 
 // initTeam inits team manager.
-func initTeam(db *sqlx.DB, i18n *i18n.I18n) *team.Manager {
+func initTeam(db *sqlx.DB, i18n *gotext.Locale) *team.Manager {
 	var lo = initLogger("team-manager")
 	mgr, err := team.New(team.Opts{
 		DB:   db,
@@ -575,7 +586,7 @@ func initTeam(db *sqlx.DB, i18n *i18n.I18n) *team.Manager {
 }
 
 // initMedia inits media manager.
-func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.Manager {
+func initMedia(db *sqlx.DB, i18n *gotext.Locale, settings *setting.Manager) *media.Manager {
 	var (
 		store media.Store
 		err   error
@@ -640,7 +651,7 @@ func initMedia(db *sqlx.DB, i18n *i18n.I18n, settings *setting.Manager) *media.M
 }
 
 // initInbox initializes the inbox manager without registering inboxes.
-func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
+func initInbox(db *sqlx.DB, i18n *gotext.Locale) *inbox.Manager {
 	var lo = initLogger("inbox-manager")
 	mgr, err := inbox.New(lo, db, i18n, ko.MustString("app.encryption_key"))
 	if err != nil {
@@ -650,7 +661,7 @@ func initInbox(db *sqlx.DB, i18n *i18n.I18n) *inbox.Manager {
 }
 
 // initAutomationEngine initializes the automation engine.
-func initAutomationEngine(db *sqlx.DB, i18n *i18n.I18n) *automation.Engine {
+func initAutomationEngine(db *sqlx.DB, i18n *gotext.Locale) *automation.Engine {
 	var lo = initLogger("automation_engine")
 	engine, err := automation.New(automation.Opts{
 		DB:                      db,
@@ -899,7 +910,7 @@ func (r *inboxAccountResolver) WhatsAppAccount(inboxID int) (whatsappapi.Account
 }
 
 // initWhatsAppTemplates wires the WhatsApp template manager.
-func initWhatsAppTemplates(db *sqlx.DB, i18n *i18n.I18n, client *whatsappapi.Client, inboxMgr *inbox.Manager) *whatsappTemplate.Manager {
+func initWhatsAppTemplates(db *sqlx.DB, i18n *gotext.Locale, client *whatsappapi.Client, inboxMgr *inbox.Manager) *whatsappTemplate.Manager {
 	mgr, err := whatsappTemplate.New(whatsappTemplate.Opts{
 		Lo:       initLogger("whatsapp_template"),
 		DB:       db,
@@ -914,7 +925,7 @@ func initWhatsAppTemplates(db *sqlx.DB, i18n *i18n.I18n, client *whatsappapi.Cli
 }
 
 // initAuthz initializes authorization enforcer.
-func initAuthz(i18n *i18n.I18n) *authz.Enforcer {
+func initAuthz(i18n *gotext.Locale) *authz.Enforcer {
 	enforcer, err := authz.NewEnforcer(initLogger("authz"), i18n)
 	if err != nil {
 		log.Fatalf("error initializing authz: %v", err)
@@ -929,7 +940,7 @@ func initSSRFControl() ssrf.Control {
 }
 
 // initAuth initializes the authentication manager.
-func initAuth(o *oidc.Manager, rd *redis.Client, i18n *i18n.I18n, dialControl ssrf.Control) *auth_.Auth {
+func initAuth(o *oidc.Manager, rd *redis.Client, i18n *gotext.Locale, dialControl ssrf.Control) *auth_.Auth {
 	lo := initLogger("auth")
 
 	providers, err := buildProviders(o)
@@ -987,7 +998,7 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 }
 
 // initOIDC initializes open id connect config manager.
-func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Manager {
+func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *gotext.Locale) *oidc.Manager {
 	lo := initLogger("oidc")
 	o, err := oidc.New(oidc.Opts{
 		DB:            db,
@@ -1002,14 +1013,11 @@ func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Man
 }
 
 // initI18n inits i18n.
-func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
+func initI18n(_ stuffbin.FileSystem) *gotext.Locale {
 	lo := initLogger("i18n")
 	lang := cmp.Or(ko.String("app.lang"), defLang)
-	log.Printf("loading i18n language file: %s", lang)
-	if _, err := fs.Read("/i18n/" + lang + ".json"); err != nil {
-		log.Fatalf("error reading i18n language file `%s` : %v", lang, err)
-	}
-	i18n, err := loadI18nLang(lang, fs, lo)
+	lo.Info("loading i18n language", "language", lang)
+	i18n, err := locales.New(lang)
 	if err != nil {
 		log.Fatalf("error initializing i18n: %v", err)
 	}
@@ -1066,7 +1074,7 @@ func initDB() *sqlx.DB {
 }
 
 // initRedis inits role manager.
-func initRole(db *sqlx.DB, i18n *i18n.I18n) *role.Manager {
+func initRole(db *sqlx.DB, i18n *gotext.Locale) *role.Manager {
 	var lo = initLogger("role_manager")
 	r, err := role.New(role.Opts{
 		DB:   db,
@@ -1080,7 +1088,7 @@ func initRole(db *sqlx.DB, i18n *i18n.I18n) *role.Manager {
 }
 
 // initStatus inits conversation status manager.
-func initStatus(db *sqlx.DB, i18n *i18n.I18n) *status.Manager {
+func initStatus(db *sqlx.DB, i18n *gotext.Locale) *status.Manager {
 	manager, err := status.New(status.Opts{
 		DB:   db,
 		Lo:   initLogger("status-manager"),
@@ -1093,7 +1101,7 @@ func initStatus(db *sqlx.DB, i18n *i18n.I18n) *status.Manager {
 }
 
 // initPriority inits conversation priority manager.
-func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
+func initPriority(db *sqlx.DB, i18n *gotext.Locale) *priority.Manager {
 	manager, err := priority.New(priority.Opts{
 		DB:   db,
 		Lo:   initLogger("priority-manager"),
@@ -1106,7 +1114,7 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *gotext.Locale, dialControl ssrf.Control) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
 		Ctx:           ctx,
@@ -1123,7 +1131,7 @@ func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.
 }
 
 // initHelpCenter inits the help center manager.
-func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleIndexer) *helpcenter.Manager {
+func initHelpCenter(db *sqlx.DB, i18n *gotext.Locale, indexer helpcenter.ArticleIndexer) *helpcenter.Manager {
 	m, err := helpcenter.New(helpcenter.Opts{
 		DB:      db,
 		Lo:      initLogger("helpcenter"),
@@ -1137,7 +1145,7 @@ func initHelpCenter(db *sqlx.DB, i18n *i18n.I18n, indexer helpcenter.ArticleInde
 }
 
 // initAIAgent inits the autonomous AI agent manager.
-func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
+func initAIAgent(db *sqlx.DB, i18n *gotext.Locale, aiManager *ai.Manager, convo *conversation.Manager, inboxManager *inbox.Manager, mediaManager *media.Manager, settingManager *setting.Manager, userManager *user.Manager, notifierService *notifier.Service, rdb *redis.Client) *aiagent.Manager {
 	m, err := aiagent.New(aiagent.Opts{
 		DB:                 db,
 		Lo:                 initLogger("ai_agent"),
@@ -1153,7 +1161,7 @@ func initAIAgent(db *sqlx.DB, i18n *i18n.I18n, aiManager *ai.Manager, convo *con
 }
 
 // initSearch inits search manager.
-func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *search.Manager {
+func initSearch(db *sqlx.DB, i18n *gotext.Locale, convo *conversation.Manager) *search.Manager {
 	lo := initLogger("search")
 	m, err := search.New(search.Opts{
 		DB:              db,
@@ -1170,7 +1178,7 @@ func initSearch(db *sqlx.DB, i18n *i18n.I18n, convo *conversation.Manager) *sear
 }
 
 // initCustomAttribute inits custom attribute manager.
-func initCustomAttribute(db *sqlx.DB, i18n *i18n.I18n) *customAttribute.Manager {
+func initCustomAttribute(db *sqlx.DB, i18n *gotext.Locale) *customAttribute.Manager {
 	lo := initLogger("custom-attribute")
 	m, err := customAttribute.New(customAttribute.Opts{
 		DB:   db,
@@ -1184,7 +1192,7 @@ func initCustomAttribute(db *sqlx.DB, i18n *i18n.I18n) *customAttribute.Manager 
 }
 
 // initActivityLog inits activity log manager.
-func initActivityLog(db *sqlx.DB, i18n *i18n.I18n) *activitylog.Manager {
+func initActivityLog(db *sqlx.DB, i18n *gotext.Locale) *activitylog.Manager {
 	lo := initLogger("activity-log")
 	m, err := activitylog.New(activitylog.Opts{
 		DB:   db,
@@ -1198,7 +1206,7 @@ func initActivityLog(db *sqlx.DB, i18n *i18n.I18n) *activitylog.Manager {
 }
 
 // initReport inits report manager.
-func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
+func initReport(db *sqlx.DB, i18n *gotext.Locale) *report.Manager {
 	lo := initLogger("report")
 	m, err := report.New(report.Opts{
 		DB:   db,
@@ -1212,7 +1220,7 @@ func initReport(db *sqlx.DB, i18n *i18n.I18n) *report.Manager {
 }
 
 // initContextLink inits context link manager.
-func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
+func initContextLink(db *sqlx.DB, i18n *gotext.Locale) *contextlink.Manager {
 	var lo = initLogger("context-link")
 	m, err := contextlink.New(contextlink.Opts{
 		DB:            db,
@@ -1227,7 +1235,7 @@ func initContextLink(db *sqlx.DB, i18n *i18n.I18n) *contextlink.Manager {
 }
 
 // initWebhook inits webhook manager.
-func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhook.Manager {
+func initWebhook(db *sqlx.DB, i18n *gotext.Locale, dialControl ssrf.Control) *webhook.Manager {
 	var lo = initLogger("webhook")
 	m, err := webhook.New(webhook.Opts{
 		DB:            db,
@@ -1246,7 +1254,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhoo
 }
 
 // initUserNotification inits user notification manager.
-func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificationManager {
+func initUserNotification(db *sqlx.DB, i18n *gotext.Locale) *notifier.UserNotificationManager {
 	var lo = initLogger("user-notification")
 	m, err := notifier.NewUserNotificationManager(notifier.UserNotificationOpts{
 		DB:   db,
@@ -1260,7 +1268,7 @@ func initUserNotification(db *sqlx.DB, i18n *i18n.I18n) *notifier.UserNotificati
 }
 
 // initNotificationPreference inits the notification preference manager.
-func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.PreferenceManager {
+func initNotificationPreference(db *sqlx.DB, i18n *gotext.Locale) *notifier.PreferenceManager {
 	m, err := notifier.NewPreferenceManager(notifier.PreferenceManagerOpts{
 		DB:   db,
 		Lo:   initLogger("notification-preference"),
@@ -1273,7 +1281,7 @@ func initNotificationPreference(db *sqlx.DB, i18n *i18n.I18n) *notifier.Preferen
 }
 
 // initImporter inits the importer manager.
-func initImporter(i18n *i18n.I18n) *importer.Importer {
+func initImporter(i18n *gotext.Locale) *importer.Importer {
 	return importer.New(importer.Opts{
 		Lo:   initLogger("importer"),
 		I18n: i18n,
@@ -1297,7 +1305,7 @@ func initReplyDeliveryChecker(notifications *notifier.UserNotificationManager, a
 	return notifier.NewReplyDeliveryChecker(notifications, agents, prefs)
 }
 
-func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n, checker notifier.DeliveryChecker) *notifier.PushManager {
+func initPushNotification(db *sqlx.DB, settings *setting.Manager, i18n *gotext.Locale, checker notifier.DeliveryChecker) *notifier.PushManager {
 	m, err := notifier.NewPushManager(notifier.PushManagerOpts{
 		DB:          db,
 		Settings:    settings,
@@ -1413,7 +1421,7 @@ func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
 	return limiter
 }
 
-func initProactive(db *sqlx.DB, i18n *i18n.I18n) *proactive.Manager {
+func initProactive(db *sqlx.DB, i18n *gotext.Locale) *proactive.Manager {
 	manager, err := proactive.New(proactive.Opts{DB: db, I18n: i18n, Lo: initLogger("proactive")})
 	if err != nil {
 		log.Fatalf("error initializing proactive messages: %v", err)

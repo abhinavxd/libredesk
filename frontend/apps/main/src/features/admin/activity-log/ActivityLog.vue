@@ -9,7 +9,7 @@
               <PopoverTrigger as-child>
                 <Button type="button" variant="outline" class="gap-2">
                   <ListFilter size="14" />
-                  <span>{{ t('globals.terms.filter', 1) }}</span>
+                  <span>{{ i18n.ngettext('Filter', 'Filters', 1) }}</span>
                   <span
                     v-if="filters.length > 0"
                     class="flex items-center justify-center bg-primary text-primary-foreground rounded-full size-4 text-xs"
@@ -38,7 +38,7 @@
                   type="button"
                   variant="outline"
                   size="icon"
-                  :aria-label="t('globals.messages.sortBy')"
+                  :aria-label="i18n._('Sort by')"
                 >
                   <ArrowDownWideNarrow size="18" class="text-muted-foreground cursor-pointer" />
                 </Button>
@@ -51,7 +51,7 @@
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem :value="'activity_logs.created_at'">
-                      {{ t('globals.terms.createdAt') }}
+                      {{ i18n._('Created at') }}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -62,8 +62,8 @@
                     <SelectValue :placeholder="orderByDirection" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem :value="'asc'">{{ t('globals.terms.ascending') }}</SelectItem>
-                    <SelectItem :value="'desc'">{{ t('globals.terms.descending') }}</SelectItem>
+                    <SelectItem :value="'asc'">{{ i18n._('Ascending') }}</SelectItem>
+                    <SelectItem :value="'desc'">{{ i18n._('Descending') }}</SelectItem>
                   </SelectContent>
                 </Select>
               </PopoverContent>
@@ -75,9 +75,9 @@
       <div class="w-full overflow-x-auto">
         <SimpleTable
           :headers="[
-            t('globals.terms.name'),
-            t('globals.terms.timestamp'),
-            t('globals.terms.ipAddress')
+            i18n.ngettext('Name', 'Names', 1),
+            i18n.ngettext('Timestamp', 'Timestamps', 1),
+            i18n.ngettext('IP Address', 'IP Addresses', 1)
           ]"
           :keys="['activity_description', 'created_at', 'ip']"
           :data="activityLogs"
@@ -118,13 +118,13 @@ import { Button } from '@shared-ui/components/ui/button'
 import { ListFilter, ArrowDownWideNarrow } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { useActivityLogFilters } from '@main/composables/useActivityLogFilters'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import TableDate from '@main/components/table/TableDate.vue'
 import PaginationBar from '@main/components/pagination/PaginationBar.vue'
 import api from '@main/api'
 
 const activityLogs = ref([])
-const { t } = useI18n()
+const i18n = useI18n()
 const loading = ref(true)
 const page = ref(1)
 const perPage = ref(15)

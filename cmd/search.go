@@ -135,7 +135,8 @@ func searchTerm(r *fastglue.Request) (*App, amodels.User, string, error) {
 	user, _ := r.RequestCtx.UserValue("user").(amodels.User)
 	term := string(r.RequestCtx.QueryArgs().Peek("query"))
 	if len(term) < minSearchQueryLength {
-		return app, user, "", envelope.NewError(envelope.InputError, app.i18n.Ts("search.minQueryLength", "length", fmt.Sprintf("%d", minSearchQueryLength)), nil)
+		return app, user, "", envelope.NewError(envelope.InputError, app.i18n.Get("Please enter at least %[1]s characters to search.",
+			fmt.Sprintf("%d", minSearchQueryLength)), nil)
 	}
 	return app, user, term, nil
 }

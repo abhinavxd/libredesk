@@ -4,7 +4,7 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="editRole(props.role.id)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <template v-if="Roles.includes(props.role.name) === false">
         <DropdownMenuSeparator />
@@ -13,7 +13,7 @@
           class="text-destructive focus:text-destructive"
         >
           <Trash class="mr-2 h-4 w-4" />
-          {{ $t('globals.messages.delete') }}
+          {{ i18n._('Delete') }}
         </DropdownMenuItem>
       </template>
     </DropdownMenuContent>
@@ -22,15 +22,15 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ $t('role.deletionConfirmation') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this role.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          $t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

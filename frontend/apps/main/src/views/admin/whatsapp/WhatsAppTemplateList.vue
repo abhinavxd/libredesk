@@ -9,10 +9,10 @@
         >
           <template #left>
             <div class="flex items-center gap-3">
-              <label class="text-sm text-muted-foreground">{{ $t('globals.terms.inbox') }}</label>
+              <label class="text-sm text-muted-foreground">{{ i18n.ngettext('Inbox', 'Inboxes', 1) }}</label>
               <Select v-model="selectedInboxID" @update:model-value="onInboxChange">
                 <SelectTrigger class="w-48 sm:w-60">
-                  <SelectValue :placeholder="$t('placeholders.selectInbox')" />
+                  <SelectValue :placeholder="i18n._('Select inbox')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem v-for="inb in whatsappInboxes" :key="inb.id" :value="inb.id">
@@ -30,16 +30,16 @@
               @click="onSync"
             >
               <RefreshCw class="size-4" :class="{ 'animate-spin': isSyncing }" />
-              {{ $t('admin.whatsappTemplates.syncFromMeta') }}
+              {{ i18n._('Sync from Meta') }}
             </Button>
             <Button type="button" :disabled="!selectedInboxID" @click="onNew">
-              {{ $t('globals.messages.newTemplate') }}
+              {{ i18n._('New template') }}
             </Button>
           </template>
         </AdminToolbar>
 
         <div v-if="!whatsappInboxes.length" class="box p-6 text-sm text-muted-foreground">
-          {{ $t('admin.whatsappTemplates.noInboxes') }}
+          {{ i18n._('Create a WhatsApp inbox first to author templates.') }}
         </div>
         <DataTable
           v-else
@@ -54,15 +54,15 @@
       <AlertDialog :open="deleteAlertOpen" @update:open="deleteAlertOpen = $event">
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{{ $t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+            <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
             <AlertDialogDescription>
-              {{ $t('admin.whatsappTemplates.confirmDelete') }}
+              {{ i18n._('Delete this template on libredesk and Meta?') }}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
+            <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
             <AlertDialogAction @click="handleDelete">
-              {{ $t('globals.messages.delete') }}
+              {{ i18n._('Delete') }}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -73,10 +73,10 @@
       <div class="space-y-4">
         <div class="space-y-1">
           <p class="text-sm font-medium text-foreground">
-            {{ $t('admin.whatsappTemplates.title') }}
+            {{ i18n._('WhatsApp templates') }}
           </p>
           <p class="ui-description">
-            {{ $t('admin.whatsappTemplates.help.overview') }}
+            {{ i18n._('Message templates are pre-approved formats required to start a WhatsApp conversation or reply outside the 24-hour window. Create one here, or sync templates you already approved in Meta.') }}
           </p>
           <a
             href="https://developers.facebook.com/docs/whatsapp/business-management-api/message-templates"
@@ -84,7 +84,7 @@
             rel="noopener noreferrer"
             class="link-style text-sm"
           >
-            {{ $t('globals.terms.learnMore') }}
+            {{ i18n._('Learn more') }}
           </a>
         </div>
       </div>
@@ -96,7 +96,7 @@
 import { computed, h, onMounted, ref } from 'vue'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import TableDate from '@main/components/table/TableDate.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Info, RefreshCw, Trash2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Badge } from '@shared-ui/components/ui/badge'
@@ -129,7 +129,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 import { canEditWhatsAppTemplate } from '@/features/conversation/whatsappTemplate.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const route = useRoute()
 const emitter = useEmitter()
@@ -160,7 +160,7 @@ const STATUS_BADGE_VARIANT = {
 const columns = [
   {
     accessorKey: 'name',
-    header: () => h('div', t('globals.terms.name')),
+    header: () => h('div', i18n._('{count, plural, one {Name} other {Names}}')),
     cell: ({ row }) => {
       const name = row.getValue('name')
       const children = [
@@ -177,7 +177,7 @@ const columns = [
               'span',
               {
                 class: 'font-mono text-xs',
-                title: t('admin.whatsappTemplates.error.editUnavailable')
+                title: i18n._('This template cannot be edited here in its current state or format. Sync templates from Meta, or edit it in WhatsApp Manager.')
               },
               name
             )
@@ -190,7 +190,7 @@ const columns = [
                 h(Info, { class: 'size-3.5 text-muted-foreground cursor-help' })
               ),
               h(TooltipContent, { class: 'max-w-xs' }, () =>
-                t('admin.whatsappTemplates.error.reserved')
+                i18n._('This template is reserved for CSAT surveys and can\'\'t be deleted. Edit it in the inbox\'\'s CSAT settings.')
               )
             ]
           })
@@ -201,16 +201,16 @@ const columns = [
   },
   {
     accessorKey: 'language',
-    header: () => h('div', t('globals.terms.language'))
+    header: () => h('div', i18n._('{count, plural, one {Language} other {Languages}}'))
   },
   {
     accessorKey: 'category',
-    header: () => h('div', t('globals.terms.category')),
+    header: () => h('div', i18n._('Category')),
     cell: ({ row }) => h(Badge, { variant: 'outline' }, () => row.getValue('category'))
   },
   {
     accessorKey: 'status',
-    header: () => h('div', t('globals.terms.status')),
+    header: () => h('div', i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) => {
       const status = row.getValue('status')
       return h(
@@ -226,7 +226,7 @@ const columns = [
   {
     accessorKey: 'updated_at',
     meta: { compact: true },
-    header: () => h('div', t('globals.terms.updatedAt')),
+    header: () => h('div', i18n._('Updated at')),
     cell: ({ row }) => h(TableDate, { value: row.getValue('updated_at') })
   },
   {
@@ -241,7 +241,7 @@ const columns = [
           variant: 'ghost',
           size: 'sm',
           type: 'button',
-          'aria-label': t('globals.messages.delete'),
+          'aria-label': i18n._('Delete'),
           onClick: () => confirmDelete(row.original.id)
         },
         () => h(Trash2, { class: 'size-4' })
@@ -291,7 +291,7 @@ const onSync = async () => {
     isSyncing.value = true
     const resp = await api.syncWhatsAppTemplates(selectedInboxID.value)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('admin.whatsappTemplates.synced', { count: resp.data.data?.synced || 0 })
+      description: i18n._('Synced {count} template(s) from Meta.', { count: resp.data.data?.synced || 0 })
     })
     await fetchTemplates()
   } catch (error) {
@@ -316,7 +316,7 @@ const handleDelete = async () => {
   try {
     await api.deleteWhatsAppTemplate(id)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.deletedSuccessfully')
+      description: i18n._('Deleted successfully')
     })
     await fetchTemplates()
   } catch (error) {

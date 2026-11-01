@@ -2,16 +2,16 @@
   <div class="space-y-6">
     <!-- Master Toggle -->
     <SwitchField
-      :title="$t('admin.inbox.livechat.prechatForm.enabled')"
-      :description="$t('admin.inbox.livechat.prechatForm.enabled.description')"
+      :title="i18n._('Enable pre-chat form')"
+      :description="i18n._('Show a form to collect information before chat starts')"
       :checked="prechatConfig.enabled"
       @update:checked="prechatConfig.enabled = $event"
     />
 
     <SwitchField
       v-if="prechatConfig.enabled"
-      :title="$t('admin.inbox.livechat.prechatForm.handoffOnly')"
-      :description="$t('admin.inbox.livechat.prechatForm.handoffOnly.description')"
+      :title="i18n._('Show only during AI handoff')"
+      :description="i18n._('Skip this form when a chat starts. Show it when the AI needs to transfer the conversation to a human.')"
       :checked="prechatConfig.handoff_only"
       @update:checked="prechatConfig.handoff_only = $event"
     />
@@ -21,10 +21,10 @@
         <template #left>
           <TabsList class="w-max justify-start">
             <TabsTrigger value="visitors">
-              {{ $t('admin.inbox.livechat.userSettings.visitors') }}
+              {{ i18n._('Visitors') }}
             </TabsTrigger>
             <TabsTrigger value="users">
-              {{ $t('globals.terms.users') }}
+              {{ i18n._('Users') }}
             </TabsTrigger>
           </TabsList>
         </template>
@@ -32,7 +32,7 @@
 
       <div class="mt-4 space-y-6">
         <SwitchField
-          :title="$t('admin.inbox.livechat.prechatForm.audienceEnabled')"
+          :title="i18n._('Show form to this audience')"
           :checked="audienceConfig.enabled"
           @update:checked="audienceConfig.enabled = $event"
         />
@@ -40,19 +40,19 @@
         <div v-if="audienceConfig.enabled" class="space-y-6">
           <div>
             <Label>
-              {{ $t('admin.inbox.livechat.prechatForm.title') }}
+              {{ i18n._('Form title') }}
             </Label>
             <Input
               type="text"
               v-model="audienceConfig.title"
-              :placeholder="$t('placeholders.tellUsAboutYourself')"
+              :placeholder="i18n._('Tell us about yourself')"
               class="mt-1"
             />
           </div>
 
           <div class="space-y-4">
             <h4 class="ui-heading">
-              {{ $t('admin.inbox.livechat.prechatForm.fields') }}
+              {{ i18n._('Form fields') }}
             </h4>
 
             <div class="space-y-3">
@@ -86,8 +86,8 @@
                           <div class="text-sm text-muted-foreground">
                             {{ field.type }} ({{
                               field.is_default
-                                ? $t('globals.terms.default')
-                                : $t('globals.terms.custom')
+                                ? i18n.pgettext('Built-in form field', 'Default')
+                                : i18n._('Custom')
                             }})
                           </div>
                         </div>
@@ -99,7 +99,7 @@
                           type="button"
                           variant="ghost"
                           size="sm"
-                          :aria-label="$t('globals.terms.remove')"
+                          :aria-label="i18n._('Remove')"
                           @click="removeField(index)"
                         >
                           <X class="w-4 h-4" aria-hidden="true" />
@@ -110,21 +110,21 @@
                     <div v-if="field.enabled" class="space-y-4">
                       <div class="grid grid-cols-2 gap-4">
                         <div>
-                          <Label>{{ $t('globals.terms.label') }}</Label>
+                          <Label>{{ i18n.ngettext('Label', 'Labels', 1) }}</Label>
                           <Input
                             v-model="field.label"
-                            :placeholder="$t('placeholders.fieldLabel')"
+                            :placeholder="i18n._('Field label')"
                             class="mt-1"
                           />
                         </div>
 
                         <div>
                           <Label>
-                            {{ $t('globals.terms.placeholder') }}
+                            {{ i18n.ngettext('Placeholder', 'Placeholders', 1) }}
                           </Label>
                           <Input
                             v-model="field.placeholder"
-                            :placeholder="$t('placeholders.fieldPlaceholder')"
+                            :placeholder="i18n._('Field placeholder')"
                             class="mt-1"
                           />
                         </div>
@@ -132,7 +132,7 @@
 
                       <div v-if="field.type !== 'checkbox'" class="flex items-center space-x-2">
                         <Checkbox v-model:checked="field.required" />
-                        <Label class="font-normal">{{ $t('globals.terms.required') }}</Label>
+                        <Label class="font-normal">{{ i18n.pgettext('Form field requirement', 'Required') }}</Label>
                       </div>
                     </div>
                   </div>
@@ -140,13 +140,13 @@
               </Draggable>
 
               <div v-if="formFields.length === 0" class="text-center py-8 text-muted-foreground">
-                {{ $t('admin.inbox.livechat.prechatForm.noFields') }}
+                {{ i18n._('No fields configured. Add fields from custom attributes.') }}
               </div>
             </div>
 
             <div v-if="availableCustomAttributes.length > 0" class="space-y-3">
               <h5 class="ui-subheading">
-                {{ $t('admin.inbox.livechat.prechatForm.availableFields') }}
+                {{ i18n._('Available custom attributes') }}
               </h5>
               <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                 <div

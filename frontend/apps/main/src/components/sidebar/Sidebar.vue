@@ -62,7 +62,7 @@ import { filterNavItems } from '@main/utils/nav-permissions'
 import { permissions } from '@main/constants/permissions'
 import { useStorage } from '@vueuse/core'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
 import { navIconMap } from '@main/constants/navIcons'
@@ -77,7 +77,7 @@ const userStore = useUserStore()
 const conversationStore = useConversationStore()
 const settingsStore = useAppSettingsStore()
 const route = useRoute()
-const { t } = useI18n()
+const i18n = useI18n()
 const emit = defineEmits(['createView', 'editView', 'deleteView', 'createConversation'])
 
 const isActiveParent = (parentHref) => {
@@ -124,8 +124,8 @@ const filteredContactsNavItems = computed(() => filterNavItems(contactNavItems, 
 
 // For auto opening admin collapsibles when a child route is active
 const openAdminCollapsible = ref(null)
-const toggleAdminCollapsible = (titleKey) => {
-  openAdminCollapsible.value = openAdminCollapsible.value === titleKey ? null : titleKey
+const toggleAdminCollapsible = (id) => {
+  openAdminCollapsible.value = openAdminCollapsible.value === id ? null : id
 }
 // Watch for route changes and update the active collapsible
 watch(
@@ -136,7 +136,7 @@ watch(
       return item.children.some((child) => isActiveParent(child.href))
     })
     if (activeItem) {
-      openAdminCollapsible.value = activeItem.titleKey
+      openAdminCollapsible.value = activeItem.titleMessage.id
     }
   },
   { immediate: true }
@@ -174,16 +174,16 @@ onMounted(() => {
       v-if="route.matched.some((record) => record.name && record.name.startsWith('contact'))"
     >
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
-        <SidebarSectionHeader :title="t('globals.terms.contact', 2)" />
+        <SidebarSectionHeader :title="i18n.ngettext('Contact', 'Contacts', 2)" />
         <SidebarContent>
           <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
-              <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.titleKey">
+              <SidebarMenuItem v-for="item in filteredContactsNavItems" :key="item.href || item.titleMessage.id">
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
                     <component :is="navIconMap[item.icon]" v-if="item.icon" />
-                    <span>{{ t(item.allLabelKey) }}</span>
+                    <span>{{ i18n._(item.allLabelMessage) }}</span>
                   </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -202,16 +202,16 @@ onMounted(() => {
       "
     >
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
-        <SidebarSectionHeader :title="t('globals.terms.report', 2)" />
+        <SidebarSectionHeader :title="i18n.ngettext('Report', 'Reports', 2)" />
         <SidebarContent>
           <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
-              <SidebarMenuItem v-for="item in filteredReportsNavItems" :key="item.titleKey">
+              <SidebarMenuItem v-for="item in filteredReportsNavItems" :key="item.href || item.titleMessage.id">
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
                     <component :is="navIconMap[item.icon]" v-if="item.icon" />
-                    <span>{{ t(item.titleKey) }}</span>
+                    <span>{{ i18n._(item.titleMessage) }}</span>
                   </router-link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -225,7 +225,7 @@ onMounted(() => {
     <!-- Admin Sidebar -->
     <template v-if="route.matched.some((record) => record.name && record.name.startsWith('admin'))">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
-        <SidebarSectionHeader :title="t('globals.terms.admin')">
+        <SidebarSectionHeader :title="i18n.ngettext('Admin', 'Admins', 1)">
           <template #suffix>
             <span>({{ settingsStore.settings['app.version'] }})</span>
           </template>
@@ -234,26 +234,26 @@ onMounted(() => {
           <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
-              <SidebarMenuItem v-for="item in filteredAdminNavItems" :key="item.titleKey">
+              <SidebarMenuItem v-for="item in filteredAdminNavItems" :key="item.href || item.titleMessage.id">
                 <SidebarMenuButton
                   v-if="!item.children"
                   :isActive="isActiveParent(item.href)"
                   asChild
                 >
                   <router-link :to="item.href">
-                    <span>{{ t(item.titleKey) }}</span>
+                    <span>{{ i18n._(item.titleMessage) }}</span>
                   </router-link>
                 </SidebarMenuButton>
 
                 <Collapsible
                   v-else
                   class="group/collapsible"
-                  :open="openAdminCollapsible === item.titleKey"
-                  @update:open="toggleAdminCollapsible(item.titleKey)"
+                  :open="openAdminCollapsible === item.titleMessage.id"
+                  @update:open="toggleAdminCollapsible(item.titleMessage.id)"
                 >
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton :isActive="isActiveParent(item.href)">
-                      <span>{{ t(item.titleKey, item.isTitleKeyPlural === true ? 2 : 1) }}</span>
+                      <span>{{ i18n._(item.titleMessage, item.isTitlePlural === true ? 2 : 1) }}</span>
                       <BetaBadge v-if="item.badge" class="ml-1.5">
                         {{ item.badge }}
                       </BetaBadge>
@@ -264,12 +264,12 @@ onMounted(() => {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      <SidebarMenuSubItem v-for="child in item.children" :key="child.titleKey">
+                      <SidebarMenuSubItem v-for="child in item.children" :key="child.href || child.titleMessage.id">
                         <SidebarMenuButton size="sm" :isActive="isActiveParent(child.href)" asChild>
                           <router-link :to="child.href">
                             <component :is="navIconMap[child.icon]" v-if="child.icon" />
                             <span>{{
-                              t(child.titleKey, child.isTitleKeyPlural === true ? 2 : 1)
+                              i18n._(child.titleMessage, child.isTitlePlural === true ? 2 : 1)
                             }}</span>
                           </router-link>
                         </SidebarMenuButton>
@@ -288,16 +288,16 @@ onMounted(() => {
     <!-- Account sidebar -->
     <template v-if="isActiveParent('/account')">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
-        <SidebarSectionHeader :title="t('globals.terms.account')" />
+        <SidebarSectionHeader :title="i18n.ngettext('Account', 'Accounts', 1)" />
         <SidebarContent>
           <MobileDrawerNav />
           <SidebarGroup>
             <SidebarMenu>
-              <SidebarMenuItem v-for="item in accountNavItems" :key="item.titleKey">
+              <SidebarMenuItem v-for="item in accountNavItems" :key="item.href || item.titleMessage.id">
                 <SidebarMenuButton :isActive="isActiveParent(item.href)" asChild>
                   <router-link :to="item.href">
                     <component :is="navIconMap[item.icon]" v-if="item.icon" />
-                    <span>{{ t(item.titleKey) }}</span>
+                    <span>{{ i18n._(item.titleMessage) }}</span>
                   </router-link>
                 </SidebarMenuButton>
                 <SidebarMenuAction>
@@ -314,10 +314,10 @@ onMounted(() => {
     <!-- Inbox sidebar -->
     <template v-if="route.path && isInboxRoute(route.path)">
       <Sidebar collapsible="offcanvas" class="sidebar-secondary">
-        <SidebarSectionHeader :title="t('globals.terms.inbox')">
+        <SidebarSectionHeader :title="i18n.ngettext('Inbox', 'Inboxes', 1)">
           <template #actions>
             <Button variant="ghost" size="icon" as-child class="size-8 text-muted-foreground">
-              <router-link :to="{ name: 'search' }" :aria-label="t('globals.terms.search')">
+              <router-link :to="{ name: 'search' }" :aria-label="i18n._('Search')">
                 <Search size="18" stroke-width="2.5" aria-hidden="true" />
               </router-link>
             </Button>
@@ -331,7 +331,7 @@ onMounted(() => {
               <SidebarMenuItem>
                 <SidebarMenuButton @click="emit('createConversation')">
                   <Plus />
-                  <span>{{ t('conversation.newConversation') }}</span>
+                  <span>{{ i18n._('New conversation') }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
@@ -340,14 +340,11 @@ onMounted(() => {
                   @click="navigateToInbox('assigned')"
                 >
                   <User />
-                  <span class="flex-1 truncate">{{ t('globals.terms.myInbox') }}</span>
+                  <span class="flex-1 truncate">{{ i18n.ngettext('My Inbox', 'My Inboxes', 1) }}</span>
                   <SidebarCountBadge
                     :count="conversationStore.sidebarCounts.assigned"
                     :ariaLabel="
-                      t(
-                        'conversation.sidebarCounts.assigned',
-                        conversationStore.sidebarCounts.assigned
-                      )
+                      i18n.ngettext('{count} open conversation in my inbox', '{count} open conversations in my inbox', conversationStore.sidebarCounts.assigned)
                     "
                   />
                 </SidebarMenuButton>
@@ -360,15 +357,12 @@ onMounted(() => {
                 >
                   <AtSign />
                   <span class="flex-1 truncate">
-                    {{ t('globals.terms.mention', 2) }}
+                    {{ i18n.ngettext('Mention', 'Mentions', 2) }}
                   </span>
                   <SidebarCountBadge
                     :count="conversationStore.sidebarCounts.mentioned"
                     :ariaLabel="
-                      t(
-                        'conversation.sidebarCounts.mentioned',
-                        conversationStore.sidebarCounts.mentioned
-                      )
+                      i18n.ngettext('{count} open conversation with mentions', '{count} open conversations with mentions', conversationStore.sidebarCounts.mentioned)
                     "
                   />
                 </SidebarMenuButton>
@@ -381,15 +375,12 @@ onMounted(() => {
                 >
                   <UserRoundX />
                   <span class="flex-1 truncate">
-                    {{ t('globals.terms.unassigned') }}
+                    {{ i18n._('Unassigned') }}
                   </span>
                   <SidebarCountBadge
                     :count="conversationStore.sidebarCounts.unassigned"
                     :ariaLabel="
-                      t(
-                        'conversation.sidebarCounts.unassigned',
-                        conversationStore.sidebarCounts.unassigned
-                      )
+                      i18n.ngettext('{count} open unassigned conversation', '{count} open unassigned conversations', conversationStore.sidebarCounts.unassigned)
                     "
                   />
                 </SidebarMenuButton>
@@ -402,12 +393,12 @@ onMounted(() => {
                 >
                   <Inbox />
                   <span class="flex-1 truncate">
-                    {{ t('globals.messages.all') }}
+                    {{ i18n._('All') }}
                   </span>
                   <SidebarCountBadge
                     :count="conversationStore.sidebarCounts.all"
                     :ariaLabel="
-                      t('conversation.sidebarCounts.all', conversationStore.sidebarCounts.all)
+                      i18n.ngettext('{count} open conversation in all', '{count} open conversations in all', conversationStore.sidebarCounts.all)
                     "
                   />
                 </SidebarMenuButton>
@@ -424,7 +415,7 @@ onMounted(() => {
                   <CollapsibleTrigger as-child>
                     <SidebarMenuButton>
                       <span class="sidebar-section-label">
-                        {{ t('globals.terms.teamInbox', 2) }}
+                        {{ i18n.ngettext('Team Inbox', 'Team Inboxes', 2) }}
                       </span>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -459,7 +450,7 @@ onMounted(() => {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton class="group/item !p-2">
                       <span class="sidebar-section-label">
-                        {{ t('globals.terms.view', 2) }}
+                        {{ i18n.ngettext('View', 'Views', 2) }}
                       </span>
                       <div>
                         <Plus
@@ -492,7 +483,7 @@ onMounted(() => {
                           <SidebarCountBadge
                             :count="viewSidebarCount(view.id)"
                             :ariaLabel="
-                              t('conversation.sidebarCounts.view', viewSidebarCount(view.id))
+                              i18n.ngettext('{count} conversation in this view', '{count} conversations in this view', viewSidebarCount(view.id))
                             "
                           />
                         </SidebarMenuButton>
@@ -507,10 +498,10 @@ onMounted(() => {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem @click="() => editView(view)">
-                              <span>{{ t('globals.messages.edit') }}</span>
+                              <span>{{ i18n._('Edit') }}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem @click="() => openDeleteConfirmation(view)">
-                              <span>{{ t('globals.messages.delete') }}</span>
+                              <span>{{ i18n._('Delete') }}</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -531,7 +522,7 @@ onMounted(() => {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton class="!p-2">
                       <span class="sidebar-section-label">
-                        {{ t('globals.terms.sharedView', 2) }}
+                        {{ i18n.ngettext('Shared view', 'Shared views', 2) }}
                       </span>
                       <ChevronRight
                         class="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -551,7 +542,7 @@ onMounted(() => {
                           <SidebarCountBadge
                             :count="viewSidebarCount(view.id)"
                             :ariaLabel="
-                              t('conversation.sidebarCounts.view', viewSidebarCount(view.id))
+                              i18n.ngettext('{count} conversation in this view', '{count} conversations in this view', viewSidebarCount(view.id))
                             "
                           />
                         </SidebarMenuButton>
@@ -577,15 +568,15 @@ onMounted(() => {
   <AlertDialog v-model:open="isDeleteOpen">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ t('confirm.deleteView') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this view.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDeleteView">
-          {{ t('globals.messages.delete') }}
+          {{ i18n._('Delete') }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

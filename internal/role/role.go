@@ -10,7 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/role/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -24,14 +24,14 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -63,7 +63,7 @@ func (u *Manager) GetAll() ([]models.Role, error) {
 	var roles = make([]models.Role, 0)
 	if err := u.q.GetAll.Select(&roles); err != nil {
 		u.lo.Error("error fetching roles", "error", err)
-		return roles, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return roles, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return roles, nil
 }
@@ -73,10 +73,10 @@ func (u *Manager) Get(id int) (models.Role, error) {
 	var role = models.Role{}
 	if err := u.q.Get.Get(&role, id); err != nil {
 		if err == sql.ErrNoRows {
-			return role, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundRole"), nil)
+			return role, envelope.NewError(envelope.NotFoundError, u.i18n.Get("Role not found"), nil)
 		}
 		u.lo.Error("error fetching role", "error", err)
-		return role, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return role, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return role, nil
 }
@@ -90,12 +90,12 @@ func (u *Manager) Delete(id int) error {
 	}
 	for _, r := range models.DefaultRoles {
 		if role.Name == r {
-			return envelope.NewError(envelope.InputError, u.i18n.T("admin.role.cannotModifyAdminRole"), nil)
+			return envelope.NewError(envelope.InputError, u.i18n.Get("Cannot modify admin role, Please create a new role."), nil)
 		}
 	}
 	if _, err := u.q.Delete.Exec(id); err != nil {
 		u.lo.Error("error deleting role", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -107,15 +107,16 @@ func (u *Manager) Create(r models.Role) (models.Role, error) {
 		return models.Role{}, err
 	}
 	if len(validPermissions) == 0 {
-		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.empty", "name", u.i18n.P("globals.terms.permission")), nil)
+		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Get("%[1]s empty",
+			u.i18n.GetN("Permission", "Permissions", 2)), nil)
 	}
 	var result models.Role
 	if err := u.q.Insert.Get(&result, r.Name, r.Description, pq.Array(validPermissions)); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.T("errors.alreadyExistsRole"), nil)
+			return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Get("Role already exists"), nil)
 		}
 		u.lo.Error("error inserting role", "error", err)
-		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -127,7 +128,8 @@ func (u *Manager) Update(id int, r models.Role) (models.Role, error) {
 		return models.Role{}, err
 	}
 	if len(validPermissions) == 0 {
-		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Ts("globals.messages.empty", "name", u.i18n.P("globals.terms.permission")), nil)
+		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Get("%[1]s empty",
+			u.i18n.GetN("Permission", "Permissions", 2)), nil)
 	}
 	// Disallow updating `Admin` role, as the main System login requires it.
 	role, err := u.Get(id)
@@ -135,13 +137,13 @@ func (u *Manager) Update(id int, r models.Role) (models.Role, error) {
 		return models.Role{}, err
 	}
 	if role.Name == models.RoleAdmin {
-		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.T("admin.role.cannotModifyAdminRole"), nil)
+		return models.Role{}, envelope.NewError(envelope.InputError, u.i18n.Get("Cannot modify admin role, Please create a new role."), nil)
 	}
 
 	var result models.Role
 	if err := u.q.Update.Get(&result, id, r.Name, r.Description, pq.Array(validPermissions)); err != nil {
 		u.lo.Error("error updating role", "error", err)
-		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Role{}, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }

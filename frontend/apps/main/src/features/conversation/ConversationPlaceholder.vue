@@ -5,7 +5,7 @@
       <div v-if="showGettingStarted" class="getting-started-wrapper">
         <div class="text-center">
           <h2 class="ui-display-heading mb-6">
-            {{ $t('setup.completeYourSetup') }}
+            {{ i18n._('Complete your setup') }}
           </h2>
 
           <div class="space-y-4 mb-6">
@@ -13,7 +13,7 @@
               <CheckCircle v-if="hasInboxes" class="check-icon completed" />
               <Circle v-else class="w-5 h-5 text-muted-foreground" />
               <span class="flex-1 text-left ml-3 text-foreground">
-                {{ $t('setup.createFirstInbox') }}
+                {{ i18n._('Create your first inbox') }}
               </span>
               <Button
                 v-if="!hasInboxes"
@@ -22,7 +22,7 @@
                 @click="router.push({ name: 'inbox-list' })"
                 class="ml-auto"
               >
-                {{ $t('globals.messages.setUp') }}
+                {{ i18n._('Set up') }}
               </Button>
             </div>
 
@@ -30,7 +30,7 @@
               <CheckCircle v-if="hasAgents" class="check-icon completed" />
               <Circle v-else class="w-5 h-5 text-muted-foreground" />
               <span class="flex-1 text-left ml-3 text-foreground">
-                {{ $t('setup.inviteTeammates') }}
+                {{ i18n._('Invite teammates') }}
               </span>
               <Button
                 v-if="!hasAgents && hasInboxes"
@@ -39,14 +39,14 @@
                 @click="router.push({ name: 'agent-list' })"
                 class="ml-auto"
               >
-                {{ $t('globals.messages.invite') }}
+                {{ i18n._('Invite') }}
               </Button>
             </div>
           </div>
         </div>
       </div>
       <div v-else class="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-        <p class="text-sm text-muted-foreground">{{ $t('conversation.placeholder') }}</p>
+        <p class="text-sm text-muted-foreground">{{ i18n._('Select a conversation from the left panel.') }}</p>
       </div>
     </template>
   </div>

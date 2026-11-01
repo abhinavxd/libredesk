@@ -28,10 +28,10 @@
               'bg-warning': chatTitle.availability_status === 'away'
             }"
           ></span>
-          {{ chatTitle.availability_status === 'online' ? $t('globals.terms.online') : $t('globals.terms.away') }}
+          {{ chatTitle.availability_status === 'online' ? i18n.ngettext('Online', 'Online', 1) : i18n.ngettext('Away', 'Away', 1) }}
         </span>
         <span v-else-if="chatStore.currentConversation?.assignee?.active_at">
-          {{ $t('globals.terms.active') }}
+          {{ i18n.pgettext('Last agent activity', 'Active') }}
           {{ getRelativeTime(chatStore.currentConversation?.assignee?.active_at).toLowerCase() }}
         </span>
       </p>
@@ -46,12 +46,12 @@ import { computed } from 'vue'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
 import { useBusinessHours } from '@widget/composables/useBusinessHours.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const chatStore = useChatStore()
 const widgetStore = useWidgetStore()
 const { resolveBusinessHours, getBusinessHoursStatus } = useBusinessHours()
-const { t } = useI18n()
+const i18n = useI18n()
 
 const isAgentOnline = (status) => status === 'online' || status === 'away'
 
@@ -111,7 +111,7 @@ const chatTitle = computed(() => {
   // Show loading state while conversation is being fetched
   if (chatStore.isLoadingConversation) {
     return {
-      name: t('globals.terms.loading'),
+      name: i18n._('Loading'),
       avatarUrl: '',
       avatarFallback: '',
       availability_status: null,

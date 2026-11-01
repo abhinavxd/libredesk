@@ -4,7 +4,7 @@
       <Input
         :model-value="header.key"
         type="text"
-        :placeholder="t('admin.ai.tool.headerKeyPlaceholder')"
+        :placeholder="i18n._('Authorization')"
         class="flex-1"
         @update:model-value="updateHeader(index, 'key', $event)"
       />
@@ -12,7 +12,7 @@
         :model-value="header.value"
         type="password"
         autocomplete="new-password"
-        :placeholder="t('admin.ai.tool.headerValuePlaceholder')"
+        :placeholder="i18n._('Bearer xxx')"
         class="flex-1"
         @update:model-value="updateHeader(index, 'value', $event)"
       />
@@ -20,7 +20,7 @@
         type="button"
         variant="ghost"
         size="icon"
-        :aria-label="t('globals.terms.remove')"
+        :aria-label="i18n._('Remove')"
         class="text-muted-foreground hover:text-foreground"
         @click="removeHeader(index)"
       >
@@ -30,7 +30,7 @@
 
     <Button type="button" variant="ghost" size="sm" class="text-foreground" @click="addHeader">
       <Plus class="w-4 h-4" />
-      {{ t('admin.ai.tool.addHeader') }}
+      {{ i18n._('Add header') }}
     </Button>
   </div>
 </template>
@@ -38,12 +38,12 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { Plus, X } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 
 const model = defineModel({ type: Array, required: true })
-const { t } = useI18n()
+const i18n = useI18n()
 
 // Local rows carry a stable id so v-for keys survive removals; the emitted model stays {key,value}.
 let seq = 0

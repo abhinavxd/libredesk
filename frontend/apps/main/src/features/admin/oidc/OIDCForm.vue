@@ -5,11 +5,11 @@
         <FormControl>
           <div class="flex items-center space-x-2">
             <Checkbox
-              :aria-label="$t('globals.terms.enabled')"
+              :aria-label="i18n._('Enabled')"
               :checked="value"
               @update:checked="handleChange"
             />
-            <Label>{{ $t('globals.terms.enabled') }}</Label>
+            <Label>{{ i18n._('Enabled') }}</Label>
           </div>
         </FormControl>
         <FormMessage />
@@ -19,11 +19,11 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="provider">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.provider') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Provider', 'Providers', 1) }}</FormLabel>
           <FormControl>
             <Select v-bind="componentField">
               <SelectTrigger>
-                <SelectValue :placeholder="t('placeholders.selectProvider')" />
+                <SelectValue :placeholder="i18n._('Select provider')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -40,7 +40,7 @@
 
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="Google" v-bind="componentField" />
           </FormControl>
@@ -51,7 +51,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="provider_url">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.providerURL') }}</FormLabel>
+          <FormLabel>{{ i18n._('Provider URL') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="https://accounts.google.com" v-bind="componentField" />
           </FormControl>
@@ -65,11 +65,11 @@
         v-if="form.values.provider === 'Custom'"
       >
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.logoUrl') }}</FormLabel>
+          <FormLabel>{{ i18n._('Logo URL') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="https://example.com/logo.svg" v-bind="componentField" />
           </FormControl>
-          <FormDescription>{{ $t('admin.sso.logoURLDescription') }}</FormDescription>
+          <FormDescription>{{ i18n._('Custom logo URL to display on the login page.') }}</FormDescription>
           <FormMessage />
         </FormItem>
       </FormField>
@@ -77,7 +77,7 @@
     <FormGrid>
       <FormField v-slot="{ componentField }" name="client_id">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.clientID') }}</FormLabel>
+          <FormLabel>{{ i18n._('Client ID') }}</FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -87,7 +87,7 @@
 
       <FormField v-slot="{ componentField }" name="client_secret">
         <FormItem>
-          <FormLabel>{{ $t('globals.terms.clientSecret') }}</FormLabel>
+          <FormLabel>{{ i18n._('Client secret') }}</FormLabel>
           <FormControl>
             <Input type="password" placeholder="" v-bind="componentField" />
           </FormControl>
@@ -97,11 +97,11 @@
     </FormGrid>
     <FormField v-slot="{ componentField }" name="redirect_uri" v-if="!isNewForm">
       <FormItem>
-        <FormLabel>{{ $t('globals.terms.callbackURL') }}</FormLabel>
+        <FormLabel>{{ i18n._('Callback URL') }}</FormLabel>
         <FormControl>
           <Input type="text" placeholder="" v-bind="componentField" readonly />
         </FormControl>
-        <FormDescription>{{ $t('admin.sso.setThisUrlForCallback') }}</FormDescription>
+        <FormDescription>{{ i18n._('Set this URI for callback.') }}</FormDescription>
         <FormMessage />
       </FormItem>
     </FormField>
@@ -119,7 +119,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema.js'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   FormControl,
   FormField,
@@ -160,17 +160,17 @@ const props = defineProps({
     required: false
   }
 })
-const { t } = useI18n()
+const i18n = useI18n()
 
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t))
+  validationSchema: toTypedSchema(createFormSchema(i18n))
 })
 
 const onSubmit = form.handleSubmit((values) => {

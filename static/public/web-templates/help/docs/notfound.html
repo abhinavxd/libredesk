@@ -7,10 +7,10 @@
     <p>{{ .Data.ErrorText }}</p>
     <a class="hcd-notfound-search" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
         {{ template "hc-search-icon" }}
-        <span>{{ .L.T "helpCenter.searchPlaceholder" }}</span>
+        <span>{{ .L.GetD "templates" "Search articles..." }}</span>
         <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
     </a>
-    <p><a class="hcd-back" href="{{ .Data.HelpCenter.BasePath }}">{{ .L.T "helpCenter.backToHelpCenter" }}</a></p>
+    <p><a class="hcd-back" href="{{ .Data.HelpCenter.BasePath }}">{{ .L.GetD "templates" "Back to help center" }}</a></p>
 </section>
 
 {{ template "docs-footer" . }}

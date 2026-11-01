@@ -9,12 +9,12 @@
   >
     <div v-if="show" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-md">
       <div class="flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 shadow-lg">
-        <span class="flex-1 text-sm text-foreground">{{ $t('conversation.assignSelfPrompt') }}</span>
-        <Button size="sm" @click="$emit('assign')">{{ $t('conversation.assignSelfAction') }}</Button>
+        <span class="flex-1 text-sm text-foreground">{{ i18n._('This conversation isn\'\'t assigned to anyone.') }}</span>
+        <Button size="sm" @click="$emit('assign')">{{ i18n._('Assign to me') }}</Button>
         <button
           type="button"
           class="text-muted-foreground hover:text-foreground"
-          :aria-label="$t('globals.messages.close')"
+          :aria-label="i18n._('Close')"
           @click="$emit('dismiss')"
         >
           <X class="size-4" />

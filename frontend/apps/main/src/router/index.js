@@ -1,3 +1,5 @@
+
+import { defineMessage as msg } from '@lingui/core/macro'
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import { getI18n } from '@main/i18n'
@@ -12,19 +14,19 @@ const routes = [
         path: '',
         name: 'login',
         component: () => import('@main/views/auth/UserLoginView.vue'),
-        meta: { titleKey: 'auth.signInButton' }
+        meta: { titleMessage: msg({ message: 'Sign in' }) }
       },
       {
         path: 'reset-password',
         name: 'reset-password',
         component: () => import('@main/views/auth/ResetPasswordView.vue'),
-        meta: { titleKey: 'auth.resetPassword' }
+        meta: { titleMessage: msg({ message: 'Reset password' }) }
       },
       {
         path: 'set-password',
         name: 'set-password',
         component: () => import('@main/views/auth/SetPasswordView.vue'),
-        meta: { titleKey: 'auth.setNewPassword' }
+        meta: { titleMessage: msg({ message: 'Set new password' }) }
       }
     ]
   },
@@ -36,13 +38,13 @@ const routes = [
         path: 'contacts',
         name: 'contacts',
         component: () => import('@main/views/contact/ContactsView.vue'),
-        meta: { titleKey: 'contact.allContacts' }
+        meta: { titleMessage: msg({ message: 'All contacts' }) }
       },
       {
         path: 'contacts/:id',
         name: 'contact-detail',
         component: () => import('@main/views/contact/ContactDetailView.vue'),
-        meta: { titleKey: 'globals.terms.contact', titleCount: 2 }
+        meta: { titleMessage: msg({ message: '{count, plural, one {Contact} other {Contacts}}' }), titleCount: 2 }
       },
       {
         path: '/reports',
@@ -53,7 +55,7 @@ const routes = [
             path: 'overview',
             name: 'overview',
             component: () => import('@main/views/reports/OverviewView.vue'),
-            meta: { titleKey: 'globals.terms.overview' }
+            meta: { titleMessage: msg({ message: 'Overview' }) }
           }
         ]
       },
@@ -62,20 +64,20 @@ const routes = [
         name: 'teams',
         props: true,
         component: () => import('@main/layouts/inbox/InboxLayout.vue'),
-        meta: { titleKey: 'globals.terms.teamInbox', hidePageHeader: true },
+        meta: { titleMessage: msg({ message: '{count, plural, one {Team Inbox} other {Team Inboxes}}' }), hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'team-inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: { titleKey: 'globals.terms.teamInbox' },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Team Inbox} other {Team Inboxes}}' }) },
             children: [
               {
                 path: 'conversation/:uuid',
                 name: 'team-inbox-conversation',
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
-                meta: { titleKey: 'globals.terms.teamInbox', hidePageHeader: true }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Team Inbox} other {Team Inboxes}}' }), hidePageHeader: true }
               }
             ]
           }
@@ -86,20 +88,20 @@ const routes = [
         name: 'views',
         props: true,
         component: () => import('@main/layouts/inbox/InboxLayout.vue'),
-        meta: { titleKey: 'globals.terms.view', hidePageHeader: true },
+        meta: { titleMessage: msg({ message: '{count, plural, one {View} other {Views}}' }), hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'view-inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
-            meta: { titleKey: 'globals.terms.view' },
+            meta: { titleMessage: msg({ message: '{count, plural, one {View} other {Views}}' }) },
             children: [
               {
                 path: 'conversation/:uuid',
                 name: 'view-inbox-conversation',
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
-                meta: { titleKey: 'globals.terms.view', hidePageHeader: true }
+                meta: { titleMessage: msg({ message: '{count, plural, one {View} other {Views}}' }), hidePageHeader: true }
               }
             ]
           }
@@ -109,7 +111,7 @@ const routes = [
         path: 'inboxes/search',
         name: 'search',
         component: () => import('@main/views/search/SearchView.vue'),
-        meta: { titleKey: 'globals.terms.search', hidePageHeader: true }
+        meta: { titleMessage: msg({ message: 'Search' }), hidePageHeader: true }
       },
       {
         path: '/inboxes/:type(assigned|unassigned|all|mentioned)?',
@@ -117,19 +119,19 @@ const routes = [
         redirect: '/inboxes/assigned',
         component: () => import('@main/layouts/inbox/InboxLayout.vue'),
         props: true,
-        meta: { titleKey: 'globals.terms.inbox', hidePageHeader: true },
+        meta: { titleMessage: msg({ message: '{count, plural, one {Inbox} other {Inboxes}}' }), hidePageHeader: true },
         children: [
           {
             path: '',
             name: 'inbox',
             component: () => import('@main/views/inbox/InboxView.vue'),
             meta: {
-              titleKey: 'globals.terms.inbox',
-              typeKey: (route) => {
-                if (route.params.type === 'assigned') return 'conversation.myInbox'
-                if (route.params.type === 'mentioned') return 'conversation.mentions'
-                if (route.params.type === 'unassigned') return 'globals.terms.unassigned'
-                if (route.params.type === 'all') return 'globals.messages.all'
+              titleMessage: msg({ message: '{count, plural, one {Inbox} other {Inboxes}}' }),
+              typeMessage: (route) => {
+                if (route.params.type === 'assigned') return msg({ message: 'My inbox' })
+                if (route.params.type === 'mentioned') return msg({ message: 'Mentions' })
+                if (route.params.type === 'unassigned') return msg({ message: 'Unassigned' })
+                if (route.params.type === 'all') return msg({ message: 'All' })
                 return ''
               }
             },
@@ -140,12 +142,12 @@ const routes = [
                 component: () => import('@main/views/conversation/ConversationDetailView.vue'),
                 props: true,
                 meta: {
-                  titleKey: 'globals.terms.inbox',
-                  typeKey: (route) => {
-                    if (route.params.type === 'assigned') return 'conversation.myInbox'
-                    if (route.params.type === 'mentioned') return 'conversation.mentions'
-                    if (route.params.type === 'unassigned') return 'globals.terms.unassigned'
-                    if (route.params.type === 'all') return 'globals.messages.all'
+                  titleMessage: msg({ message: '{count, plural, one {Inbox} other {Inboxes}}' }),
+                  typeMessage: (route) => {
+                    if (route.params.type === 'assigned') return msg({ message: 'My inbox' })
+                    if (route.params.type === 'mentioned') return msg({ message: 'Mentions' })
+                    if (route.params.type === 'unassigned') return msg({ message: 'Unassigned' })
+                    if (route.params.type === 'all') return msg({ message: 'All' })
                     return ''
                   },
                   hidePageHeader: true
@@ -161,20 +163,20 @@ const routes = [
         redirect: '/account/profile',
         component: () => import('@main/layouts/account/AccountLayout.vue'),
         props: true,
-        meta: { titleKey: 'globals.terms.account' },
+        meta: { titleMessage: msg({ message: '{count, plural, one {Account} other {Accounts}}' }) },
         children: [
           {
             path: 'profile',
             name: 'profile',
             component: () => import('@main/views/account/profile/ProfileEditView.vue'),
-            meta: { titleKey: 'account.editProfile' }
+            meta: { titleMessage: msg({ message: 'Edit profile' }) }
           },
           {
             path: 'notifications',
             name: 'account-notifications',
             component: () =>
               import('@main/views/account/notifications/NotificationPreferences.vue'),
-            meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Notification} other {Notifications}}' }), titleCount: 2 }
           }
         ]
       },
@@ -182,19 +184,19 @@ const routes = [
         path: '/admin',
         name: 'admin',
         component: () => import('@main/layouts/admin/AdminLayout.vue'),
-        meta: { titleKey: 'globals.terms.admin' },
+        meta: { titleMessage: msg({ message: '{count, plural, one {Admin} other {Admins}}' }) },
         children: [
           {
             path: 'custom-attributes',
             name: 'custom-attributes',
             component: () => import('@main/views/admin/custom-attributes/CustomAttributes.vue'),
-            meta: { titleKey: 'globals.terms.customAttribute', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Custom attribute} other {Custom attributes}}' }), titleCount: 2 }
           },
           {
             path: 'general',
             name: 'general',
             component: () => import('@main/views/admin/general/General.vue'),
-            meta: { titleKey: 'globals.terms.general' }
+            meta: { titleMessage: msg({ message: 'General' }) }
           },
           {
             path: 'ai',
@@ -203,7 +205,7 @@ const routes = [
           {
             path: 'help-center',
             component: () => import('@main/views/admin/help-center/HelpCenter.vue'),
-            meta: { titleKey: 'globals.terms.helpCenter' },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Help center} other {Help centers}}' }) },
             children: [
               {
                 path: '',
@@ -215,14 +217,14 @@ const routes = [
                 name: 'help-center-customize',
                 props: true,
                 component: () => import('@main/views/admin/help-center/HelpCenterCustomize.vue'),
-                meta: { titleKey: 'globals.terms.helpCenter' }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Help center} other {Help centers}}' }) }
               },
               {
                 path: ':id/tree/:locale?',
                 name: 'help-center-tree',
                 props: true,
                 component: () => import('@main/views/admin/help-center/HelpCenterTree.vue'),
-                meta: { titleKey: 'globals.terms.helpCenter' }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Help center} other {Help centers}}' }) }
               }
             ]
           },
@@ -230,68 +232,68 @@ const routes = [
             path: 'ai/providers',
             name: 'ai-providers',
             component: () => import('@main/views/admin/ai/AIProviders.vue'),
-            meta: { titleKey: 'globals.terms.provider', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Provider} other {Providers}}' }), titleCount: 2 }
           },
           {
             path: 'ai/snippets',
             name: 'ai-snippets',
             component: () => import('@main/views/admin/ai/AISnippets.vue'),
-            meta: { titleKey: 'admin.ai.snippets', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Snippet} other {Snippets}}' }), titleCount: 2 }
           },
           {
             path: 'ai/editor-prompts',
             name: 'ai-editor-prompts',
             component: () => import('@main/views/admin/ai/AIEditorPrompts.vue'),
-            meta: { titleKey: 'admin.ai.editorPrompts', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Editor prompt} other {Editor prompts}}' }), titleCount: 2 }
           },
           {
             path: 'ai/suggestions',
             name: 'ai-suggestions',
             component: () => import('@main/views/admin/ai/AISuggestions.vue'),
-            meta: { titleKey: 'admin.ai.suggestions' }
+            meta: { titleMessage: msg({ message: 'Suggestions' }) }
           },
           {
             path: 'ai/tools',
             name: 'ai-tools',
             component: () => import('@main/views/admin/ai/AITools.vue'),
-            meta: { titleKey: 'admin.ai.tools' }
+            meta: { titleMessage: msg({ message: 'Tools' }) }
           },
           {
             path: 'ai/assistants',
             name: 'ai-assistants',
             component: () => import('@main/views/admin/ai/AIAssistants.vue'),
-            meta: { titleKey: 'admin.ai.assistants' }
+            meta: { titleMessage: msg({ message: 'Assistants' }) }
           },
           {
             path: 'ai/tools/new',
             name: 'new-ai-tool',
             component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
-            meta: { titleKey: 'admin.ai.tool.new' }
+            meta: { titleMessage: msg({ message: 'New tool' }) }
           },
           {
             path: 'ai/tools/:id/edit',
             name: 'edit-ai-tool',
             props: true,
             component: () => import('@main/views/admin/ai/CreateOrEditTool.vue'),
-            meta: { titleKey: 'admin.ai.tool.edit' }
+            meta: { titleMessage: msg({ message: 'Edit tool' }) }
           },
           {
             path: 'ai/assistants/new',
             name: 'new-ai-assistant',
             component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
-            meta: { titleKey: 'admin.ai.assistant.new' }
+            meta: { titleMessage: msg({ message: 'New assistant' }) }
           },
           {
             path: 'ai/assistants/:id/edit',
             name: 'edit-ai-assistant',
             props: true,
             component: () => import('@main/views/admin/ai/CreateOrEditAssistant.vue'),
-            meta: { titleKey: 'admin.ai.assistant.edit' }
+            meta: { titleMessage: msg({ message: 'Edit assistant' }) }
           },
           {
             path: 'business-hours',
             component: () => import('@main/views/admin/business-hours/BusinessHours.vue'),
-            meta: { titleKey: 'globals.terms.businessHour', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Business hour} other {Business hours}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -303,7 +305,7 @@ const routes = [
                 name: 'new-business-hours',
                 component: () =>
                   import('@main/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
-                meta: { titleKey: 'businessHour.new' }
+                meta: { titleMessage: msg({ message: 'New business hour' }) }
               },
               {
                 path: ':id/edit',
@@ -311,14 +313,14 @@ const routes = [
                 props: true,
                 component: () =>
                   import('@main/views/admin/business-hours/CreateOrEditBusinessHours.vue'),
-                meta: { titleKey: 'businessHour.edit' }
+                meta: { titleMessage: msg({ message: 'Edit business hour' }) }
               }
             ]
           },
           {
             path: 'sla',
             component: () => import('@main/views/admin/sla/SLA.vue'),
-            meta: { titleKey: 'globals.terms.sla' },
+            meta: { titleMessage: msg({ message: '{count, plural, one {SLA} other {SLAs}}' }) },
             children: [
               {
                 path: '',
@@ -329,21 +331,21 @@ const routes = [
                 path: 'new',
                 name: 'new-sla',
                 component: () => import('@main/views/admin/sla/CreateEditSLA.vue'),
-                meta: { titleKey: 'sla.new' }
+                meta: { titleMessage: msg({ message: 'New SLA policy' }) }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-sla',
                 component: () => import('@main/views/admin/sla/CreateEditSLA.vue'),
-                meta: { titleKey: 'sla.edit' }
+                meta: { titleMessage: msg({ message: 'Edit SLA policy' }) }
               }
             ]
           },
           {
             path: 'inboxes',
             component: () => import('@main/views/admin/inbox/InboxView.vue'),
-            meta: { titleKey: 'globals.terms.inbox', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Inbox} other {Inboxes}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -354,20 +356,20 @@ const routes = [
                 path: 'new',
                 name: 'new-inbox',
                 component: () => import('@main/views/admin/inbox/NewInbox.vue'),
-                meta: { titleKey: 'inbox.newInbox' }
+                meta: { titleMessage: msg({ message: 'New inbox' }) }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-inbox',
                 component: () => import('@main/views/admin/inbox/EditInbox.vue'),
-                meta: { titleKey: 'inbox.edit' }
+                meta: { titleMessage: msg({ message: 'Edit inbox' }) }
               }
             ]
           },
           {
             path: 'whatsapp/templates',
-            meta: { titleKey: 'admin.whatsappTemplates.title' },
+            meta: { titleMessage: msg({ message: 'WhatsApp templates' }) },
             children: [
               {
                 path: '',
@@ -378,30 +380,30 @@ const routes = [
                 path: 'new',
                 name: 'whatsapp-template-new',
                 component: () => import('@main/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue'),
-                meta: { titleKey: 'globals.messages.newTemplate' }
+                meta: { titleMessage: msg({ message: 'New template' }) }
               },
               {
                 path: ':id/edit',
                 name: 'whatsapp-template-edit',
                 component: () => import('@main/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue'),
                 props: true,
-                meta: { titleKey: 'globals.messages.edit' }
+                meta: { titleMessage: msg({ message: 'Edit' }) }
               }
             ]
           },
           {
             path: 'notification',
             component: () => import('@main/features/admin/notification/NotificationSetting.vue'),
-            meta: { titleKey: 'globals.terms.notification', titleCount: 2 }
+            meta: { titleMessage: msg({ message: '{count, plural, one {Notification} other {Notifications}}' }), titleCount: 2 }
           },
           {
             path: 'teams',
-            meta: { titleKey: 'globals.terms.team', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Team} other {Teams}}' }), titleCount: 2 },
             children: [
               {
                 path: 'agents',
                 component: () => import('@main/views/admin/agents/Agents.vue'),
-                meta: { titleKey: 'globals.terms.agent', titleCount: 2 },
+                meta: { titleMessage: msg({ message: '{count, plural, one {Agent} other {Agents}}' }), titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -412,21 +414,21 @@ const routes = [
                     path: 'new',
                     name: 'new-agent',
                     component: () => import('@main/views/admin/agents/CreateAgent.vue'),
-                    meta: { titleKey: 'agent.new' }
+                    meta: { titleMessage: msg({ message: 'New agent' }) }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-agent',
                     component: () => import('@main/views/admin/agents/EditAgent.vue'),
-                    meta: { titleKey: 'agent.edit' }
+                    meta: { titleMessage: msg({ message: 'Edit agent' }) }
                   }
                 ]
               },
               {
                 path: 'teams',
                 component: () => import('@main/views/admin/teams/Teams.vue'),
-                meta: { titleKey: 'globals.terms.team', titleCount: 2 },
+                meta: { titleMessage: msg({ message: '{count, plural, one {Team} other {Teams}}' }), titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -437,21 +439,21 @@ const routes = [
                     path: 'new',
                     name: 'new-team',
                     component: () => import('@main/views/admin/teams/CreateTeamForm.vue'),
-                    meta: { titleKey: 'team.new' }
+                    meta: { titleMessage: msg({ message: 'New team' }) }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-team',
                     component: () => import('@main/views/admin/teams/EditTeamForm.vue'),
-                    meta: { titleKey: 'team.edit' }
+                    meta: { titleMessage: msg({ message: 'Edit team' }) }
                   }
                 ]
               },
               {
                 path: 'roles',
                 component: () => import('@main/views/admin/roles/Roles.vue'),
-                meta: { titleKey: 'globals.terms.role', titleCount: 2 },
+                meta: { titleMessage: msg({ message: '{count, plural, one {Role} other {Roles}}' }), titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -462,14 +464,14 @@ const routes = [
                     path: 'new',
                     name: 'new-role',
                     component: () => import('@main/views/admin/roles/NewRole.vue'),
-                    meta: { titleKey: 'role.new' }
+                    meta: { titleMessage: msg({ message: 'New role' }) }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-role',
                     component: () => import('@main/views/admin/roles/EditRole.vue'),
-                    meta: { titleKey: 'role.edit' }
+                    meta: { titleMessage: msg({ message: 'Edit role' }) }
                   }
                 ]
               },
@@ -477,14 +479,14 @@ const routes = [
                 path: 'activity-log',
                 name: 'activity-log',
                 component: () => import('@main/views/admin/activity-log/ActivityLog.vue'),
-                meta: { titleKey: 'globals.terms.activityLog', titleCount: 2 }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Activity log} other {Activity logs}}' }), titleCount: 2 }
               }
             ]
           },
           {
             path: 'automations',
             component: () => import('@main/views/admin/automations/Automation.vue'),
-            meta: { titleKey: 'globals.terms.automation', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Automation} other {Automations}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -496,21 +498,21 @@ const routes = [
                 props: true,
                 name: 'new-automation',
                 component: () => import('@main/views/admin/automations/CreateOrEditRule.vue'),
-                meta: { titleKey: 'automation.newRule' }
+                meta: { titleMessage: msg({ message: 'New rule' }) }
               },
               {
                 path: ':id/edit',
                 props: true,
                 name: 'edit-automation',
                 component: () => import('@main/views/admin/automations/CreateOrEditRule.vue'),
-                meta: { titleKey: 'automation.editRule' }
+                meta: { titleMessage: msg({ message: 'Edit rule' }) }
               }
             ]
           },
           {
             path: 'templates',
             component: () => import('@main/views/admin/templates/Templates.vue'),
-            meta: { titleKey: 'globals.terms.template', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Template} other {Templates}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -522,14 +524,14 @@ const routes = [
                 name: 'edit-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'template.edit' }
+                meta: { titleMessage: msg({ message: 'Edit template' }) }
               },
               {
                 path: 'new',
                 name: 'new-template',
                 props: true,
                 component: () => import('@main/views/admin/templates/CreateEditTemplate.vue'),
-                meta: { titleKey: 'globals.messages.newTemplate' }
+                meta: { titleMessage: msg({ message: 'New template' }) }
               }
             ]
           },
@@ -537,7 +539,7 @@ const routes = [
             path: 'sso',
             component: () => import('@main/views/admin/oidc/OIDC.vue'),
             name: 'sso',
-            meta: { titleKey: 'globals.terms.sso' },
+            meta: { titleMessage: msg({ message: '{count, plural, one {SSO} other {SSOs}}' }) },
             children: [
               {
                 path: '',
@@ -549,13 +551,13 @@ const routes = [
                 props: true,
                 name: 'edit-sso',
                 component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { titleKey: 'oidc.edit' }
+                meta: { titleMessage: msg({ message: 'Edit SSO' }) }
               },
               {
                 path: 'new',
                 name: 'new-sso',
                 component: () => import('@main/views/admin/oidc/CreateEditOIDC.vue'),
-                meta: { titleKey: 'oidc.new' }
+                meta: { titleMessage: msg({ message: 'New SSO' }) }
               }
             ]
           },
@@ -563,7 +565,7 @@ const routes = [
             path: 'webhooks',
             component: () => import('@main/views/admin/webhooks/Webhooks.vue'),
             name: 'webhooks',
-            meta: { titleKey: 'globals.terms.webhook', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Webhook} other {Webhooks}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -575,13 +577,13 @@ const routes = [
                 props: true,
                 name: 'edit-webhook',
                 component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { titleKey: 'webhook.edit' }
+                meta: { titleMessage: msg({ message: 'Edit webhook' }) }
               },
               {
                 path: 'new',
                 name: 'new-webhook',
                 component: () => import('@main/views/admin/webhooks/CreateEditWebhook.vue'),
-                meta: { titleKey: 'webhook.new' }
+                meta: { titleMessage: msg({ message: 'New webhook' }) }
               }
             ]
           },
@@ -589,7 +591,7 @@ const routes = [
             path: 'context-links',
             component: () => import('@main/views/admin/context-links/ContextLinks.vue'),
             name: 'context-links',
-            meta: { titleKey: 'globals.terms.contextLink', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Context link} other {Context links}}' }), titleCount: 2 },
             children: [
               {
                 path: '',
@@ -602,35 +604,35 @@ const routes = [
                 name: 'edit-context-link',
                 component: () =>
                   import('@main/views/admin/context-links/CreateEditContextLink.vue'),
-                meta: { titleKey: 'contextLink.edit' }
+                meta: { titleMessage: msg({ message: 'Edit context link' }) }
               },
               {
                 path: 'new',
                 name: 'new-context-link',
                 component: () =>
                   import('@main/views/admin/context-links/CreateEditContextLink.vue'),
-                meta: { titleKey: 'contextLink.new' }
+                meta: { titleMessage: msg({ message: 'New context link' }) }
               }
             ]
           },
           {
             path: 'conversations',
-            meta: { titleKey: 'globals.terms.conversation', titleCount: 2 },
+            meta: { titleMessage: msg({ message: '{count, plural, one {Conversation} other {Conversations}}' }), titleCount: 2 },
             children: [
               {
                 path: 'tags',
                 component: () => import('@main/views/admin/tags/TagsView.vue'),
-                meta: { titleKey: 'globals.terms.tag', titleCount: 2 }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Tag} other {Tags}}' }), titleCount: 2 }
               },
               {
                 path: 'statuses',
                 component: () => import('@main/views/admin/status/StatusView.vue'),
-                meta: { titleKey: 'globals.terms.status', titleCount: 2 }
+                meta: { titleMessage: msg({ message: '{count, plural, one {Status} other {Statuses}}' }), titleCount: 2 }
               },
               {
                 path: 'macros',
                 component: () => import('@main/views/admin/macros/Macros.vue'),
-                meta: { titleKey: 'globals.terms.macro', titleCount: 2 },
+                meta: { titleMessage: msg({ message: '{count, plural, one {Macro} other {Macros}}' }), titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -641,21 +643,21 @@ const routes = [
                     path: 'new',
                     name: 'new-macro',
                     component: () => import('@main/views/admin/macros/CreateMacro.vue'),
-                    meta: { titleKey: 'macro.new' }
+                    meta: { titleMessage: msg({ message: 'New macro' }) }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-macro',
                     component: () => import('@main/views/admin/macros/EditMacro.vue'),
-                    meta: { titleKey: 'macro.editMacro' }
+                    meta: { titleMessage: msg({ message: 'Edit macro' }) }
                   }
                 ]
               },
               {
                 path: 'shared-views',
                 component: () => import('@main/views/admin/shared-views/SharedViews.vue'),
-                meta: { titleKey: 'globals.terms.sharedView', titleCount: 2 },
+                meta: { titleMessage: msg({ message: '{count, plural, one {Shared view} other {Shared views}}' }), titleCount: 2 },
                 children: [
                   {
                     path: '',
@@ -666,14 +668,14 @@ const routes = [
                     path: 'new',
                     name: 'new-shared-view',
                     component: () => import('@main/views/admin/shared-views/CreateSharedView.vue'),
-                    meta: { titleKey: 'sharedView.new' }
+                    meta: { titleMessage: msg({ message: 'New shared view' }) }
                   },
                   {
                     path: ':id/edit',
                     props: true,
                     name: 'edit-shared-view',
                     component: () => import('@main/views/admin/shared-views/EditSharedView.vue'),
-                    meta: { titleKey: 'sharedView.editSharedView' }
+                    meta: { titleMessage: msg({ message: 'Edit shared view' }) }
                   }
                 ]
               }
@@ -722,10 +724,10 @@ router.beforeEach((to, from, next) => {
   const appSettingsStore = useAppSettingsStore()
   const siteName = appSettingsStore.settings?.['app.site_name'] || 'libredesk'
   const i18n = getI18n()
-  const typeKey = typeof to.meta?.typeKey === 'function' ? to.meta.typeKey(to) : ''
-  const titleKey = typeKey || to.meta?.titleKey
-  const pageTitle = titleKey && i18n
-    ? i18n.global.t(titleKey, to.meta?.titleCount || 1)
+  const typeMessage = typeof to.meta?.typeMessage === 'function' ? to.meta.typeMessage(to) : ''
+  const titleMessage = typeMessage || to.meta?.titleMessage
+  const pageTitle = titleMessage && i18n
+    ? i18n.global._(titleMessage, to.meta?.titleCount || 1)
     : ''
   document.title = `${pageTitle} - ${siteName}`
   next()

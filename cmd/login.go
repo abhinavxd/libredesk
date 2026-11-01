@@ -27,18 +27,18 @@ func handleLogin(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 		if !isLocalLoginEnabled(oidcProviders) {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("auth.localLoginDisabled"), nil, envelope.PermissionError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("Password login is disabled. Sign in with your SSO provider."), nil, envelope.PermissionError)
 		}
 		app.lo.Warn("local login is disabled in config but no OIDC provider is enabled, allowing password login")
 	}
 
 	// Decode JSON request.
 	if err := r.Decode(&loginReq, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.InputError)
 	}
 
 	if loginReq.Email == "" || loginReq.Password == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 
 	// Verify email and password.
@@ -49,7 +49,7 @@ func handleLogin(r *fastglue.Request) error {
 
 	// Check if user is enabled.
 	if !user.Enabled {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("user.accountDisabled"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Your account is disabled, Please contact administrator"), nil))
 	}
 
 	if err := app.auth.SaveSession(amodels.User{
@@ -58,12 +58,12 @@ func handleLogin(r *fastglue.Request) error {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 	}, r); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
 		app.lo.Error("error setting csrf cookie", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 
 	// Update last login time.
@@ -96,7 +96,7 @@ func handleLogout(r *fastglue.Request) error {
 
 	if err := app.auth.DestroySession(r); err != nil {
 		app.lo.Error("error destroying session", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	return r.SendEnvelope(true)
 }

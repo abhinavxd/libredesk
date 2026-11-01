@@ -13,14 +13,14 @@
             value="reply"
             class="max-md:py-2.5"
           >
-            {{ $t('globals.terms.reply') }}
+            {{ i18n.ngettext('Reply', 'Replies', 1) }}
           </TabsTrigger>
           <TabsTrigger
             v-if="canSendPrivateNote"
             value="private_note"
             class="max-md:py-2.5"
           >
-            {{ $t('globals.terms.privateNote') }}
+            {{ i18n.ngettext('Private note', 'Private notes', 1) }}
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -30,7 +30,7 @@
           type="button"
           class="text-muted-foreground"
           variant="ghost"
-          :aria-label="t('globals.terms.collapse')"
+          :aria-label="i18n._('Collapse')"
           @click="emit('minimize')"
         >
           <Minus class="translate-y-1" />
@@ -52,7 +52,7 @@
         v-if="messageType === 'reply'"
       >
         <div v-if="conversationStore.currentFromOptions.length > 1" :class="RECIPIENT_ROW_CLASS">
-          <label :for="`${recipientId}-from`" :class="RECIPIENT_LABEL_CLASS">{{ $t('globals.terms.from') }}</label>
+          <label :for="`${recipientId}-from`" :class="RECIPIENT_LABEL_CLASS">{{ i18n._('From') }}</label>
           <div class="flex min-w-0 items-center gap-2">
             <Select v-model="sendFrom">
               <SelectTrigger :id="`${recipientId}-from`" :class="RECIPIENT_INPUT_CLASS"><SelectValue /></SelectTrigger>
@@ -65,12 +65,12 @@
           </div>
         </div>
         <div :class="RECIPIENT_ROW_CLASS">
-          <label :for="`${recipientId}-to`" :class="RECIPIENT_LABEL_CLASS">{{ $t('globals.terms.to') }}</label>
+          <label :for="`${recipientId}-to`" :class="RECIPIENT_LABEL_CLASS">{{ i18n._('To') }}</label>
           <div class="flex min-w-0 items-center gap-2">
             <Input
               :id="`${recipientId}-to`"
               type="text"
-              :placeholder="t('replyBox.emailAddresess')"
+              :placeholder="i18n._('Email addresses separated by comma')"
               v-model="to"
               :class="RECIPIENT_INPUT_CLASS"
               @blur="validateEmails"
@@ -83,7 +83,7 @@
               :class="RECIPIENT_TOGGLE_CLASS"
               @click="showRecipientField('cc')"
             >
-              {{ $t('replyBox.cc') }}
+              {{ i18n._('CC') }}
             </Button>
             <Button
               v-if="!showBcc"
@@ -93,18 +93,18 @@
               :class="RECIPIENT_TOGGLE_CLASS"
               @click="showRecipientField('bcc')"
             >
-              {{ $t('replyBox.bcc') }}
+              {{ i18n._('BCC') }}
             </Button>
           </div>
         </div>
         <div v-if="showCc" :class="RECIPIENT_ROW_CLASS">
-          <label :for="`${recipientId}-cc`" :class="RECIPIENT_LABEL_CLASS">{{ $t('replyBox.cc') }}</label>
+          <label :for="`${recipientId}-cc`" :class="RECIPIENT_LABEL_CLASS">{{ i18n._('CC') }}</label>
           <div class="flex min-w-0 items-center gap-2">
             <Input
               ref="ccInputRef"
               :id="`${recipientId}-cc`"
               type="text"
-              :placeholder="t('replyBox.emailAddresess')"
+              :placeholder="i18n._('Email addresses separated by comma')"
               v-model="cc"
               :class="RECIPIENT_INPUT_CLASS"
               @blur="validateEmails"
@@ -114,7 +114,7 @@
               size="sm"
               variant="ghost"
               :class="RECIPIENT_TOGGLE_CLASS"
-              :aria-label="t('replyBox.removeCC')"
+              :aria-label="i18n._('Remove CC')"
               @click="hideRecipientField('cc')"
             >
               <X class="w-4 h-4" />
@@ -122,13 +122,13 @@
           </div>
         </div>
         <div v-if="showBcc" :class="RECIPIENT_ROW_CLASS">
-          <label :for="`${recipientId}-bcc`" :class="RECIPIENT_LABEL_CLASS">{{ $t('replyBox.bcc') }}</label>
+          <label :for="`${recipientId}-bcc`" :class="RECIPIENT_LABEL_CLASS">{{ i18n._('BCC') }}</label>
           <div class="flex min-w-0 items-center gap-2">
             <Input
               ref="bccInputRef"
               :id="`${recipientId}-bcc`"
               type="text"
-              :placeholder="t('replyBox.emailAddresess')"
+              :placeholder="i18n._('Email addresses separated by comma')"
               v-model="bcc"
               :class="RECIPIENT_INPUT_CLASS"
               @blur="validateEmails"
@@ -138,7 +138,7 @@
               size="sm"
               variant="ghost"
               :class="RECIPIENT_TOGGLE_CLASS"
-              :aria-label="t('replyBox.removeBCC')"
+              :aria-label="i18n._('Remove BCC')"
               @click="hideRecipientField('bcc')"
             >
               <X class="w-4 h-4" />
@@ -163,7 +163,7 @@
         v-model:htmlContent="htmlContent"
         v-model:textContent="textContent"
         :message-type="messageType"
-        :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
+        :placeholder="isCramped ? i18n._('Type your message...') : i18n._('Shift + Enter to add a new line. Ctrl + Enter to send. Ctrl + K to open command bar.')"
         :insertContent="insertContent"
         :autoFocus="false"
         :disabled="isDraftLoading"
@@ -241,7 +241,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import ReplyBoxAttachmentPreview from '@/features/conversation/message/attachment/ReplyBoxAttachmentPreview.vue'
 import MacroActionsPreview from '@/features/conversation/MacroActionsPreview.vue'
 import ReplyBoxMenuBar from '@/features/conversation/ReplyBoxMenuBar.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { validateEmail } from '@shared-ui/utils/string'
 import { useMacroStore } from '@main/stores/macro'
 import api from '@main/api'
@@ -379,7 +379,7 @@ const isWhatsAppReply = computed(
 )
 const isCramped = useIsComposerCramped()
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const recipientId = useId()
 const insertContent = ref(null)
 const editorRef = ref(null)
@@ -443,7 +443,7 @@ const validateEmails = async () => {
       .filter((e) => e && !validateEmail(e))
 
     if (invalid.length)
-      emailErrors.value.push(`${t('replyBox.invalidEmailsIn')} '${field}': ${invalid.join(', ')}`)
+      emailErrors.value.push(`${i18n._('Invalid email(s) in')} '${field}': ${invalid.join(', ')}`)
   })
 }
 
@@ -452,7 +452,7 @@ const validateBeforeSend = async () => {
   if (emailErrors.value.length > 0) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.correctEmailErrors')
+      description: i18n._('Please correct the email errors')
     })
     return false
   }
