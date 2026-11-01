@@ -137,6 +137,9 @@ export class WebSocketClient {
         // New notification.
         [WS_EVENT.NEW_NOTIFICATION]: () => {
           this.notificationStore.addNotification(data.data)
+          if (['assignment', 'mention'].includes(data.data?.notification_type)) {
+            this.convStore.refreshSidebarCounts()
+          }
         },
         [WS_EVENT.AGENT_AVAILABILITY_UPDATE]: () =>
           this.usersStore.setAvailability(data.data.agent_id, data.data.availability_status),

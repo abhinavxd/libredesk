@@ -50,6 +50,7 @@ describe('sidebar count refreshes', () => {
   })
 
   afterEach(() => {
+    vi.clearAllTimers()
     vi.useRealTimers()
   })
 
@@ -95,7 +96,7 @@ describe('sidebar count refreshes', () => {
     expect(store.sidebarCounts.assigned).toBe(2)
   })
 
-  it('does not fetch counts for websocket bursts', () => {
+  it('does not fetch counts for unrelated websocket bursts', () => {
     const store = setup()
     const client = new WebSocketClient()
     client.socket = {}
@@ -105,11 +106,80 @@ describe('sidebar count refreshes', () => {
     for (let n = 0; n < 100; n++) {
       for (const type of ['new_conversation', 'conversation_update', 'new_notification']) {
         client.handleMessage({ target: client.socket, data: JSON.stringify({
-          type, data: { uuid: 'conversation-a', status: 'Open' }
+          type, data: { uuid: 'conversation-a', status: 'Open', notification_type: 'new_reply' }
         }) })
       }
     }
     expect(api.getSidebarCounts).not.toHaveBeenCalled()
+  })
+
+  it.each(['assignment', 'mention'])('refreshes real counts immediately for %s notifications', async notificationType => {
+    const store = setup()
+    store.sidebarCounts.assigned = 8
+    store.sidebarCounts.mentioned = 5
+    api.getSidebarCounts.mockResolvedValueOnce({ data: { data: { assigned: 2, mentioned: 1 } } })
+    const client = new WebSocketClient()
+    client.socket = {}
+    client.handleMessage({ target: client.socket, data: JSON.stringify({
+      type: 'new_notification', data: { notification_type: notificationType, is_read: false }
+    }) })
+
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+    expect(useNotificationStore().unreadCount).toBe(1)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.sidebarCounts.assigned).toBe(2)
+    expect(store.sidebarCounts.mentioned).toBe(1)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+  })
+
+  it('combines assignment and mention bursts and fetches final counts after ten seconds', async () => {
+    const store = setup()
+    api.getSidebarCounts.mockResolvedValueOnce({ data: { data: { assigned: 1, mentioned: 0 } } })
+      .mockResolvedValueOnce({ data: { data: { assigned: 77, mentioned: 12 } } })
+    const client = new WebSocketClient()
+    client.socket = {}
+    for (let n = 0; n < 100; n++) {
+      client.handleMessage({ target: client.socket, data: JSON.stringify({
+        type: 'new_notification', data: { notification_type: n % 2 ? 'mention' : 'assignment', is_read: false }
+      }) })
+    }
+
+    expect(useNotificationStore().unreadCount).toBe(100)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+    expect(store.sidebarCounts.assigned).toBe(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(2)
+    expect(store.sidebarCounts.assigned).toBe(77)
+    expect(store.sidebarCounts.mentioned).toBe(12)
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(2)
+  })
+
+  it('limits continuous assignment events to one count refresh every ten seconds', async () => {
+    setup()
+    const starts = []
+    const initialTime = Date.now()
+    api.getSidebarCounts.mockImplementation(() => {
+      starts.push(Date.now() - initialTime)
+      return Promise.resolve({ data: { data: {} } })
+    })
+    const client = new WebSocketClient()
+    client.socket = {}
+    for (let n = 0; n < 35; n++) {
+      client.handleMessage({ target: client.socket, data: JSON.stringify({
+        type: 'new_notification', data: { notification_type: 'assignment', is_read: false }
+      }) })
+      await vi.advanceTimersByTimeAsync(1_000)
+    }
+
+    expect(starts).toEqual([0, 10_000, 20_000, 30_000])
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(starts).toEqual([0, 10_000, 20_000, 30_000, 40_000])
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(5)
   })
 })
 

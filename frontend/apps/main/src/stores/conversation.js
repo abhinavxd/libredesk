@@ -55,6 +55,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   // Navigation reuses recent counts. Mutations force a refresh.
   const SIDEBAR_COUNTS_TTL = 120_000
+  const SIDEBAR_COUNTS_NOTIFICATION_THROTTLE = 10_000
   let sidebarCountsRequest = null
   let sidebarCountsFetchedAt = 0
   let sidebarCountsForceQueued = false
@@ -91,6 +92,12 @@ export const useConversationStore = defineStore('conversation', () => {
 
     return sidebarCountsRequest
   }
+
+  const refreshSidebarCounts = useThrottleFn(
+    () => fetchSidebarCounts({ force: true }),
+    SIDEBAR_COUNTS_NOTIFICATION_THROTTLE,
+    true /** trailing **/
+  )
 
   async function fetchViewCount (viewID) {
     try {
@@ -1388,6 +1395,7 @@ export const useConversationStore = defineStore('conversation', () => {
     isSelected,
     sidebarCounts,
     fetchSidebarCounts,
+    refreshSidebarCounts,
     fetchViewCount
   }
 })
