@@ -981,6 +981,7 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 			RedirectURL:  func() (string, error) { return o.RedirectURL(config.ID) },
 			ClientID:     config.ClientID,
 			ClientSecret: config.ClientSecret,
+			VerifyEmail:  config.VerifyEmail,
 		})
 	}
 	return providers, nil

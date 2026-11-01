@@ -36,3 +36,29 @@ func TestV2_10_0_RC1QueryIndexesMatchSchemaAfterRepeatedUpgrade(t *testing.T) {
 		}
 	}
 }
+
+func TestV2_10_0_RC1OIDCVerificationDefaultAndPreservedChoice(t *testing.T) {
+	db := testutil.NewDB(t, "migration_oidc_verification")
+	if _, err := db.Exec(`
+		ALTER TABLE oidc DROP COLUMN verify_email;
+		INSERT INTO oidc (provider_url, client_id, client_secret)
+		VALUES ('https://oidc.test', 'migration-test', 'secret');
+	`); err != nil {
+		t.Fatal(err)
+	}
+	for attempt := range 2 {
+		if err := V2_10_0_RC1(db, nil /** fs **/, nil /** ko **/); err != nil {
+			t.Fatal(err)
+		}
+		var verifyEmail bool
+		if err := db.Get(&verifyEmail, `SELECT verify_email FROM oidc WHERE client_id = 'migration-test'`); err != nil {
+			t.Fatal(err)
+		}
+		if expected := attempt == 0; verifyEmail != expected {
+			t.Fatalf("upgrade %d: verify_email = %t, want %t", attempt+1, verifyEmail, expected)
+		}
+		if _, err := db.Exec(`UPDATE oidc SET verify_email = false WHERE client_id = 'migration-test'`); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
