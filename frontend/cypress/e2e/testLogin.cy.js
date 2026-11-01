@@ -232,9 +232,6 @@ freshInstallation('Fresh installation setup', () => {
         cy.viewport(1440, 1000)
         const code = Cypress.env('SETUP_CODE')
         const password = 'SetupPass!123'
-        const api = (method, path, body) => cy.getCookie('csrf_token').then((cookie) =>
-            cy.request({ method, url: path, body, headers: { 'X-CSRFTOKEN': cookie.value } })
-        )
         cy.visit('/')
         cy.location('pathname').should('eq', '/setup')
         cy.get('#token').type('x'.repeat(40), { log: false })
@@ -266,7 +263,7 @@ freshInstallation('Fresh installation setup', () => {
         cy.get('input[name="config.brand_name"]').type('Support')
         cy.get('form button[type="submit"]').click()
         cy.location('pathname').should('eq', '/admin/inboxes')
-        api('GET', '/api/v1/inboxes').then(({ body }) => {
+        cy.api('GET', '/api/v1/inboxes').then(({ body }) => {
             const inbox = body.data.find((item) => item.name === 'Setup test inbox')
             expect(inbox).to.have.property('uuid')
             cy.request({
@@ -277,7 +274,7 @@ freshInstallation('Fresh installation setup', () => {
             }).then(({ body }) => {
                 const conversation = body.data.conversation.uuid
                 const token = body.data.session_token
-                api('POST', `/api/v1/conversations/${conversation}/messages`, {
+                cy.api('POST', `/api/v1/conversations/${conversation}/messages`, {
                     message: 'Setup is working.', private: false, sender_type: 'agent'
                 })
                 cy.visit('/inboxes/assigned')
