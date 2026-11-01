@@ -68,6 +68,8 @@ func TestOIDCEmailVerification(t *testing.T) {
 		verified      any
 		verifyEmail   bool
 		reload        bool
+		failReload    bool
+		failureFirst  bool
 		userInfo      map[string]any
 		userInfoError bool
 		want          bool
@@ -88,6 +90,12 @@ func TestOIDCEmailVerification(t *testing.T) {
 		{name: "verification disabled unverified", email: "agent@example.com", verified: false, want: true},
 		{name: "verification disabled missing", reload: true, email: "agent@example.com", want: true},
 		{name: "verification disabled empty email", userInfo: map[string]any{"sub": "test-user"}, wantUserInfo: true},
+		{name: "failed reload enforces verification before failure", reload: true, failReload: true, email: "agent@example.com", verified: false, verifyEmail: true},
+		{name: "failed reload enforces verification after failure", reload: true, failReload: true, failureFirst: true, email: "agent@example.com", verified: false, verifyEmail: true},
+		{name: "failed reload accepts verified email", reload: true, failReload: true, email: "agent@example.com", verified: true, verifyEmail: true, want: true},
+		{name: "failed reload verifies through userinfo", reload: true, failReload: true, failureFirst: true, email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com", "email_verified": true}, want: true, wantUserInfo: true},
+		{name: "failed reload rejects missing verification", reload: true, failReload: true, email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com"}, wantUserInfo: true},
+		{name: "failed reload cannot disable verification", reload: true, failReload: true, email: "agent@example.com", verified: false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var token string
@@ -110,6 +118,8 @@ func TestOIDCEmailVerification(t *testing.T) {
 						return
 					}
 					json.NewEncoder(w).Encode(tt.userInfo)
+				case "/unavailable/.well-known/openid-configuration":
+					http.Error(w, "unavailable", http.StatusServiceUnavailable)
 				default:
 					http.NotFound(w, r)
 				}
@@ -135,8 +145,19 @@ func TestOIDCEmailVerification(t *testing.T) {
 			}
 			if tt.reload {
 				cfg.Providers[0].VerifyEmail = tt.verifyEmail
-				if err := a.Reload(cfg); err != nil {
-					t.Fatal(err)
+				if tt.failReload {
+					unavailable := Provider{ID: 2, ProviderURL: server.URL + "/unavailable"}
+					if tt.failureFirst {
+						cfg.Providers = append([]Provider{unavailable}, cfg.Providers...)
+					} else {
+						cfg.Providers = append(cfg.Providers, unavailable)
+					}
+				}
+				if err := a.Reload(cfg); (err != nil) != tt.failReload {
+					t.Fatalf("reload err = %v, want failure %v", err, tt.failReload)
+				}
+				if _, ok := a.providers[2]; ok {
+					t.Fatal("unavailable provider became active")
 				}
 			}
 			provider := a.providers[1]

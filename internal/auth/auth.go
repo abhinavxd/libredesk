@@ -168,6 +168,14 @@ func (a *Auth) Reload(cfg Config) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	// Enforce stricter verification even when discovery prevents a full reload.
+	for _, provider := range cfg.Providers {
+		if current, ok := a.providers[provider.ID]; ok && provider.VerifyEmail {
+			current.verifyEmail = true
+			a.providers[provider.ID] = current
+		}
+	}
+
 	oauthCfgs := make(map[int]oauth2.Config)
 	providers := make(map[int]oidcProvider)
 	redirectURLs := make(map[int]func() (string, error))
