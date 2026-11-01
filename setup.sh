@@ -76,10 +76,11 @@ unset POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB LIBREDESK_IMAGE LIBREDESK_HTTP
 unset POSTGRES_PUBLISHED_PORT REDIS_PUBLISHED_PORT LIBREDESK_APP__ROOT_URL
 docker compose --env-file .env -f docker-compose.yml up -d --wait
 docker compose --env-file .env -f docker-compose.yml logs --tail=30 app
+printf 'Open %s. Existing accounts and passwords are unchanged.\n' "$root_url"
 if [ -n "${LIBREDESK_SYSTEM_USER_PASSWORD:-}" ]; then
-  printf 'Open %s and sign in as System with the password you supplied.\n' "$root_url"
+  printf '%s\n' 'For a new installation, sign in as System with the password you supplied.'
 else
-  printf 'Open %s/setup and create your admin account using the temporary code in the logs.\n' "$root_url"
+  printf 'If you have not created an admin account, open %s/setup and use the temporary code in the logs.\n' "$root_url"
 fi
 if [ "$mode" = production ]; then
   printf '%s\n' 'Configure your HTTPS reverse proxy before opening setup. See INSTALL.md in the release archive.'
