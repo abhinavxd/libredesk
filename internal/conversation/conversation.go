@@ -2063,7 +2063,6 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 	if order == "" {
 		order = "DESC"
 	}
-	order = strings.ToUpper(order)
 	if filtersJSON == "" {
 		filtersJSON = "[]"
 	}
@@ -2081,26 +2080,14 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		return "", nil, err
 	}
 
-	whereClause := listTypeWhereClause(conditions)
-	location := c.FilterLocation()
-	pageBase := fmt.Sprintf(c.q.GetConversationsPageBase, orderBy, whereClause)
-	pageQuery, pageArgs, err := dbutil.BuildPaginatedQuery(pageBase, qArgs, dbutil.PaginationOptions{
+	pageBase := fmt.Sprintf(c.q.GetConversationsPageBase, orderBy, listTypeWhereClause(conditions))
+	return dbutil.BuildCountedPaginatedQuery(baseQuery, pageBase, qArgs, dbutil.PaginationOptions{
 		Order:    order,
 		OrderBy:  orderBy,
 		Page:     page,
 		PageSize: pageSize,
-		Location: location,
+		Location: c.FilterLocation(),
 	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
-	if err != nil {
-		return "", nil, err
-	}
-
-	countQuery, _, err := dbutil.BuildFilterQuery(pageBase, qArgs, filtersJSON, ListFilterAllowedFields, ListFilterRenderers, location)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return fmt.Sprintf(baseQuery, pageQuery, countQuery, order), pageArgs, nil
 }
 
 // ValidateListFilters structurally validates a conversation view's filters payload.

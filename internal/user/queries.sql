@@ -1,5 +1,14 @@
 -- name: get-users-compact
-SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+WITH page AS MATERIALIZED (
+    %s
+)
+SELECT (SELECT COUNT(*) FROM (%s) matching) AS total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+FROM page
+JOIN users ON users.id = page.id
+ORDER BY page.sort_value %s NULLS LAST
+
+-- name: get-users-page-base
+SELECT users.id, %s AS sort_value
 FROM users
 -- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
 WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)

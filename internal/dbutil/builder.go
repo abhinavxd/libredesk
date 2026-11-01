@@ -138,23 +138,21 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 	return query, args, nil
 }
 
-// BuildCountedPaginatedQuery counts matches independently of the selected page's payload.
-func BuildCountedPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOptions, filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
-	pageQuery, pageArgs, err := BuildPaginatedQuery(baseQuery, existingArgs, opts, filtersJSON, allowedFields, renderers)
+// BuildCountedPaginatedQuery fills a payload template with the page, independent count query, and validated sort direction.
+func BuildCountedPaginatedQuery(payloadQuery, pageBase string, existingArgs []any, opts PaginationOptions, filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
+	pageQuery, pageArgs, err := BuildPaginatedQuery(pageBase, existingArgs, opts, filtersJSON, allowedFields, renderers)
 	if err != nil {
 		return "", nil, err
 	}
-	countQuery, _, err := BuildFilterQuery(baseQuery, existingArgs, filtersJSON, allowedFields, renderers, opts.Location)
+	countQuery, _, err := BuildFilterQuery(pageBase, existingArgs, filtersJSON, allowedFields, renderers, opts.Location)
 	if err != nil {
 		return "", nil, err
 	}
-	query := fmt.Sprintf(`WITH page AS MATERIALIZED (%s)
-		SELECT page.*, (SELECT COUNT(*) FROM (%s) matching) AS total FROM page`, pageQuery, countQuery)
+	order := ""
 	if opts.OrderBy != "" {
-		_, field, _ := strings.Cut(opts.OrderBy, ".")
-		query += fmt.Sprintf(" ORDER BY page.%s %s NULLS LAST", field, strings.ToUpper(opts.Order))
+		order = strings.ToUpper(opts.Order)
 	}
-	return query, pageArgs, nil
+	return fmt.Sprintf(payloadQuery, pageQuery, countQuery, order), pageArgs, nil
 }
 
 // BuildFilterQuery appends validated filter conditions with AND to a base query that already has a WHERE clause.

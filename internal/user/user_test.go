@@ -48,18 +48,21 @@ func TestUserListCountMatchesFilteredPages(t *testing.T) {
 		}
 	}
 	for _, tt := range []struct {
-		name, order, filters string
-		page, total          int
-		want                 []string
+		name, order, orderBy, filters string
+		page, total                   int
+		want                          []string
 	}{
-		{"second page", "desc", "[]", 2, 4, []string{"contact2@example.com", "contact1@example.com"}},
-		{"ascending", "asc", "[]", 1, 4, []string{"contact1@example.com", "contact2@example.com"}},
-		{"exact email", "desc", `[{"model":"users","field":"email","operator":"equals","value":"contact3@example.com"}]`, 1, 1, []string{"contact3@example.com"}},
-		{"date filter", "desc", `[{"model":"users","field":"created_at","operator":"equals","value":"2026-01-01"}]`, 1, 4, []string{"contact4@example.com", "contact3@example.com"}},
-		{"empty page", "desc", "[]", 3, 0, nil},
+		{"second page", "desc", "users.created_at", "[]", 2, 4, []string{"contact2@example.com", "contact1@example.com"}},
+		{"ascending", "asc", "users.created_at", "[]", 1, 4, []string{"contact1@example.com", "contact2@example.com"}},
+		{"email sort", "desc", "users.email", "[]", 1, 4, []string{"contact4@example.com", "contact3@example.com"}},
+		{"default direction", "", "users.created_at", "[]", 1, 4, []string{"contact1@example.com", "contact2@example.com"}},
+		{"exact email", "desc", "users.created_at", `[{"model":"users","field":"email","operator":"equals","value":"contact3@example.com"}]`, 1, 1, []string{"contact3@example.com"}},
+		{"date filter", "desc", "users.created_at", `[{"model":"users","field":"created_at","operator":"equals","value":"2026-01-01"}]`, 1, 4, []string{"contact4@example.com", "contact3@example.com"}},
+		{"no matches", "desc", "users.created_at", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
+		{"empty page", "desc", "users.created_at", "[]", 3, 0, nil},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			rows, err := u.GetAllUsers(tt.page, 2 /** pageSize **/, []string{"contact"}, tt.order, "users.created_at", tt.filters, "UTC")
+			rows, err := u.GetAllUsers(tt.page, 2 /** pageSize **/, []string{"contact"}, tt.order, tt.orderBy, tt.filters, "UTC")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -72,6 +75,19 @@ func TestUserListCountMatchesFilteredPages(t *testing.T) {
 			}
 			if !slices.Equal(emails, tt.want) {
 				t.Fatalf("emails = %v, want %v", emails, tt.want)
+			}
+		})
+	}
+	for _, order := range []string{"", "desc", "ASC; SELECT 1"} {
+		t.Run("no sort/"+order, func(t *testing.T) {
+			rows, err := u.GetAllUsers(1 /** page **/, 2 /** pageSize **/, []string{"contact"}, order, "" /** orderBy **/, "[]", "UTC")
+			if err != nil || len(rows) != 2 {
+				t.Fatalf("unsorted page: rows=%d, err=%v", len(rows), err)
+			}
+			for _, row := range rows {
+				if row.Total != 4 || !slices.Contains([]string{"contact1@example.com", "contact2@example.com", "contact3@example.com", "contact4@example.com"}, row.Email.String) {
+					t.Fatalf("unexpected unsorted result: %+v", row)
+				}
 			}
 		})
 	}

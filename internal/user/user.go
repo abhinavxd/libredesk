@@ -2,6 +2,7 @@
 package user
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -84,6 +85,7 @@ type queries struct {
 	GetUserIDsByRole                 *sqlx.Stmt `query:"get-user-ids-by-role"`
 	GetUserByExternalID              *sqlx.Stmt `query:"get-user-by-external-id"`
 	GetUsersCompact                  string     `query:"get-users-compact"`
+	GetUsersPageBase                 string     `query:"get-users-page-base"`
 	GetAgentsCompact                 *sqlx.Stmt `query:"get-agents-compact"`
 	GetAgentsCompactByIDs            *sqlx.Stmt `query:"get-agents-compact-by-ids"`
 	UpdateContact                    *sqlx.Stmt `query:"update-contact"`
@@ -627,9 +629,8 @@ func updateSystemUserPassword(db *sqlx.DB, hashedPassword []byte) (int, error) {
 
 // makeUserListQuery generates a query to fetch users based on the provided filters.
 func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, order, orderBy, filtersJSON, location string) (string, []any, error) {
-	var qArgs []any
-	qArgs = append(qArgs, pq.Array(userTypes))
-	return dbutil.BuildCountedPaginatedQuery(u.q.GetUsersCompact, qArgs, dbutil.PaginationOptions{
+	pageBase := fmt.Sprintf(u.q.GetUsersPageBase, cmp.Or(orderBy, "NULL"))
+	return dbutil.BuildCountedPaginatedQuery(u.q.GetUsersCompact, pageBase, []any{pq.Array(userTypes)}, dbutil.PaginationOptions{
 		Order:    order,
 		OrderBy:  orderBy,
 		Page:     page,

@@ -28,6 +28,39 @@ var testRenderers = FieldRenderers{
 	},
 }
 
+func TestCountedPaginationSortValidation(t *testing.T) {
+	for _, tt := range []struct {
+		name, orderBy, order string
+		wantError            bool
+	}{
+		{"lowercase direction", "users.email", "asc", false},
+		{"default direction", "users.email", "", false},
+		{"unsorted", "", "", false},
+		{"ignored direction without sort", "", "ASC; SELECT 1", false},
+		{"invalid direction", "users.email", "ASC; SELECT 1", true},
+		{"invalid field", "users.email; SELECT 1", "ASC", true},
+		{"unknown field", "users.password", "ASC", true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			query, _, err := BuildCountedPaginatedQuery(
+				"WITH page AS MATERIALIZED (%s) SELECT page.*, (SELECT COUNT(*) FROM (%s) matching) AS total FROM page ORDER BY page.sort_value %s NULLS LAST",
+				"SELECT users.id, users.email AS sort_value FROM users WHERE users.deleted_at IS NULL",
+				nil, /** existingArgs **/
+				PaginationOptions{Page: 1, PageSize: 2, OrderBy: tt.orderBy, Order: tt.order},
+				"[]", testAllowed, nil /** renderers **/)
+			if (err != nil) != tt.wantError {
+				t.Fatalf("error = %v, want error %v", err, tt.wantError)
+			}
+			if strings.Contains(query, "SELECT 1") {
+				t.Fatal("unvalidated sort text reached the query")
+			}
+			if tt.name == "lowercase direction" && !strings.Contains(query, "ORDER BY page.sort_value ASC NULLS LAST") {
+				t.Fatalf("outer sort direction was lost: %s", query)
+			}
+		})
+	}
+}
+
 func build(t *testing.T, filtersJSON string) (string, []any, error) {
 	t.Helper()
 	return BuildPaginatedQuery("SELECT 1 FROM conversations WHERE 1=1", nil, PaginationOptions{Page: 1, PageSize: 30}, filtersJSON, testAllowed, testRenderers)
