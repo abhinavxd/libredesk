@@ -4,18 +4,24 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/envelope"
 	oidcmodels "github.com/abhinavxd/libredesk/internal/oidc/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/abhinavxd/libredesk/internal/user"
 	"github.com/jmoiron/sqlx"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/stuffbin"
+	"github.com/lib/pq"
+	"github.com/valyala/fasthttp"
+	"github.com/zerodha/fastglue"
 	"github.com/zerodha/logf"
 )
 
@@ -226,6 +232,78 @@ func TestInstallationChecksUploadAndCookieSettings(t *testing.T) {
 		if err := checkCookieConfiguration(config); (err != nil) != tt.wantError {
 			t.Fatalf("cookie check for %s: %v", tt.url, err)
 		}
+	}
+}
+
+func TestSetupErrorsKeepDatabaseDetailsPrivate(t *testing.T) {
+	logger := logf.New(logf.Opts{Level: logf.FatalLevel})
+	ctx := &fasthttp.RequestCtx{}
+	req := &fastglue.Request{RequestCtx: ctx, Context: &App{lo: &logger, i18n: testutil.NewI18n(t)}}
+	cause := &pq.Error{Code: "XX000", Detail: "private database detail", Table: "private_table"}
+	if err := sendSetupError(req, envelope.NewError(envelope.GeneralError, "setup.saveFailed", cause)); err != nil {
+		t.Fatal(err)
+	}
+	body := string(ctx.Response.Body())
+	if ctx.Response.StatusCode() != fasthttp.StatusInternalServerError {
+		t.Fatalf("status = %d", ctx.Response.StatusCode())
+	}
+	if strings.Contains(body, "private") || strings.Contains(body, "XX000") || strings.Contains(body, "setup.saveFailed") {
+		t.Fatalf("response exposed internal details or an untranslated key: %s", body)
+	}
+}
+
+func TestSetupScriptIgnoresExportedCredentials(t *testing.T) {
+	if _, err := exec.LookPath("openssl"); err != nil {
+		t.Skip("openssl is required by the installer")
+	}
+	root, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	binDir := filepath.Join(dir, "bin")
+	if err := os.Mkdir(binDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	scripts := map[string]string{
+		"curl": `#!/bin/sh
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -o) output=$2; shift 2 ;;
+    http*) url=$1; shift ;;
+    *) shift ;;
+  esac
+done
+case "$url" in
+  */config.sample.toml) cp "$SETUP_CONFIG_TEMPLATE" "$output" ;;
+  */docker-compose.yml) cp "$SETUP_COMPOSE_TEMPLATE" "$output" ;;
+  *) exit 1 ;;
+esac
+`,
+		"docker": `#!/bin/sh
+if [ "$2" = version ]; then exit 0; fi
+[ "${POSTGRES_USER+x}${POSTGRES_PASSWORD+x}${POSTGRES_DB+x}${LIBREDESK_IMAGE+x}${LIBREDESK_APP__ROOT_URL+x}" = "" ]
+`,
+	}
+	for name, content := range scripts {
+		if err := os.WriteFile(filepath.Join(binDir, name), []byte(content), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command := exec.CommandContext(t.Context(), "sh", filepath.Join(root, "setup.sh"), "local")
+	command.Dir = dir
+	command.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "LIBREDESK_RELEASE=v9.9.9",
+		"SETUP_CONFIG_TEMPLATE="+filepath.Join(root, "config.sample.toml"), "SETUP_COMPOSE_TEMPLATE="+filepath.Join(root, "docker-compose.yml"),
+		"POSTGRES_USER=exported-user", "POSTGRES_PASSWORD=exported-password", "POSTGRES_DB=exported-db", "LIBREDESK_IMAGE=exported-image", "LIBREDESK_APP__ROOT_URL=https://wrong.example")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("setup failed with exported credentials: %v, %s", err, output)
+	}
+	config, err := os.ReadFile(filepath.Join(dir, "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(config), "exported-password") || strings.Contains(string(config), sampleEncKey) {
+		t.Fatal("setup failed to generate independent credentials")
 	}
 }
 

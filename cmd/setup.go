@@ -86,7 +86,7 @@ func handleGetSetup(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	required, err := setupRequired(app.db)
 	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("setup.unavailable"), err))
+		return sendSetupError(r, envelope.NewError(envelope.GeneralError, "setup.unavailable", err))
 	}
 	r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
 	return r.SendEnvelope(map[string]bool{"required": required})
@@ -99,11 +99,7 @@ func handleCreateSetupAccount(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
 	}
 	if err := createSetupAccount(r.RequestCtx, app.db, req); err != nil {
-		if detail, ok := errors.AsType[envelope.Error](err); ok {
-			detail.Message = app.i18n.T(detail.Message)
-			err = detail
-		}
-		return sendErrorEnvelope(r, err)
+		return sendSetupError(r, err)
 	}
 	return r.SendEnvelope(true)
 }
@@ -164,7 +160,7 @@ func handleGetSetupChecklist(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	out, err := getSetupChecklist(app.db)
 	if err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("setup.unavailable"), err))
+		return sendSetupError(r, envelope.NewError(envelope.GeneralError, "setup.unavailable", err))
 	}
 	return r.SendEnvelope(out)
 }
@@ -172,7 +168,7 @@ func handleGetSetupChecklist(r *fastglue.Request) error {
 func handleSkipSetupNotifications(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	if _, err := app.db.Exec(`UPDATE settings SET value = 'true' WHERE key = 'setup.notifications_skipped'`); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("setup.unavailable"), err))
+		return sendSetupError(r, envelope.NewError(envelope.GeneralError, "setup.unavailable", err))
 	}
 	return r.SendEnvelope(true)
 }
@@ -199,4 +195,17 @@ func markSetupWorkspaceComplete(db *sqlx.DB) error {
 		return fmt.Errorf("saving setup progress: %w", err)
 	}
 	return nil
+}
+
+func sendSetupError(r *fastglue.Request, err error) error {
+	app := r.Context.(*App)
+	if detail, ok := errors.AsType[envelope.Error](err); ok {
+		if detail.Data != nil {
+			app.lo.Error("setup request failed", "error", detail.Data)
+			detail.Data = nil
+		}
+		detail.Message = app.i18n.T(detail.Message)
+		err = detail
+	}
+	return sendErrorEnvelope(r, err)
 }

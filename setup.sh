@@ -72,9 +72,11 @@ else
   printf 'Configuration created for %s. Back up config.toml, .env, and uploads with your database.\n' "$root_url"
 fi
 
-docker compose up -d --wait
+unset POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB LIBREDESK_IMAGE LIBREDESK_HTTP_BIND
+unset POSTGRES_PUBLISHED_PORT REDIS_PUBLISHED_PORT LIBREDESK_APP__ROOT_URL LIBREDESK_SYSTEM_USER_PASSWORD
+docker compose --env-file .env -f docker-compose.yml up -d --wait
 printf '%s\n' 'Read the temporary setup code below, then open /setup at your libredesk address.'
-docker compose logs --tail=30 app
+docker compose --env-file .env -f docker-compose.yml logs --tail=30 app
 if [ "$mode" = production ]; then
   printf '%s\n' 'Configure your HTTPS reverse proxy before opening setup. See INSTALL.md in the release archive.'
 else

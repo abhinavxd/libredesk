@@ -108,7 +108,7 @@ mkdir -p uploads
 ./libredesk
 ```
 
-Open `/setup` and use the temporary code printed on startup. Production requires the HTTPS reverse proxy described above.
+Open `/setup` and use the temporary code printed on startup. For production, set `app.server.address` to `127.0.0.1:9000` in `config.toml` and use the HTTPS reverse proxy described above.
 
 ## Preserve data during upgrades
 
