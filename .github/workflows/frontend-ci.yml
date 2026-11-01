@@ -71,7 +71,7 @@ jobs:
           restore-keys: cypress-${{ runner.os }}-
 
       - name: Install cypress deps
-        run: sudo apt-get update && sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb
+        run: sudo apt-get update && sudo apt-get install -y libgtk2.0-0 libgtk-3-0 libgbm-dev libnotify-dev libnss3 libxss1 libasound2t64 libxtst6 xauth xvfb postgresql-client
 
       - name: Build binary and frontend
         run: make build
@@ -126,3 +126,6 @@ jobs:
           specs=$(find cypress/e2e -type f -regextype posix-extended -regex '.*\.(cy|spec)\.(js|jsx|ts|tsx)$' | sort | awk -v s=${{ matrix.shard }} -v n=5 'NR % n == s % n' | paste -sd,)
           echo "shard ${{ matrix.shard }} runs: $specs"
           pnpm exec cypress run --e2e --headless --spec "$specs"
+          if [ "${{ matrix.shard }}" = "1" ]; then
+            pnpm exec cypress run --e2e --headless --env FRESH_INSTALL=true --spec cypress/e2e/testLogin.cy.js
+          fi

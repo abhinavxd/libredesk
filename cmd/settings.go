@@ -70,6 +70,9 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	if err := app.setting.Update(req); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := markSetupWorkspaceComplete(app.db); err != nil {
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("setup.unavailable"), err))
+	}
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
 		app.lo.Error("error reloading settings", "error", err)

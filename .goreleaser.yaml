@@ -42,6 +42,9 @@ archives:
     name_template: 'libredesk_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Arch "arm" }}v{{ .Arm }}{{ end }}'
     files:
       - config.sample.toml
+      - docker-compose.yml
+      - setup.sh
+      - INSTALL.md
       - README.md
       - LICENSE
 
@@ -186,3 +189,6 @@ release:
     name: libredesk
   prerelease: auto
   draft: true
+  extra_files:
+    - glob: setup.sh
+    - glob: INSTALL.md

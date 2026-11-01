@@ -35,6 +35,10 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 
 	// Public config for app initialization.
 	g.GET("/api/v1/config", handleGetConfig)
+	g.GET("/api/v1/setup", rateLimit(handleGetSetup, "auth"))
+	g.POST("/api/v1/setup/account", rateLimit(handleCreateSetupAccount, "auth"))
+	g.GET("/api/v1/setup/checklist", perm(handleGetSetupChecklist, "general_settings:manage"))
+	g.POST("/api/v1/setup/skip-notifications", perm(handleSkipSetupNotifications, "general_settings:manage"))
 
 	// Media - supports both authenticated access and signed URLs.
 	g.GET("/uploads/{uuid}", authOrSignedURL(handleServeMedia))
@@ -430,6 +434,7 @@ func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	g.GET("/account/{all:*}", authPage(serveIndexPage))
 	g.GET("/reset-password", notAuthPage(serveIndexPage))
 	g.GET("/set-password", notAuthPage(serveIndexPage))
+	g.GET("/setup", notAuthPage(serveIndexPage))
 
 	// Assets and static files.
 	// FIXME: Reduce the number of routes.

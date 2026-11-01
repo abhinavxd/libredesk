@@ -1,20 +1,29 @@
 services:
   # Libredesk app
   app:
-    image: libredesk/libredesk:latest
+    image: ${LIBREDESK_IMAGE:-libredesk/libredesk:latest}
     container_name: libredesk_app
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "${LIBREDESK_HTTP_BIND:-0.0.0.0}:9000:9000"
     environment:
       # If the password is set during first docker-compose up, the system user password will be set to this value.
       # You can always set system user password later by running `docker exec -it libredesk_app ./libredesk --set-system-user-password`.
       LIBREDESK_SYSTEM_USER_PASSWORD: ${LIBREDESK_SYSTEM_USER_PASSWORD:-}
+      LIBREDESK_APP__ROOT_URL: ${LIBREDESK_APP__ROOT_URL:-http://localhost:9000}
     networks:
       - libredesk
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 12
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./uploads:/libredesk/uploads:rw 
       - ./config.toml:/libredesk/config.toml
@@ -23,13 +32,12 @@ services:
   # PostgreSQL database
   db:
     image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:${POSTGRES_PUBLISHED_PORT:-5432}:5432"
     container_name: libredesk_db
     restart: unless-stopped
     networks:
       - libredesk
-    ports:
-      # Only bind on the local interface. To connect to Postgres externally, change this to 0.0.0.0
-      - "127.0.0.1:5432:5432"
     environment:
       # Set these environment variables to configure the database, defaults to libredesk.
       POSTGRES_USER: ${POSTGRES_USER:-libredesk}
@@ -46,13 +54,17 @@ services:
   # Redis
   redis:
     image: redis:7-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PUBLISHED_PORT:-6379}:6379"
     container_name: libredesk_redis
     restart: unless-stopped
-    ports:
-      # Only bind on the local interface.
-      - "127.0.0.1:6379:6379"
     networks:
       - libredesk
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     volumes:
       - redis-data:/data
 

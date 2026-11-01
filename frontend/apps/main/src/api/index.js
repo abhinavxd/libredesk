@@ -666,7 +666,16 @@ const deletePushSubscription = (endpoint) => http.delete('/api/v1/notifications/
 
 const getCampaignStats = (id, params) => http.get(`/api/v1/inboxes/${id}/campaign-stats`, { params })
 
+const getSetupStatus = () => http.get('/api/v1/setup')
+const createSetupAccount = (data) => http.post('/api/v1/setup/account', data)
+const getSetupChecklist = () => http.get('/api/v1/setup/checklist')
+const skipSetupNotifications = () => http.post('/api/v1/setup/skip-notifications')
+
 export default {
+  getSetupStatus,
+  createSetupAccount,
+  getSetupChecklist,
+  skipSetupNotifications,
  getCampaignStats,
   login,
   logout,
