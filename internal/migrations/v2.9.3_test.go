@@ -9,7 +9,7 @@ import (
 
 func TestV2_9_3QueryIndexesMatchSchemaAfterRepeatedUpgrade(t *testing.T) {
 	db := testutil.NewDB(t, "migration_query_indexes")
-	names := []string{"index_conversations_on_last_message_at_desc", "index_conversation_messages_on_sender_id_and_created_at", "index_conversation_tags_on_tag_id_and_conversation_id"}
+	names := []string{"index_conversations_on_last_message_at_desc", "index_conversations_on_last_interaction_at_desc", "index_conversation_messages_on_sender_id_and_created_at", "index_conversation_tags_on_tag_id_and_conversation_id"}
 	expected := map[string]string{}
 	for _, name := range names {
 		var definition string

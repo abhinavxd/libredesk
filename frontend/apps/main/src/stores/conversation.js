@@ -53,8 +53,8 @@ export const useConversationStore = defineStore('conversation', () => {
     views: {}
   })
 
-  // Route changes reuse a count younger than the TTL; mutations and WS events pass force.
-  const SIDEBAR_COUNTS_TTL = 45_000
+  // Navigation reuses recent counts. Mutations force a refresh.
+  const SIDEBAR_COUNTS_TTL = 120_000
   let sidebarCountsRequest = null
   let sidebarCountsFetchedAt = 0
   let sidebarCountsForceQueued = false
@@ -100,14 +100,6 @@ export const useConversationStore = defineStore('conversation', () => {
       // The sidebar works without counts.
     }
   }
-
-  // WS events burst one per conversation; leading + trailing keeps it to two requests per burst.
-  const SIDEBAR_COUNTS_EVENT_THROTTLE = 45_000
-  const refreshSidebarCounts = useThrottleFn(
-    () => fetchSidebarCounts({ force: true }),
-    SIDEBAR_COUNTS_EVENT_THROTTLE,
-    true
-  )
 
   const priorityOptions = computed(() => {
     return priorities.value.map(p => ({ label: p.name, value: p.id }))
@@ -1396,7 +1388,6 @@ export const useConversationStore = defineStore('conversation', () => {
     isSelected,
     sidebarCounts,
     fetchSidebarCounts,
-    fetchViewCount,
-    refreshSidebarCounts
+    fetchViewCount
   }
 })

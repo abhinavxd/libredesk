@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { useConversationStore } from './conversation'
@@ -43,6 +43,76 @@ const setup = () => {
   return store
 }
 
+describe('sidebar count refreshes', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reuses counts across navigation for two minutes', async () => {
+    const store = setup()
+    await store.fetchSidebarCounts()
+    vi.advanceTimersByTime(119_999)
+    await store.fetchSidebarCounts()
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(1)
+    await store.fetchSidebarCounts()
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(2)
+  })
+
+  it('coalesces navigation requests while a count request is running', async () => {
+    const store = setup()
+    let finish
+    api.getSidebarCounts.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const first = store.fetchSidebarCounts()
+    const second = store.fetchSidebarCounts()
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+    finish({ data: { data: { assigned: 3 } } })
+    await Promise.all([first, second])
+    expect(store.sidebarCounts.assigned).toBe(3)
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes after a mutation even when an earlier count request is running', async () => {
+    const store = setup()
+    store.conversation.data.status = 'Open'
+    let finish
+    api.getSidebarCounts.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      .mockResolvedValueOnce({ data: { data: { assigned: 2 } } })
+    api.updateConversationStatus.mockResolvedValueOnce()
+    const pending = store.fetchSidebarCounts()
+    await store.updateStatus('conversation-a', 'Resolved')
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(1)
+    finish({ data: { data: { assigned: 3 } } })
+    await pending
+    await Promise.resolve()
+    expect(api.getSidebarCounts).toHaveBeenCalledTimes(2)
+    expect(store.sidebarCounts.assigned).toBe(2)
+  })
+
+  it('does not fetch counts for websocket bursts', () => {
+    const store = setup()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'handleConvPush').mockImplementation(() => {})
+    vi.spyOn(store, 'mergeConversationUpdate').mockImplementation(() => {})
+    vi.spyOn(useNotificationStore(), 'addNotification').mockImplementation(() => {})
+    for (let n = 0; n < 100; n++) {
+      for (const type of ['new_conversation', 'conversation_update', 'new_notification']) {
+        client.handleMessage({ target: client.socket, data: JSON.stringify({
+          type, data: { uuid: 'conversation-a', status: 'Open' }
+        }) })
+      }
+    }
+    expect(api.getSidebarCounts).not.toHaveBeenCalled()
+  })
+})
+
 describe('conversation assignees', () => {
   const agent = { id: 2194, first_name: 'Agent', last_name: 'One', avatar_url: '/avatar.png', type: 'agent', availability_status: 'online' }
 
@@ -79,7 +149,6 @@ describe('conversation assignees', () => {
     const users = useUsersStore()
     const client = new WebSocketClient()
     client.socket = {}
-    vi.spyOn(store, 'refreshSidebarCounts').mockImplementation(() => {})
     vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
     const payload = { uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent }
 
