@@ -36,13 +36,16 @@ const (
 	userSessionKeyPrefix   = "user_sessions:"
 )
 
-// ErrOIDCInvalidClient reports the provider rejecting the client credentials, typically an expired or wrong client secret.
-var ErrOIDCInvalidClient = errors.New("oidc provider rejected client credentials")
+var (
+	// ErrOIDCInvalidClient reports the provider rejecting the client credentials.
+	ErrOIDCInvalidClient    = errors.New("oidc provider rejected client credentials")
+	ErrOIDCEmailNotVerified = errors.New("oidc email is not verified")
+)
 
 // OIDCclaim holds OIDC token claims data
 type OIDCclaim struct {
 	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	EmailVerified *bool  `json:"email_verified"`
 	Sub           string `json:"sub"`
 	Picture       string `json:"picture"`
 }
@@ -55,6 +58,7 @@ type Provider struct {
 	RedirectURL  func() (string, error)
 	ClientID     string
 	ClientSecret string
+	VerifyEmail  bool
 }
 
 // Config holds OIDC providers and cookies security settings
@@ -64,13 +68,19 @@ type Config struct {
 	SessionLifetime time.Duration
 }
 
+type oidcProvider struct {
+	provider    *oidc.Provider
+	verifier    *oidc.IDTokenVerifier
+	verifyEmail bool
+}
+
 // Auth is the auth service it manages OIDC authentication and sessions
 type Auth struct {
 	mu           sync.RWMutex
 	cfg          Config
 	i18n         *i18n.I18n
 	oauthCfgs    map[int]oauth2.Config
-	verifiers    map[int]*oidc.IDTokenVerifier
+	providers    map[int]oidcProvider
 	redirectURLs map[int]func() (string, error)
 	sess         *simplesessions.Manager
 	logger       *logf.Logger
@@ -81,7 +91,7 @@ type Auth struct {
 // New creates an Auth service with configured OIDC providers.
 func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dialControl ssrf.Control) (*Auth, error) {
 	oauthCfgs := make(map[int]oauth2.Config)
-	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	providers := make(map[int]oidcProvider)
 	redirectURLs := make(map[int]func() (string, error))
 
 	oidcClient := newOIDCClient(dialControl)
@@ -103,7 +113,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		verifier := oidcProv.Verifier(&oidc.Config{ClientID: provider.ClientID})
 
 		oauthCfgs[provider.ID] = oauthCfg
-		verifiers[provider.ID] = verifier
+		providers[provider.ID] = oidcProvider{provider: oidcProv, verifier: verifier, verifyEmail: provider.VerifyEmail}
 		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
@@ -135,7 +145,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		cfg:          cfg,
 		i18n:         i18n,
 		oauthCfgs:    oauthCfgs,
-		verifiers:    verifiers,
+		providers:    providers,
 		redirectURLs: redirectURLs,
 		sess:         sess,
 		logger:       logger,
@@ -160,7 +170,7 @@ func (a *Auth) Reload(cfg Config) error {
 	defer a.mu.Unlock()
 
 	oauthCfgs := make(map[int]oauth2.Config)
-	verifiers := make(map[int]*oidc.IDTokenVerifier)
+	providers := make(map[int]oidcProvider)
 	redirectURLs := make(map[int]func() (string, error))
 
 	for _, provider := range cfg.Providers {
@@ -180,13 +190,13 @@ func (a *Auth) Reload(cfg Config) error {
 		verifier := oidcProv.Verifier(&oidc.Config{ClientID: provider.ClientID})
 
 		oauthCfgs[provider.ID] = oauthCfg
-		verifiers[provider.ID] = verifier
+		providers[provider.ID] = oidcProvider{provider: oidcProv, verifier: verifier, verifyEmail: provider.VerifyEmail}
 		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	a.cfg.Providers = cfg.Providers
 	a.oauthCfgs = oauthCfgs
-	a.verifiers = verifiers
+	a.providers = providers
 	a.redirectURLs = redirectURLs
 
 	return nil
@@ -196,7 +206,7 @@ func (a *Auth) RemoveProvider(id int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	delete(a.oauthCfgs, id)
-	delete(a.verifiers, id)
+	delete(a.providers, id)
 	delete(a.redirectURLs, id)
 }
 
@@ -232,7 +242,7 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	}
 	oauthCfg.RedirectURL = redirectURL
 
-	verifier, ok := a.verifiers[providerID]
+	provider, ok := a.providers[providerID]
 	if !ok {
 		a.logger.Error("oidc verifier not configured, it may have failed to initialize at startup", "provider_id", providerID)
 		return "", OIDCclaim{}, fmt.Errorf("invalid provider ID: %d", providerID)
@@ -259,7 +269,7 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 	}
 
 	// Parse and verify ID Token payload.
-	idTk, err := verifier.Verify(ctx, rawIDTk)
+	idTk, err := provider.verifier.Verify(ctx, rawIDTk)
 	if err != nil {
 		a.logger.Error("error verifying oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, fmt.Errorf("error verifying ID token: %v", err)
@@ -270,11 +280,30 @@ func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code strin
 		a.logger.Error("error parsing claims from oidc id_token", "provider_id", providerID, "error", err)
 		return "", OIDCclaim{}, errors.New("error getting user from OIDC")
 	}
+	if strings.TrimSpace(claims.Email) == "" || (provider.verifyEmail && claims.EmailVerified == nil) {
+		userInfo, err := provider.provider.UserInfo(ctx, oauth2.StaticTokenSource(tk))
+		if err != nil {
+			a.logger.Error("error fetching oidc user info", "provider_id", providerID, "error", err)
+			return "", OIDCclaim{}, fmt.Errorf("error fetching OIDC user info: %w", err)
+		}
+		if userInfo.Subject == "" || userInfo.Subject != idTk.Subject {
+			return "", OIDCclaim{}, errors.New("oidc user info subject does not match ID token")
+		}
+		// Verification from UserInfo must apply to the email returned by UserInfo.
+		claims = OIDCclaim{}
+		if err := userInfo.Claims(&claims); err != nil {
+			return "", OIDCclaim{}, fmt.Errorf("error parsing OIDC user info: %w", err)
+		}
+	}
 	if strings.TrimSpace(claims.Email) == "" {
 		a.logger.Error("oidc id_token has no email, check that the provider sends the email claim", "provider_id", providerID)
 		return "", OIDCclaim{}, errors.New("oidc id_token has no email")
 	}
-	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified)
+	if provider.verifyEmail && (claims.EmailVerified == nil || !*claims.EmailVerified) {
+		a.logger.Warn("oidc login rejected because email is not verified", "provider_id", providerID)
+		return "", OIDCclaim{}, ErrOIDCEmailNotVerified
+	}
+	a.logger.Debug("oidc token exchange successful", "provider_id", providerID, "email", claims.Email, "email_verified", claims.EmailVerified != nil && *claims.EmailVerified)
 	return rawIDTk, claims, nil
 }
 

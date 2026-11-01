@@ -61,21 +61,61 @@ func (h sessionRedisHook) ProcessPipelineHook(next redis.ProcessPipelineHook) re
 	}
 }
 
-func TestOIDCRejectsBlankEmail(t *testing.T) {
+func TestOIDCEmailVerification(t *testing.T) {
 	for _, tt := range []struct {
-		name     string
-		email    string
-		verified any
-		want     bool
+		name          string
+		email         string
+		verified      any
+		verifyEmail   bool
+		reload        bool
+		userInfo      map[string]any
+		userInfoError bool
+		want          bool
+		wantUserInfo  bool
 	}{
-		{"verified", "agent@example.com", true, true},
-		{"unverified", "agent@example.com", false, true},
-		{"missing verification", "agent@example.com", nil, true},
-		{"empty email", "", true, false},
-		{"blank email", " \t", true, false},
+		{name: "verified", reload: true, email: "agent@example.com", verified: true, verifyEmail: true, want: true},
+		{name: "unverified", reload: true, email: "agent@example.com", verified: false, verifyEmail: true},
+		{name: "unverified cannot use userinfo", email: "agent@example.com", verified: false, verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com", "email_verified": true}},
+		{name: "missing verification uses userinfo", email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com", "email_verified": true}, want: true, wantUserInfo: true},
+		{name: "userinfo unverified", email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com", "email_verified": false}, wantUserInfo: true},
+		{name: "userinfo silent", email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com"}, wantUserInfo: true},
+		{name: "userinfo subject mismatch", email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "other-user", "email": "agent@example.com", "email_verified": true}, wantUserInfo: true},
+		{name: "userinfo email missing", email: "agent@example.com", verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email_verified": true}, wantUserInfo: true},
+		{name: "userinfo failure", email: "agent@example.com", verifyEmail: true, userInfoError: true, wantUserInfo: true},
+		{name: "empty email falls back", email: "", verified: true, verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "agent@example.com", "email_verified": true}, want: true, wantUserInfo: true},
+		{name: "verification cannot transfer between emails", email: "", verified: true, verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": "other@example.com"}, wantUserInfo: true},
+		{name: "blank email", email: " \t", verified: true, verifyEmail: true, userInfo: map[string]any{"sub": "test-user", "email": " \t", "email_verified": true}, wantUserInfo: true},
+		{name: "verification disabled unverified", email: "agent@example.com", verified: false, want: true},
+		{name: "verification disabled missing", reload: true, email: "agent@example.com", want: true},
+		{name: "verification disabled empty email", userInfo: map[string]any{"sub": "test-user"}, wantUserInfo: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			claims := map[string]any{"iss": "https://id.example.com", "aud": "desk", "sub": "test-user", "exp": time.Now().Add(time.Hour).Unix(), "email": tt.email}
+			var token string
+			userInfoCalls := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/.well-known/openid-configuration":
+					issuer := "http://" + r.Host
+					json.NewEncoder(w).Encode(map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "userinfo_endpoint": issuer + "/userinfo", "jwks_uri": issuer + "/jwks"})
+				case "/token":
+					json.NewEncoder(w).Encode(map[string]any{"access_token": "test-token", "token_type": "Bearer", "id_token": token})
+				case "/userinfo":
+					userInfoCalls++
+					if r.Header.Get("Authorization") != "Bearer test-token" {
+						t.Error("userinfo request missing access token")
+					}
+					if tt.userInfoError {
+						http.Error(w, "unavailable", http.StatusServiceUnavailable)
+						return
+					}
+					json.NewEncoder(w).Encode(tt.userInfo)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+			claims := map[string]any{"iss": server.URL, "aud": "desk", "sub": "test-user", "exp": time.Now().Add(time.Hour).Unix(), "email": tt.email}
 			if tt.verified != nil {
 				claims["email_verified"] = tt.verified
 			}
@@ -83,23 +123,31 @@ func TestOIDCRejectsBlankEmail(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			token := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`)) + "." + base64.RawURLEncoding.EncodeToString(payload) + ".c2ln"
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]any{"access_token": "test-token", "token_type": "Bearer", "id_token": token})
-			}))
-			defer server.Close()
+			token = base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256"}`)) + "." + base64.RawURLEncoding.EncodeToString(payload) + ".c2ln"
 			lo := logf.New(logf.Opts{})
-			a := &Auth{
-				logger:       &lo,
-				oidcClient:   server.Client(),
-				oauthCfgs:    map[int]oauth2.Config{1: {ClientID: "desk", Endpoint: oauth2.Endpoint{TokenURL: server.URL}}},
-				verifiers:    map[int]*oidc.IDTokenVerifier{1: oidc.NewVerifier("https://id.example.com", testOIDCKeys{payload}, &oidc.Config{ClientID: "desk"})},
-				redirectURLs: map[int]func() (string, error){1: func() (string, error) { return "https://app.example.com/finish", nil }},
+			cfg := Config{Providers: []Provider{{ID: 1, ProviderURL: server.URL, ClientID: "desk", VerifyEmail: tt.verifyEmail, RedirectURL: func() (string, error) { return "https://app.example.com/finish", nil }}}}
+			if tt.reload {
+				cfg.Providers[0].VerifyEmail = !tt.verifyEmail
 			}
+			a, err := New(cfg, testutil.NewI18n(t), nil /** rd **/, &lo, nil /** dialControl **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tt.reload {
+				cfg.Providers[0].VerifyEmail = tt.verifyEmail
+				if err := a.Reload(cfg); err != nil {
+					t.Fatal(err)
+				}
+			}
+			provider := a.providers[1]
+			provider.verifier = oidc.NewVerifier(server.URL, testOIDCKeys{payload}, &oidc.Config{ClientID: "desk"})
+			a.providers[1] = provider
 			_, _, err = a.ExchangeOIDCToken(t.Context(), 1, "test-code")
 			if (err == nil) != tt.want {
 				t.Fatalf("exchange err = %v, want success %v", err, tt.want)
+			}
+			if (userInfoCalls > 0) != tt.wantUserInfo {
+				t.Fatalf("userinfo calls = %d, want call %v", userInfoCalls, tt.wantUserInfo)
 			}
 		})
 	}
@@ -112,7 +160,7 @@ func TestRemovedProviderStaysDisabledWhenReloadFails(t *testing.T) {
 		i18n:         testutil.NewI18n(t),
 		oidcClient:   http.DefaultClient,
 		oauthCfgs:    map[int]oauth2.Config{1: {ClientID: "desk", Endpoint: oauth2.Endpoint{AuthURL: "https://id.example.com/auth"}}},
-		verifiers:    map[int]*oidc.IDTokenVerifier{1: nil},
+		providers:    map[int]oidcProvider{1: {}},
 		redirectURLs: map[int]func() (string, error){1: func() (string, error) { return "https://app.example.com/finish", nil }},
 	}
 	if _, err := a.LoginURL(1, "state"); err != nil {

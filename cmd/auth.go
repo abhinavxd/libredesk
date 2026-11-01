@@ -16,12 +16,13 @@ import (
 )
 
 const (
-	oidcErrLoginFailed     = "oidc_login_failed"
-	oidcErrSessionExpired  = "oidc_session_expired"
-	oidcErrInvalidClient   = "oidc_invalid_client"
-	oidcErrAccessDenied    = "oidc_access_denied"
-	oidcErrNoAccount       = "oidc_no_account"
-	oidcErrAccountDisabled = "oidc_account_disabled"
+	oidcErrLoginFailed      = "oidc_login_failed"
+	oidcErrSessionExpired   = "oidc_session_expired"
+	oidcErrInvalidClient    = "oidc_invalid_client"
+	oidcErrAccessDenied     = "oidc_access_denied"
+	oidcErrNoAccount        = "oidc_no_account"
+	oidcErrAccountDisabled  = "oidc_account_disabled"
+	oidcErrEmailNotVerified = "oidc_email_not_verified"
 )
 
 var (
@@ -112,6 +113,9 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	if err != nil {
 		if errors.Is(err, auth_.ErrOIDCInvalidClient) {
 			return redirectLoginError(r, oidcErrInvalidClient, nextStr)
+		}
+		if errors.Is(err, auth_.ErrOIDCEmailNotVerified) {
+			return redirectLoginError(r, oidcErrEmailNotVerified, nextStr)
 		}
 		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}
