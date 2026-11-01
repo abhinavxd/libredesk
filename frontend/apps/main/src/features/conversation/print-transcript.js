@@ -9,6 +9,12 @@ export async function printTranscript(text, title) {
   } catch (error) {
     if (error.response?.status !== 404) throw error
   }
+  const template = new DOMParser().parseFromString(transcriptTemplate, 'text/html')
+  const base = template.querySelector('base') || template.createElement('base')
+  const templateDirectory = new URL('/static/public/static/', window.location.href)
+  base.href = new URL(base.getAttribute('href') || '.', templateDirectory).href
+  template.head.prepend(base)
+
   const frame = document.createElement('iframe')
   frame.title = title
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals')
@@ -16,7 +22,7 @@ export async function printTranscript(text, title) {
   frame.style.cssText = 'position: fixed; width: 0; height: 0; border: 0'
 
   const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }))
-  frame.srcdoc = transcriptTemplate
+  frame.srcdoc = `<!doctype html>${template.documentElement.outerHTML}`
   document.body.appendChild(frame)
 
   try {
