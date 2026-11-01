@@ -316,7 +316,6 @@ CREATE INDEX index_conversations_on_resolved_at ON conversations (resolved_at);
 CREATE INDEX index_conversations_on_last_message_at ON conversations (last_message_at);
 CREATE INDEX index_conversations_on_last_message_at_desc ON conversations (last_message_at DESC NULLS LAST);
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
-CREATE INDEX index_conversations_on_last_interaction_at_desc ON conversations (last_interaction_at DESC NULLS LAST);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
 CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
