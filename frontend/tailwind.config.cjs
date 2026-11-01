@@ -9,7 +9,7 @@ const canHover = plugin(({ addVariant }) => addVariant("can-hover", "@media (hov
 module.exports = {
   mode: 'jit',
   darkMode: "class",
-  safelist: ["dark"],
+  safelist: ["dark", "animate-fade-in"],
   prefix: "",
 
   content: [
