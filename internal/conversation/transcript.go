@@ -7,15 +7,11 @@ import (
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	"github.com/signintech/gopdf"
-	"golang.org/x/image/font/gofont/goregular"
 )
 
 const (
 	transcriptTimeFormat = "Jan 02, 2006 03:04 PM MST"
 	transcriptSeparator  = "------------------------------------------------------------"
-	transcriptPDFMargin  = 36.0
-	transcriptLineHeight = 14.0
 )
 
 func (m *Manager) BuildTranscript(conversation models.Conversation, messages []models.Message, downloadedAt time.Time) []byte {
@@ -56,45 +52,6 @@ func (m *Manager) BuildTranscript(conversation models.Conversation, messages []m
 		}
 	}
 	return []byte(b.String())
-}
-
-// BuildTranscriptPDF wraps the text transcript across A4 pages with an embedded font.
-func BuildTranscriptPDF(transcript []byte) ([]byte, error) {
-	var pdf gopdf.GoPdf
-	pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
-	pdf.SetMargins(transcriptPDFMargin, transcriptPDFMargin, transcriptPDFMargin, transcriptPDFMargin)
-	if err := pdf.AddTTFFontData("Go", goregular.TTF); err != nil {
-		return nil, err
-	}
-	if err := pdf.SetFont("Go", "" /* style */, 10 /* size */); err != nil {
-		return nil, err
-	}
-	pdf.AddPage()
-	width := gopdf.PageSizeA4.W - 2*transcriptPDFMargin
-	text := strings.ReplaceAll(string(transcript), "\r\n", "\n")
-	text = strings.ReplaceAll(text, "\t", "    ")
-	for paragraph := range strings.SplitSeq(text, "\n") {
-		lines := []string{""}
-		if paragraph != "" {
-			var err error
-			lines, err = pdf.SplitTextWithWordWrap(paragraph, width)
-			if err != nil {
-				return nil, err
-			}
-		}
-		for _, line := range lines {
-			if pdf.GetY()+transcriptLineHeight > gopdf.PageSizeA4.H-transcriptPDFMargin {
-				pdf.AddPage()
-			}
-			if line != "" {
-				if err := pdf.Cell(nil /* rectangle */, line); err != nil {
-					return nil, err
-				}
-			}
-			pdf.Br(transcriptLineHeight)
-		}
-	}
-	return pdf.GetBytesPdfReturnErr()
 }
 
 func (m *Manager) senderTypeLabel(senderType string) string {

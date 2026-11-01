@@ -1,7 +1,6 @@
 package conversation
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -13,36 +12,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/volatiletech/null/v9"
 )
-
-func TestBuildTranscriptPDF(t *testing.T) {
-	for _, text := range []string{
-		"",
-		"Conversation #1234\n\nCafé, Grüße, Καλημέρα, Привет\nAttachment: invoice.pdf\n",
-		"Windows\r\n\r\nIndented\tmessage",
-		strings.Repeat("https://example.com/verylongpath", 100),
-		"Hello 世界",
-		"नमस्कार",
-		"Hello 👋",
-	} {
-		pdf, err := BuildTranscriptPDF([]byte(text))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.HasPrefix(pdf, []byte("%PDF-")) || !bytes.Contains(pdf, []byte("%%EOF")) {
-			t.Fatal("transcript is not a complete PDF")
-		}
-	}
-}
-
-func TestBuildTranscriptPDFPagination(t *testing.T) {
-	pdf, err := BuildTranscriptPDF([]byte(strings.Repeat("Message on a new line\n", 200)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if pages := bytes.Count(pdf, []byte("/Type /Page\n")); pages < 4 {
-		t.Fatalf("long transcript has %d pages, want at least 4", pages)
-	}
-}
 
 func TestBuildTranscript(t *testing.T) {
 	m := &Manager{i18n: testutil.NewI18n(t)}

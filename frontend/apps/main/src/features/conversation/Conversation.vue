@@ -140,6 +140,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
+import { printTranscript } from '@main/features/conversation/print-transcript'
 import api from '@main/api'
 import { permissions as perms } from '@main/constants/permissions.js'
 defineProps({ detailsOpen: { type: Boolean, default: false } })
@@ -177,8 +178,13 @@ const downloadTranscript = async (format = 'txt') => {
   const conversation = conversationStore.current
   if (!conversation) return
   try {
-    const response = await api.getConversationTranscript(conversation.uuid, format)
-    downloadBlobResponse(response, `transcript-${conversation.reference_number}.${format}`)
+    const response = await api.getConversationTranscript(conversation.uuid)
+    const filename = `transcript-${conversation.reference_number}`
+    if (format === 'pdf') {
+      await printTranscript(await response.data.text(), filename)
+    } else {
+      downloadBlobResponse(response, `${filename}.txt`)
+    }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

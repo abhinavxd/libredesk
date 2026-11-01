@@ -389,20 +389,13 @@ func handleGetConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conv)
 }
 
-// handleDownloadConversationTranscript downloads the public transcript as TXT or PDF.
+// handleDownloadConversationTranscript downloads the public transcript as plain text.
 func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	var (
-		app    = r.Context.(*App)
-		uuid   = r.RequestCtx.UserValue("uuid").(string)
-		auser  = r.RequestCtx.UserValue("user").(amodels.User)
-		format = string(r.RequestCtx.QueryArgs().Peek("format"))
+		app   = r.Context.(*App)
+		uuid  = r.RequestCtx.UserValue("uuid").(string)
+		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
-	if format == "" {
-		format = "txt"
-	}
-	if format != "txt" && format != "pdf" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.invalidValue"), nil /* data */, envelope.InputError)
-	}
 
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
@@ -421,20 +414,11 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	}
 
 	transcript := app.conversation.BuildTranscript(*conv, messages, time.Now() /* downloadedAt */)
-	contentType := "text/plain; charset=utf-8"
-	if format == "pdf" {
-		transcript, err = conversation.BuildTranscriptPDF(transcript)
-		if err != nil {
-			app.lo.Error("error building PDF transcript", "error", err)
-			return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil /* data */, envelope.GeneralError)
-		}
-		contentType = "application/pdf"
-	}
 	safeRef := stringutil.SanitizeFilename(conv.ReferenceNumber)
-	filename := fmt.Sprintf("transcript-%s.%s", safeRef, format)
+	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
 	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
-	r.RequestCtx.SetContentType(contentType)
+	r.RequestCtx.SetContentType("text/plain; charset=utf-8")
 	r.RequestCtx.SetBody(transcript)
 	return nil
 }
