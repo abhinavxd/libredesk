@@ -1,4 +1,7 @@
+import api from '@main/api'
+
 export async function printTranscript(text, title) {
+  const { data: transcriptTemplate } = await api.getTranscriptTemplate()
   const frame = document.createElement('iframe')
   frame.title = title
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals')
@@ -6,7 +9,7 @@ export async function printTranscript(text, title) {
   frame.style.cssText = 'position: fixed; width: 0; height: 0; border: 0'
 
   const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }))
-  frame.srcdoc = '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>'
+  frame.srcdoc = transcriptTemplate
   document.body.appendChild(frame)
 
   try {
@@ -15,24 +18,11 @@ export async function printTranscript(text, title) {
     doc.title = title
     doc.documentElement.lang = document.documentElement.lang
 
-    const style = doc.createElement('style')
-    style.textContent = `
-      @page { size: A4; margin: 12.7mm; }
-      body { margin: 0; }
-      pre {
-        font: 10pt/1.4 system-ui, sans-serif;
-        margin: 0;
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        unicode-bidi: plaintext;
-        tab-size: 4;
-      }
-    `
-    doc.head.appendChild(style)
-
-    const content = doc.createElement('pre')
-    content.textContent = text
-    doc.body.appendChild(content)
+    const headingEnd = text.indexOf('\n')
+    doc.querySelector('[data-transcript-title]').textContent =
+      headingEnd === -1 ? text : text.slice(0, headingEnd)
+    doc.querySelector('[data-transcript-body]').textContent =
+      headingEnd === -1 ? '' : text.slice(headingEnd + 1)
     await doc.fonts.ready
 
     frame.contentWindow.addEventListener('afterprint', () => frame.remove(), { once: true })
