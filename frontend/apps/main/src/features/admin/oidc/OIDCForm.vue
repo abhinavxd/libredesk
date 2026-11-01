@@ -116,7 +116,7 @@
               @update:checked="(checked) => handleChange(checked, meta.validated)"
             />
           </FormControl>
-          <FormLabel>{{ $t('admin.sso.verifyEmail') }}</FormLabel>
+          <FormLabel>{{ $t('globals.messages.requireVerifiedEmail') }}</FormLabel>
         </div>
         <FormDescription>{{ $t('admin.sso.verifyEmailDescription') }}</FormDescription>
         <FormMessage />

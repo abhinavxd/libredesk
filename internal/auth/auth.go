@@ -37,7 +37,6 @@ const (
 )
 
 var (
-	// ErrOIDCInvalidClient reports the provider rejecting the client credentials.
 	ErrOIDCInvalidClient    = errors.New("oidc provider rejected client credentials")
 	ErrOIDCEmailNotVerified = errors.New("oidc email is not verified")
 )
