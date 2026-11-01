@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +15,53 @@ import (
 	"github.com/zerodha/fastglue"
 	"golang.org/x/text/language"
 )
+
+func TestHelpCenterCustomCodeRequiresSeparateHost(t *testing.T) {
+	app := newValidatorTestApp(t)
+	tests := []struct {
+		name         string
+		uri          string
+		customDomain string
+		wantCode     bool
+	}{
+		{"app host without custom domain", "https://desk.example.com/hc/docs/en", "", false},
+		{"app host with custom domain", "https://desk.example.com/hc/docs/en", "https://help.example.com", false},
+		{"admin preview", "https://desk.example.com/api/v1/help-centers/1/preview", "https://help.example.com", false},
+		{"app host configured as custom domain", "https://desk.example.com/en", "https://desk.example.com", false},
+		{"app host with different scheme", "http://desk.example.com/en", "http://desk.example.com", false},
+		{"app host with different port", "https://desk.example.com:8443/en", "https://desk.example.com:8443", false},
+		{"app host case", "https://DESK.EXAMPLE.COM/en", "https://desk.example.com", false},
+		{"configured custom domain", "https://help.example.com/en", "https://help.example.com", true},
+		{"custom domain case", "https://HELP.EXAMPLE.COM/en", "https://help.example.com", true},
+		{"embedded article on custom domain", "https://help.example.com/en/articles/example?embed=1", "https://help.example.com", true},
+		{"embedded article on app host", "https://desk.example.com/hc/docs/en/articles/example?embed=1", "https://help.example.com", false},
+		{"other host", "https://other.example.com/en", "https://help.example.com", false},
+		{"unconfigured host", "https://help.example.com/en", "", false},
+		{"invalid custom domain", "https://help.example.com/en", "help.example.com", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := request(tt.uri, "" /** ifNoneMatch **/)
+			hc := hcmodels.HelpCenter{
+				Slug:         "docs",
+				CustomDomain: tt.customDomain,
+				CustomCSS:    `</style><script>window.cssExecuted = true</script>`,
+				CustomJS:     `window.jsExecuted = true`,
+			}
+			data := helpCenterTemplateData(app, r, hc, "en")
+			wantCSS, wantJS := "", ""
+			if tt.wantCode {
+				wantCSS, wantJS = hc.CustomCSS, hc.CustomJS
+			}
+			if got := string(data["CustomCSS"].(template.CSS)); got != wantCSS {
+				t.Errorf("CustomCSS = %q, want %q", got, wantCSS)
+			}
+			if got := string(data["CustomJS"].(template.JS)); got != wantJS {
+				t.Errorf("CustomJS = %q, want %q", got, wantJS)
+			}
+		})
+	}
+}
 
 func TestResolveQueryLocale(t *testing.T) {
 	tests := []struct {
