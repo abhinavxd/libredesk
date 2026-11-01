@@ -282,6 +282,7 @@ esac
 `,
 		"docker": `#!/bin/sh
 if [ "$2" = version ]; then exit 0; fi
+[ "$LIBREDESK_SYSTEM_USER_PASSWORD" = 'SetupAdmin123!' ] || exit 1
 [ "${POSTGRES_USER+x}${POSTGRES_PASSWORD+x}${POSTGRES_DB+x}${LIBREDESK_IMAGE+x}${LIBREDESK_APP__ROOT_URL+x}" = "" ]
 `,
 	}
@@ -293,6 +294,7 @@ if [ "$2" = version ]; then exit 0; fi
 	command := exec.CommandContext(t.Context(), "sh", filepath.Join(root, "setup.sh"), "local")
 	command.Dir = dir
 	command.Env = append(os.Environ(), "PATH="+binDir+":"+os.Getenv("PATH"), "LIBREDESK_RELEASE=v9.9.9",
+		"LIBREDESK_SYSTEM_USER_PASSWORD=SetupAdmin123!",
 		"SETUP_CONFIG_TEMPLATE="+filepath.Join(root, "config.sample.toml"), "SETUP_COMPOSE_TEMPLATE="+filepath.Join(root, "docker-compose.yml"),
 		"POSTGRES_USER=exported-user", "POSTGRES_PASSWORD=exported-password", "POSTGRES_DB=exported-db", "LIBREDESK_IMAGE=exported-image", "LIBREDESK_APP__ROOT_URL=https://wrong.example")
 	if output, err := command.CombinedOutput(); err != nil {
