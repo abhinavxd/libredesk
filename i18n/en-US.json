@@ -549,7 +549,7 @@
   "admin.sla.warning": "Warning",
   "admin.sso.logoURLDescription": "Custom logo URL to display on the login page.",
   "admin.sso.setThisUrlForCallback": "Set this URI for callback.",
-  "admin.sso.verifyEmailDescription": "Disable only for trusted providers that manage email addresses and omit verification, such as Microsoft Entra ID.",
+  "admin.sso.verifyEmailDescription": "Disabling this allows sign in without confirming email ownership.",
   "admin.status.help": "Create custom conversation statuses to extend default workflow.",
   "admin.tag.help": "Tags can be used to filter conversations and as conditions in automations.",
   "admin.tags.deleteConfirmation": "Are you sure you want to delete this tag? This will also remove it from all conversations",
