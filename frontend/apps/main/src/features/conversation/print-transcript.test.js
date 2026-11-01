@@ -14,13 +14,16 @@ describe('printTranscript', () => {
   })
 
   it.each([
-    ['default', transcriptTemplate],
+    ['default', transcriptTemplate, null],
     [
       'custom',
-      '<!doctype html><html><head></head><body><h2 data-transcript-title></h2><div data-transcript-body></div></body></html>'
-    ]
-  ])('prints multilingual text safely with the %s template', async (_name, template) => {
-    api.getTranscriptTemplate.mockResolvedValue({ data: template })
+      '<!doctype html><html><head></head><body><h2 data-transcript-title></h2><div data-transcript-body></div></body></html>',
+      null
+    ],
+    ['missing', null, { response: { status: 404 } }]
+  ])('prints multilingual text safely with the %s template', async (_name, template, error) => {
+    if (error) api.getTranscriptTemplate.mockRejectedValue(error)
+    else api.getTranscriptTemplate.mockResolvedValue({ data: template })
     const heading = 'Conversation #123 <script>alert("heading")</script>'
     const body = 'Hello 世界\nनमस्कार\nمرحبا\n👋\n<script>alert("message")</script>'
     const text = `${heading}\n${body}`

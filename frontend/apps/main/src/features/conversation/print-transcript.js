@@ -1,7 +1,14 @@
 import api from '@main/api'
+import defaultTemplate from '@public-static/transcript.html?raw'
 
 export async function printTranscript(text, title) {
-  const { data: transcriptTemplate } = await api.getTranscriptTemplate()
+  let transcriptTemplate = defaultTemplate
+  try {
+    const response = await api.getTranscriptTemplate()
+    transcriptTemplate = response.data
+  } catch (error) {
+    if (error.response?.status !== 404) throw error
+  }
   const frame = document.createElement('iframe')
   frame.title = title
   frame.setAttribute('sandbox', 'allow-same-origin allow-modals')
