@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
@@ -175,6 +176,10 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		{ID: 1, SenderID: contactID, SenderType: cmodels.SenderTypeContact, Type: cmodels.MessageIncoming, TextContent: "Where is my order?"},
 		{ID: 2, SenderType: cmodels.SenderTypeAgent, Type: cmodels.MessageOutgoing, TextContent: "Can you share your order number?"},
 	}
+	previous[0].CreatedAt = time.Date(2026, time.November, 2, 0, 15, 0, 0, time.FixedZone("NPT", 5*3600+45*60))
+	previous[1].CreatedAt = previous[0].CreatedAt.Add(time.Hour)
+	firstContent := "[2026-11-01T18:30:00Z]\n" + previous[0].TextContent
+	secondContent := "[2026-11-01T19:30:00Z]\n" + previous[1].TextContent
 	tests := []struct {
 		name        string
 		content     string
@@ -205,15 +210,16 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 			latest := cmodels.Message{
 				ID: 3, SenderID: contactID, SenderType: cmodels.SenderTypeContact, Type: cmodels.MessageIncoming,
 				Content: tt.content, TextContent: tt.content, ContentType: tt.contentType, Attachments: tt.attachments,
+				CreatedAt: previous[0].CreatedAt.Add(2 * time.Hour),
 			}
 			if tt.contentType == cmodels.ContentTypeHTML {
 				latest.TextContent = stringutil.HTML2Text(tt.content)
 			}
 			history := m.buildHistory(append(previous, latest), contactID)
 			want := []aimodels.ChatMessage{
-				{Role: aimodels.RoleUser, Content: previous[0].TextContent},
-				{Role: aimodels.RoleAssistant, Content: previous[1].TextContent},
-				{Role: aimodels.RoleUser, Content: tt.want},
+				{Role: aimodels.RoleUser, Content: firstContent},
+				{Role: aimodels.RoleAssistant, Content: secondContent},
+				{Role: aimodels.RoleUser, Content: "[2026-11-01T20:30:00Z]\n" + tt.want},
 			}
 			if !reflect.DeepEqual(history, want) {
 				t.Fatalf("got %#v, want %#v", history, want)
@@ -233,7 +239,7 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		blank := cmodels.Message{SenderType: cmodels.SenderTypeContact, SenderID: contactID, Type: cmodels.MessageIncoming}
 		history := m.buildHistory([]cmodels.Message{previous[0], blank, blank}, contactID)
 		want := []aimodels.ChatMessage{
-			{Role: aimodels.RoleUser, Content: previous[0].TextContent},
+			{Role: aimodels.RoleUser, Content: firstContent},
 			{Role: aimodels.RoleUser, Content: emptyMessage},
 			{Role: aimodels.RoleUser, Content: emptyMessage},
 		}
@@ -242,7 +248,7 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		}
 	})
 	t.Run("empty assistant message", func(t *testing.T) {
-		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeAgent, Type: cmodels.MessageOutgoing}}, contactID)
+		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeAgent, Type: cmodels.MessageOutgoing, CreatedAt: previous[0].CreatedAt}}, contactID)
 		if len(history) != 0 {
 			t.Fatalf("empty assistant message kept: %#v", history)
 		}

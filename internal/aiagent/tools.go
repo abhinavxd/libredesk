@@ -7,6 +7,7 @@ import (
 	"net/mail"
 	"slices"
 	"strings"
+	"time"
 
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/aiagent/models"
@@ -207,7 +208,7 @@ func (t *previousConversationsTool) Execute(ctx context.Context, args string) (s
 		if transcript == "" {
 			continue
 		}
-		fmt.Fprintf(&b, "<<conversation %s | %s | started %s>>\n", rc.ReferenceNumber, rc.Status, rc.CreatedAt.Format("Jan 2, 2006"))
+		fmt.Fprintf(&b, "<<conversation %s | %s | started %s>>\n", rc.ReferenceNumber, rc.Status, rc.CreatedAt.UTC().Format(time.RFC3339))
 		if subject := strings.TrimSpace(rc.Subject); subject != "" {
 			fmt.Fprintf(&b, "Subject: %s\n", neutralizeMarkers(subject))
 		}

@@ -268,6 +268,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 
 	contactLines := contactFieldLines(conv.Contact)
 	systemPrompt := buildSystemPrompt(assistant)
+	if msgs[0].Total > len(msgs) {
+		systemPrompt += "\n\nOnly the latest public messages are included. Earlier messages are omitted."
+	}
 	if len(contactLines) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
@@ -727,6 +730,9 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 				text += "\n"
 			}
 			text += strings.Join(markers, "\n")
+		}
+		if !msg.CreatedAt.IsZero() {
+			text = "[" + msg.CreatedAt.UTC().Format(time.RFC3339) + "]\n" + text
 		}
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}

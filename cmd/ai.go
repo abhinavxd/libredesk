@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	aimodels "github.com/abhinavxd/libredesk/internal/ai/models"
@@ -367,7 +369,7 @@ func handleAIGenerateReply(r *fastglue.Request) error {
 		if err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		transcript = conversationTranscript(app, req.ConversationUUID)
+		transcript = conversationContext(app, conv)
 	}
 	toolIDs := []int(nil)
 	tctx := ai.ToolContext{}
@@ -407,10 +409,11 @@ func handleAISummarizeConversation(r *fastglue.Request) error {
 	if req.ConversationUUID == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+	conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	transcript := conversationTranscript(app, req.ConversationUUID)
+	transcript := conversationContext(app, conv)
 	if strings.TrimSpace(transcript) == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.summarizeEmptyConversation"), nil))
 	}
@@ -441,11 +444,12 @@ func handleAISuggestTags(r *fastglue.Request) error {
 	if req.ConversationUUID == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
 	}
-	if _, err := enforceAIConversationAccess(r, req.ConversationUUID); err != nil {
+	conv, err := enforceAIConversationAccess(r, req.ConversationUUID)
+	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
 
-	transcript := conversationTranscript(app, req.ConversationUUID)
+	transcript := conversationContext(app, conv)
 	if strings.TrimSpace(transcript) == "" {
 		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("ai.tagSuggestEmptyConversation"), nil))
 	}
@@ -495,9 +499,13 @@ func handleAICopilot(r *fastglue.Request) error {
 	}
 	history := make([]aimodels.ChatMessage, 0, len(saved)+1)
 	for _, m := range saved {
-		history = append(history, aimodels.ChatMessage{Role: m.Role, Content: m.Content})
+		content := m.Content
+		if !m.CreatedAt.IsZero() {
+			content = "[" + m.CreatedAt.UTC().Format(time.RFC3339) + "]\n" + content
+		}
+		history = append(history, aimodels.ChatMessage{Role: m.Role, Content: content})
 	}
-	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: req.Message})
+	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: "[" + time.Now().UTC().Format(time.RFC3339) + "]\n" + req.Message})
 
 	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot, UserMessage: req.Message}
 	app.ai.ClearPendingAgentRuns(scope)
@@ -505,7 +513,7 @@ func handleAICopilot(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	convoContext := conversationTranscript(app, req.ConversationUUID)
+	convoContext := conversationContext(app, conv)
 	resp, err := app.ai.Copilot(r.RequestCtx, convoContext, history, agentToolContext(conv), copilotTools(app, user, conv), persona, toolIDs, scope)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
@@ -612,6 +620,23 @@ func conversationTranscript(app *App, uuid string) string {
 		return ""
 	}
 	return cmodels.Transcript(msgs, maxTranscriptMessages)
+}
+
+func conversationContext(app *App, conv *cmodels.Conversation) string {
+	transcript := conversationTranscript(app, conv.UUID)
+	if transcript == "" {
+		return ""
+	}
+	return conversationHeader(conv) + "\n\n" + transcript
+}
+
+func conversationHeader(conv *cmodels.Conversation) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Conversation reference: %s\nSubject: %s\nStatus: %s\nChannel: %s\nContact: %s", conv.ReferenceNumber, conv.Subject.String, conv.Status.String, conv.InboxChannel, conv.Contact.FullName())
+	if !conv.CreatedAt.IsZero() {
+		fmt.Fprintf(&b, "\nStarted: %s", conv.CreatedAt.UTC().Format(time.RFC3339))
+	}
+	return b.String()
 }
 
 func decideAIToolRun(r *fastglue.Request, approved bool) (aimodels.AgentRunResult, error) {

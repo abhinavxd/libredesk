@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -201,10 +202,8 @@ func (t *fetchConversationTool) Execute(ctx context.Context, args string) (strin
 
 	var b strings.Builder
 	b.WriteString(untrustedConversationData)
-	fmt.Fprintf(&b, "Subject: %s\n", strings.TrimSpace(conv.Subject.String))
-	fmt.Fprintf(&b, "Status: %s\n", strings.TrimSpace(conv.Status.String))
-	fmt.Fprintf(&b, "Contact: %s\n", strings.TrimSpace(conv.Contact.FullName()))
-	fmt.Fprintf(&b, "Created: %s\n\n", conv.CreatedAt.Format("2006-01-02 15:04"))
+	b.WriteString(conversationHeader(&conv))
+	b.WriteString("\n\n")
 	b.WriteString(capTranscript(conversationTranscript(t.app, conv.UUID)))
 	return b.String(), nil
 }
@@ -280,9 +279,9 @@ func renderAIConversations(rows []cmodels.AIConversationSummary) string {
 		if r.Status.Valid && r.Status.String != "" {
 			fmt.Fprintf(&b, " | Status: %s", r.Status.String)
 		}
-		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.Format("2006-01-02 15:04"))
+		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.UTC().Format(time.RFC3339))
 		if r.LastMessageAt.Valid {
-			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.Format("2006-01-02 15:04"))
+			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.UTC().Format(time.RFC3339))
 		}
 		b.WriteString("\n")
 	}
