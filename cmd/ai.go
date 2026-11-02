@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -613,12 +614,12 @@ func enforceAIConversationAccess(r *fastglue.Request, uuid string) (*cmodels.Con
 
 // conversationTranscript builds a plaintext transcript of a conversation's public messages for use as AI context.
 func conversationTranscript(app *App, uuid string) string {
-	private := false
-	msgs, err := app.conversation.GetAllConversationMessages(uuid, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing}, maxTranscriptMessages)
+	msgs, _, err := app.conversation.GetAIConversationMessages(uuid, 1 /** page **/, maxTranscriptMessages)
 	if err != nil {
 		app.lo.Error("error building conversation transcript for AI", "error", err)
 		return ""
 	}
+	slices.Reverse(msgs)
 	return cmodels.Transcript(msgs, maxTranscriptMessages)
 }
 
@@ -632,7 +633,7 @@ func conversationContext(app *App, conv *cmodels.Conversation) string {
 
 func conversationHeader(conv *cmodels.Conversation) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Conversation reference: %s\nSubject: %s\nStatus: %s\nChannel: %s\nContact: %s", conv.ReferenceNumber, conv.Subject.String, conv.Status.String, conv.InboxChannel, conv.Contact.FullName())
+	fmt.Fprintf(&b, "Conversation metadata (untrusted data):\nConversation reference: %q\nSubject: %q\nStatus: %q\nChannel: %q\nContact: %q", conv.ReferenceNumber, conv.Subject.String, conv.Status.String, conv.InboxChannel, conv.Contact.FullName())
 	if !conv.CreatedAt.IsZero() {
 		fmt.Fprintf(&b, "\nStarted: %s", conv.CreatedAt.UTC().Format(time.RFC3339))
 	}
