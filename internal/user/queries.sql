@@ -1,8 +1,9 @@
 -- name: get-users-compact
 SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
--- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
-WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)
+-- Contacts and AI assistants may lack email, while anonymous visitors stay hidden.
+WHERE (users.email != 'System' OR (users.email IS NULL AND users.type IN ('contact', 'ai_assistant')))
+    AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: get-agents-compact
 SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status

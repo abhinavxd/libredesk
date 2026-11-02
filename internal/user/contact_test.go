@@ -427,6 +427,12 @@ func TestContactListSearch(t *testing.T) {
 		('contact', 'null-last@example.test', 'Quintessa', NULL, NULL, NULL),
 		('contact', 'emailneedle681@example.test', 'Different', 'Alias', NULL, NULL),
 		('contact', 'phone-only@example.test', 'Different', 'Phone', '+449876543210', NULL),
+		('contact', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
+		('visitor', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
+		('agent', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
+		('ai_assistant', NULL, 'Noemail', 'Customer', NULL, NULL),
+		('contact', NULL, 'Noemail', 'Customer', '+12025550181', now()),
+		('contact', 'System', 'Noemail', 'Customer', '+12025550181', NULL),
 		('contact', 'percent@example.test', 'Rate%value', '', NULL, NULL),
 		('contact', 'underscore@example.test', 'Under_score', '', NULL, NULL),
 		('contact', 'slash@example.test', 'Back\slash', '', NULL, NULL),
@@ -461,6 +467,8 @@ func TestContactListSearch(t *testing.T) {
 		{"Quintessa", []string{"null-last@example.test"}},
 		{"emailneedle681", []string{"emailneedle681@example.test"}},
 		{"9876543210", []string{"phone-only@example.test"}},
+		{"Noemail Customer", []string{""}},
+		{"2025550181", []string{""}},
 		{"Visitorfixture", []string{"visitor@example.test"}},
 		{"Rate%value", []string{"percent@example.test"}},
 		{"Under_score", []string{"underscore@example.test"}},
@@ -495,5 +503,14 @@ func TestContactListSearch(t *testing.T) {
 		if len(results) != 1 || results[0].Email.String != email || results[0].Total != 2 {
 			t.Fatalf("page %d = %+v, want %s with total 2", index+1, results, email)
 		}
+	}
+
+	page, assistantPageSize := 1, 15
+	assistants, err := u.GetAllUsers(page, assistantPageSize, []string{models.UserTypeAIAssistant}, "asc", "users.email", filtersFor("Noemail Customer"), "UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(assistants) != 1 || assistants[0].Email.Valid {
+		t.Fatalf("assistants without email = %+v, want one assistant", assistants)
 	}
 }
