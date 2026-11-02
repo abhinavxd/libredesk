@@ -1,5 +1,5 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
 -- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
 WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)

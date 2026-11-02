@@ -1,9 +1,12 @@
 package user
 
 import (
+	"encoding/json/v2"
+	"slices"
 	"sync"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/jmoiron/sqlx"
@@ -413,4 +416,84 @@ func TestResolveContactConcurrent(t *testing.T) {
 	race(models.ContactReuse, "race-reuse-ext@example.com", "ext-race-reuse")
 	race(models.ContactSync, "race-sync@example.com", "")
 	race(models.ContactSync, "race-sync-ext@example.com", "ext-race-sync")
+}
+
+func TestContactListSearch(t *testing.T) {
+	u, db := newTestManager(t)
+	if _, err := db.Exec(`
+		INSERT INTO users (type, email, first_name, last_name, phone_number, deleted_at) VALUES
+		('contact', 'person-one@example.test', 'Jane', 'Doe', NULL, NULL),
+		('contact', 'person-two@example.test', 'Jane', 'Doe', NULL, NULL),
+		('contact', 'null-last@example.test', 'Quintessa', NULL, NULL, NULL),
+		('contact', 'emailneedle681@example.test', 'Different', 'Alias', NULL, NULL),
+		('contact', 'phone-only@example.test', 'Different', 'Phone', '+449876543210', NULL),
+		('contact', 'percent@example.test', 'Rate%value', '', NULL, NULL),
+		('contact', 'underscore@example.test', 'Under_score', '', NULL, NULL),
+		('contact', 'slash@example.test', 'Back\slash', '', NULL, NULL),
+		('visitor', 'visitor@example.test', 'Visitorfixture', '', NULL, NULL),
+		('agent', 'agent@example.test', 'Jane', 'Doe', NULL, NULL),
+		('contact', 'deleted@example.test', 'Jane', 'Doe', NULL, now())
+	`); err != nil {
+		t.Fatal(err)
+	}
+
+	filtersFor := func(term string) string {
+		t.Helper()
+		filter := dbutil.FilterNode{Logic: "OR"}
+		for _, field := range []string{"email", "phone_number", "full_name"} {
+			filter.Rules = append(filter.Rules, dbutil.FilterNode{Model: "users", Field: field, Operator: "ilike", Value: term})
+		}
+		data, err := json.Marshal(filter)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+
+	for _, tc := range []struct {
+		term string
+		want []string
+	}{
+		{"jAnE", []string{"person-one@example.test", "person-two@example.test"}},
+		{"Doe", []string{"person-one@example.test", "person-two@example.test"}},
+		{"Jane Doe", []string{"person-one@example.test", "person-two@example.test"}},
+		{"ane Do", []string{"person-one@example.test", "person-two@example.test"}},
+		{"Quintessa", []string{"null-last@example.test"}},
+		{"emailneedle681", []string{"emailneedle681@example.test"}},
+		{"9876543210", []string{"phone-only@example.test"}},
+		{"Visitorfixture", []string{"visitor@example.test"}},
+		{"Rate%value", []string{"percent@example.test"}},
+		{"Under_score", []string{"underscore@example.test"}},
+		{`Back\slash`, []string{"slash@example.test"}},
+		{"no-matching-contact", nil},
+	} {
+		t.Run(tc.term, func(t *testing.T) {
+			page, pageSize := 1, 15
+			results, err := u.GetContacts(page, pageSize, "asc", "users.email", filtersFor(tc.term), "UTC")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var emails []string
+			for _, contact := range results {
+				emails = append(emails, contact.Email.String)
+				if contact.Total != len(tc.want) {
+					t.Fatalf("total = %d, want %d", contact.Total, len(tc.want))
+				}
+			}
+			if !slices.Equal(emails, tc.want) {
+				t.Fatalf("emails = %v, want %v", emails, tc.want)
+			}
+		})
+	}
+
+	pageSize := 1
+	for index, email := range []string{"person-one@example.test", "person-two@example.test"} {
+		results, err := u.GetContacts(index+1, pageSize, "asc", "users.email", filtersFor("Jane Doe"), "UTC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(results) != 1 || results[0].Email.String != email || results[0].Total != 2 {
+			t.Fatalf("page %d = %+v, want %s with total 2", index+1, results, email)
+		}
+	}
 }
