@@ -162,6 +162,18 @@ func (m *Manager) MessageSenderWorker(ctx context.Context) {
 	}
 }
 
+// replyPrefix matches the reply marker mail clients put in front of a subject, in the common localized forms.
+var replyPrefix = regexp.MustCompile(`(?i)^(re|aw|antw|sv|vs)(\[\d+\])?:`)
+
+// replySubject returns the subject a reply goes out with: prefixed with "Re: " as mail clients do,
+// unless it already carries a reply marker, e.g. because the contact's own subject had one.
+func replySubject(subject string) string {
+	if replyPrefix.MatchString(subject) {
+		return subject
+	}
+	return "Re: " + subject
+}
+
 // sendOutgoingMessage sends an outgoing message.
 func (m *Manager) sendOutgoingMessage(message models.Message) {
 	defer m.outgoingProcessingMessages.Delete(message.ID)
@@ -223,6 +235,9 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
+		if outbound.InReplyTo != "" {
+			outbound.Subject = replySubject(outbound.Subject)
+		}
 	}
 
 	// Send message
