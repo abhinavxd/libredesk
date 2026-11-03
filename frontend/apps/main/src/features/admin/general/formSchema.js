@@ -55,5 +55,6 @@ export const createFormSchema = (t) => z.object({
     })
     .optional()
     .default(0),
+  conversation_retention_delete_contacts: z.boolean().optional(),
   show_conversation_subject: z.boolean().optional()
 })

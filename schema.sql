@@ -1122,6 +1122,7 @@ VALUES
 	('app.business_hours_id', '""'::jsonb),
 	('app.show_conversation_subject', 'true'::jsonb),
 	('app.conversation_retention_days', '0'::jsonb),
+	('app.conversation_retention_delete_contacts', 'false'::jsonb),
 	('ai_agent.faq_learning_enabled', 'false'::jsonb),
     ('notification.email.username', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.host', '""'::jsonb),

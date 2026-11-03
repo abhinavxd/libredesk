@@ -262,6 +262,8 @@
   "admin.general.conversationRetentionDays": "Delete resolved conversations after (days)",
   "admin.general.conversationRetentionDays.description": "Resolved and closed conversations are deleted with their messages and attachments this many days after their last message or status change. 0 keeps them.",
   "admin.general.conversationRetentionDays.valid": "Retention must be between 0 and 3650 days",
+  "admin.general.conversationRetentionDeleteContacts": "Also delete contacts left without conversations",
+  "admin.general.conversationRetentionDeleteContacts.description": "When retention removes a contact's last conversation, the contact and their details are deleted as well.",
   "admin.general.maxAllowedFileUploadSize": "Max allowed file upload size",
   "admin.general.maxAllowedFileUploadSize.description": "Max allowed file upload size in MB.",
   "admin.general.maxAllowedFileUploadSize.valid": "Max allowed file upload size should be between 1 and 500 MB",

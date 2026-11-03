@@ -13,6 +13,8 @@ type General struct {
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
 	// ConversationRetentionDays deletes resolved conversations this many days after their last activity; 0 keeps them.
 	ConversationRetentionDays int `json:"app.conversation_retention_days"`
+	// ConversationRetentionDeleteContacts also deletes a contact once retention removed their last conversation.
+	ConversationRetentionDeleteContacts bool `json:"app.conversation_retention_delete_contacts"`
 }
 
 type EmailNotification struct {

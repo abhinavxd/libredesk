@@ -609,7 +609,15 @@ WHERE id IN (
     WHERE s.category = 'resolved'
       AND GREATEST(c.created_at, COALESCE(c.last_message_at, c.created_at), COALESCE(c.last_resolved_at, c.created_at)) < NOW() - make_interval(days => $1)
     LIMIT $2
-);
+)
+RETURNING contact_id;
+
+-- name: delete-contacts-without-conversations
+-- Deletes those of the given contacts and visitors that have no conversation left, returning their avatar URLs.
+DELETE FROM users
+WHERE id = ANY($1::BIGINT[]) AND type IN ('contact', 'visitor')
+  AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.contact_id = users.id)
+RETURNING avatar_url;
 
 -- name: get-user-active-conversations-count
 SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;

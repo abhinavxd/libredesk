@@ -95,6 +95,19 @@
           </FormItem>
         </FormField>
       </FormGrid>
+      <FormField
+        v-slot="{ componentField, handleChange }"
+        name="conversation_retention_delete_contacts"
+      >
+        <FormItem class="mt-5">
+          <SwitchField
+            :title="t('admin.general.conversationRetentionDeleteContacts')"
+            :description="t('admin.general.conversationRetentionDeleteContacts.description')"
+            :checked="componentField.modelValue"
+            @update:checked="handleChange"
+          />
+        </FormItem>
+      </FormField>
       <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
         <FormItem class="mt-5">
           <SwitchField

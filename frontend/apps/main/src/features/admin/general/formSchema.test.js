@@ -25,7 +25,8 @@ describe('General Form Schema', () => {
             logo_url: 'https://support.example.com/logo.png',
             allowed_file_upload_extensions: ['png', 'pdf'],
             show_conversation_subject: true,
-            conversation_retention_days: 365
+            conversation_retention_days: 365,
+            conversation_retention_delete_contacts: true
         })).not.toThrow()
     })
 
