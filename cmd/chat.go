@@ -16,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/attachment"
 	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
@@ -209,11 +208,7 @@ func handleChatInit(r *fastglue.Request) error {
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
-	subject, ok := normalizeChatSubject(req.Subject)
-	if !ok {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatSubjectLength)), nil, envelope.InputError)
-	}
-	req.Subject = subject
+	req.Subject = normalizeChatSubject(req.Subject)
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
@@ -1049,12 +1044,8 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	return *claims, nil
 }
 
-func normalizeChatSubject(subject string) (string, bool) {
-	subject = strings.Join(strings.Fields(subject), " ")
-	if utf8.RuneCountInString(subject) > maxChatSubjectLength {
-		return "", false
-	}
-	return subject, true
+func normalizeChatSubject(subject string) string {
+	return stringutil.TruncateRunes(strings.Join(strings.Fields(subject), " "), maxChatSubjectLength)
 }
 
 // generateSessionToken creates a random session token and stores it in Redis.
