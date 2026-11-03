@@ -114,7 +114,7 @@ SELECT
     id,
     created_at,
     first_name,
-    last_name,
+    COALESCE(last_name, '') AS last_name,
     email,
     phone_number,
     phone_number_country_code,
@@ -122,5 +122,6 @@ SELECT
 FROM users
 WHERE type = 'contact'
 AND deleted_at IS NULL
-AND (email ILIKE $1 ESCAPE '\' OR phone_number ILIKE $1 ESCAPE '\')
+AND (email ILIKE $1 ESCAPE '\' OR phone_number ILIKE $1 ESCAPE '\'
+     OR (first_name || ' ' || COALESCE(last_name, '')) ILIKE $1 ESCAPE '\')
 LIMIT $2;

@@ -139,17 +139,7 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	// Build email content with all unread messages
 	emailContent := m.buildContinuityEmailContent(unreadMessages, websiteURL)
 
-	// Reuse saved subject for threading, or build from first message on first email
-	emailSubject := conv.ContinuityEmailSubject.String
-	if emailSubject == "" {
-		emailSubject = m.formatRefMarker(conv.ReferenceNumber)
-		if text := strings.TrimSpace(unreadMessages[0].TextContent); text != "" {
-			if len(text) > 100 {
-				text = stringutil.TruncateUTF8(text, 100 /* maxBytes */) + "..."
-			}
-			emailSubject = fmt.Sprintf("%s - %s", text, emailSubject)
-		}
-	}
+	emailSubject := m.buildContinuityEmailSubject(conv, unreadMessages[0].TextContent)
 
 	// Generate unique Message-ID for threading
 	sourceID, err := stringutil.GenerateEmailMessageID(conv.UUID, linkedEmailInbox.FromAddress())
@@ -273,6 +263,22 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 		"linked_email_inbox_id", conv.LinkedEmailInboxID.Int)
 
 	return nil
+}
+
+// buildContinuityEmailSubject preserves threading and limits new subject previews to 100 bytes before the suffix.
+func (m *Manager) buildContinuityEmailSubject(conv models.ContinuityConversation, firstMessageText string) string {
+	emailSubject := conv.ContinuityEmailSubject.String
+	if emailSubject == "" {
+		emailSubject = m.formatRefMarker(conv.ReferenceNumber)
+		if text := strings.Join(strings.Fields(firstMessageText), " "); text != "" {
+			if len(text) > 100 {
+				text = stringutil.TruncateUTF8(text, 100 /* maxBytes */) + "..."
+			}
+			emailSubject = fmt.Sprintf("%s - %s", text, emailSubject)
+		}
+	}
+
+	return emailSubject
 }
 
 func (m *Manager) renderContinuityEmailContent(unreadMessages []models.ContinuityUnreadMessage, websiteURL string) (string, bool) {
