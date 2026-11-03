@@ -379,6 +379,7 @@ type queries struct {
 	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
 	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
+	DeleteExpiredConversations          *sqlx.Stmt `query:"delete-expired-conversations"`
 	RemoveConversationAssignee          *sqlx.Stmt `query:"remove-conversation-assignee"`
 
 	// Draft queries.

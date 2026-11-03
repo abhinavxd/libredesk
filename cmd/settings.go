@@ -38,6 +38,9 @@ func handleGetGeneralSettings(r *fastglue.Request) error {
 }
 
 // handleUpdateGeneralSettings updates general settings.
+// maxConversationRetentionDays caps the retention setting at ten years; 0 turns retention off.
+const maxConversationRetentionDays = 3650
+
 func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
@@ -60,6 +63,9 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	req.RootURL = strings.TrimRight(strings.TrimSpace(req.RootURL), "/")
 	if !httputil.IsValidHTTPURL(req.RootURL) {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.general.rootURL.valid"), nil, envelope.InputError)
+	}
+	if req.ConversationRetentionDays < 0 || req.ConversationRetentionDays > maxConversationRetentionDays {
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.general.conversationRetentionDays.valid"), nil, envelope.InputError)
 	}
 
 	app.Lock()

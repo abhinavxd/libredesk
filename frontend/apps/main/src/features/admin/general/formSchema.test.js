@@ -24,8 +24,17 @@ describe('General Form Schema', () => {
             business_hours_id: '1',
             logo_url: 'https://support.example.com/logo.png',
             allowed_file_upload_extensions: ['png', 'pdf'],
-            show_conversation_subject: true
+            show_conversation_subject: true,
+            conversation_retention_days: 365
         })).not.toThrow()
+    })
+
+    test('conversation retention days', () => {
+        expect(schema.parse(validForm).conversation_retention_days).toBe(0)
+        expect(() => schema.parse({ ...validForm, conversation_retention_days: 0 })).not.toThrow()
+        expect(() => schema.parse({ ...validForm, conversation_retention_days: -1 })).toThrow()
+        expect(() => schema.parse({ ...validForm, conversation_retention_days: 1.5 })).toThrow()
+        expect(() => schema.parse({ ...validForm, conversation_retention_days: 3651 })).toThrow()
     })
 
     test('site_name missing', () => {

@@ -150,6 +150,24 @@
             <FormMessage />
           </FormItem>
         </FormField>
+        <FormField
+          v-slot="{ field }"
+          name="conversation_retention_days"
+          :value="props.initialValues.conversation_retention_days"
+        >
+          <FormItem>
+            <FormLabel>
+              {{ t('admin.general.conversationRetentionDays') }}
+            </FormLabel>
+            <FormControl>
+              <Input type="number" placeholder="0" v-bind="field" />
+            </FormControl>
+            <FormDescription>
+              {{ t('admin.general.conversationRetentionDays.description') }}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
         <FormField name="allowed_file_upload_extensions" v-slot="{ componentField, handleChange }">
           <FormItem>
             <FormLabel>

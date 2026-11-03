@@ -40,5 +40,20 @@ export const createFormSchema = (t) => z.object({
       message: t('admin.general.maxAllowedFileUploadSize.valid')
     }),
   allowed_file_upload_extensions: z.array(z.string()).nullable().optional().default([]),
+  conversation_retention_days: z
+    .number({
+      required_error: t('globals.messages.required')
+    })
+    .int({
+      message: t('admin.general.conversationRetentionDays.valid')
+    })
+    .min(0, {
+      message: t('admin.general.conversationRetentionDays.valid')
+    })
+    .max(3650, {
+      message: t('admin.general.conversationRetentionDays.valid')
+    })
+    .optional()
+    .default(0),
   show_conversation_subject: z.boolean().optional()
 })

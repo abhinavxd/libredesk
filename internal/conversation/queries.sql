@@ -598,6 +598,19 @@ SET status_id        = (SELECT id FROM new_status),
     updated_at       = NOW()
 WHERE uuid = $1;
 
+-- name: delete-expired-conversations
+-- Deletes resolved conversations whose last message and last status change lie more than $1 days back,
+-- at most $2 at a time. Messages, drafts and the rest cascade; attachments go with the unlinked-media sweep.
+DELETE FROM conversations
+WHERE id IN (
+    SELECT c.id
+    FROM conversations c
+    JOIN conversation_statuses s ON s.id = c.status_id
+    WHERE s.category = 'resolved'
+      AND GREATEST(c.created_at, COALESCE(c.last_message_at, c.created_at), COALESCE(c.last_resolved_at, c.created_at)) < NOW() - make_interval(days => $1)
+    LIMIT $2
+);
+
 -- name: get-user-active-conversations-count
 SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;
 

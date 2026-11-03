@@ -11,6 +11,8 @@ type General struct {
 	Timezone                    string   `json:"app.timezone"`
 	BusinessHoursID             string   `json:"app.business_hours_id"`
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
+	// ConversationRetentionDays deletes resolved conversations this many days after their last activity; 0 keeps them.
+	ConversationRetentionDays int `json:"app.conversation_retention_days"`
 }
 
 type EmailNotification struct {
