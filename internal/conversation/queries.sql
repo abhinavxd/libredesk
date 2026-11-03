@@ -612,12 +612,18 @@ WHERE id IN (
 )
 RETURNING contact_id;
 
+-- name: lock-contacts
+-- Locks the given users for the rest of the transaction, so a conversation inserted meanwhile waits on
+-- its foreign key and is seen by the check that follows.
+SELECT id FROM users WHERE id = ANY($1::BIGINT[]) FOR UPDATE;
+
 -- name: delete-contacts-without-conversations
--- Deletes those of the given contacts and visitors that have no conversation left, returning their avatar URLs.
+-- Deletes those of the given contacts and visitors that have no conversation left. Their avatars are
+-- media rows of model 'users' and go with the unlinked-media sweep.
 DELETE FROM users
 WHERE id = ANY($1::BIGINT[]) AND type IN ('contact', 'visitor')
   AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.contact_id = users.id)
-RETURNING avatar_url;
+RETURNING id;
 
 -- name: get-user-active-conversations-count
 SELECT COUNT(*) FROM conversations WHERE status_id IN (SELECT id FROM conversation_statuses WHERE category = 'open') AND assigned_user_id = $1;

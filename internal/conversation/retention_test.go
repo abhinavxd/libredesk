@@ -51,7 +51,7 @@ func TestDeleteExpiredConversations(t *testing.T) {
 	openOld := insert("Open", "90 days", "60 days", "60 days")
 
 	lo := logf.New(logf.Opts{})
-	m := &Manager{lo: &lo}
+	m := &Manager{lo: &lo, db: db}
 	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
 		t.Fatal(err)
 	}

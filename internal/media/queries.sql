@@ -64,6 +64,15 @@ WHERE model_type = 'messages'
     OR (model_id > 0 AND created_at < NOW() - INTERVAL '24 hours' AND NOT EXISTS (SELECT 1 FROM conversation_messages cm WHERE cm.id = media.model_id))
   );
 
+-- name: get-unlinked-user-media
+-- Avatars of users that no longer exist, e.g. contacts deleted by hand or by retention.
+SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
+FROM media
+WHERE model_type = 'users'
+  AND model_id > 0
+  AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = media.model_id)
+  AND created_at < NOW() - INTERVAL '24 hours';
+
 -- name: get-unlinked-help-article-media
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media

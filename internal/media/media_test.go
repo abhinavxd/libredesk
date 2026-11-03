@@ -113,3 +113,44 @@ func TestPendingMediaOwnership(t *testing.T) {
 		}
 	}
 }
+
+func TestUnlinkedUserMedia(t *testing.T) {
+	db := testutil.NewDB(t, "unlinked_user_media")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.queries, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var kept, gone int
+	if err := db.Get(&kept, `INSERT INTO users (type, email, first_name, last_name) VALUES ('contact', 'kept@example.com', 'Kept', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&gone, `INSERT INTO users (type, email, first_name, last_name) VALUES ('contact', 'gone@example.com', 'Gone', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	insert := func(userID int, age string) string {
+		var uuid string
+		if err := db.Get(&uuid, `INSERT INTO media (store, filename, content_type, content_id, model_type, model_id, "size", created_at) VALUES ('fs', 'avatar.png', 'image/png', '', 'users', $1, 10, NOW() - $2::interval) RETURNING uuid`, userID, age); err != nil {
+			t.Fatal(err)
+		}
+		return uuid
+	}
+	keptAvatar := insert(kept, "2 days")
+	goneAvatar := insert(gone, "2 days")
+	goneFresh := insert(gone, "1 hour")
+	if _, err := db.Exec(`DELETE FROM users WHERE id = $1`, gone); err != nil {
+		t.Fatal(err)
+	}
+	var rows []models.Media
+	if err := m.queries.GetUnlinkedUserMedia.Select(&rows); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, r := range rows {
+		got[r.UUID] = true
+	}
+	// Only the day-old avatar of the deleted user is due; the fresh one waits, the kept user's stays.
+	if len(got) != 1 || !got[goneAvatar] || got[keptAvatar] || got[goneFresh] {
+		t.Fatalf("unlinked user media = %v; want only %s", got, goneAvatar)
+	}
+}

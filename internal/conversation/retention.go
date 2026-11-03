@@ -2,9 +2,7 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
 	"errors"
-	"path/filepath"
 	"time"
 
 	"github.com/lib/pq"
@@ -41,41 +39,46 @@ func (c *Manager) RunRetention(ctx context.Context, policy func() (days int, del
 
 // DeleteExpiredConversations deletes resolved conversations that have had no message and no status change
 // for more than days days, in batches. With deleteContacts, contacts and visitors left without any
-// conversation are deleted too, with their avatar. Returns how many conversations and contacts went.
+// conversation are deleted too; their avatars go with the unlinked-media sweep. Each batch is one
+// transaction, so a failure leaves nothing half done and the next run picks the batch up again.
+// Returns how many conversations and contacts went.
 func (c *Manager) DeleteExpiredConversations(ctx context.Context, days int, deleteContacts bool) (conversations, contacts int, err error) {
 	for {
-		var contactIDs []int64
-		if err := c.q.DeleteExpiredConversations.SelectContext(ctx, &contactIDs, days, retentionBatchSize); err != nil {
+		n, m, err := c.deleteExpiredBatch(ctx, days, deleteContacts)
+		conversations += n
+		contacts += m
+		if err != nil || n < retentionBatchSize {
 			return conversations, contacts, err
-		}
-		conversations += len(contactIDs)
-		if deleteContacts && len(contactIDs) > 0 {
-			n, err := c.deleteContactsWithoutConversations(ctx, contactIDs)
-			contacts += n
-			if err != nil {
-				return conversations, contacts, err
-			}
-		}
-		if len(contactIDs) < retentionBatchSize {
-			return conversations, contacts, nil
 		}
 	}
 }
 
-// deleteContactsWithoutConversations deletes those of the given contacts that have no conversation left and
-// removes their avatars from the media store. Returns how many contacts went.
-func (c *Manager) deleteContactsWithoutConversations(ctx context.Context, contactIDs []int64) (int, error) {
-	var avatars []sql.NullString
-	if err := c.q.DeleteContactsWithoutConversations.SelectContext(ctx, &avatars, pq.Array(contactIDs)); err != nil {
-		return 0, err
+// deleteExpiredBatch deletes one batch of expired conversations and, if asked, the contacts they leave
+// without any conversation. The contacts are locked before the check, so a conversation created for one
+// of them meanwhile waits on its foreign key and keeps the contact.
+func (c *Manager) deleteExpiredBatch(ctx context.Context, days int, deleteContacts bool) (conversations, contacts int, err error) {
+	tx, err := c.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
 	}
-	for _, avatar := range avatars {
-		if !avatar.Valid || avatar.String == "" || c.mediaStore == nil {
-			continue
-		}
-		if err := c.mediaStore.Delete(filepath.Base(avatar.String)); err != nil {
-			c.lo.Error("error deleting avatar of retired contact", "file", filepath.Base(avatar.String), "error", err)
-		}
+	defer tx.Rollback()
+
+	var contactIDs []int64
+	if err := tx.Stmtx(c.q.DeleteExpiredConversations).SelectContext(ctx, &contactIDs, days, retentionBatchSize); err != nil {
+		return 0, 0, err
 	}
-	return len(avatars), nil
+	if deleteContacts && len(contactIDs) > 0 {
+		var locked, deleted []int64
+		if err := tx.Stmtx(c.q.LockContacts).SelectContext(ctx, &locked, pq.Array(contactIDs)); err != nil {
+			return 0, 0, err
+		}
+		if err := tx.Stmtx(c.q.DeleteContactsWithoutConversations).SelectContext(ctx, &deleted, pq.Array(contactIDs)); err != nil {
+			return 0, 0, err
+		}
+		contacts = len(deleted)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+	return len(contactIDs), contacts, nil
 }

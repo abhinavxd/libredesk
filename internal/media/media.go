@@ -99,6 +99,7 @@ type queries struct {
 	GetByModel                  *sqlx.Stmt `query:"get-model-media"`
 	GetUnlinkedMessageMedia     *sqlx.Stmt `query:"get-unlinked-message-media"`
 	GetUnlinkedHelpArticleMedia *sqlx.Stmt `query:"get-unlinked-help-article-media"`
+	GetUnlinkedUserMedia        *sqlx.Stmt `query:"get-unlinked-user-media"`
 	LinkHelpArticleMedia        *sqlx.Stmt `query:"link-help-article-media"`
 	UnlinkHelpArticleMedia      *sqlx.Stmt `query:"unlink-help-article-media"`
 	ContentIDExists             *sqlx.Stmt `query:"content-id-exists"`
@@ -347,7 +348,7 @@ func (m *Manager) Delete(name string) error {
 	return nil
 }
 
-// DeleteUnlinkedMedia is a blocking function that periodically deletes media files that are not linked to any conversation message or help article.
+// DeleteUnlinkedMedia is a blocking function that periodically deletes media files that are not linked to any conversation message, help article or user.
 func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
 	select {
 	case <-ctx.Done():
@@ -368,7 +369,7 @@ func (m *Manager) DeleteUnlinkedMedia(ctx context.Context) {
 
 // deleteUnlinked runs all unlinked-media sweeps.
 func (m *Manager) deleteUnlinked() {
-	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia} {
+	for _, stmt := range []*sqlx.Stmt{m.queries.GetUnlinkedMessageMedia, m.queries.GetUnlinkedHelpArticleMedia, m.queries.GetUnlinkedUserMedia} {
 		if err := m.deleteUnlinkedRows(stmt); err != nil {
 			m.lo.Error("error deleting unlinked media", "error", err)
 		}
