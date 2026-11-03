@@ -33,7 +33,7 @@ func TestDeleteExpiredConversations(t *testing.T) {
 			contactID, inboxID, status, createdAgo, lastMessageAgo, lastResolvedAgo); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Exec(`INSERT INTO conversation_messages (type, status, conversation_id, sender_id, sender_type, content) VALUES ('incoming', 'received', $1, $2, 'contact', 'Hello')`, id, contactID); err != nil {
+		if _, err := db.Exec(`INSERT INTO conversation_messages (type, status, conversation_id, sender_id, sender_type, content, created_at) VALUES ('incoming', 'received', $1, $2, 'contact', 'Hello', NOW() - $3::interval)`, id, contactID, lastMessageAgo); err != nil {
 			t.Fatal(err)
 		}
 		return id
@@ -44,11 +44,22 @@ func TestDeleteExpiredConversations(t *testing.T) {
 	// A contact whose only conversation expires goes with it, the main contact keeps their open conversation.
 	lonelyContact := newContact("lonely@example.com")
 	lonelyExpired := insertFor(lonelyContact, "Closed", "90 days", "60 days", "45 days")
+	// A message that arrived after the recorded last message means its timestamp update is still on the way.
+	messageInFlight := insert("Closed", "90 days", "60 days", "45 days")
+	if _, err := db.Exec(`INSERT INTO conversation_messages (type, status, conversation_id, sender_id, sender_type, content) VALUES ('incoming', 'received', $1, $2, 'contact', 'One more thing')`, messageInFlight, contactID); err != nil {
+		t.Fatal(err)
+	}
+	// A contact who also wrote in someone else's conversation keeps their messages, so they stay.
+	writerContact := newContact("writer@example.com")
+	writerExpired := insertFor(writerContact, "Closed", "90 days", "60 days", "45 days")
 	expiredClosed := insert("Closed", "90 days", "60 days", "45 days")
 	expiredResolved := insert("Resolved", "90 days", "60 days", "45 days")
 	recentlyResolved := insert("Resolved", "90 days", "60 days", "10 days")
 	newMessageSince := insert("Closed", "90 days", "5 days", "45 days")
 	openOld := insert("Open", "90 days", "60 days", "60 days")
+	if _, err := db.Exec(`INSERT INTO conversation_messages (type, status, conversation_id, sender_id, sender_type, content, created_at) VALUES ('incoming', 'received', $1, $2, 'contact', 'Me too', NOW() - '60 days'::interval)`, openOld, writerContact); err != nil {
+		t.Fatal(err)
+	}
 
 	lo := logf.New(logf.Opts{})
 	m := &Manager{lo: &lo, db: db}
@@ -60,10 +71,10 @@ func TestDeleteExpiredConversations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if deleted != 3 || deletedContacts != 1 {
-		t.Fatalf("deleted = %d conversations, %d contacts; want 3, 1", deleted, deletedContacts)
+	if deleted != 4 || deletedContacts != 1 {
+		t.Fatalf("deleted = %d conversations, %d contacts; want 4, 1", deleted, deletedContacts)
 	}
-	for id, want := range map[int]bool{lonelyContact: false, contactID: true} {
+	for id, want := range map[int]bool{lonelyContact: false, writerContact: true, contactID: true} {
 		var exists bool
 		if err := db.Get(&exists, `SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)`, id); err != nil {
 			t.Fatal(err)
@@ -72,7 +83,7 @@ func TestDeleteExpiredConversations(t *testing.T) {
 			t.Errorf("contact %d exists = %v, want %v", id, exists, want)
 		}
 	}
-	for id, want := range map[int]bool{lonelyExpired: false, expiredClosed: false, expiredResolved: false, recentlyResolved: true, newMessageSince: true, openOld: true} {
+	for id, want := range map[int]bool{lonelyExpired: false, writerExpired: false, expiredClosed: false, expiredResolved: false, messageInFlight: true, recentlyResolved: true, newMessageSince: true, openOld: true} {
 		var exists bool
 		if err := db.Get(&exists, `SELECT EXISTS (SELECT 1 FROM conversations WHERE id = $1)`, id); err != nil {
 			t.Fatal(err)

@@ -598,19 +598,29 @@ SET status_id        = (SELECT id FROM new_status),
     updated_at       = NOW()
 WHERE uuid = $1;
 
+-- name: get-expired-conversations
+-- Resolved conversations whose last message and last status change lie more than $1 days back, at most $2.
+SELECT c.id
+FROM conversations c
+JOIN conversation_statuses s ON s.id = c.status_id
+WHERE s.category = 'resolved'
+  AND GREATEST(c.created_at, COALESCE(c.last_message_at, c.created_at), COALESCE(c.last_resolved_at, c.created_at)) < NOW() - make_interval(days => $1)
+ORDER BY c.id
+LIMIT $2;
+
+-- name: lock-conversations
+-- Locks the given conversations for the rest of the transaction, so a message being inserted into one of
+-- them (which holds a key-share lock on its row) commits before the delete looks again.
+SELECT id FROM conversations WHERE id = ANY($1::BIGINT[]) FOR UPDATE;
+
 -- name: delete-expired-conversations
--- Deletes resolved conversations whose last message and last status change lie more than $1 days back,
--- at most $2 at a time. Messages, drafts and the rest cascade; attachments go with the unlinked-media sweep.
-DELETE FROM conversations
-WHERE id IN (
-    SELECT c.id
-    FROM conversations c
-    JOIN conversation_statuses s ON s.id = c.status_id
-    WHERE s.category = 'resolved'
-      AND GREATEST(c.created_at, COALESCE(c.last_message_at, c.created_at), COALESCE(c.last_resolved_at, c.created_at)) < NOW() - make_interval(days => $1)
-    LIMIT $2
-)
-RETURNING contact_id;
+-- Deletes the given conversations, except those with a message younger than $2 days: a message is committed
+-- before last_message_at moves, so such a conversation waits for the next run.
+-- Messages, drafts and the rest cascade; attachments go with the unlinked-media sweep.
+DELETE FROM conversations c
+WHERE c.id = ANY($1::BIGINT[])
+  AND NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.conversation_id = c.id AND m.created_at >= NOW() - make_interval(days => $2))
+RETURNING c.contact_id;
 
 -- name: lock-contacts
 -- Locks the given users for the rest of the transaction, so a conversation inserted meanwhile waits on
@@ -618,11 +628,13 @@ RETURNING contact_id;
 SELECT id FROM users WHERE id = ANY($1::BIGINT[]) FOR UPDATE;
 
 -- name: delete-contacts-without-conversations
--- Deletes those of the given contacts and visitors that have no conversation left. Their avatars are
--- media rows of model 'users' and go with the unlinked-media sweep.
+-- Deletes those of the given contacts and visitors that have no conversation left and no message in
+-- anyone else's, so nothing of theirs cascades away. Their avatars are media rows of model 'users' and
+-- go with the unlinked-media sweep.
 DELETE FROM users
 WHERE id = ANY($1::BIGINT[]) AND type IN ('contact', 'visitor')
   AND NOT EXISTS (SELECT 1 FROM conversations c WHERE c.contact_id = users.id)
+  AND NOT EXISTS (SELECT 1 FROM conversation_messages m WHERE m.sender_id = users.id)
 RETURNING id;
 
 -- name: get-user-active-conversations-count
