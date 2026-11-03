@@ -428,6 +428,7 @@ func TestContactListSearch(t *testing.T) {
 		('contact', 'emailneedle681@example.test', 'Different', 'Alias', NULL, NULL),
 		('contact', 'phone-only@example.test', 'Different', 'Phone', '+449876543210', NULL),
 		('contact', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
+		('contact', NULL, 'Single', NULL, NULL, NULL),
 		('visitor', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
 		('agent', NULL, 'Noemail', 'Customer', '+12025550181', NULL),
 		('ai_assistant', NULL, 'Noemail', 'Customer', NULL, NULL),
@@ -468,6 +469,7 @@ func TestContactListSearch(t *testing.T) {
 		{"emailneedle681", []string{"emailneedle681@example.test"}},
 		{"9876543210", []string{"phone-only@example.test"}},
 		{"Noemail Customer", []string{""}},
+		{"Single", []string{""}},
 		{"2025550181", []string{""}},
 		{"Visitorfixture", []string{"visitor@example.test"}},
 		{"Rate%value", []string{"percent@example.test"}},
@@ -512,5 +514,18 @@ func TestContactListSearch(t *testing.T) {
 	}
 	if len(assistants) != 1 || assistants[0].Email.Valid {
 		t.Fatalf("assistants without email = %+v, want one assistant", assistants)
+	}
+	for _, name := range []string{"Quintessa", "Single"} {
+		var id int
+		if err := db.Get(&id, `SELECT id FROM users WHERE first_name = $1`, name); err != nil {
+			t.Fatal(err)
+		}
+		contact, err := u.GetContactOrVisitor(id, "" /** email **/)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if contact.ID != id || contact.LastName != "" {
+			t.Fatalf("contact = %+v, want %d with empty last name", contact, id)
+		}
 	}
 }

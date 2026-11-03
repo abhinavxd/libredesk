@@ -7,7 +7,7 @@ select
 from
     tags
 where
-    ($1 = '' or name ilike '%' || $1 || '%')
+    ($1 = '' or name ilike $4 ESCAPE '\')
 order by
     name
 limit NULLIF($2, 0) offset $3;

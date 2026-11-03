@@ -114,8 +114,21 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 			t.Fatalf("inserting message: %v", err)
 		}
 	}
+	if _, err := db.Exec(`UPDATE users SET last_name = NULL, email = NULL WHERE id = $1`, senderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE conversations SET subject = NULL, last_message_at = NULL WHERE id = $1`, conversationID); err != nil {
+		t.Fatal(err)
+	}
 
 	scope := models.ReadScope{Read: true, ReadAll: true}
+	nullableResults, _, _, err := manager.Conversations(models.Query{Term: "999"}, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nullableResults) != 1 || nullableResults[0].Contact.Email.Valid || nullableResults[0].Contact.LastName.Valid || nullableResults[0].Subject.Valid || nullableResults[0].LastMessageAt.Valid {
+		t.Fatalf("nullable conversation search returned %+v", nullableResults)
+	}
 	results, hasMore, cursor, err := manager.Conversations(models.Query{Term: "108", PageSize: 10}, scope)
 	if err != nil {
 		t.Fatalf("searching conversations: %v", err)
@@ -212,6 +225,9 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 	if len(messages) != 10 || !hasMore || cursor == "" {
 		t.Fatalf("message search returned results %+v, has_more %t, cursor %q", messages, hasMore, cursor)
 	}
+	if messages[0].Sender.LastName.Valid || messages[0].Contact.Email.Valid || messages[0].ConversationSubject.Valid || messages[0].Assignee.FirstName.Valid {
+		t.Fatalf("nullable message fields = %+v", messages[0])
+	}
 	messages, hasMore, nextCursor, err = manager.Messages(models.Query{Term: "ordinary", Cursor: cursor, PageSize: 10}, scope)
 	if err != nil {
 		t.Fatalf("searching next message page: %v", err)
@@ -280,20 +296,43 @@ func TestContactSearchMatchesName(t *testing.T) {
 		t.Fatalf("creating search manager: %v", err)
 	}
 	if _, err := db.Exec(`
-		INSERT INTO users (type, email, first_name, last_name)
-		VALUES ('contact', 'jane@example.com', 'Jane', 'Doe'), ('contact', 'other@example.com', 'Other', '')
+		INSERT INTO users (type, email, first_name, last_name, phone_number, deleted_at) VALUES
+		('contact', 'jane@example.com', 'Jane', 'Doe', NULL, NULL),
+		('contact', 'other@example.com', 'Other', '', NULL, NULL),
+		('contact', 'solo@example.com', 'Solo', NULL, NULL, NULL),
+		('contact', NULL, 'Phoneonly', NULL, '9876543210', NULL),
+		('contact', NULL, 'Nameonly', NULL, NULL, NULL),
+		('contact', 'literal@example.com', 'Rate%_\value', NULL, NULL, NULL),
+		('contact', 'deleted@example.com', 'Solo', NULL, NULL, now()),
+		('agent', 'agent@example.com', 'Solo', NULL, NULL, NULL),
+		('visitor', 'visitor@example.com', 'Solo', NULL, NULL, NULL)
 	`); err != nil {
 		t.Fatalf("inserting contacts: %v", err)
 	}
 
-	for term, want := range map[string]string{"jane": "jane@example.com", "Jane Doe": "jane@example.com", "doe": "jane@example.com", "other": "other@example.com"} {
-		results, err := manager.Contacts(term, 10)
-		if err != nil {
-			t.Fatalf("searching contacts for %q: %v", term, err)
-		}
-		if len(results) != 1 || results[0].Email.String != want {
-			t.Fatalf("contact search for %q returned %+v, want only %s", term, results, want)
-		}
+	for term, want := range map[string]string{
+		"jane": "Jane", "Jane Doe": "Jane", "doe": "Jane", "other": "Other",
+		"solo": "Solo", "solo@": "Solo", "987654": "Phoneonly", "phoneonly": "Phoneonly",
+		"nameonly": "Nameonly", `%_\`: `Rate%_\value`, "missing": "",
+	} {
+		t.Run(term, func(t *testing.T) {
+			results, err := manager.Contacts(term, 10)
+			if err != nil {
+				t.Fatalf("searching contacts for %q: %v", term, err)
+			}
+			if want == "" {
+				if len(results) != 0 {
+					t.Fatalf("contact search for %q returned %+v, want no results", term, results)
+				}
+				return
+			}
+			if len(results) != 1 || results[0].FirstName != want {
+				t.Fatalf("contact search for %q returned %+v, want only %s", term, results, want)
+			}
+			if want != "Jane" && results[0].LastName != "" {
+				t.Fatalf("last name = %q, want empty string", results[0].LastName)
+			}
+		})
 	}
 }
 

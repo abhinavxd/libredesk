@@ -114,7 +114,7 @@ SELECT
     id,
     created_at,
     first_name,
-    last_name,
+    COALESCE(last_name, '') AS last_name,
     email,
     phone_number,
     phone_number_country_code,
