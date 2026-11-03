@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-1 flex-col gap-4 box p-5">
     <div class="flex items-center justify-between">
-      <p class="text-sm font-medium text-muted-foreground">{{ title }}</p>
+      <h3 class="ui-heading">{{ title }}</h3>
       <slot name="header-right"></slot>
     </div>
     <div :class="gridClass">

@@ -42,7 +42,7 @@
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
         <Calendar
-          :model-value="toCalendarDate(modelValue)"
+          :model-value="dateValue"
           @update:model-value="handlePick"
         />
       </PopoverContent>
@@ -81,6 +81,8 @@ const toCalendarDate = (v) => {
     return undefined
   }
 }
+
+const dateValue = computed(() => toCalendarDate(modelValue.value))
 
 const formatDisplay = (v) => {
   try {

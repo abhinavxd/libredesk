@@ -25,7 +25,7 @@ func initEncoder(lo *logf.Logger) {
 		enc, err := tiktoken.GetEncoding(embeddingEncoding)
 		if err != nil {
 			if lo != nil {
-				lo.Error("could not load tiktoken encoding, falling back to rune-based token estimates", "error", err)
+				lo.Warn("could not load tiktoken encoding, falling back to rune-based token estimates", "error", err)
 			}
 			return
 		}

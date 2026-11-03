@@ -1,10 +1,14 @@
 <template>
-  <form class="space-y-6 w-full">
+  <form novalidate class="webhook-form space-y-6 w-full">
     <FormField name="is_active" v-slot="{ value, handleChange }" v-if="!isNewForm">
       <FormItem>
         <FormControl>
           <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Checkbox
+              :aria-label="$t('globals.terms.active')"
+              :checked="value"
+              @update:checked="handleChange"
+            />
             <Label>{{ $t('globals.terms.active') }}</Label>
           </div>
         </FormControl>
@@ -12,25 +16,27 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="My Webhook" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid class="webhook-settings-grid">
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="My Webhook" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="url">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.url') }}</FormLabel>
-        <FormControl>
-          <Input type="url" placeholder="https://your-app.com/webhook" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="url">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.url') }}</FormLabel>
+          <FormControl>
+            <Input type="url" placeholder="https://your-app.com/webhook" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <FormField name="events" v-slot="{ componentField, handleChange }">
       <FormItem>
@@ -46,7 +52,7 @@
               class="rounded-md border border-border bg-card"
             >
               <div class="border-b border-border bg-muted/30 px-5 py-3">
-                <h4 class="font-medium text-card-foreground">{{ group.name }}</h4>
+                <h4 class="ui-subheading">{{ group.name }}</h4>
               </div>
               <div class="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div
@@ -55,6 +61,7 @@
                   class="flex items-start space-x-3"
                 >
                   <Checkbox
+                    :id="`${eventId}-${event.value}`"
                     :checked="componentField.modelValue?.includes(event.value)"
                     @update:checked="
                       (checked) =>
@@ -66,7 +73,11 @@
                         )
                     "
                   />
-                  <label class="font-normal text-sm">{{ event.label }}</label>
+                  <Label
+                    :for="`${eventId}-${event.value}`"
+                    class="font-normal text-sm cursor-pointer"
+                    >{{ event.label }}</Label
+                  >
                 </div>
               </div>
             </div>
@@ -76,16 +87,18 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField }" name="secret">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.secret') }}</FormLabel>
-        <FormControl>
-          <Input type="password" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>{{ $t('admin.webhook.secret.description') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid class="webhook-settings-grid">
+      <FormField v-slot="{ componentField }" name="secret">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.secret') }}</FormLabel>
+          <FormControl>
+            <Input type="password" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ $t('admin.webhook.secret.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <!-- Form submit button slot -->
     <slot name="footer"></slot>
@@ -93,9 +106,11 @@
 </template>
 
 <script setup>
+import { useId } from 'vue'
+import { Label } from '@shared-ui/components/ui/label'
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref } from 'vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
-import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'
 import {
   FormControl,
@@ -118,6 +133,7 @@ defineProps({
 })
 
 const { t } = useI18n()
+const eventId = useId()
 
 const webhookEvents = ref([
   {
@@ -166,3 +182,19 @@ const handleEventChange = (checked, eventName, handleChange, currentEvents) => {
   handleChange(checked ? [...events, eventName] : events.filter((e) => e !== eventName))
 }
 </script>
+
+<style scoped>
+.webhook-form {
+  container-type: inline-size;
+}
+
+.webhook-settings-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 32rem) {
+  .webhook-settings-grid.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

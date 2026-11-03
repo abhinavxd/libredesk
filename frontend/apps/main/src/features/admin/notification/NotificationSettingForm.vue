@@ -4,7 +4,11 @@
       <FormItem>
         <FormControl>
           <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Checkbox
+              :aria-label="$t('globals.terms.enabled')"
+              :checked="value"
+              @update:checked="handleChange"
+            />
             <Label>{{ $t('globals.terms.enabled') }}</Label>
           </div>
         </FormControl>
@@ -12,7 +16,7 @@
       </FormItem>
     </FormField>
 
-    <div class="grid gap-6 md:grid-cols-2">
+    <FormGrid compact>
       <FormField v-slot="{ componentField }" name="host">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.smtpHost') }}</FormLabel>
@@ -28,52 +32,6 @@
           <FormLabel>{{ $t('globals.terms.smtpPort') }}</FormLabel>
           <FormControl>
             <Input type="number" placeholder="587" v-bind="componentField" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
-      <FormField v-slot="{ componentField }" name="username">
-        <FormItem>
-          <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
-          <FormControl>
-            <Input type="text" placeholder="admin@yourcompany.com" v-bind="componentField" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="password">
-        <FormItem>
-          <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
-          <FormControl>
-            <Input type="password" placeholder="" v-bind="componentField" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
-      <FormField v-slot="{ componentField }" name="auth_protocol">
-        <FormItem>
-          <FormLabel>{{ $t('admin.inbox.authProtocol') }}</FormLabel>
-          <FormControl>
-            <Select v-bind="componentField" v-model="componentField.modelValue">
-              <SelectTrigger>
-                <SelectValue :placeholder="t('admin.inbox.authProtocol.description')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="plain">Plain</SelectItem>
-                  <SelectItem value="login">Login</SelectItem>
-                  <SelectItem value="cram">CRAM-MD5</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
           </FormControl>
           <FormMessage />
         </FormItem>
@@ -99,9 +57,51 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="username">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="admin@yourcompany.com" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <div class="grid gap-6 md:grid-cols-2">
+      <FormField v-slot="{ componentField }" name="password">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
+          <FormControl>
+            <Input type="password" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="auth_protocol">
+        <FormItem>
+          <FormLabel>{{ $t('admin.inbox.authProtocol') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField" v-model="componentField.modelValue">
+              <SelectTrigger>
+                <SelectValue :placeholder="t('admin.inbox.authProtocol.description')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="plain">Plain</SelectItem>
+                  <SelectItem value="login">Login</SelectItem>
+                  <SelectItem value="cram">CRAM-MD5</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
+    <FormGrid>
       <FormField v-slot="{ componentField }" name="email_address">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.fromEmailAddress') }}</FormLabel>
@@ -129,9 +129,8 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
-
-    <div class="grid gap-6 md:grid-cols-2">
+    </FormGrid>
+    <FormGrid compact>
       <FormField v-slot="{ componentField }" name="max_conns">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.maxConnections') }}</FormLabel>
@@ -153,9 +152,7 @@
           <FormDescription> {{ $t('admin.inbox.maxRetries.description') }} </FormDescription>
         </FormItem>
       </FormField>
-    </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
       <FormField v-slot="{ componentField }" name="idle_timeout">
         <FormItem>
           <FormLabel>{{ $t('admin.inbox.idleTimeout') }}</FormLabel>
@@ -181,7 +178,7 @@
           </FormDescription>
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="tls_skip_verify">
       <FormItem>
@@ -199,6 +196,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, ref, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'

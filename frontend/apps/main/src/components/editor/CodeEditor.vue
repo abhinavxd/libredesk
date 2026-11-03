@@ -3,8 +3,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick, useTemplateRef } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, useTemplateRef } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
+import { Compartment } from '@codemirror/state'
 import { html } from '@codemirror/lang-html'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -19,11 +20,12 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 const data = ref('')
-let editorView = null 
+const mode = useColorMode()
+const theme = new Compartment()
+let editorView = null
 const codeEditor = useTemplateRef('codeEditor')
 
 const initCodeEditor = (body) => {
-    const isDark = useColorMode().value === 'dark'
     const langExtension = props.language === 'javascript' ? javascript() : html()
     const isEditable = !props.disabled && !props.readOnly
 
@@ -32,7 +34,7 @@ const initCodeEditor = (body) => {
         extensions: [
             basicSetup,
             langExtension,
-            ...(isDark ? [oneDark] : []),
+            theme.of(mode.value === 'dark' ? oneDark : []),
             EditorView.editable.of(isEditable),
             EditorView.theme({
                 '&': { height: props.readOnly ? 'auto' : '100%' },
@@ -59,6 +61,12 @@ const initCodeEditor = (body) => {
 
 onMounted(() => {
     initCodeEditor(props.modelValue || '')
+})
+
+onBeforeUnmount(() => editorView?.destroy())
+
+watch(mode, (value) => {
+    editorView?.dispatch({ effects: theme.reconfigure(value === 'dark' ? oneDark : []) })
 })
 
 watch(() => props.modelValue, (newVal) => {

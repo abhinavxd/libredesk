@@ -12,7 +12,7 @@
               v-bind="fieldBinding(componentField, handleChange, meta)"
               :items="allCountries"
               :placeholder="t('globals.terms.select')"
-              :buttonClass="'w-auto rounded-r-none border-r-0'"
+              button-class="w-auto rounded-r-none border-r-0 bg-transparent"
             >
               <template #item="{ item }">
                 <div class="flex items-center gap-2">

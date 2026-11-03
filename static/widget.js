@@ -56,8 +56,12 @@
             this.campaignData = null;
             this.campaignActiveSeconds = 0;
             this.campaignURL = location.href;
+            this.campaignPageGeneration = 0;
             this.campaignEvent = "";
             this.campaignDelay = 0;
+            this.campaignElapsed = 0;
+            this.campaignAsked = false;
+            this.campaignGap = this.CAMPAIGN_POLL_MIN;
             this.campaignBrowserKey = this.getCookie(this.getCookieName('campaign')) || this.randomKey();
             this.setCookie(this.getCookieName('campaign'), this.campaignBrowserKey);
             this.campaignSessionKey = this.getCookie(this.getCookieName('campaign-session')) || this.randomKey();
@@ -65,6 +69,7 @@
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
             this.isExpanded = false;
             this.hideLauncher = config.hideLauncher || false;
+            this.language = config.language || '';
             this.widgetLoaded = false;
             this._onShowCallback = null;
             this._onHideCallback = null;
@@ -225,8 +230,12 @@
         createElements () {
             const branding = this.branding();
 
-            this.toggleButton = document.createElement('div');
+            this.toggleButton = document.createElement('button');
+            this.toggleButton.type = 'button';
             this.toggleButton.style.cssText = `
+                all: revert;
+                border: 0;
+                padding: 0;
                 position: fixed;
                 cursor: pointer;
                 z-index: 9999;
@@ -242,6 +251,7 @@
             `;
 
             this.iconContainer = document.createElement('div');
+            this.iconContainer.setAttribute('aria-hidden', 'true');
             this.iconContainer.style.cssText = `
                 width: 100%;
                 height: 100%;
@@ -254,6 +264,7 @@
             const iconTransition = `opacity ${this.OPEN_MS}ms ${this.EASE_OUT}, transform ${this.OPEN_MS}ms ${this.EASE_OUT}`;
 
             this.defaultIcon = document.createElement('img');
+            this.defaultIcon.alt = '';
             this.defaultIcon.src = branding.launcher?.logo_url || (this.config.baseURL + DEFAULT_LAUNCHER_LOGO_PATH);
             this.defaultIcon.style.transition = iconTransition;
             this.styleLauncherIcon();
@@ -319,7 +330,11 @@
             this.widgetButtonWrapper = widgetButtonWrapper;
 
             this.iframe = document.createElement('iframe');
-            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}`;
+            this.iframe.id = `libredesk-widget-${this.config.inboxID}`;
+            this.toggleButton.setAttribute('aria-controls', this.iframe.id);
+            this.iframe.src = `${this.config.baseURL}/widget?inbox_id=${encodeURIComponent(this.config.inboxID)}&parent_origin=${encodeURIComponent(window.location.origin)}` +
+                (this.language ? `&lang=${encodeURIComponent(this.language)}` : '');
+            this.iframeLanguage = this.language;
             this.iframe.title = 'libredesk';
             this.iframe.style.cssText = `
                 position: fixed;
@@ -409,7 +424,7 @@
         }
 
         getNormalIframeHeight () {
-            return `min(${this.IFRAME_HEIGHT}, calc(100vh - ${this.iframeBottomOffset() + this.LAUNCHER_IFRAME_GAP}px))`;
+            return `min(${this.IFRAME_HEIGHT}, calc(100dvh - ${this.iframeBottomOffset() + this.LAUNCHER_IFRAME_GAP}px))`;
         }
 
         sendPageInfo () {
@@ -457,7 +472,7 @@
 
             if (this.isExpanded) {
                 iframe.style.width = this.EXPANDED_WIDTH;
-                iframe.style.height = 'calc(100vh - 40px)';
+                iframe.style.height = 'calc(100dvh - 40px)';
                 iframe.style.bottom = '20px';
             } else {
                 iframe.style.width = this.IFRAME_WIDTH;
@@ -479,7 +494,7 @@
 
             switch (event.data.type) {
                 case 'SHOW_CAMPAIGN':
-                    if (this.isChatVisible || this.unreadCount > 0 || this.hideLauncher) {
+                    if (event.data.url !== location.href || event.data.pageGeneration !== this.campaignPageGeneration || this.isChatVisible || this.unreadCount > 0 || this.hideLauncher) {
                         this.dropCampaign(event.data.delivery.id);
                         break;
                     }
@@ -495,6 +510,7 @@
                 case 'REPLY_PREVIEWS':
                     if (event.data.previews?.length && this.campaignData) this.dropCampaign(this.campaignData.id);
                     this.previewData = event.data;
+                    this.setLauncherIcon(this.isChatVisible);
                     this.renderPreviews();
                     break;
                 case 'VUE_APP_READY':
@@ -598,6 +614,10 @@
             this.widgetLoaded = true;
             this.updateLauncherVisibility();
             this.renderPreviews();
+            // setLanguage() may have been called before the iframe loaded.
+            if (this.language !== this.iframeLanguage) {
+                this.postToIframe({ type: 'SET_LANGUAGE', language: this.language });
+            }
         }
 
         toggle () {
@@ -610,6 +630,11 @@
 
         showChat () {
             if (!this.iframe) return;
+
+            if (!this.isChatVisible && this.campaignData && this.previewHost && this.unreadCount === 0) {
+                this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'opened', id: this.campaignData.id });
+                this.campaignData = null;
+            }
 
             this.isMobile = window.innerWidth <= this.MOBILE_BREAKPOINT;
             this.isChatVisible = true;
@@ -661,18 +686,21 @@
             if (this.unreadCount > 0) this.showUnreadBadge(this.unreadCount);
 
             this.postToIframe({ type: 'WIDGET_CLOSED' });
+            if (document.activeElement === iframe) this.toggleButton.focus();
 
             if (this._onHideCallback) this._onHideCallback();
         }
 
         applyLauncherScale () {
             if (!this.toggleButton) return;
-            const base = this.isChatVisible ? this.LAUNCHER_OPEN_SCALE : 1;
-            const scale = this.isLauncherHovered ? base * this.LAUNCHER_HOVER_SCALE : base;
+            const base = !this.reducedMotion && this.isChatVisible ? this.LAUNCHER_OPEN_SCALE : 1;
+            const scale = !this.reducedMotion && this.isLauncherHovered ? base * this.LAUNCHER_HOVER_SCALE : base;
             this.toggleButton.style.transform = `scale(${scale})`;
         }
 
         setLauncherIcon (open) {
+            this.toggleButton.setAttribute('aria-expanded', String(open));
+            this.toggleButton.setAttribute('aria-label', this.previewData?.labels?.[open ? 'closeChat' : 'openChat'] || 'libredesk');
             const hidden = (deg) => this.reducedMotion ? 'none' : `rotate(${deg}deg) scale(0.9)`;
             if (this.defaultIcon) {
                 this.defaultIcon.style.opacity = open ? '0' : '1';
@@ -712,6 +740,7 @@
             } else {
                 this.unreadBadge.style.display = 'none';
             }
+            this.renderPreviews();
         }
 
         expandWidget () {
@@ -738,6 +767,7 @@
                 const url = window.location.href;
                 if (url === self._lastPageURL) return;
                 self._lastPageURL = url;
+                self.resetCampaignPage();
                 // Defer to let SPA frameworks update document.title after route change.
                 setTimeout(() => { self.sendPageInfo(); }, 100);
             };
@@ -856,10 +886,7 @@
                 open.className = 'open';
                 open.setAttribute('aria-label', `${data.labels.open}: ${item.name}. ${item.text}`);
                 open.addEventListener('click', () => {
-                    if (item.campaign) {
-                        this.postToIframe({ type: 'CAMPAIGN_EVENT', event: 'opened', id: item.key });
-                        this.campaignData = null;
-                    } else this.postToIframe({ type: 'OPEN_CONVERSATION', uuid: item.conversation });
+                    if (!item.campaign) this.postToIframe({ type: 'OPEN_CONVERSATION', uuid: item.conversation });
                     this.showChat();
                 });
                 const avatar = safeImage(item.avatar, 'avatar');
@@ -899,45 +926,54 @@
             this.previewHost = host;
         }
 
+        resetCampaignPage () {
+            if (location.href === this.campaignURL) return;
+            this.campaignURL = location.href;
+            this.campaignPageGeneration++;
+            this.campaignActiveSeconds = 0;
+            this.campaignEvent = '';
+            this.campaignElapsed = 0;
+            this.campaignAsked = false;
+            this.campaignGap = Math.max(this.CAMPAIGN_POLL_MIN, this.campaignDelay);
+            if (this.campaignData) this.dropCampaign(this.campaignData.id);
+            this.renderPreviews();
+        }
+
         startCampaignTracking () {
             if (this.campaignInterval) return;
             let last = performance.now();
-            let elapsed = 0;
-            let asked = false;
-            const firstGap = () => Math.max(this.CAMPAIGN_POLL_MIN, this.campaignDelay);
-            let gap = firstGap();
+            this.campaignGap = Math.max(this.CAMPAIGN_POLL_MIN, this.campaignDelay);
             this.campaignInterval = setInterval(() => {
                 const now = performance.now();
                 const delta = Math.min((now - last) / 1000, 2);
                 last = now;
-                if (location.href !== this.campaignURL) {
-                    this.campaignURL = location.href;
-                    this.campaignActiveSeconds = 0;
-                    this.campaignEvent = '';
-                    elapsed = 0;
-                    asked = false;
-                    gap = firstGap();
-                    if (this.campaignData) this.dropCampaign(this.campaignData.id);
-                    this.renderPreviews();
-                }
+                this.resetCampaignPage();
                 if (document.hidden || this.isChatVisible || this.hideLauncher) return;
                 this.campaignActiveSeconds += delta;
-                elapsed += delta;
-                if (elapsed < gap || this.unreadCount > 0 || this.campaignData) return;
-                elapsed = 0;
-                gap = asked ? Math.min(gap * 2, this.CAMPAIGN_POLL_MAX) : this.CAMPAIGN_POLL_MIN;
-                asked = true;
-                this.postToIframe({ type: 'CAMPAIGN_CONTEXT', context: { url: location.href, mobile: this.isMobile, active_seconds: Math.floor(this.campaignActiveSeconds), event: this.campaignEvent } });
+                this.campaignElapsed += delta;
+                if (this.campaignElapsed < this.campaignGap || this.unreadCount > 0 || this.campaignData) return;
+                this.campaignElapsed = 0;
+                this.campaignGap = this.campaignAsked ? Math.min(this.campaignGap * 2, this.CAMPAIGN_POLL_MAX) : this.CAMPAIGN_POLL_MIN;
+                this.campaignAsked = true;
+                this.postToIframe({ type: 'CAMPAIGN_CONTEXT', pageGeneration: this.campaignPageGeneration, context: { url: location.href, mobile: this.isMobile, active_seconds: Math.floor(this.campaignActiveSeconds), event: this.campaignEvent } });
             }, 1000);
         }
 
         trackEvent (name) {
+            this.resetCampaignPage();
             if (typeof name === 'string' && name.length <= 128) this.campaignEvent = name;
         }
 
         setUser (jwt) {
             this.clearPreviews();
             this.postToIframe({ type: 'SET_JWT_TOKEN', jwt: jwt });
+        }
+
+        setLanguage (language) {
+            this.language = language || '';
+            if (this.widgetLoaded) {
+                this.postToIframe({ type: 'SET_LANGUAGE', language: this.language });
+            }
         }
 
         logout () {

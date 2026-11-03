@@ -58,7 +58,6 @@ func handleLogin(r *fastglue.Request) error {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 	}, r); err != nil {
-		app.lo.Error("error saving session", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
 	// Set CSRF cookie if not already set.
@@ -99,10 +98,5 @@ func handleLogout(r *fastglue.Request) error {
 		app.lo.Error("error destroying session", "error", err)
 		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
 	}
-	// Add no-cache headers.
-	r.RequestCtx.Response.Header.Add("Cache-Control",
-		"no-store, no-cache, must-revalidate, post-check=0, pre-check=0")
-	r.RequestCtx.Response.Header.Add("Pragma", "no-cache")
-	r.RequestCtx.Response.Header.Add("Expires", "-1")
-	return r.RedirectURI("/", fasthttp.StatusFound, nil, "")
+	return r.SendEnvelope(true)
 }

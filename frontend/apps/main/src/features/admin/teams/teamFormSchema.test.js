@@ -47,6 +47,12 @@ describe('Team Form Schema', () => {
         expect(() => schema.parse({ ...validForm, emoji: 1 })).toThrow()
     })
 
+    test('emoji rejects empty or blank selections', () => {
+        for (const emoji of ['', '   ']) {
+            expect(() => schema.parse({ ...validForm, emoji })).toThrow()
+        }
+    })
+
     test('conversation_assignment_type missing', () => {
         const { conversation_assignment_type, ...form } = validForm
         expect(() => schema.parse(form)).toThrow()

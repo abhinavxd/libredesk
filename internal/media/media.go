@@ -328,9 +328,8 @@ func (m *Manager) GetByModel(modelID int, model string) ([]models.Media, error) 
 // Delete deletes a media file from both the storage backend and the database.
 func (m *Manager) Delete(name string) error {
 	if err := m.store.Delete(name); err != nil {
-		m.lo.Error("error deleting media from store", "error", err)
-		// If the file does not exist, ignore the error.
 		if !errors.Is(err, os.ErrNotExist) {
+			m.lo.Error("error deleting media from store", "name", name, "error", err)
 			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 		}
 	}
@@ -436,7 +435,7 @@ func (m *Manager) detectContentType(sourceContentType string, content io.ReadSee
 	content.Seek(0, io.SeekStart)
 	mtype, err := mimetype.DetectReader(content)
 	if err != nil {
-		m.lo.Error("error detecting content type", "error", err)
+		m.lo.Warn("error detecting content type", "error", err)
 		content.Seek(0, io.SeekStart)
 		return sourceContentType, nil
 	}

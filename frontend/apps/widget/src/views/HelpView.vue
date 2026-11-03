@@ -16,7 +16,7 @@ import api from '@widget/api/index.js'
 
 const help = useHelpStore()
 const widget = useWidgetStore()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 let mounted = true
 onUnmounted(() => {
   mounted = false
@@ -30,6 +30,16 @@ const backButton = ref(null)
 const searchInput = ref(null)
 const articleHistory = ref([])
 const originArticleID = ref(null)
+watch(
+  () => help.identity,
+  () => {
+    busy.value = false
+    searching.value = false
+    error.value = ''
+    articleHistory.value = []
+    originArticleID.value = null
+  }
+)
 const currentCollection = computed(() => help.collectionPath.at(-1))
 const collections = computed(() => currentCollection.value?.children || help.data?.tree || [])
 const items = computed(() => help.results ?? currentCollection.value?.articles ?? [])
@@ -52,7 +62,7 @@ watch(
 
 const retry = () => {
   error.value = ''
-  help.load(locale.value)
+  help.load()
 }
 const search = async () => {
   const query = help.query.trim()
@@ -71,7 +81,7 @@ const search = async () => {
     if (valid(identity) && help.query.trim() === query)
       error.value = t('globals.messages.helpLoadError')
   } finally {
-    searching.value = false
+    if (valid(identity)) searching.value = false
   }
 }
 const openArticle = async ({ id, slug, locale: articleLocale }) => {
@@ -94,7 +104,7 @@ const openArticle = async ({ id, slug, locale: articleLocale }) => {
   } catch {
     if (valid(identity)) error.value = t('globals.messages.helpLoadError')
   } finally {
-    busy.value = false
+    if (valid(identity)) busy.value = false
   }
 }
 const openCollection = async (collection) => {
@@ -128,7 +138,7 @@ const back = async () => {
   }
 }
 onMounted(async () => {
-  if (!help.data && !help.loading) await help.load(locale.value)
+  if (!help.data && !help.loading) await help.load()
   if (scroller.value) scroller.value.scrollTop = help.scrollTop
   if (help.article && help.expandArticles && !widget.isMobileFullScreen) widget.expandWidget()
   if (help.pendingArticle && mounted) {

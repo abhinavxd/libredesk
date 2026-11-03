@@ -1,5 +1,5 @@
 <template>
-  <div class="sticky bottom-0 bg-background border-t border-border px-4 py-3 mt-auto">
+  <div class="sticky bottom-0 bg-card border-t border-border px-4 py-3 mt-auto">
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <span class="text-sm text-muted-foreground tabular-nums">

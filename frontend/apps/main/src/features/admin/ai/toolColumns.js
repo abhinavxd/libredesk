@@ -1,16 +1,16 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import dropdown from './toolDropdown.vue'
 
 export const createToolColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'name',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.name')),
+    header: () => h('div', null, t('globals.terms.name')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         onEdit
           ? h(
               'span',
@@ -25,18 +25,19 @@ export const createToolColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'url',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.url')),
+    header: () => h('div', null, t('globals.terms.url')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center break-all text-muted-foreground' }, row.getValue('url'))
+      h('div', { class: 'text-muted-foreground' }, row.getValue('url'))
   },
   {
     accessorKey: 'enabled',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
+    header: () => h('div', null, t('globals.terms.status')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
           row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
         )
@@ -44,10 +45,11 @@ export const createToolColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
+    header: () => h('div', null, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h(TableDate, { value: row.getValue('updated_at') })
   },
   {
     id: 'actions',

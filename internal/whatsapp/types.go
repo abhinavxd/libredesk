@@ -142,6 +142,7 @@ type ParsedMessage struct {
 }
 
 type ParsedStatus struct {
+	ErrorCode int
 	MessageID string
 	Status    string
 	Timestamp time.Time

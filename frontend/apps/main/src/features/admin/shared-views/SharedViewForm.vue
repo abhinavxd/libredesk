@@ -1,6 +1,6 @@
 <template>
   <Spinner v-if="formLoading"></Spinner>
-  <form @submit="onSubmit" class="space-y-6 w-full" :class="{ 'opacity-50': formLoading }">
+  <form @submit="onSubmit" class="shared-view-form space-y-6 w-full" :class="{ 'opacity-50': formLoading }">
     <FormField v-slot="{ componentField }" name="name" :validate-on-blur="false">
       <FormItem>
         <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
@@ -23,7 +23,7 @@
       </FormItem>
     </FormField>
 
-    <div class="grid grid-cols-2 gap-4">
+    <FormGrid class="visibility-grid">
       <FormField
         v-slot="{ componentField }"
         name="visibility"
@@ -65,13 +65,14 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
 
     <Button type="submit" :isLoading="isLoading">{{ submitLabel }}</Button>
   </form>
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref, watch, computed, provide } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -230,3 +231,19 @@ watch(
   { immediate: true }
 )
 </script>
+
+<style scoped>
+.shared-view-form {
+  container-type: inline-size;
+}
+
+.visibility-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 32rem) {
+  .visibility-grid.form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

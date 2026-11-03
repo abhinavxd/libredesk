@@ -3,18 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
+	"runtime/debug"
 	"sync"
 	"time"
-
-	realip "github.com/ferluci/fast-realip"
 
 	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/fasthttp/websocket"
+	realip "github.com/ferluci/fast-realip"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/fastglue"
 )
 
@@ -169,7 +171,7 @@ func handleWidgetWS(r *fastglue.Request) error {
 
 				joinedClient, joinedLiveChat, joinedInboxUUID, joinedUserID, err := handleInboxJoin(app, sc, msg.Data, msg.Token, clientIP)
 				if err != nil {
-					app.lo.Error("error handling widget join", "error", err)
+					app.lo.Debug("error handling widget join", "error", err)
 					sendWidgetError(sc, "Failed to join conversation")
 					continue
 				}
@@ -278,7 +280,7 @@ func handleInboxJoin(app *App, sc *safeConn, data json.RawMessage, token, client
 	go func() {
 		defer func() {
 			if rec := recover(); rec != nil {
-				app.lo.Error("panic in widget ws forwarder", "panic", rec)
+				app.lo.Error("panic in widget ws forwarder", "panic", rec, "stack", string(debug.Stack()))
 			}
 		}()
 		for msgData := range client.Channel {
@@ -344,7 +346,11 @@ func handleWidgetPageVisit(app *App, data json.RawMessage, contactID int) {
 	key := fmt.Sprintf("%s%d", pageVisitRedisKeyPrefix, contactID)
 
 	// Skip if the most recent page visit has the same URL.
-	if latest, err := app.redis.LIndex(redisCtx, key, 0).Result(); err == nil {
+	latest, err := app.redis.LIndex(redisCtx, key, 0).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		app.lo.Warn("error checking visitor page history", "contact_id", contactID, "error", err)
+	}
+	if err == nil {
 		var lastVisit map[string]string
 		if json.Unmarshal([]byte(latest), &lastVisit) == nil && lastVisit["url"] == visit.URL {
 			return
@@ -362,7 +368,10 @@ func handleWidgetPageVisit(app *App, data json.RawMessage, contactID int) {
 	pipe.LTrim(redisCtx, key, 0, maxPageVisits-1)
 	pipe.Expire(redisCtx, key, pageVisitTTL)
 	lrangeCmd := pipe.LRange(redisCtx, key, 0, maxPageVisits-1)
-	pipe.Exec(redisCtx)
+	if _, err := pipe.Exec(redisCtx); err != nil {
+		app.lo.Warn("error saving visitor page history", "contact_id", contactID, "error", err)
+		return
+	}
 
 	entries, err := lrangeCmd.Result()
 	if err != nil {
@@ -383,6 +392,7 @@ func getPageVisitsFromRedis(app *App, contactID int) []map[string]string {
 	key := fmt.Sprintf("%s%d", pageVisitRedisKeyPrefix, contactID)
 	entries, err := app.redis.LRange(redisCtx, key, 0, maxPageVisits-1).Result()
 	if err != nil {
+		app.lo.Warn("error loading visitor page history", "contact_id", contactID, "error", err)
 		return nil
 	}
 	pages := make([]map[string]string, 0, len(entries))

@@ -67,6 +67,11 @@ export function renderTemplate(text, data) {
   )
 }
 
+// Takes field paths without braces, e.g. '.Contact.FirstName'.
+export function formatTemplateVariables (vars) {
+  return vars.map((v) => `{{ ${v} }}`).join(', ')
+}
+
 export function isValidTemplate (text, allowedVars = []) {
   if (!text) return true
   // Strip valid variable tokens; any leftover brace means bad syntax or an unknown variable.

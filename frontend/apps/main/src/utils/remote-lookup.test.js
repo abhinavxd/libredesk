@@ -1,9 +1,14 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { createRemoteLookup } from './remote-lookup'
 
 const rows = (values) => ({ data: { data: values } })
 
 describe('createRemoteLookup', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
   it('seeds the list from the first page and only fetches it once', async () => {
     const fetchRows = vi.fn().mockResolvedValue(rows([{ id: 1, name: 'a' }]))
     const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
@@ -12,6 +17,36 @@ describe('createRemoteLookup', () => {
 
     expect(fetchRows).toHaveBeenCalledTimes(1)
     expect(lookup.rows.value).toEqual([{ id: 1, name: 'a' }])
+  })
+
+  it('uses supplied rows for selected ids without a request and preserves other fields', async () => {
+    const fetchRows = vi.fn()
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    lookup.upsert([{ id: 2194, first_name: 'Agent', last_name: 'One', email: 'agent@example.com' }])
+    lookup.upsert([{ id: 2194, first_name: 'Updated', avatar_url: '/avatar.png' }])
+
+    await lookup.ensureIDs([2194, '2194'])
+
+    expect(fetchRows).not.toHaveBeenCalled()
+    expect(lookup.rows.value).toEqual([
+      { id: 2194, first_name: 'Updated', last_name: 'One', email: 'agent@example.com', avatar_url: '/avatar.png' }
+    ])
+  })
+
+  it('keeps supplied rows when the first page and search results arrive', async () => {
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'First page' }]))
+      .mockResolvedValueOnce(rows([{ id: 2, name: 'Search result' }]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    lookup.upsert([{ id: 2194, name: 'Assigned agent' }])
+
+    await lookup.fetchFirstPage()
+    expect(await lookup.search('search')).toEqual([{ id: 2, name: 'Search result' }])
+    await lookup.ensureIDs([2194])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, q: 'search', page: 1 })
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'First page' }, { id: 2194, name: 'Assigned agent' }])
   })
 
   it('returns server search results without replacing the shared list', async () => {
@@ -114,6 +149,61 @@ describe('createRemoteLookup', () => {
     expect(lookup.rows.value).toEqual([{ id: 1, name: 'a' }])
   })
 
+  it('shares pending lookups when assignment updates contain overlapping ids', async () => {
+    let resolveAgents
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveAgents = resolve }))
+      .mockResolvedValue(rows([{ id: 11 }]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    const first = lookup.ensureIDs([9, 10, 9])
+    await vi.waitFor(() => expect(fetchRows).toHaveBeenCalledTimes(2))
+    let secondFinished = false
+    const second = lookup.ensureIDs([10, 9, 11]).then(() => { secondFinished = true })
+    await vi.waitFor(() => expect(fetchRows).toHaveBeenCalledTimes(3))
+
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '11' })
+    expect(secondFinished).toBe(false)
+    resolveAgents(rows([{ id: 9 }, { id: 10 }]))
+    await Promise.all([first, second])
+    await lookup.ensureIDs([11, 10, 9])
+
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(lookup.rows.value.map(({ id }) => id)).toEqual([9, 10, 11])
+  })
+
+  it('remembers ids omitted by a successful lookup', async () => {
+    const fetchRows = vi.fn().mockResolvedValue(rows([]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+
+    await lookup.ensureIDs([180, '180', 0, -1, null])
+    await lookup.ensureIDs([180])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '180' })
+    expect(lookup.rows.value).toEqual([])
+  })
+
+  it('retries failed id lookups without repeating successful lookups', async () => {
+    const onError = vi.fn()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1 }]))
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(rows([{ id: 9 }]))
+    const lookup = createRemoteLookup({ fetchRows, onError })
+
+    await lookup.ensureIDs([1, 9])
+    await lookup.ensureIDs([9, 1])
+    await lookup.ensureIDs([9])
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '9' })
+    expect(lookup.rows.value).toEqual([{ id: 1 }, { id: 9 }])
+  })
+
   it('reports a failed first page and allows a retry', async () => {
     const onError = vi.fn()
     const fetchRows = vi.fn()
@@ -137,5 +227,177 @@ describe('createRemoteLookup', () => {
     lookup.patch(1, { availability_status: 'online' })
 
     expect(lookup.rows.value).toEqual([{ id: 1, availability_status: 'online' }])
+  })
+
+  it('refreshes expired ids once while keeping their previous names visible', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    let resolveRefresh
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'Old name' }]))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRefresh = resolve }))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.ensureIDs([1])
+
+    now.mockReturnValue(300999)
+    await lookup.ensureIDs([1])
+    expect(fetchRows).toHaveBeenCalledTimes(1)
+
+    now.mockReturnValue(301000)
+    const refresh = lookup.ensureIDs([1])
+    const repeated = lookup.ensureIDs([1, '1'])
+    await vi.waitFor(() => expect(fetchRows).toHaveBeenCalledTimes(2))
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '1' })
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'Old name' }])
+
+    resolveRefresh(rows([{ id: 1, name: 'New name' }]))
+    await Promise.all([refresh, repeated])
+    await lookup.ensureIDs([1])
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'New name' }])
+  })
+
+  it('refreshes the first page after five minutes and shares the refresh', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'Old name' }]))
+      .mockResolvedValueOnce(rows([{ id: 2, name: 'New agent' }]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    now.mockReturnValue(301000)
+    await Promise.all([lookup.search(''), lookup.fetchFirstPage()])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, page: 1 })
+    expect(lookup.rows.value).toEqual([{ id: 2, name: 'New agent' }])
+  })
+
+  it('retries missing ids after five minutes', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([{ id: 180, name: 'Restored agent' }]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.ensureIDs([180])
+
+    now.mockReturnValue(300999)
+    await lookup.ensureIDs([180])
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+
+    now.mockReturnValue(301000)
+    await lookup.ensureIDs([180])
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '180' })
+    expect(lookup.rows.value).toEqual([{ id: 180, name: 'Restored agent' }])
+  })
+
+  it('keeps expired rows after a failed refresh and allows another request', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const onError = vi.fn()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'Old name' }]))
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'New name' }]))
+    const lookup = createRemoteLookup({ fetchRows, onError })
+    await lookup.ensureIDs([1])
+
+    now.mockReturnValue(301000)
+    await lookup.ensureIDs([1])
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'Old name' }])
+
+    await lookup.ensureIDs([1])
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(lookup.rows.value).toEqual([{ id: 1, name: 'New name' }])
+  })
+
+  it('removes an expired row when the server no longer returns it', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000)
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([{ id: 1, name: 'Removed agent' }]))
+      .mockResolvedValueOnce(rows([]))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.ensureIDs([1])
+
+    now.mockReturnValue(301000)
+    await lookup.ensureIDs([1])
+    await lookup.ensureIDs([1])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(lookup.rows.value).toEqual([])
+  })
+
+  it.each([[300, 2], [500, 3]])('batches %i assignment updates into %i id requests', async (count, requests) => {
+    vi.useFakeTimers()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    const updates = Array.from({ length: count }, (_, index) => lookup.ensureIDs([index + 1, 1, 2, 0, -1]))
+    await vi.advanceTimersByTimeAsync(49)
+    expect(fetchRows).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await Promise.all(updates)
+
+    const batches = fetchRows.mock.calls.slice(1).map(([params]) => params.ids.split(',').map(Number))
+    expect(batches).toHaveLength(requests)
+    expect(batches.every((batch) => batch.length <= 200)).toBe(true)
+    expect(batches.flat()).toEqual(Array.from({ length: count }, (_, index) => index + 1))
+    expect(lookup.rows.value).toHaveLength(count)
+  })
+
+  it('keeps the first batch deadline while new updates keep arriving', async () => {
+    vi.useFakeTimers()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError: vi.fn() })
+    await lookup.fetchFirstPage()
+
+    const first = lookup.ensureIDs([302, 111])
+    await vi.advanceTimersByTimeAsync(40)
+    const second = lookup.ensureIDs([999, 302, 111])
+    await vi.advanceTimersByTimeAsync(10)
+    await Promise.all([first, second])
+
+    expect(fetchRows).toHaveBeenCalledTimes(2)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '302,111,999' })
+
+    const next = lookup.ensureIDs([555, 302])
+    await vi.advanceTimersByTimeAsync(50)
+    await next
+    expect(fetchRows).toHaveBeenCalledTimes(3)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: '555' })
+  })
+
+  it('retries only the failed chunk of a large batch', async () => {
+    vi.useFakeTimers()
+    const onError = vi.fn()
+    const fetchRows = vi.fn()
+      .mockResolvedValueOnce(rows([]))
+      .mockImplementationOnce(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockImplementation(({ ids }) => Promise.resolve(rows(ids.split(',').map((id) => ({ id: Number(id) })))))
+    const lookup = createRemoteLookup({ fetchRows, onError })
+    await lookup.fetchFirstPage()
+    const ids = Array.from({ length: 300 }, (_, index) => index + 1)
+
+    const first = lookup.ensureIDs(ids)
+    await vi.advanceTimersByTimeAsync(50)
+    await first
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(lookup.rows.value).toHaveLength(200)
+
+    const retry = lookup.ensureIDs(ids)
+    await vi.advanceTimersByTimeAsync(50)
+    await retry
+
+    expect(fetchRows).toHaveBeenCalledTimes(4)
+    expect(fetchRows).toHaveBeenLastCalledWith({ page_size: 50, ids: ids.slice(200).join(',') })
+    expect(lookup.rows.value).toHaveLength(300)
   })
 })

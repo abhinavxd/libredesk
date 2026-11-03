@@ -1,28 +1,79 @@
 <template>
   <!-- idk why I named this select tag, should be named multi-select -->
-  <TagsInput ref="rootRef" v-model="tags" class="px-0 gap-0" :displayValue="getLabel">
-    <!-- Tags visible to the user -->
-    <div class="flex gap-2 flex-wrap items-center px-3">
-      <TagsInputItem v-for="tagValue in tags" :key="tagValue" :value="tagValue">
-        <TagsInputItemText />
-        <TagsInputItemDelete />
-      </TagsInputItem>
-    </div>
+  <TagsInput
+    ref="rootRef"
+    v-model="tags"
+    class="min-h-9 gap-1 px-2 py-0.5"
+    :displayValue="getLabel"
+  >
+    <TagsInputItem
+      v-for="tagValue in tags"
+      :key="tagValue"
+      :value="tagValue"
+      class="min-w-0"
+      :class="compact ? 'max-w-[calc(100%-4rem)]' : ''"
+    >
+      <TagsInputItemText
+        class="min-w-0"
+        :class="compact ? 'truncate' : ''"
+        :title="compact ? getLabel(tagValue) : undefined"
+      />
+      <TagsInputItemDelete
+        type="button"
+        :tabindex="compact ? 0 : -1"
+        class="shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        :class="compact ? 'size-4 items-center justify-center text-muted-foreground can-hover:hover:text-foreground focus-visible:text-foreground [&_svg]:size-3' : ''"
+        @click="focusAfterRemove"
+      />
+    </TagsInputItem>
 
-    <!-- Combobox for selecting new tags -->
+    <Popover v-if="compact && tags.length" v-model:open="open">
+      <PopoverTrigger as-child>
+        <Button
+          ref="addButtonRef"
+          type="button"
+          variant="ghost"
+          size="icon"
+          :aria-label="placeholder"
+          class="h-7 w-7 shrink-0 text-muted-foreground"
+          @blur="handleBlur"
+        >
+          <Plus aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" class="p-0">
+        <Command v-model:search-term="searchTerm" :filter-function="filterFunc">
+          <CommandInput :placeholder="placeholder" :aria-label="placeholder" :loading="searching" />
+          <CommandEmpty v-if="!searching">{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
+          <CommandList>
+            <CommandGroup>
+              <CommandItem
+                v-for="item in visibleOptions"
+                :key="item.value"
+                :value="item.value"
+                @select="handleSelect"
+              >
+                {{ item.label }}
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+
     <ComboboxRoot
+      v-else
       :model-value="tags"
       v-model:open="open"
       v-model:search-term="searchTerm"
       :filterFunction="filterFunc"
-      class="w-full"
+      class="min-w-24 flex-1"
     >
       <ComboboxAnchor as-child>
         <div class="flex w-full items-center">
-          <ComboboxInput :placeholder="placeholder" as-child>
+          <ComboboxInput :placeholder="tags.length ? '' : placeholder" :aria-label="placeholder" as-child>
             <TagsInputInput
-              class="w-full px-3"
-              :class="tags.length > 0 ? 'mt-2' : ''"
+              class="w-0 min-w-0 flex-1 px-1 placeholder:text-muted-foreground"
               @keydown.enter.prevent
               @blur="handleBlur"
               @click="open = true"
@@ -34,8 +85,11 @@
             size="xs"
             variant="muted"
             :absolute="false"
-            class="mr-3 h-4 w-4 shrink-0"
+            class="mr-1 h-4 w-4 shrink-0"
           />
+          <div v-if="$slots.action" class="shrink-0">
+            <slot name="action" />
+          </div>
         </div>
       </ComboboxAnchor>
       <ComboboxPortal>
@@ -44,7 +98,9 @@
             position="popper"
             class="w-[--radix-popper-anchor-width] rounded-md mt-2 border bg-popover text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
           >
-            <CommandEmpty v-if="!searching">{{ $t('globals.messages.noResultsFound') }}</CommandEmpty>
+            <CommandEmpty v-if="!searching">{{
+              $t('globals.messages.noResultsFound')
+            }}</CommandEmpty>
             <CommandGroup>
               <CommandItem
                 v-for="item in visibleOptions"
@@ -59,11 +115,21 @@
         </ComboboxContent>
       </ComboboxPortal>
     </ComboboxRoot>
+    <div v-if="compact && tags.length && $slots.action" class="ml-auto shrink-0">
+      <slot name="action" />
+    </div>
   </TagsInput>
 </template>
 
 <script setup>
-import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '@shared-ui/components/ui/command'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from '@shared-ui/components/ui/command'
 import {
   TagsInput,
   TagsInputInput,
@@ -80,6 +146,9 @@ import {
 } from 'radix-vue'
 import { computed, nextTick, ref, watch, onUnmounted } from 'vue'
 import { useField } from 'vee-validate'
+import { Plus } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import Spinner from '@shared-ui/components/ui/spinner/Spinner.vue'
 import { useRemoteSearch } from '@shared-ui/composables/useRemoteSearch'
 
@@ -114,6 +183,10 @@ const props = defineProps({
   keepOpenOnSelect: {
     type: Boolean,
     default: false
+  },
+  compact: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -124,6 +197,7 @@ const { handleBlur } = useField(() => props.name, undefined, {
 const open = ref(false)
 const searchTerm = ref('')
 const rootRef = ref(null)
+const addButtonRef = ref(null)
 
 const {
   results: remoteItems,
@@ -176,6 +250,14 @@ const getLabel = (value) => {
   return item?.label || seenLabels.get(value) || value
 }
 
+const focusAfterRemove = () => {
+  if (!props.compact) return
+  nextTick(() => {
+    const target = rootRef.value?.$el?.querySelector('input') || addButtonRef.value?.$el
+    target?.focus()
+  })
+}
+
 // Closing the list here, not in the combobox, keeps focus in the input for the next pick.
 const handleSelect = (event) => {
   event.preventDefault()
@@ -194,7 +276,9 @@ const handleSelect = (event) => {
 }
 
 const filterFunc = (remainingItemValues, term) => {
-  const remainingItems = displayedItems.value.filter((item) => remainingItemValues.includes(item.value))
+  const remainingItems = displayedItems.value.filter((item) =>
+    remainingItemValues.includes(item.value)
+  )
   if (props.search) return remainingItems.map((item) => item.value)
   return remainingItems
     .filter((item) => item.label.toLowerCase().includes(term.toLowerCase()))

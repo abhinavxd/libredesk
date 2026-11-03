@@ -438,6 +438,27 @@ func TestSplitName(t *testing.T) {
 		})
 	}
 }
+
+func TestCapitalizeFirst(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "", want: ""},
+		{input: "thulasi", want: "Thulasi"},
+		{input: "Thulasi", want: "Thulasi"},
+		{input: "john.doe", want: "John.doe"},
+		{input: "123abc", want: "123abc"},
+		{input: "élodie", want: "Élodie"},
+		{input: "\xffabc", want: "\xffabc"},
+	}
+
+	for _, tt := range tests {
+		if got := CapitalizeFirst(tt.input); got != tt.want {
+			t.Errorf("CapitalizeFirst(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
 func TestGenerateSlug(t *testing.T) {
 	tests := []struct {
 		name     string

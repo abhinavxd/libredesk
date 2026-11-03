@@ -48,7 +48,7 @@ func validateWidgetInbox(next func(*fastglue.Request) error) func(*fastglue.Requ
 
 		inbox, err := app.inbox.GetDBRecord(inboxUUID)
 		if err != nil {
-			app.lo.Error("error fetching inbox", "inbox_uuid", inboxUUID, "error", err)
+			app.lo.Debug("error fetching inbox", "inbox_uuid", inboxUUID, "error", err)
 			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("validation.notFoundInbox"), nil, envelope.InputError)
 		}
 		if !inbox.Enabled || inbox.Channel != livechat.ChannelLiveChat {

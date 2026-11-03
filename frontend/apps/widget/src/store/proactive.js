@@ -31,7 +31,7 @@ export const useProactiveStore = defineStore('proactive', () => {
   const abandon = () => {
     pending.value = null
   }
-  const next = async (context) => {
+  const next = async (context, pageGeneration) => {
     if (!browserKey || busy || invitation.value || pending.value || !widget.config.has_campaigns || widget.isOpen || chat.getConversations.some(item => item.unread_message_count > 0)) return
     busy = true
     const request = generation
@@ -40,7 +40,7 @@ export const useProactiveStore = defineStore('proactive', () => {
       if (request !== generation || !response.data.data || widget.isOpen) return
       const delivery = response.data.data
       invitation.value = delivery
-      postToParent({ type: 'SHOW_CAMPAIGN', delivery })
+      postToParent({ type: 'SHOW_CAMPAIGN', delivery, url: context.url, pageGeneration })
     } catch { return false }
     finally { if (request === generation) busy = false }
   }

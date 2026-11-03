@@ -41,6 +41,7 @@ export const useUsersStore = defineStore('users', () => {
         fetchUsers: lookup.fetchFirstPage,
         searchUsers,
         ensureUserIDs: lookup.ensureIDs,
+        upsertUsers: lookup.upsert,
         setAvailability,
     }
 })

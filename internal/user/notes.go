@@ -1,6 +1,9 @@
 package user
 
 import (
+	"database/sql"
+	"errors"
+
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 )
@@ -19,7 +22,9 @@ func (u *Manager) GetNotes(id int) ([]models.Note, error) {
 func (u *Manager) GetNote(id int) (models.Note, error) {
 	var note models.Note
 	if err := u.q.GetNote.Get(&note, id); err != nil {
-		u.lo.Error("error fetching user note", "error", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			u.lo.Error("error fetching user note", "error", err)
+		}
 		return note, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return note, nil

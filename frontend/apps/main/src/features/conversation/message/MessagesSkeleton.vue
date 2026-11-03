@@ -4,7 +4,7 @@
       <div
         v-if="row.showName"
         class="mb-1 flex items-center gap-2"
-        :class="row.outgoing ? 'justify-end pr-[47px]' : 'pl-[47px]'"
+        :class="row.outgoing ? 'justify-end pr-10' : 'pl-10'"
       >
         <div class="skel-bar h-3 w-24 rounded-sm" />
         <div class="skel-bar h-3 w-12 rounded-sm" />
@@ -36,7 +36,7 @@
         </template>
       </div>
 
-      <div v-if="row.showTime" class="mt-1" :class="row.outgoing ? 'pr-[47px]' : 'pl-[47px]'">
+      <div v-if="row.showTime" class="mt-1" :class="row.outgoing ? 'pr-10' : 'pl-10'">
         <div class="skel-bar h-2.5 w-16 rounded-sm" :class="{ 'ml-auto': row.outgoing }" />
       </div>
     </div>

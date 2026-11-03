@@ -45,6 +45,7 @@ Cypress.Commands.add('login', () => {
       }
     }
   )
+  cy.clearLocalStorage('replyBoxMinimized')
 })
 
 Cypress.Commands.add('setEmailInboxSection', (section, open) => {

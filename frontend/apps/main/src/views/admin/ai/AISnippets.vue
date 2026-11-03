@@ -2,48 +2,52 @@
   <AdminSplitLayout>
     <template #content>
       <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="flex justify-end gap-2 mb-4">
-          <Dialog v-model:open="importDialogOpen">
-            <DialogTrigger as-child>
-              <Button variant="outline">{{ t('admin.ai.snippet.importUrl') }}</Button>
-            </DialogTrigger>
-            <DialogContent class="sm:max-w-[560px]">
-              <DialogHeader>
-                <DialogTitle>{{ t('admin.ai.snippet.importUrl') }}</DialogTitle>
-              </DialogHeader>
-              <form class="space-y-4" @submit.prevent="importFromUrl">
-                <Input
-                  v-model="importUrl"
-                  type="url"
-                  :placeholder="t('admin.ai.snippet.importUrlPlaceholder')"
+        <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+          <template #actions>
+            <Dialog v-model:open="importDialogOpen">
+              <DialogTrigger as-child>
+                <Button variant="outline">{{ t('admin.ai.snippet.importUrl') }}</Button>
+              </DialogTrigger>
+              <DialogContent class="sm:max-w-[560px]">
+                <DialogHeader>
+                  <DialogTitle>{{ t('admin.ai.snippet.importUrl') }}</DialogTitle>
+                </DialogHeader>
+                <form class="space-y-4" @submit.prevent="importFromUrl">
+                  <Input
+                    v-model="importUrl"
+                    type="url"
+                    :placeholder="t('admin.ai.snippet.importUrlPlaceholder')"
+                  />
+                  <div class="flex justify-end">
+                    <Button type="submit" :isLoading="isImporting" :disabled="!importUrl.trim()">
+                      {{ t('globals.messages.import') }}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Dialog v-model:open="snippetDialogOpen">
+              <DialogTrigger as-child @click="newSnippet">
+                <Button>{{ t('admin.ai.snippet.new') }}</Button>
+              </DialogTrigger>
+              <DialogContent class="sm:max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {{ snippetEditing ? t('admin.ai.snippet.edit') : t('admin.ai.snippet.new') }}
+                  </DialogTitle>
+                </DialogHeader>
+                <SnippetForm
+                  :initial-values="snippetInitial"
+                  :is-editing="snippetEditing"
+                  :submit-form="submitSnippet"
                 />
-                <div class="flex justify-end">
-                  <Button type="submit" :isLoading="isImporting" :disabled="!importUrl.trim()">
-                    {{ t('globals.messages.import') }}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-          <Dialog v-model:open="snippetDialogOpen">
-            <DialogTrigger as-child @click="newSnippet">
-              <Button>{{ t('admin.ai.snippet.new') }}</Button>
-            </DialogTrigger>
-            <DialogContent class="sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {{ snippetEditing ? t('admin.ai.snippet.edit') : t('admin.ai.snippet.new') }}
-                </DialogTitle>
-              </DialogHeader>
-              <SnippetForm
-                :initial-values="snippetInitial"
-                :is-editing="snippetEditing"
-                :submit-form="submitSnippet"
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogContent>
+            </Dialog>
+          </template>
+        </AdminToolbar>
         <DataTable
+          v-model:search="searchTerm"
+          :searchable="false"
           :columns="createSnippetColumns(t, { onEdit: editSnippet })"
           :data="snippets"
           :loading="isLoading"
@@ -66,6 +70,8 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
@@ -87,6 +93,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)

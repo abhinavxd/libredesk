@@ -13,7 +13,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="flex shrink-0">
+  <div class="flex shrink-0 can-hover:opacity-0 can-hover:group-hover/reorder:opacity-100 can-hover:group-focus-within/reorder:opacity-100">
     <Button
       type="button"
       variant="ghost"

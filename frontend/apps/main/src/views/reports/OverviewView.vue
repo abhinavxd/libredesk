@@ -14,7 +14,9 @@
             </span>
             <template v-if="autoRefreshPaused">
               <Separator orientation="vertical" class="h-4" />
-              <span class="text-sm text-muted-foreground">{{ $t('report.autoRefreshPaused') }}</span>
+              <span class="text-sm text-muted-foreground">{{
+                $t('report.autoRefreshPaused')
+              }}</span>
               <Button size="sm" variant="outline" :disabled="isLoading" @click="manualRefresh">
                 {{ $t('globals.terms.refresh') }}
               </Button>
@@ -56,7 +58,7 @@
         </div>
 
         <!-- Row 1: Open Conversations and Agent Status -->
-        <div class="flex flex-col w-full gap-4 md:flex-row">
+        <div :class="REPORT_ROW_CLASS">
           <Card
             class="flex-1"
             :title="$t('report.openConversations')"
@@ -74,10 +76,10 @@
         </div>
 
         <!-- Row 2: CSAT and Message Volume -->
-        <div class="flex flex-col w-full gap-4 md:flex-row">
+        <div :class="REPORT_ROW_CLASS">
           <!-- CSAT Card -->
           <div class="flex-1 box p-5">
-            <p class="card-title mb-4">{{ $t('report.csat.cardTitle') }}</p>
+            <p class="ui-heading mb-4">{{ $t('report.csat.cardTitle') }}</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{ formatRating(csatData.average_rating) }}</span>
@@ -98,7 +100,7 @@
 
           <!-- Message Volume Card -->
           <div class="flex-1 box p-5">
-            <p class="card-title mb-4">{{ $t('report.messages.cardTitle') }}</p>
+            <p class="ui-heading mb-4">{{ $t('report.messages.cardTitle') }}</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               <div class="metric-item">
                 <span class="metric-value">{{
@@ -130,19 +132,19 @@
 
         <!-- Row 3: SLA Card with Compliance Percentages -->
         <div class="w-full box p-5">
-          <p class="card-title mb-4">{{ $t('report.sla.cardTitle') }}</p>
+          <p class="ui-heading mb-4">{{ $t('report.sla.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- First Response -->
             <div class="space-y-4">
-              <p class="section-title">{{ $t('report.sla.firstResponse') }}</p>
+              <p class="ui-subheading text-center">{{ $t('report.sla.firstResponse') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.first_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
-              <div class="grid grid-cols-2 gap-4 text-center pt-2">
+              <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.first_response_met_count || 0
@@ -165,15 +167,15 @@
             </div>
 
             <!-- Next Response -->
-            <div class="space-y-4 border-l border-r px-8">
-              <p class="section-title">{{ $t('report.sla.nextResponse') }}</p>
+            <div class="space-y-4 border-y py-6 md:border-y-0 md:border-x md:px-8 md:py-0">
+              <p class="ui-subheading text-center">{{ $t('report.sla.nextResponse') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.next_response_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
-              <div class="grid grid-cols-2 gap-4 text-center pt-2">
+              <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.next_response_met_count || 0
@@ -197,14 +199,14 @@
 
             <!-- Resolution -->
             <div class="space-y-4">
-              <p class="section-title">{{ $t('report.sla.resolution') }}</p>
+              <p class="ui-subheading text-center">{{ $t('report.sla.resolution') }}</p>
               <div class="metric-item">
                 <span class="metric-value"
                   >{{ slaCounts.resolution_compliance_percent || 0 }}%</span
                 >
                 <span class="metric-label">{{ $t('report.sla.compliance') }}</span>
               </div>
-              <div class="grid grid-cols-2 gap-4 text-center pt-2">
+              <div :class="SLA_COUNT_GRID_CLASS">
                 <div>
                   <span class="text-2xl font-semibold tabular-nums text-success">{{
                     slaCounts.resolution_met_count || 0
@@ -230,7 +232,7 @@
 
         <!-- Row 4: Tag Distribution -->
         <div class="w-full box p-5">
-          <p class="card-title mb-4">{{ $t('report.tags.cardTitle') }}</p>
+          <p class="ui-heading mb-4">{{ $t('report.tags.cardTitle') }}</p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- Tagged percentage metric -->
@@ -248,7 +250,7 @@
 
             <!-- Top tags list -->
             <div class="space-y-3">
-              <p class="section-title mb-3 text-left">{{ $t('report.tags.topTags') }}</p>
+              <p class="ui-subheading mb-3 text-left">{{ $t('report.tags.topTags') }}</p>
               <div
                 v-for="tag in (tagDistributionData.top_tags || []).slice(0, 5)"
                 :key="tag.tag_id"
@@ -266,7 +268,7 @@
 
         <!-- Row 5: Line Chart -->
         <div class="box w-full p-5">
-          <p class="card-title mb-4">{{ $t('report.chart.title') }}</p>
+          <p class="ui-heading mb-4">{{ $t('report.chart.title') }}</p>
           <LineChart :data="processedLineData" />
         </div>
       </div>
@@ -275,10 +277,13 @@
 </template>
 
 <script setup>
+const REPORT_ROW_CLASS = 'flex flex-col w-full gap-4 md:flex-row'
+const SLA_COUNT_GRID_CLASS = 'grid grid-cols-2 gap-4 text-center pt-2'
+
 import { ref, computed, watch, onMounted } from 'vue'
 import { useIntervalFn, useDocumentVisibility } from '@vueuse/core'
-import { useEmitter } from '../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { formatDuration } from '@shared-ui/utils/datetime.js'
 import Card from '@/features/reports/OverviewCard.vue'
@@ -288,7 +293,7 @@ import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Input } from '@shared-ui/components/ui/input'
 import { Separator } from '@shared-ui/components/ui/separator'
 import { useI18n } from 'vue-i18n'
-import api from '../../api'
+import api from '@main/api'
 
 const emitter = useEmitter()
 const { t } = useI18n()
@@ -572,15 +577,9 @@ onMounted(loadDashboardData)
   @apply text-xs text-muted-foreground;
 }
 
-.card-title {
-  @apply text-sm font-medium text-muted-foreground;
-}
 
 .metric-item {
   @apply flex flex-col items-center gap-1 text-center;
 }
 
-.section-title {
-  @apply text-sm font-medium text-center text-muted-foreground;
-}
 </style>

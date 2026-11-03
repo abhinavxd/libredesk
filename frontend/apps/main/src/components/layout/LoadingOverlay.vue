@@ -8,9 +8,11 @@
 </template>
 
 <script setup>
+import { provide, toRef } from 'vue'
 import { Spinner } from '@shared-ui/components/ui/spinner'
+import { LOADING_OVERLAY_INJECTION_KEY } from './loadingOverlay'
 
-defineProps({
+const props = defineProps({
   loading: {
     type: Boolean,
     default: false
@@ -20,4 +22,6 @@ defineProps({
     default: false
   }
 })
+
+provide(LOADING_OVERLAY_INJECTION_KEY, toRef(props, 'loading'))
 </script>

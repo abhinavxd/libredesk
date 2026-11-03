@@ -48,7 +48,10 @@
           </DialogContent>
         </Dialog>
 
+        <AdminToolbar v-model:search="searchTerm" searchable class="mb-5" />
         <DataTable
+          v-model:search="searchTerm"
+          :searchable="false"
           :columns="createSuggestionColumns(t, { onReview: openReview })"
           :data="suggestions"
           :loading="isLoading"
@@ -71,6 +74,8 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted } from 'vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
@@ -95,6 +100,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import api from '@/api'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)

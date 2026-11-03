@@ -13,13 +13,19 @@
         />
 
         <Tabs v-else default-value="settings">
-          <TabsList class="grid w-full grid-cols-3 mb-5">
-            <TabsTrigger value="settings">{{ t('admin.ai.assistant.tabs.settings') }}</TabsTrigger>
-            <TabsTrigger value="test">{{ t('admin.ai.assistant.tabs.test') }}</TabsTrigger>
-            <TabsTrigger value="performance">{{
-              t('admin.ai.assistant.tabs.performance')
-            }}</TabsTrigger>
-          </TabsList>
+          <AdminToolbar class="mb-5">
+            <template #left>
+              <TabsList class="w-max justify-start">
+                <TabsTrigger value="settings">{{
+                  t('admin.ai.assistant.tabs.settings')
+                }}</TabsTrigger>
+                <TabsTrigger value="test">{{ t('admin.ai.assistant.tabs.test') }}</TabsTrigger>
+                <TabsTrigger value="performance">{{
+                  t('admin.ai.assistant.tabs.performance')
+                }}</TabsTrigger>
+              </TabsList>
+            </template>
+          </AdminToolbar>
 
           <TabsContent value="settings">
             <AssistantForm
@@ -168,6 +174,7 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
@@ -177,12 +184,7 @@ import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { Textarea } from '@shared-ui/components/ui/textarea/index.js'
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from '@shared-ui/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@shared-ui/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
@@ -208,9 +210,7 @@ const previewMessage = ref('')
 const previewReply = ref('')
 const previewSources = ref([])
 const previewLoading = ref(false)
-const previewReferences = computed(() =>
-  previewSources.value.filter((source) => source.url)
-)
+const previewReferences = computed(() => previewSources.value.filter((source) => source.url))
 
 const fmtNumber = (value) => Number(value ?? 0).toLocaleString()
 const fmtPercent = (value) => `${Number(value ?? 0).toFixed(1)}%`
@@ -240,13 +240,43 @@ const tiles = computed(() => {
     return { ...base, delta: deltaRaw, ...buildDelta(deltaRaw, unit, increaseIsGood) }
   }
   return [
-    tile('admin.ai.assistant.stats.conversations', fmtNumber(s.conversations), trends.conversations, 'percent', true),
+    tile(
+      'admin.ai.assistant.stats.conversations',
+      fmtNumber(s.conversations),
+      trends.conversations,
+      'percent',
+      true
+    ),
     tile('admin.ai.assistant.stats.replies', fmtNumber(s.replies), trends.replies, 'percent', true),
-    tile('admin.ai.assistant.stats.resolutionRate', fmtPercent(s.resolution_rate), trends.resolution_rate, 'point', true),
-    tile('admin.ai.assistant.stats.handoffRate', fmtPercent(s.handoff_rate), trends.handoff_rate, 'point', false),
-    tile('admin.ai.assistant.stats.reopenRate', fmtPercent(s.reopen_rate), trends.reopen_rate, 'point', false),
+    tile(
+      'admin.ai.assistant.stats.resolutionRate',
+      fmtPercent(s.resolution_rate),
+      trends.resolution_rate,
+      'point',
+      true
+    ),
+    tile(
+      'admin.ai.assistant.stats.handoffRate',
+      fmtPercent(s.handoff_rate),
+      trends.handoff_rate,
+      'point',
+      false
+    ),
+    tile(
+      'admin.ai.assistant.stats.reopenRate',
+      fmtPercent(s.reopen_rate),
+      trends.reopen_rate,
+      'point',
+      false
+    ),
     tile('admin.ai.assistant.stats.depth', fmtDecimal(s.depth), null),
-    tile('admin.ai.assistant.stats.csat', hasCsat ? fmtDecimal(s.csat_avg) : '-', hasCsat ? trends.csat_avg : null, 'point', true),
+    tile(
+      'admin.ai.assistant.stats.csat',
+      hasCsat ? fmtDecimal(s.csat_avg) : '-',
+      hasCsat ? trends.csat_avg : null,
+      'point',
+      true
+    ),
     tile('admin.ai.assistant.stats.csatPositive', hasCsat ? fmtPercent(s.csat_positive) : '-', null)
   ]
 })

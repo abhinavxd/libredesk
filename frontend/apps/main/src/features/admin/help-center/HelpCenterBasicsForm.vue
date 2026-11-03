@@ -1,35 +1,37 @@
 <template>
   <form @submit="onSubmit" novalidate class="space-y-6 w-full">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" v-bind="componentField" @input="generateSlug" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" @input="generateSlug" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="slug">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.slug') }}</FormLabel>
-        <FormControl>
-          <Input type="text" v-bind="componentField" @input="markSlugEdited" />
-        </FormControl>
-        <FormDescription>{{ t('helpCenter.slugHint') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="slug">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.slug') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" @input="markSlugEdited" />
+          </FormControl>
+          <FormDescription>{{ t('helpCenter.slugHint') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="page_title">
-      <FormItem>
-        <FormLabel>{{ t('helpCenter.pageTitle') }}</FormLabel>
-        <FormControl>
-          <Input type="text" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="page_title">
+        <FormItem class="col-span-full">
+          <FormLabel>{{ t('helpCenter.pageTitle') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <FormField v-slot="{ componentField }" name="template">
       <FormItem>
@@ -74,6 +76,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { ref } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'

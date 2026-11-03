@@ -49,7 +49,7 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 
 		// Match CSRF token from cookie and header.
 		if cookieToken == "" || hdrToken == "" || cookieToken != hdrToken {
-			app.lo.Error("csrf token mismatch", "method", method, "cookie_token", cookieToken, "header_token", hdrToken)
+			app.lo.Warn("csrf token mismatch", "method", method, "cookie_present", cookieToken != "", "header_present", hdrToken != "")
 			return user, envelope.NewError(envelope.PermissionError, app.i18n.T("auth.csrfTokenMismatch"), nil)
 		}
 	}

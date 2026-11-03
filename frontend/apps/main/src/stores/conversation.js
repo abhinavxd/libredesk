@@ -15,6 +15,7 @@ import { getI18n } from '@main/i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
 import { useThrottleFn, useStorage } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
+import { useUsersStore } from '@/stores/users'
 import { useNotificationStore } from '@/stores/notification'
 import { delayedLoading } from '@/utils/delayed-loading'
 import api from '@main/api'
@@ -36,6 +37,7 @@ export const useConversationStore = defineStore('conversation', () => {
   let resolveDraftsReady
   const draftsReady = new Promise((resolve) => { resolveDraftsReady = resolve })
   const userStore = useUserStore()
+  const usersStore = useUsersStore()
   const notificationStore = useNotificationStore()
   const router = useRouter()
   const isViewingConversation = (uuid) => router.currentRoute.value.params.uuid === uuid
@@ -498,6 +500,10 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function rememberAssignee (conv) {
+    if (conv.assignee?.id > 0) usersStore.upsertUsers([conv.assignee])
+  }
+
   async function fetchConversation (uuid) {
     const cached = conversationDataCache.get(uuid)
     if (cached) {
@@ -510,6 +516,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const guard = delayedLoading(conversation, 'loading')
     try {
       const resp = await api.getConversation(uuid)
+      rememberAssignee(resp.data.data)
       conversation.data = resp.data.data
       resetTypingState()
       subscribeToConversation(uuid)
@@ -529,6 +536,7 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       const resp = await api.getConversation(uuid)
       if (conversation.data?.uuid === uuid) {
+        rememberAssignee(resp.data.data)
         deepMerge(conversation.data, resp.data.data)
         cacheConversationData(uuid, conversation.data)
       }
@@ -778,6 +786,7 @@ export const useConversationStore = defineStore('conversation', () => {
     const apiResponse = response.data.data
     const newConversations = []
     for (const conv of apiResponse.results) {
+      rememberAssignee(conv)
       if (!mergeIntoList(conv.uuid, conv)) newConversations.push(conv)
     }
     conversations.page = Math.max(conversations.page, apiResponse.page)
@@ -818,16 +827,17 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  async function updateStatus (v) {
-    if (!conversation.data) return
-    const previous = conversation.data.status
-    conversation.data.status = v
+  async function updateStatus (uuid, v) {
+    if (!uuid) return
+    const isCurrent = () => conversation.data?.uuid === uuid
+    const previous = isCurrent() ? conversation.data.status : null
+    if (isCurrent()) conversation.data.status = v
     try {
-      await api.updateConversationStatus(conversation.data.uuid, { status: v })
-      notificationStore.markAssignmentAsReadForConversation(conversation.data.uuid)
+      await api.updateConversationStatus(uuid, { status: v })
+      notificationStore.markAssignmentAsReadForConversation(uuid)
       fetchSidebarCounts({ force: true })
     } catch (error) {
-      if (conversation.data) conversation.data.status = previous
+      if (previous !== null && isCurrent()) conversation.data.status = previous
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
         variant: 'destructive',
         description: handleHTTPError(error).message
@@ -886,13 +896,14 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function updateAssignee (type, v) {
+    const conv = conversation.data
     try {
       const teamChanged =
-        type === 'team' && Number(conversation.data.assigned_team_id) !== Number(v.assignee_id)
-      await api.updateAssignee(conversation.data.uuid, type, v)
-      conversation.data[`assigned_${type}_id`] = v.assignee_id
+        type === 'team' && Number(conv.assigned_team_id) !== Number(v.assignee_id)
+      await api.updateAssignee(conv.uuid, type, v)
+      conv[`assigned_${type}_id`] = v.assignee_id
       // Backend clears the user assignee when the team changes.
-      if (teamChanged) conversation.data.assigned_user_id = null
+      if (teamChanged) conv.assigned_user_id = null
       fetchSidebarCounts({ force: true })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -903,9 +914,10 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   async function removeAssignee (type) {
+    const conv = conversation.data
     try {
-      await api.removeAssignee(conversation.data.uuid, type)
-      conversation.data[`assigned_${type}_id`] = null
+      await api.removeAssignee(conv.uuid, type)
+      conv[`assigned_${type}_id`] = null
       fetchSidebarCounts({ force: true })
     } catch (error) {
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -1104,6 +1116,7 @@ export const useConversationStore = defineStore('conversation', () => {
 
   function handleConvPush (payload) {
     if (!payload || !payload.uuid) return
+    rememberAssignee(payload)
     if (mergeLiveUpdate(payload.uuid, payload)) {
       if (conversation.data?.uuid === payload.uuid) {
         deepMerge(conversation.data, payload)

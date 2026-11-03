@@ -304,7 +304,6 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 
 	var createdInbox imodels.Inbox
 	if err := tx.Stmtx(m.queries.InsertInbox).Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.Enabled, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.ReopenWindowHours, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
-		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, m.persistenceError("creating inbox", err)
 	}
 	if inbox.Channel == ChannelEmail {

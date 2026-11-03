@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/mail"
 	"path/filepath"
 	"regexp"
@@ -27,6 +28,7 @@ import (
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	"github.com/abhinavxd/libredesk/internal/sla"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
+	tmpl "github.com/abhinavxd/libredesk/internal/template"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/jmoiron/sqlx"
@@ -37,7 +39,8 @@ import (
 const (
 	maxMessagesPerPage = 500
 	// Only allow visitor-to-contact upgrade within this window after the last continuity email.
-	upgradeWindowTTL = 7 * 24 * time.Hour
+	upgradeWindowTTL    = 7 * 24 * time.Hour
+	maxPreviousMessages = 10
 )
 
 // Matches <img ... src="URL"> and captures the URL for downstream parsing.
@@ -52,6 +55,26 @@ type fromNameVars struct {
 type fromNameAgent struct{ FirstName, LastName, FullName string }
 
 type fromNameInbox struct{ Name string }
+
+// previousMessage is one earlier message exposed to the outgoing email template. String fields are HTML-escaped.
+type previousMessage struct {
+	SenderName  string
+	SenderEmail string
+	CreatedAt   time.Time
+	IsIncoming  bool
+	Content     string
+}
+
+type previousMessageRow struct {
+	CreatedAt   time.Time `db:"created_at"`
+	IsIncoming  bool      `db:"is_incoming"`
+	Content     string    `db:"content"`
+	TextContent string    `db:"text_content"`
+	ContentType string    `db:"content_type"`
+	FirstName   string    `db:"first_name"`
+	LastName    string    `db:"last_name"`
+	Email       string    `db:"email"`
+}
 
 // Run starts a pool of worker goroutines to handle message dispatching via inbox's channel and processes incoming messages. It scans for
 // pending outgoing messages at the specified read interval and pushes them to the outgoing queue to be sent.
@@ -118,7 +141,7 @@ func (m *Manager) IncomingMessageWorker(ctx context.Context) {
 				return
 			}
 			if _, err := m.ProcessIncomingMessage(msg); err != nil {
-				m.lo.Error("error processing incoming msg", "error", err)
+				m.lo.Error("error processing incoming message", "inbox_id", msg.InboxID, "channel", msg.Channel, "source_id", msg.SourceID.String, "error", err)
 			}
 		}
 	}
@@ -146,7 +169,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Helper function to handle errors
 	handleError := func(err error, errorMsg string) bool {
 		if err != nil {
-			m.lo.Error(errorMsg, "error", err, "message_id", message.ID)
+			m.lo.Error(errorMsg, "error", err, "message_id", message.ID, "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID)
 			m.UpdateMessageStatus(message.UUID, models.MessageStatusFailed)
 			return true
 		}
@@ -192,6 +215,12 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 			outbound.AltContent = stringutil.HTML2TextMarkdownLinks(message.Content)
 		}
 
+		// Emails with no subject (e.g. arrived via IMAP with an empty Subject header) are
+		// rejected by some SMTP servers. Fall back to the reference number so replies go through.
+		if outbound.Subject == "" {
+			outbound.Subject = m.formatRefMarker(message.ReferenceNumber)
+		}
+
 		// Set "In-Reply-To" and "References" headers for email threading.
 		outbound.References, outbound.InReplyTo = m.BuildEmailThreadingHeaders(message.ConversationID, outbound.SourceID)
 	}
@@ -206,6 +235,11 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
+	if errors.Is(err, livechat.ErrClientNotConnected) {
+		m.lo.Info("outgoing message stored for offline widget", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID)
+	} else {
+		m.lo.Info("outgoing message accepted by channel", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID, "channel", inb.Channel())
+	}
 	// Update status as sent.
 	m.UpdateMessageStatus(message.UUID, models.MessageStatusSent)
 
@@ -265,50 +299,13 @@ func (m *Manager) BuildTemplateData(conversationUUID string, senderID int) (map[
 		return nil, fmt.Errorf("fetching message sender user: %w", err)
 	}
 
-	data := map[string]any{
-		"Conversation": map[string]any{
-			"ReferenceNumber": conversation.ReferenceNumber,
-			"Subject":         conversation.Subject.String,
-			"Priority":        conversation.Priority.String,
-			"UUID":            conversation.UUID,
-		},
-		// The inbox the message leaves from, so one outgoing template can sign or brand per inbox.
-		"Inbox": map[string]any{
-			"Name":    conversation.InboxName,
-			"Channel": conversation.InboxChannel,
-		},
-		"Contact": map[string]any{
-			"FirstName": conversation.Contact.FirstName,
-			"LastName":  conversation.Contact.LastName,
-			"FullName":  conversation.Contact.FullName(),
-			"Email":     conversation.Contact.Email.String,
-		},
-		"Recipient": map[string]any{
-			"FirstName": conversation.Contact.FirstName,
-			"LastName":  conversation.Contact.LastName,
-			"FullName":  conversation.Contact.FullName(),
-			"Email":     conversation.Contact.Email.String,
-		},
-		"Author": map[string]any{
-			"FirstName": sender.FirstName,
-			"LastName":  sender.LastName,
-			"FullName":  sender.FullName(),
-			"Email":     sender.Email.String,
-		},
-		// Lets templates disclose AI-composed replies, e.g. {{ if .IsAIComposed }}Composed by AI{{ end }}.
-		"IsAIComposed": sender.Type == umodels.UserTypeAIAssistant,
+	recipient := umodels.User{
+		FirstName: conversation.Contact.FirstName,
+		LastName:  conversation.Contact.LastName,
+		Email:     conversation.Contact.Email,
 	}
-
-	// For automated replies set author fields to empty strings as the recipients will see name as System.
-	if sender.IsSystemUser() {
-		data["Author"] = map[string]any{
-			"FirstName": "",
-			"LastName":  "",
-			"FullName":  "",
-			"Email":     "",
-		}
-	}
-
+	data := tmpl.BuildConversationData(conversation, recipient, sender)
+	data["Recipient"] = data["Contact"]
 	return data, nil
 }
 
@@ -321,6 +318,10 @@ func (m *Manager) RenderMessageInTemplate(channel string, message *models.Messag
 		}
 
 		content := m.emailTemplateContent(message, data)
+		isContinuity, _ := data["IsContinuityEmail"].(bool)
+		if !isContinuity && m.template.DefaultOutgoingEmailTemplateContains("PreviousMessages") {
+			data["PreviousMessages"] = m.previousMessagesData(message.ConversationID, message.ID)
+		}
 		message.Content, err = m.template.RenderEmailWithTemplate(data, content)
 		if err != nil {
 			m.lo.Error("could not render email content using template", "id", message.ID, "error", err)
@@ -347,14 +348,37 @@ func (m *Manager) emailTemplateContent(message *models.Message, data map[string]
 	}
 	data["IsContinuityEmail"] = isContinuity
 	if isContinuity {
-		data["ContinuityContent"] = content
-		return "{{ .ContinuityContent }}"
+		return content
 	}
-	if references := m.emailArticleReferences(message); references != "" {
-		data["ArticleReferences"] = references
-		return content + "{{ .ArticleReferences }}"
+	return content + m.emailArticleReferences(message)
+}
+
+// previousMessagesData returns the conversation's earlier messages exchanged with the contact, newest first, with incoming reply chains removed.
+func (m *Manager) previousMessagesData(conversationID, messageID int) []previousMessage {
+	out := []previousMessage{}
+	var rows []previousMessageRow
+	if err := m.q.GetPreviousMessages.Select(&rows, conversationID, messageID, maxPreviousMessages); err != nil {
+		m.lo.Error("error fetching previous messages", "conversation_id", conversationID, "error", err)
+		return out
 	}
-	return content
+	for _, r := range rows {
+		text := strings.TrimSpace(r.TextContent)
+		if r.IsIncoming {
+			text = textWithoutQuotedReplies(models.Message{Content: r.Content, TextContent: r.TextContent, ContentType: r.ContentType})
+		}
+		if text == "" {
+			continue
+		}
+		sender := umodels.User{FirstName: r.FirstName, LastName: r.LastName}
+		out = append(out, previousMessage{
+			SenderName:  html.EscapeString(strings.TrimSpace(sender.FullName())),
+			SenderEmail: html.EscapeString(r.Email),
+			CreatedAt:   r.CreatedAt,
+			IsIncoming:  r.IsIncoming,
+			Content:     strings.ReplaceAll(html.EscapeString(text), "\n", "<br>"),
+		})
+	}
+	return out
 }
 
 // GetConversationMessages retrieves messages for a specific conversation.
@@ -422,7 +446,9 @@ func (m *Manager) GetAllConversationMessages(conversationUUID string, private *b
 func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	var message models.Message
 	if err := m.q.GetMessage.Get(&message, uuid); err != nil {
-		m.lo.Error("error fetching message", "uuid", uuid, "error", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			m.lo.Error("error fetching message", "uuid", uuid, "error", err)
+		}
 		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -564,13 +590,17 @@ func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
 	return n > 0, err
 }
 
+// RenderStaffTemplate fills template variables in text written by staff. Returns content unchanged on any error.
+func (m *Manager) RenderStaffTemplate(conversationUUID string, senderID int, content string) string {
+	data, err := m.BuildTemplateData(conversationUUID, senderID)
+	if err != nil {
+		return content
+	}
+	return m.template.RenderString(data, content)
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
-	// Best-effort render template variables before saving.
-	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
-	}
-
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
@@ -644,11 +674,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
-	if !isWhatsAppTemplate {
-		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-			content = m.template.RenderString(data, content)
-		}
-	}
 
 	var (
 		sourceID    string
@@ -784,7 +809,7 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
-		m.lo.Error("error inserting message in db", "error", err)
+		m.lo.Error("error inserting message in db", "inbox_id", message.InboxID, "conversation_uuid", message.ConversationUUID, "source_id", message.SourceID.String, "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -796,7 +821,9 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 
 // AfterMessageInsert runs the post-commit side effects of a message insert: participant, last message and broadcast.
 func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []string) {
-	// Add this user as a participant if not already present.
+	if message.Type == models.MessageIncoming {
+		m.lo.Info("incoming message stored", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID, "source_id", message.SourceID.String)
+	}
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Skip updating last_message and broadcasting for continuity emails.
@@ -1037,7 +1064,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
 	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
-		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
 			if err := m.DeleteConversation(conversationUUID); err != nil {
@@ -1049,7 +1076,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Insert message. On failure, delete the conversation if it was just created for this message.
 	if err = m.InsertMessage(&msg); err != nil {
-		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
+		// The source keeps redelivering a message that never got saved, so its files must not stay behind.
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
 				return models.Message{}, fmt.Errorf("deleting conversation after message insert failure: %w", delErr)
@@ -1565,6 +1593,20 @@ func (m *Manager) getOutgoingProcessingConversationIDs() []int {
 	return out
 }
 
+// deleteUploadedMedia removes attachment files and their thumbnails uploaded for a message that was not saved.
+func (m *Manager) deleteUploadedMedia(media []mmodels.Media) {
+	for _, md := range media {
+		if err := m.mediaStore.Delete(md.UUID); err != nil {
+			m.lo.Error("error deleting media of unsaved message", "media_uuid", md.UUID, "error", err)
+		}
+		if strings.HasPrefix(md.ContentType, "image/") {
+			if err := m.mediaStore.Delete(image.ThumbPrefix + md.UUID); err != nil {
+				m.lo.Error("error deleting thumbnail of unsaved message", "media_uuid", md.UUID, "error", err)
+			}
+		}
+	}
+}
+
 // uploadThumbnailForMedia prepares and uploads a thumbnail for an image attachment.
 func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) error {
 	// Create a reader from the content
@@ -1657,7 +1699,7 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 		}
 
 		if conversation.SLAPolicyID.Int == 0 {
-			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
+			m.lo.Debug("no SLA policy applied to conversation, skipping next response SLA event creation")
 			return nil
 		}
 		if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {

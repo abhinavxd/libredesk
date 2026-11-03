@@ -64,6 +64,28 @@ describe('API: conversations', () => {
 
   beforeEach(() => cy.login())
 
+  it('requires permission to create a message as a contact', () => {
+    cy.api('GET', '/api/v1/roles').then(({ body }) => {
+      const role = body.data.find((entry) => entry.name === 'Cypress contact writer')
+      cy.api('PUT', `/api/v1/roles/${role.id}`, {
+        ...role,
+        permissions: ['conversations:write']
+      })
+      cy.api('POST', '/api/v1/conversations', {
+        inbox_id: inboxId,
+        contact_email: contactEmail,
+        first_name: 'Api',
+        content: 'hi',
+        initiator: 'contact'
+      }, { failOnStatusCode: false }).then((response) => {
+        cy.api('PUT', `/api/v1/roles/${role.id}`, role).then(() => {
+          expect(response.status).to.eq(403)
+          expect(response.body.error_type).to.eq('PermissionException')
+        })
+      })
+    })
+  })
+
   it('rejects a create with no inbox_id', () => {
     cy.api('POST', '/api/v1/conversations', {
       contact_email: contactEmail, first_name: 'Api', content: 'hi', initiator: 'contact'
@@ -169,6 +191,24 @@ describe('API: conversations', () => {
       expect(body.data.contact.last_name).to.eq('Contact')
       expect(body.data.last_message_sender).to.eq('contact')
     })
+  })
+
+  it('expands staff variables while preserving contact text', () => {
+    for (const entry of [
+      { sender_type: 'agent', private: false, expected: '<p>Hi Api</p>' },
+      { sender_type: 'agent', private: true, expected: '<p>Hi Api</p>' },
+      { sender_type: 'contact', private: false, expected: '<p>Hi {{ .Contact.FirstName }}</p>' }
+    ]) {
+      cy.api('POST', `/api/v1/conversations/${uuid}/messages`, {
+        message: '<p>Hi {{ .Contact.FirstName }}</p>',
+        sender_type: entry.sender_type,
+        private: entry.private,
+        to: [contactEmail]
+      }).then(({ status, body }) => {
+        expect(status).to.eq(200)
+        expect(body.data.content).to.eq(entry.expected)
+      })
+    }
   })
 
   it('reads the conversation back by uuid', () => {

@@ -1,51 +1,56 @@
 <template>
-  <div class="flex flex-col h-screen">
+  <div class="flex flex-col min-h-0">
     <SearchHeader />
-    <div ref="scrollRef" class="flex-1 overflow-y-auto">
-      <div class="mx-auto max-w-6xl space-y-4 px-4 py-6">
-        <SearchInput
-          ref="inputRef"
-          v-model="term"
-          :placeholder="$t('search.searchBy')"
-          :aria-label="$t('globals.terms.search')"
-          :clear-label="$t('globals.messages.clearSearch')"
-          input-class="h-12 text-base"
-          :loading="loading"
-        />
+    <div ref="scrollRef" class="flex-1 min-h-0 overflow-y-auto">
+      <div class="mx-auto max-w-6xl px-4 pb-6">
+        <div class="search-toolbar sticky top-0 z-20 space-y-3 border-b border-border bg-card py-4">
+          <SearchInput
+            ref="inputRef"
+            v-model="term"
+            :placeholder="$t('search.searchBy')"
+            :aria-label="$t('globals.terms.search')"
+            :clear-label="$t('globals.messages.clearSearch')"
+            input-class="h-12 text-base"
+            :loading="loading"
+          />
 
-        <SearchFilters :filters="filters" @update:filters="filters = $event" />
-
-        <div v-if="error" class="py-16 text-center space-y-4">
-          <p class="text-destructive">{{ error }}</p>
-          <Button type="button" @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
+          <SearchFilters :filters="filters" @update:filters="filters = $event" />
         </div>
-        <SearchResults
-          v-else-if="searchPerformed"
-          :results="results"
-          :term="term"
-          :active-tab="activeTab"
-          :sorts="sorts"
-          :show-clear-filters="hasActiveFilters(filters)"
-          :aria-busy="loading"
-          :class="{ 'pointer-events-none opacity-60': loading }"
-          @update:active-tab="selectTab"
-          @change-sort="changeSort"
-          @change-page="changePage"
-          @clear-filters="filters = emptyFilters()"
-        />
-        <p
-          v-else-if="term.length > 0 && term.length < MIN_SEARCH_LENGTH"
-          class="py-16 text-center text-sm text-muted-foreground"
-        >
-          {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
-        </p>
+
+        <div class="pt-4">
+          <div v-if="error" class="py-16 text-center space-y-4">
+            <p class="text-destructive">{{ error }}</p>
+            <Button type="button" @click="search"> {{ $t('globals.terms.tryAgain') }} </Button>
+          </div>
+          <SearchResults
+            v-else-if="searchPerformed"
+            :results="results"
+            :term="term"
+            :active-tab="activeTab"
+            :sorts="sorts"
+            :show-clear-filters="hasActiveFilters(filters)"
+            :loading="loading"
+            :aria-busy="loading"
+            :class="{ 'pointer-events-none opacity-60': loading }"
+            @update:active-tab="selectTab"
+            @change-sort="changeSort"
+            @change-page="changePage"
+            @clear-filters="filters = emptyFilters()"
+          />
+          <p
+            v-else-if="term.length < MIN_SEARCH_LENGTH"
+            class="py-16 text-center text-sm text-muted-foreground"
+          >
+            {{ $t('search.minQueryLength', { length: MIN_SEARCH_LENGTH }) }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
@@ -107,10 +112,6 @@ const searchPerformed = ref(false)
 let debounceTimer = null
 let searchRequestId = 0
 let cursorsByPage = emptyCursorHistory()
-
-const resultCount = computed(
-  () => results.value.conversations.results.length + results.value.messages.results.length
-)
 
 const searchParams = (type, perPage, cursor = '') => {
   const params = { query: term.value, page_size: perPage, sort: sorts.value[type] }
@@ -261,3 +262,11 @@ onBeforeUnmount(() => {
   clearTimeout(debounceTimer)
 })
 </script>
+
+<style scoped>
+@media (max-height: 500px) {
+  .search-toolbar {
+    position: static;
+  }
+}
+</style>

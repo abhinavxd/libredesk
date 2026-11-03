@@ -128,7 +128,7 @@ func (m *Manager) reconcileSource(ctx context.Context, src embedSource, baseURL,
 		reindexed++
 	}
 	if reindexed > 0 {
-		m.lo.Info("reconciled embeddings", "source_type", src.sourceType(), "reindexed", reindexed)
+		m.lo.Info("embedding reconciliation attempts completed", "source_type", src.sourceType(), "attempted", reindexed)
 	}
 
 	m.sweepOrphans(src)

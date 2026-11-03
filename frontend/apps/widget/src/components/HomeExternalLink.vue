@@ -1,5 +1,10 @@
 <template>
-  <a :href="link.url" target="_blank" rel="noopener noreferrer" class="block no-underline">
+  <a
+    :href="link.url"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="block rounded-xl no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  >
     <Card
       class="rounded-xl border-border/80 shadow-sm transition-[background-color,box-shadow] can-hover:hover:bg-accent can-hover:hover:shadow-md"
     >

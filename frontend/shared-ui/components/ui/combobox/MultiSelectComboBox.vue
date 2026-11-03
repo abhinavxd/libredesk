@@ -5,7 +5,7 @@
         type="button"
         variant="outline"
         role="combobox"
-        class="w-full justify-between font-normal"
+        class="w-full justify-between bg-transparent font-normal"
         :aria-expanded="open"
         :disabled="disabled"
       >

@@ -384,11 +384,12 @@ func handleGetConversation(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	conv.PreviousConversations = filterCurrentPreviousConv(prev, conv.UUID)
+	// The current conversation stays in the list; the sidebar highlights it, like the conversation list does.
+	conv.PreviousConversations = prev
 	return r.SendEnvelope(conv)
 }
 
-// handleDownloadConversationTranscript sends the conversation transcript as a text file download.
+// handleDownloadConversationTranscript downloads the public transcript as plain text.
 func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -401,7 +402,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	conversation, err := enforceConversationAccess(app, uuid, user)
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -412,8 +413,8 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
-	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
+	transcript := app.conversation.BuildTranscript(*conv, messages, time.Now() /* downloadedAt */)
+	safeRef := stringutil.SanitizeFilename(conv.ReferenceNumber)
 	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
 	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")
@@ -547,7 +548,7 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error decoding assignee change request", "error", err)
+		app.lo.Debug("error decoding assignee change request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -857,16 +858,6 @@ func handleRemoveTeamAssignee(r *fastglue.Request) error {
 	return r.SendEnvelope(true)
 }
 
-// filterCurrentPreviousConv removes the current conversation from the list of previous conversations.
-func filterCurrentPreviousConv(convs []cmodels.PreviousConversation, uuid string) []cmodels.PreviousConversation {
-	for i, c := range convs {
-		if c.UUID == uuid {
-			return append(convs[:i], convs[i+1:]...)
-		}
-	}
-	return []cmodels.PreviousConversation{}
-}
-
 // handleCreateConversation creates a new conversation and sends a message to it.
 func handleCreateConversation(r *fastglue.Request) error {
 	var (
@@ -890,6 +881,17 @@ func handleCreateConversation(r *fastglue.Request) error {
 	user, err := app.user.GetAgentCachedOrLoad(auser.ID)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
+	}
+
+	if req.Initiator == umodels.UserTypeContact {
+		canWriteAsContact, err := app.authz.Enforce(user, "messages", "write_as_contact")
+		if err != nil {
+			app.lo.Error("error checking permission", "error", err)
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		}
+		if !canWriteAsContact {
+			return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil))
+		}
 	}
 
 	var (
@@ -1004,7 +1006,8 @@ func handleCreateConversation(r *fastglue.Request) error {
 		}
 		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, "" /** content **/, nil /** to **/, nil /** cc **/, nil /** bcc **/, "" /** sendFrom **/, meta)
 	case req.Initiator == umodels.UserTypeAgent:
-		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, req.Content, to, req.CC, req.BCC, req.SendFrom, map[string]any{} /** meta **/)
+		content := app.conversation.RenderStaffTemplate(conversationUUID, auser.ID, req.Content)
+		_, sendErr = app.conversation.QueueReply(media, req.InboxID, auser.ID, contactID, conversationUUID, content, to, req.CC, req.BCC, req.SendFrom, map[string]any{} /** meta **/)
 	case req.Initiator == umodels.UserTypeContact:
 		agentInitiated = false
 		_, sendErr = app.conversation.CreateContactMessage(media, contactID, conversationUUID, req.Content, cmodels.ContentTypeHTML, true, req.SourceID, auser.ID)

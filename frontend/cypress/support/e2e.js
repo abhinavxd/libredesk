@@ -18,5 +18,12 @@ import './commands'
 import './livechat'
 import './whatsapp'
 
+Cypress.on('uncaught:exception', (err) => {
+  const firstFrame = err.stack?.split('\n').find((line) => /^\s*at /.test(line))
+  const isRadixFocusError =
+    err.message.includes("reading 'focus'") && firstFrame?.includes('radix')
+  return !isRadixFocusError
+})
+
 // Alternatively you can use CommonJS syntax:
 // require('./commands')

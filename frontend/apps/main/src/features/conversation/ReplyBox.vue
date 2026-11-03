@@ -63,7 +63,7 @@
     </AlertDialogContent>
   </AlertDialog>
 
-  <div class="text-foreground bg-background">
+  <div class="text-foreground">
     <!-- Fullscreen editor -->
     <Dialog :open="isEditorFullscreen" @update:open="isEditorFullscreen = false">
       <DialogContent
@@ -142,7 +142,7 @@
 
     <!-- Main Editor non-fullscreen -->
     <div
-      class="bg-background text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
+      class="bg-card text-card-foreground box m-2 px-2 pt-2 flex flex-col relative"
       :class="{ '!bg-private': messageType === 'private_note', 'ai-generating': isGenerating }"
       v-if="!isCollapsed && !isEditorFullscreen"
     >
@@ -184,6 +184,7 @@
 
 <script setup>
 import { ref, watch, computed, toRaw, nextTick, onMounted, onUnmounted } from 'vue'
+import { useStorage } from '@vueuse/core'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getTextFromHTML } from '@shared-ui/utils/string'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
@@ -337,7 +338,7 @@ const {
 
 // Rest of existing state
 const isEditorFullscreen = ref(false)
-const isMinimized = ref(false)
+const isMinimized = useStorage('replyBoxMinimized', false)
 const isSending = ref(false)
 const isGenerating = ref(false)
 const to = ref('')
@@ -510,6 +511,10 @@ const processSend = async (
   if (hasPendingInlineUpload(html)) return
   const hasContent = hasTextContent.value || hasInlineImage(html) || mediaFiles.value.length > 0
   const convUUID = conversationStore.current.uuid
+  // The agent can open another conversation while the send is in flight, and the editor then holds that conversation's draft.
+  const isConversationStillOpen = () => conversationStore.current?.uuid === convUUID
+  const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
+  const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
   const isPrivate = messageType.value === 'private_note'
 
   if ((isPrivate && !canSendPrivateNote.value) || (!isPrivate && !canSendReply.value)) return
@@ -650,8 +655,10 @@ const processSend = async (
         tempUUIDs.slice(i).forEach((uuid) => conversationStore.removePendingMessage(convUUID, uuid))
         // Already-accepted attachments must not be resent on retry.
         const sentIDs = new Set(parts.slice(0, i).flatMap((p) => p.attachments.map((f) => f.id)))
-        if (sentIDs.size) setMediaFiles(mediaFiles.value.filter((f) => !sentIDs.has(f.id)))
-        if (i === 0) htmlContent.value = savedContent
+        if (isConversationStillOpen()) {
+          if (sentIDs.size) setMediaFiles(mediaFiles.value.filter((f) => !sentIDs.has(f.id)))
+          if (i === 0) htmlContent.value = savedContent
+        }
         emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
           variant: 'destructive',
           description: handleHTTPError(error).message
@@ -667,8 +674,6 @@ const processSend = async (
 
   // Apply macro actions if any.
   if (!hasMessageSendingErrored) {
-    const macroID = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.id
-    const macroActions = conversationStore.getMacro(MACRO_CONTEXT.REPLY)?.actions || []
     if (macroID > 0) {
       try {
         await api.applyMacro(convUUID, macroID, macroActions)
@@ -684,11 +689,13 @@ const processSend = async (
   // Clear state on success.
   if (!hasMessageSendingErrored) {
     clearDraft(convUUID, isPrivate ? 'private_note' : 'reply')
-    conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
-    clearMediaFiles()
-    emailErrors.value = []
-    mentions.value = []
-    if (statusToSet) conversationStore.updateStatus(statusToSet)
+    if (isConversationStillOpen()) {
+      conversationStore.resetMacro(MACRO_CONTEXT.REPLY)
+      clearMediaFiles()
+      emailErrors.value = []
+      mentions.value = []
+    }
+    if (statusToSet) conversationStore.updateStatus(convUUID, statusToSet)
   }
   isSending.value = false
 }
@@ -780,70 +787,4 @@ watch(
   },
   { deep: true, immediate: true }
 )
-
-// Media files and macro state are restored per draft by the draft manager; resetting here would race ahead of the save and drop them.
-watch(
-  () => conversationStore.current?.uuid,
-  () => {
-    setTimeout(() => {
-      activeContentRef()?.focus()
-    }, 100)
-  }
-)
 </script>
-
-<style scoped>
-/* While the AI drafts a reply, a point of light orbits the reply box: a bright
-   comet head that fades to a transparent tail, with its glow travelling along. */
-@property --ai-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-.ai-generating {
-  box-shadow: 0 6px 22px -10px hsl(var(--primary) / 0.28);
-}
-
-.ai-generating::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--ai-angle),
-    hsl(var(--primary)) 0deg,
-    hsl(var(--primary) / 0) 90deg,
-    hsl(var(--primary) / 0) 180deg,
-    hsl(var(--primary)) 180deg,
-    hsl(var(--primary) / 0) 270deg,
-    hsl(var(--primary) / 0) 360deg
-  );
-  filter: drop-shadow(0 0 5px hsl(var(--primary) / 0.5));
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  animation: ai-border-spin 2.4s linear infinite;
-  pointer-events: none;
-  z-index: 20;
-}
-
-@keyframes ai-border-spin {
-  to {
-    --ai-angle: 360deg;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* Steady even glow so the active state stays legible without motion. */
-  .ai-generating {
-    box-shadow: 0 0 0 1.5px hsl(var(--primary) / 0.4);
-  }
-  .ai-generating::after {
-    display: none;
-  }
-}
-</style>

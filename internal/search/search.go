@@ -195,13 +195,13 @@ func (s *Manager) buildQuery(base string, query models.Query, scope models.ReadS
 	baseArgs = append(baseArgs, dbutil.ContainsPattern(query.Term))
 	sql, args, err := dbutil.BuildFilterQuery(base, baseArgs, query.Filters, fields, s.filterRenderers, s.filterLocation())
 	if err != nil {
-		s.lo.Error("error building search query", "error", err)
+		s.lo.Debug("error building search query", "error", err)
 		return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
 	}
 	if query.Cursor != "" {
 		condition, cursorArgs, err := cursorWhere(query.Cursor, query.Sort, len(args)+1)
 		if err != nil {
-			s.lo.Error("error decoding search cursor", "error", err)
+			s.lo.Debug("error decoding search cursor", "error", err)
 			return "", nil, envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
 		}
 		sql += " AND " + condition

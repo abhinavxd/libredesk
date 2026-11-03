@@ -1,39 +1,44 @@
 <template>
-  <div class="mb-5 flex items-center justify-between gap-4">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-    <div
-      v-if="inbox.channel === 'livechat' && inbox.uuid"
-      class="flex items-center gap-1.5 text-xs text-muted-foreground/70"
-    >
-      <span>UUID:</span>
-      <code class="font-mono">{{ inbox.uuid }}</code>
-      <CopyButton :text="inbox.uuid" />
+  <AdminToolbar class="mb-5">
+    <template #left>
+      <CustomBreadcrumb :links="breadcrumbLinks" />
+    </template>
+    <template #actions>
+      <div
+        v-if="inbox.channel === 'livechat' && inbox.uuid"
+        class="flex items-center gap-1.5 text-xs text-muted-foreground/70"
+      >
+        <span>UUID:</span>
+        <code class="font-mono">{{ inbox.uuid }}</code>
+        <CopyButton :text="inbox.uuid" />
+      </div>
+    </template>
+  </AdminToolbar>
+  <LoadingOverlay :loading="formLoading" reserve-height>
+    <div v-if="!formLoading">
+      <EmailInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        :verifyAlias="verifyAlias"
+        :aliasVerificationState="aliasVerificationState"
+        v-if="inbox.channel === 'email'"
+      />
+      <LivechatInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        :available-languages="availableLanguages"
+        v-else-if="inbox.channel === 'livechat'"
+      />
+      <WhatsAppInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        v-else-if="inbox.channel === 'whatsapp'"
+      />
     </div>
-  </div>
-  <Spinner v-if="formLoading"></Spinner>
-  <div v-else>
-    <EmailInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      :verifyAlias="verifyAlias"
-      :aliasVerificationState="aliasVerificationState"
-      v-if="inbox.channel === 'email'"
-    />
-    <LivechatInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      :available-languages="availableLanguages"
-      v-else-if="inbox.channel === 'livechat'"
-    />
-    <WhatsAppInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      v-else-if="inbox.channel === 'whatsapp'"
-    />
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -44,7 +49,8 @@ import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import CopyButton from '@/components/button/CopyButton.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'

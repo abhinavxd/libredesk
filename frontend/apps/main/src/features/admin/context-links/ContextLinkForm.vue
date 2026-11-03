@@ -4,7 +4,11 @@
       <FormItem>
         <FormControl>
           <div class="flex items-center space-x-2">
-            <Checkbox :checked="value" @update:checked="handleChange" />
+            <Checkbox
+              :aria-label="$t('globals.terms.active')"
+              :checked="value"
+              @update:checked="handleChange"
+            />
             <Label>{{ $t('globals.terms.active') }}</Label>
           </div>
         </FormControl>
@@ -12,32 +16,38 @@
       </FormItem>
     </FormField>
 
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" :placeholder="t('contextLink.namePlaceholder')" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input
+              type="text"
+              :placeholder="t('contextLink.namePlaceholder')"
+              v-bind="componentField"
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="url_template">
-      <FormItem>
-        <FormLabel>{{ $t('contextLink.urlTemplate') }}</FormLabel>
-        <FormControl>
-          <Input
-            type="text"
-            placeholder="https://tools.example.com/lookup?token={{token}}"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>{{ $t('contextLink.urlTemplateHelp') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="url_template">
+        <FormItem>
+          <FormLabel>{{ $t('contextLink.urlTemplate') }}</FormLabel>
+          <FormControl>
+            <Input
+              type="text"
+              placeholder="https://tools.example.com/lookup?token={{token}}"
+              v-bind="componentField"
+            />
+          </FormControl>
+          <FormDescription>{{ $t('contextLink.urlTemplateHelp') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
-    <div class="grid grid-cols-2 gap-4">
+    <FormGrid>
       <FormField v-slot="{ componentField }" name="secret">
         <FormItem>
           <FormLabel>{{ $t('contextLink.secret') }}</FormLabel>
@@ -59,13 +69,14 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
 
     <slot name="footer"></slot>
   </form>
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import { Label } from '@shared-ui/components/ui/label'
 import { useI18n } from 'vue-i18n'

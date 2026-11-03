@@ -178,7 +178,7 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 	)
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
-		app.lo.Error("error parsing form data", "error", err)
+		app.lo.Debug("error parsing form data", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
 	}
 
@@ -545,7 +545,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 
 	resized, err := image.Downscale(image.AvatarMaxDim, file)
 	if err != nil {
-		app.lo.Error("error downscaling avatar", "user_id", user.ID, "error", err)
+		app.lo.Debug("error downscaling avatar", "user_id", user.ID, "error", err)
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil)
 	}
 	srcFileSize := resized.Len()

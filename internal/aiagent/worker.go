@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"slices"
 	"strings"
-
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
@@ -19,7 +19,6 @@ import (
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 )
@@ -107,7 +106,7 @@ func (m *Manager) worker(ctx context.Context) {
 func (m *Manager) handleWithRecover(ctx context.Context, convID int) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.lo.Error("recovered from panic in ai agent worker", "conversation_id", convID, "panic", r)
+			m.lo.Error("recovered from panic in ai agent worker", "conversation_id", convID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	m.handle(ctx, convID)
@@ -164,7 +163,7 @@ func (m *Manager) enqueue(convID int) {
 func (m *Manager) handoffByConvID(convID int, reason string) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.lo.Error("recovered from panic handing off dropped ai job", "conversation_id", convID, "panic", r)
+			m.lo.Error("recovered from panic handing off dropped ai job", "conversation_id", convID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	conv, err := m.convo.GetConversation(convID, "", "")
@@ -234,14 +233,16 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if inbound == nil {
 		return
 	}
-	// Only respond to a fresh inbound customer message, never to the assistant's own or automated
-	// replies. A requeued run sees the previous run's just-posted reply as the last message, so it
-	// instead checks for an inbound message the previous run's history never included.
 	m.mu.Lock()
 	prevSeen, hasPrev := m.lastSeen[convID]
 	m.lastSeen[convID] = msgs[len(msgs)-1].ID
 	m.mu.Unlock()
-	if !lastIsInboundContact(msgs) && (!hasPrev || inbound.ID <= prevSeen) {
+	// Providers reject a history that ends with the reply, so put it above messages sent while it was written.
+	if hasPrev {
+		msgs = previousReplyFirst(msgs, prevSeen)
+	}
+	// A human or automated reply after the customer's message leaves nothing to answer.
+	if !lastIsInboundContact(msgs) {
 		return
 	}
 	// The reply and any identity-scoped tools act as the primary contact. An email thread can carry
@@ -716,7 +717,10 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		}
 
 		if text == "" && len(images) == 0 && len(markers) == 0 {
-			continue
+			if role != aimodels.RoleUser {
+				continue
+			}
+			text = "[The customer sent a message with no readable text.]"
 		}
 		if len(markers) > 0 {
 			if text != "" {
@@ -866,4 +870,26 @@ func messageMetaBool(raw json.RawMessage, key string) bool {
 	}
 	value, _ := meta[key].(bool)
 	return value
+}
+
+// previousReplyFirst moves AI replies posted after prevSeen above the other messages that arrived since.
+func previousReplyFirst(msgs []cmodels.Message, prevSeen int) []cmodels.Message {
+	out := make([]cmodels.Message, 0, len(msgs))
+	var later []cmodels.Message
+	for _, msg := range msgs {
+		if msg.ID > prevSeen && !isAIReply(msg) {
+			later = append(later, msg)
+			continue
+		}
+		out = append(out, msg)
+	}
+	return append(out, later...)
+}
+
+// isAIReply matches replies from any assistant, so a reassignment mid-run still finds the old reply.
+func isAIReply(msg cmodels.Message) bool {
+	var meta struct {
+		AssistantID int `json:"ai_assistant_id"`
+	}
+	return json.Unmarshal(msg.Meta, &meta) == nil && meta.AssistantID > 0
 }

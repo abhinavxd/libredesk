@@ -1,10 +1,12 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
@@ -28,7 +30,8 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	lo := logf.New(logf.Opts{})
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
 	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "learned-param-test-model"}
 	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
 
@@ -37,6 +40,10 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}
 	if len(bodies) != 2 {
 		t.Fatalf("first request should take one 400 round trip then retry, got %d requests", len(bodies))
+	}
+
+	if strings.Contains(logs.String(), "level=error") || !strings.Contains(logs.String(), "level=warn") {
+		t.Fatalf("recovered adaptation has incorrect severity: %s", logs.String())
 	}
 
 	// A fresh client must remember the swap and send max_completion_tokens up front.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/volatiletech/null/v9"
 )
@@ -15,7 +16,7 @@ func (u *Manager) CreateVisitor(user *models.User) error {
 
 	if user.FirstName == "" && user.LastName == "" {
 		if user.Email.Valid && user.Email.String != "" {
-			user.FirstName = strings.Split(user.Email.String, "@")[0]
+			user.FirstName = stringutil.CapitalizeFirst(strings.Split(user.Email.String, "@")[0])
 		} else {
 			user.FirstName = "Visitor"
 		}

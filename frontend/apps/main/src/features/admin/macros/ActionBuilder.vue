@@ -5,7 +5,7 @@
       v-if="!model.length"
       class="text-center py-12 px-6 border-2 border-dashed border-muted rounded-lg"
     >
-      <h3 class="text-sm font-medium text-foreground mb-2">
+      <h3 class="ui-heading mb-2">
         {{ $t('actions.noActions') }}
       </h3>
       <Button

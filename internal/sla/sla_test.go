@@ -6,12 +6,14 @@ import (
 	"errors"
 	"fmt"
 	htmltemplate "html/template"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	bmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	nmodels "github.com/abhinavxd/libredesk/internal/notification/models"
 	"github.com/abhinavxd/libredesk/internal/sla/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
@@ -34,9 +36,10 @@ type stubAppSettingsStore struct{}
 type stubBusinessHrsStore struct{ bh bmodels.BusinessHours }
 
 type stubNotificationDispatcher struct {
-	err     error
-	succeed int
-	sentTo  []int
+	err           error
+	succeed       int
+	sentTo        []int
+	notifications []nmodels.Notification
 }
 
 type appliedRow struct {
@@ -69,6 +72,7 @@ func (s *stubNotificationDispatcher) Send(n nmodels.Notification) ([]nmodels.Del
 	for _, recipient := range n.Recipients {
 		s.sentTo = append(s.sentTo, recipient.UserID)
 	}
+	s.notifications = append(s.notifications, n)
 	return nil, nil
 }
 
@@ -509,7 +513,8 @@ func TestSendNotificationKeepsPendingWhenDispatchFails(t *testing.T) {
 	if len(pending) != 1 {
 		t.Fatalf("pending notifications = %d, want 1", len(pending))
 	}
-	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+	renderer, err := template.New(m.lo, db, nil, layout, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,7 +542,8 @@ func TestSendNotificationRetriesOnlyUndeliveredRecipients(t *testing.T) {
 	if err := m.q.GetScheduledSLANotifications.Select(&pending); err != nil {
 		t.Fatal(err)
 	}
-	renderer, err := template.New(m.lo, db, nil, nil, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
+	layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+	renderer, err := template.New(m.lo, db, nil, layout, htmltemplate.FuncMap{"RootURL": func() string { return "http://localhost" }}, m.i18n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,6 +559,54 @@ func TestSendNotificationRetriesOnlyUndeliveredRecipients(t *testing.T) {
 	}
 	if queryInt(t, db, `SELECT COUNT(*) FROM scheduled_sla_notifications WHERE id = $1 AND processed_at IS NOT NULL`, pending[0].ID) != 0 {
 		t.Fatal("partially delivered notification was marked processed")
+	}
+}
+
+func TestSendNotificationSurvivesBrokenEmailTemplate(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		body    string
+		subject string
+	}{
+		{name: "body", body: "{{", subject: "SLA alert"},
+		{name: "subject", body: "SLA alert", subject: "{{"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			m, db := newTestManager(t)
+			policy := insertPolicy(t, db, "p1", "1h", "2h", "")
+			conv := insertConversation(t, db, "c1")
+			applySLA(t, m, conv, policy)
+			appliedID := fetchApplied(t, db, conv)[0].ID
+			db.MustExec(`INSERT INTO scheduled_sla_notifications (applied_sla_id, metric, notification_type, recipients, send_at) VALUES ($1, 'first_response', 'warning', '{1}', NOW() - INTERVAL '1 min')`, appliedID)
+			db.MustExec(`UPDATE templates SET body = $1, subject = $2 WHERE name = $3`, tt.body, tt.subject, template.TmplSLABreachWarning)
+			var pending []models.ScheduledSLANotification
+			if err := m.q.GetScheduledSLANotifications.Select(&pending); err != nil {
+				t.Fatal(err)
+			}
+			if len(pending) != 1 {
+				t.Fatalf("pending notifications = %d, want 1", len(pending))
+			}
+			layout := htmltemplate.Must(htmltemplate.New("base").Parse(`{{ define "header" }}<html><body>{{ end }}{{ define "footer" }}</body></html>{{ end }}`))
+			renderer, err := template.New(m.lo, db, nil /** webTpls **/, layout, htmltemplate.FuncMap{}, m.i18n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dispatcher := &stubNotificationDispatcher{succeed: 1}
+			m.template = renderer
+			m.dispatcher = dispatcher
+			if err := m.SendNotification(pending[0]); err != nil {
+				t.Fatal(err)
+			}
+			if len(dispatcher.notifications) != 1 {
+				t.Fatalf("dispatched alerts = %d, want 1", len(dispatcher.notifications))
+			}
+			if recipient := dispatcher.notifications[0].Recipients[0]; recipient.UserID != 1 || recipient.Email != nil {
+				t.Fatalf("unexpected recipient after email failure: %+v", recipient)
+			}
+			if queryInt(t, db, `SELECT COUNT(*) FROM scheduled_sla_notifications WHERE id = $1 AND processed_at IS NOT NULL`, pending[0].ID) != 1 {
+				t.Fatal("dispatched alert was not marked processed")
+			}
+		})
 	}
 }
 
@@ -1206,6 +1260,50 @@ func TestEvaluateConversationNextResponseOnlyRecomputes(t *testing.T) {
 	}
 	if d := conversationDeadline(t, db, conv); !d.Valid {
 		t.Fatalf("expected cached deadline recomputed from pending event, got %+v", d)
+	}
+}
+
+func TestSLANotificationTemplateData(t *testing.T) {
+	content := htmltemplate.Must(htmltemplate.New("content").Option("missingkey=error").Parse(
+		`{{ .Conversation.ReferenceNumber }}|{{ .Conversation.Subject }}|{{ .Conversation.UUID }}|{{ .Conversation.Priority }}|{{ .Inbox.Name }}|{{ .Inbox.Channel }}|{{ .Contact.FullName }}|{{ .Contact.Email }}|{{ .Recipient.FullName }}|{{ if .Recipient.Email.Valid }}{{ .Recipient.Email.String }}{{ end }}|{{ .Author.FirstName }}|{{ .Author.LastName }}|{{ .Author.FullName }}|{{ .Author.Email }}|{{ .IsAIComposed }}|{{ .SLA.Metric }}|{{ .SLA.DueIn }}|{{ .SLA.OverdueBy }}`))
+	for _, tt := range []struct {
+		name      string
+		applied   models.AppliedSLA
+		recipient umodels.User
+		want      string
+	}{
+		{
+			name: "conversation context and legacy email access",
+			applied: models.AppliedSLA{
+				ConversationReferenceNumber: "C-42",
+				ConversationSubject:         "Account <question>",
+				ConversationUUID:            "conversation-a",
+				ConversationPriority:        null.StringFrom("High"),
+				ConversationInboxName:       "Support",
+				ConversationInboxChannel:    "email",
+				ConversationContact: cmodels.ConversationContact{
+					FirstName: "Customer", LastName: "A", Email: null.StringFrom("customer@example.com"),
+				},
+			},
+			recipient: umodels.User{FirstName: "Agent", LastName: "B", Email: null.StringFrom("agent@example.com")},
+			want:      "C-42|Account &lt;question&gt;|conversation-a|High|Support|email|Customer A|customer@example.com|Agent B|agent@example.com|||||false|First response|5 minutes|2 minutes",
+		},
+		{
+			name:      "missing optional fields",
+			recipient: umodels.User{FirstName: "Agent", LastName: "B"},
+			want:      "||||||||Agent B||||||false|First response|5 minutes|2 minutes",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			data := slaNotificationTemplateData(tt.applied, tt.recipient, "First response", "5 minutes", "2 minutes")
+			var rendered strings.Builder
+			if err := content.Execute(&rendered, data); err != nil {
+				t.Fatal(err)
+			}
+			if rendered.String() != tt.want {
+				t.Fatalf("rendered = %q, want %q", rendered.String(), tt.want)
+			}
+		})
 	}
 }
 

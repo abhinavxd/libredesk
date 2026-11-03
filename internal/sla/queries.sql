@@ -251,10 +251,19 @@ SELECT a.id,
    c.uuid as conversation_uuid,
    c.reference_number as conversation_reference_number,
    c.subject as conversation_subject,
+   p.name as conversation_priority,
+   inb.name as conversation_inbox_name,
+   inb.channel::TEXT as conversation_inbox_channel,
+   ct.first_name as "conversation_contact.first_name",
+   COALESCE(ct.last_name, '') as "conversation_contact.last_name",
+   ct.email as "conversation_contact.email",
    c.assigned_user_id as conversation_assigned_user_id,
    s.name as conversation_status,
    s.category as conversation_status_category
 FROM applied_slas a INNER JOIN conversations c on a.conversation_id = c.id
+INNER JOIN inboxes inb ON c.inbox_id = inb.id
+INNER JOIN users ct ON c.contact_id = ct.id
+LEFT JOIN conversation_priorities p ON c.priority_id = p.id
 LEFT JOIN conversation_statuses s ON c.status_id = s.id
 WHERE a.id = $1;
 

@@ -8,57 +8,85 @@
     <link rel="stylesheet" href="/static/public/static/fonts.css?v={{ AssetVer }}" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: "Geist", "Inter", sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: transparent; }
-        .stars { display: flex; justify-content: center; gap: 8px; font-size: 2.2em; cursor: pointer; }
-        .star { color: #ddd; transition: color 0.15s ease, transform 0.15s ease; }
-        .star:hover, .star.sel { color: #f59e0b; transform: scale(1.15); }
-        .done { text-align: center; color: #666; font-size: 0.9em; margin-top: 0.5rem; display: none; }
+        body { font-family: "Geist", "Inter", sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100dvh; background: transparent; }
+        .stars { display: flex; justify-content: center; gap: 8px; font-size: 2.2em; }
+        .star { font: inherit; border: 0; background: transparent; cursor: pointer; padding: 4px; color: #ddd; transition: color 0.15s ease, transform 0.15s ease; }
+        .star.sel { color: #f59e0b; }
+        .star:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 4px; }
+        .star:disabled { cursor: default; }
+        @media (hover: hover) and (pointer: fine) {
+            .star:hover { color: #f59e0b; }
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            .star.sel { transform: scale(1.15); }
+        }
+        .done { text-align: center; color: #666; font-size: 0.9em; margin-top: 0.5rem; }
+        [hidden] { display: none !important; }
     </style>
 </head>
 <body>
     <div>
         {{ if .Data.CSAT.Responded }}
-        <p class="done" style="display:block">{{ L.T "globals.messages.thankYou" }}</p>
+        <p class="done" role="status">{{ L.T "globals.messages.thankYou" }}</p>
         {{ else }}
         <div class="stars" id="stars">
-            <span class="star" data-score="1">&#9733;</span>
-            <span class="star" data-score="2">&#9733;</span>
-            <span class="star" data-score="3">&#9733;</span>
-            <span class="star" data-score="4">&#9733;</span>
-            <span class="star" data-score="5">&#9733;</span>
+            <button type="button" class="star" data-score="1" aria-label="{{ L.T "globals.terms.poor" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="2" aria-label="{{ L.T "globals.terms.fair" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="3" aria-label="{{ L.T "globals.terms.good" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="4" aria-label="{{ L.T "globals.terms.great" }}"><span aria-hidden="true">&#9733;</span></button>
+            <button type="button" class="star" data-score="5" aria-label="{{ L.T "globals.terms.excellent" }}"><span aria-hidden="true">&#9733;</span></button>
         </div>
-        <p class="done" id="done">{{ L.T "globals.messages.thankYou" }}</p>
+        <p class="done" id="done" role="status" hidden>{{ L.T "globals.messages.thankYou" }}</p>
+        <p class="done" id="submitting" role="status" hidden>{{ L.T "globals.messages.submitting" }}</p>
+        <p class="done" id="error" role="alert" hidden>{{ L.T "globals.messages.somethingWentWrong" }}</p>
         <script>
         (function() {
             var uuid = '{{ .Data.CSAT.UUID }}';
             var stars = document.querySelectorAll('#stars .star');
             var done = false;
+            var submitting = false;
+            var canHover = window.matchMedia('(hover: hover) and (pointer: fine)');
 
             stars.forEach(function(s) {
                 s.addEventListener('mouseover', function(ev) {
-                    if (done) return;
-                    var score = parseInt(ev.target.dataset.score);
+                    if (done || submitting || !canHover.matches) return;
+                    var score = parseInt(ev.currentTarget.dataset.score, 10);
                     stars.forEach(function(e, i) { e.classList.toggle('sel', i < score); });
                 });
                 s.addEventListener('mouseout', function() {
-                    if (done) return;
+                    if (done || submitting || !canHover.matches) return;
                     stars.forEach(function(e) { e.classList.remove('sel'); });
                 });
-                s.addEventListener('click', function(ev) {
+                s.addEventListener('click', async function(ev) {
                     ev.preventDefault();
-                    if (done) return;
-                    done = true;
-                    var score = ev.target.dataset.score;
-                    stars.forEach(function(e, i) { e.classList.toggle('sel', i < parseInt(score)); });
-
-                    fetch('/api/v1/csat/' + uuid + '/response', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ rating: parseInt(score) })
+                    if (done || submitting) return;
+                    submitting = true;
+                    var score = parseInt(ev.currentTarget.dataset.score, 10);
+                    stars.forEach(function(e, i) {
+                        e.classList.toggle('sel', i < score);
+                        e.disabled = true;
                     });
+                    document.getElementById('stars').setAttribute('aria-busy', 'true');
+                    document.getElementById('error').hidden = true;
+                    document.getElementById('submitting').hidden = false;
 
-                    document.getElementById('stars').style.pointerEvents = 'none';
-                    document.getElementById('done').style.display = 'block';
+                    try {
+                        var response = await fetch('/api/v1/csat/' + uuid + '/response', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rating: score })
+                        });
+                        if (!response.ok) throw new Error('Submission failed');
+                        done = true;
+                        document.getElementById('done').hidden = false;
+                    } catch {
+                        document.getElementById('error').hidden = false;
+                        stars.forEach(function(e) { e.disabled = false; });
+                    } finally {
+                        submitting = false;
+                        document.getElementById('stars').setAttribute('aria-busy', 'false');
+                        document.getElementById('submitting').hidden = true;
+                    }
                 });
             });
         })();

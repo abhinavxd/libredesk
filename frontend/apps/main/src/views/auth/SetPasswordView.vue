@@ -3,7 +3,7 @@
     <Card class="bg-card box" id="set-password-container">
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
-          <CardTitle class="text-2xl font-bold text-foreground">{{
+          <CardTitle class="ui-display-heading">{{
             t('auth.setNewPassword')
           }}</CardTitle>
           <p class="text-sm text-muted-foreground">{{ t('auth.enterNewPasswordTwice') }}</p>
@@ -28,7 +28,7 @@
               <button
                 type="button"
                 :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
-                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                :class="PASSWORD_TOGGLE_CLASS"
                 @click="showPassword = !showPassword"
               >
                 <Eye v-if="!showPassword" class="w-5 h-5" />
@@ -53,7 +53,7 @@
               <button
                 type="button"
                 :aria-label="showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')"
-                class="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                :class="PASSWORD_TOGGLE_CLASS"
                 @click="showConfirmPassword = !showConfirmPassword"
               >
                 <Eye v-if="!showConfirmPassword" class="w-5 h-5" />
@@ -89,12 +89,14 @@
 </template>
 
 <script setup>
+const PASSWORD_TOGGLE_CLASS = 'absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground'
+
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import api from '../../api'
-import { useEmitter } from '../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
+import api from '@main/api'
+import { useEmitter } from '@main/composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { applyTemporaryClass } from '@/utils/temporary-class'
 import { Button } from '@shared-ui/components/ui/button'
 import { Error } from '@shared-ui/components/ui/error'

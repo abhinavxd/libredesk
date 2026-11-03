@@ -2,26 +2,32 @@
   <AdminSplitLayout>
     <template #content>
       <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="flex justify-end mb-4">
-          <Dialog v-model:open="dialogOpen">
-            <DialogTrigger as-child @click="newPrompt">
-              <Button>{{ t('admin.ai.editorPrompt.new') }}</Button>
-            </DialogTrigger>
-            <DialogContent class="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {{ isEditing ? t('admin.ai.editorPrompt.edit') : t('admin.ai.editorPrompt.new') }}
-                </DialogTitle>
-              </DialogHeader>
-              <EditorPromptForm
-                :initial-values="initialValues"
-                :is-editing="isEditing"
-                :submit-form="submitPrompt"
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+          <template #actions>
+            <Dialog v-model:open="dialogOpen">
+              <DialogTrigger as-child @click="newPrompt">
+                <Button>{{ t('admin.ai.editorPrompt.new') }}</Button>
+              </DialogTrigger>
+              <DialogContent class="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {{
+                      isEditing ? t('admin.ai.editorPrompt.edit') : t('admin.ai.editorPrompt.new')
+                    }}
+                  </DialogTitle>
+                </DialogHeader>
+                <EditorPromptForm
+                  :initial-values="initialValues"
+                  :is-editing="isEditing"
+                  :submit-form="submitPrompt"
+                />
+              </DialogContent>
+            </Dialog>
+          </template>
+        </AdminToolbar>
         <DataTable
+          v-model:search="searchTerm"
+          :searchable="false"
           :columns="createEditorPromptColumns(t, { onEdit: editPrompt })"
           :data="prompts"
           :loading="isLoading"
@@ -36,6 +42,8 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
@@ -58,6 +66,7 @@ import { useI18n } from 'vue-i18n'
 import api from '@/api'
 import { useAiPromptStore } from '@main/stores/aiPrompt'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const emitter = useEmitter()
 const aiPromptStore = useAiPromptStore()

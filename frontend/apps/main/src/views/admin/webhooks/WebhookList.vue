@@ -1,32 +1,38 @@
 <template>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-between mb-5">
-      <div></div>
-      <div>
+    <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+      <template #actions>
         <RouterLink :to="{ name: 'new-webhook' }">
-          <Button>{{
-            $t('webhook.new')
-          }}</Button>
+          <Button>{{ $t('webhook.new') }}</Button>
         </RouterLink>
-      </div>
-    </div>
+      </template>
+    </AdminToolbar>
     <div>
-      <DataTable :columns="createColumns(t)" :data="webhooks" :loading="isLoading" />
+      <DataTable
+        v-model:search="searchTerm"
+        :searchable="false"
+        :columns="createColumns(t)"
+        :data="webhooks"
+        :loading="isLoading"
+      />
     </div>
   </LoadingOverlay>
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
-import { createColumns } from '../../../features/admin/webhooks/dataTableColumns.js'
+import { createColumns } from '@/features/admin/webhooks/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
-import { useEmitter } from '../../../composables/useEmitter'
+import { useEmitter } from '@/composables/useEmitter'
 import { useI18n } from 'vue-i18n'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import api from '../../../api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import api from '@/api'
 
+const searchTerm = ref('')
 const webhooks = ref([])
 const { t } = useI18n()
 const isLoading = ref(false)

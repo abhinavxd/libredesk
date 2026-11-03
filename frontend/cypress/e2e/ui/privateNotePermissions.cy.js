@@ -242,7 +242,7 @@ describe('Private note permissions', () => {
         cy.contains('button', /^Private note$/).should('have.attr', 'data-state', 'active')
       }
 
-      cy.get('button.w-11.h-11.p-0').click()
+      cy.get('button[aria-label="More actions"]').click()
       cy.contains('[role="menuitem"]', 'Download transcript').should('exist')
       cy.contains('[role="menuitem"]', 'Summarize with AI').should(
         combination.canPrivateNote ? 'exist' : 'not.exist'

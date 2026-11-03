@@ -1,37 +1,45 @@
 <template>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-end mb-5 gap-2">
-      <Importer
-        entity-key="globals.terms.agent"
-        :upload-fn="api.importAgents"
-        :get-status-fn="api.getAgentImportStatus"
-        @import-complete="getData"
-      >
-        <template #csv-example>
-          <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
-            <div>first_name,last_name,email,roles,teams</div>
-            <div>John,Doe,john@example.com,Agent,Sales</div>
-            <div>Jane,Smith,jane@example.com,Admin,Support</div>
-            <div>Bob,Test,bob@example.com,"Agent,Admin",Support</div>
-          </div>
-          <p class="text-xs mt-2 text-muted-foreground">
-            {{ $t('importer.agentCaseSensitiveNote') }}
-          </p>
-        </template>
-      </Importer>
-      <router-link :to="{ name: 'new-agent' }">
-        <Button>{{
-          $t('agent.new')
-        }}</Button>
-      </router-link>
-    </div>
+    <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+      <template #actions>
+        <Importer
+          entity-key="globals.terms.agent"
+          :upload-fn="api.importAgents"
+          :get-status-fn="api.getAgentImportStatus"
+          @import-complete="getData"
+        >
+          <template #csv-example>
+            <div class="bg-muted p-3 rounded-md text-xs font-mono overflow-x-auto leading-relaxed">
+              <div>first_name,last_name,email,roles,teams</div>
+              <div>John,Doe,john@example.com,Agent,Sales</div>
+              <div>Jane,Smith,jane@example.com,Admin,Support</div>
+              <div>Bob,Test,bob@example.com,"Agent,Admin",Support</div>
+            </div>
+            <p class="text-xs mt-2 text-muted-foreground">
+              {{ $t('importer.agentCaseSensitiveNote') }}
+            </p>
+          </template>
+        </Importer>
+        <router-link :to="{ name: 'new-agent' }">
+          <Button>{{ $t('agent.new') }}</Button>
+        </router-link>
+      </template>
+    </AdminToolbar>
     <div>
-      <DataTable :columns="createColumns(t)" :data="data" :loading="isLoading" />
+      <DataTable
+        v-model:search="searchTerm"
+        :searchable="false"
+        :columns="createColumns(t)"
+        :data="data"
+        :loading="isLoading"
+      />
     </div>
   </LoadingOverlay>
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { onMounted, onUnmounted, ref } from 'vue'
 import { createColumns } from '@/features/admin/agents/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
@@ -45,6 +53,7 @@ import Importer from '@/components/importer/Importer.vue'
 import api from '@/api'
 
 const isLoading = ref(false)
+const searchTerm = ref('')
 const { t } = useI18n()
 const data = ref([])
 const emitter = useEmitter()

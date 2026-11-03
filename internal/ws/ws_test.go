@@ -1,8 +1,11 @@
 package ws
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/zerodha/logf"
 )
 
@@ -79,4 +82,24 @@ func TestRetainSubscribersDropsRevokedAccess(t *testing.T) {
 		t.Fatal("revoked subscriptions were retained")
 	}
 	h.RetainSubscribers("missing", nil /** allowedAgentIDs **/)
+}
+
+func TestClientBufferDropIsVisible(t *testing.T) {
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	client := &Client{ID: 7, Hub: NewHub(&lo, nil /** userStore **/), Send: make(chan models.WSMessage, 1)}
+	client.SendMessage([]byte("first"), 1 /** typ **/)
+	if logs.Len() != 0 {
+		t.Fatal("successful enqueue produced a warning")
+	}
+	client.SendMessage([]byte("second"), 1 /** typ **/)
+	if !strings.Contains(logs.String(), "level=warn") || !strings.Contains(logs.String(), "client_id=7") {
+		t.Fatalf("missing drop warning: %s", logs.String())
+	}
+	logs.Reset()
+	client.close()
+	client.SendMessage([]byte("closed"), 1 /** typ **/)
+	if logs.Len() != 0 {
+		t.Fatal("normal closed connection produced a warning")
+	}
 }

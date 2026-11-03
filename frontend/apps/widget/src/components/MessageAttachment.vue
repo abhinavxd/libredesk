@@ -5,18 +5,16 @@
       :key="attachment.uuid"
       class="flex items-center cursor-pointer"
     > 
-      <!-- Image preview -->
       <div v-if="isImage(attachment)" class="relative">
         <img
           :src="getThumbnailUrl(attachment)"
           :alt="attachment.name"
           class="max-w-48 max-h-32 rounded-md object-cover"
-          @error="fallbackToOriginal($event, attachment.url)"
+          @error="failedThumbnails.add(attachment.uuid)"
           @click="openImage(attachment.url)"
         />
       </div>
 
-      <!-- File attachment -->
       <div
         v-else
         class="flex items-center gap-2 p-2 bg-muted rounded-md border border-border hover:bg-muted/80 transition-colors"
@@ -35,6 +33,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { File } from 'lucide-vue-next';
 import { formatBytes, getThumbFilepath } from '@shared-ui/utils/file';
 defineProps({
@@ -44,19 +43,15 @@ defineProps({
   }
 })
 
+const failedThumbnails = ref(new Set())
+
 const isImage = (attachment) => {
   return attachment.content_type && attachment.content_type.startsWith('image/')
 }
 
 const getThumbnailUrl = (attachment) => {
-  if (!isImage(attachment)) return attachment.url
+  if (!isImage(attachment) || failedThumbnails.value.has(attachment.uuid)) return attachment.url
   return attachment.thumbnail_url || getThumbFilepath(attachment.url)
-}
-
-const fallbackToOriginal = (event, originalUrl) => {
-  if (event.target.dataset.originalFallback) return
-  event.target.dataset.originalFallback = 'true'
-  event.target.src = originalUrl
 }
 
 const openImage = (url) => {

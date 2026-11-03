@@ -51,10 +51,15 @@ describe('Team form', () => {
 
     cy.visit(newPath)
 
-    // Pick the required emoji first so the next click closes the picker overlay.
-    cy.get('input[name="emoji"]').click()
-    cy.get('.v3-emoji-picker .v3-emojis button').first().click()
+    cy.contains('label', 'Emoji').invoke('attr', 'for').then((id) => {
+      cy.get(`[id="${id}"]`).should('contain.text', '👥')
+    })
 
+    cy.get('input[name="name"]').then(($name) => {
+      const grid = $name.closest('.team-settings-grid')
+      const assignment = grid.find('select[name="conversation_assignment_type"]').siblings('button')[0]
+      expect(Math.abs($name[0].getBoundingClientRect().width - assignment.getBoundingClientRect().width)).to.be.lessThan(2)
+    })
     cy.get('input[name="name"]').type(teamName)
     pickOption('conversation_assignment_type', 'Round robin')
     cy.get('input[name="max_auto_assigned_conversations"]').clear().type('7')
@@ -64,6 +69,7 @@ describe('Team form', () => {
     cy.get('button[type="submit"]').click()
     cy.wait('@createTeam').then(({ response }) => {
       expect(response.statusCode).to.eq(200)
+      expect(response.body.data.emoji).to.eq('👥')
       teamId = response.body.data.id
     })
 
@@ -79,7 +85,9 @@ describe('Team form', () => {
 
     cy.get('input[name="name"]').should('have.value', teamName)
     cy.get('input[name="max_auto_assigned_conversations"]').should('have.value', '7')
-    cy.get('input[name="emoji"]').should('not.have.value', '')
+    cy.contains('label', 'Emoji').invoke('attr', 'for').then((id) => {
+      cy.get(`[id="${id}"]`).invoke('text').should('not.be.empty')
+    })
     cy.get('select[name="conversation_assignment_type"]').should('have.value', 'Round robin')
     cy.get('select[name="timezone"]').should('have.value', 'UTC')
     cy.get('select[name="business_hours_id"]').should('have.value', String(businessHoursId))

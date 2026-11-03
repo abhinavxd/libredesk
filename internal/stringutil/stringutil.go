@@ -355,6 +355,15 @@ func SplitName(name string) (string, string) {
 	return fields[0], strings.Join(fields[1:], " ")
 }
 
+// CapitalizeFirst uppercases the first letter of s and leaves the rest unchanged.
+func CapitalizeFirst(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + s[size:]
+}
+
 func htmlToText(html string, opts html2text.Options) string {
 	out, err := html2text.FromString(html, opts)
 	if err != nil {

@@ -191,7 +191,7 @@
         </FormItem>
       </FormField>
 
-      <div :class="[ROW_CLASS, 'grid grid-cols-1 sm:grid-cols-2 sm:gap-4']">
+      <div :class="[ROW_CLASS, 'grid grid-cols-1 gap-y-1 py-1 sm:grid-cols-2 sm:gap-4']">
         <FormField v-slot="{ componentField }" name="team_id">
           <FormItem class="flex items-center gap-2 min-w-0 space-y-0">
             <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.team', 1) }}</FormLabel>

@@ -248,6 +248,28 @@ describe('Email Inbox Form Schema', () => {
         }
     })
 
+    test('unauthenticated SMTP accepts empty and omitted credentials', () => {
+        for (const credential of ['', undefined]) {
+            expect(() => schema.parse(withSmtp({
+                auth_protocol: 'none', username: credential, password: credential
+            }))).not.toThrow()
+        }
+    })
+
+    test('authenticated SMTP requires both credentials', () => {
+        for (const auth_protocol of ['login', 'cram', 'plain']) {
+            for (const field of ['username', 'password']) {
+                for (const credential of ['', undefined]) {
+                    const result = schema.safeParse(withSmtp({ auth_protocol, [field]: credential }))
+                    expect(result.success).toBe(false)
+                    expect(result.error.issues).toEqual(expect.arrayContaining([
+                        expect.objectContaining({ path: ['smtp', field] })
+                    ]))
+                }
+            }
+        }
+    })
+
     test('smtp hello_hostname optional', () => {
         expect(() => schema.parse(withSmtp({ hello_hostname: 'desk.example.com' }))).not.toThrow()
     })

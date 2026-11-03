@@ -198,6 +198,7 @@ func (c *Client) trySend(msg models.WSMessage) bool {
 	case c.Send <- msg:
 		return true
 	default:
+		c.Hub.lo.Warn("client outgoing buffer full, dropping update", "client_id", c.ID, "queue_length", len(c.Send))
 		return false
 	}
 }

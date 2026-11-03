@@ -12,7 +12,7 @@
 
         <div class="space-y-4 flex-2">
           <div class="flex items-center gap-3">
-            <h3 class="text-lg font-semibold text-foreground">
+            <h3 class="ui-heading">
               {{ props.initialValues.first_name }} {{ props.initialValues.last_name }}
             </h3>
             <Badge :class="['px-2 rounded-full text-xs font-medium', availabilityStatus.color]">
@@ -24,7 +24,7 @@
             <div class="flex items-center gap-2">
               <Clock class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="text-sm text-muted-foreground">{{ $t('globals.terms.lastActive') }}</p>
+                <p class="ui-description">{{ $t('globals.terms.lastActive') }}</p>
                 <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_active_at
@@ -37,7 +37,7 @@
             <div class="flex items-center gap-2">
               <LogIn class="w-5 h-5 text-muted-foreground" />
               <div>
-                <p class="text-sm text-muted-foreground">{{ $t('globals.terms.lastLogin') }}</p>
+                <p class="ui-description">{{ $t('globals.terms.lastLogin') }}</p>
                 <p class="text-sm font-medium text-foreground">
                   {{
                     props.initialValues.last_login_at
@@ -65,8 +65,8 @@
     </FormField>
 
     <!-- Form Fields -->
-    <div class="grid gap-6 md:grid-cols-2">
-      <FormField v-slot="{ field }" name="first_name">
+    <FormGrid
+      ><FormField v-slot="{ field }" name="first_name">
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.firstName') }}</FormLabel>
           <FormControl>
@@ -75,7 +75,6 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
       <FormField v-slot="{ field }" name="last_name">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.lastName') }}</FormLabel>
@@ -85,7 +84,6 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
       <FormField v-slot="{ field }" name="email">
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.email') }}</FormLabel>
@@ -93,10 +91,10 @@
             <Input type="email" placeholder="" v-bind="field" />
           </FormControl>
           <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField, handleChange }" name="teams">
+        </FormItem> </FormField
+    ></FormGrid>
+    <FormGrid
+      ><FormField v-slot="{ componentField, handleChange }" name="teams">
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.team', 2) }}</FormLabel>
           <FormControl>
@@ -110,7 +108,6 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
       <FormField v-slot="{ componentField, handleChange }" name="roles">
         <FormItem v-auto-animate>
           <FormLabel>{{ $t('globals.terms.role', 2) }}</FormLabel>
@@ -125,7 +122,6 @@
           <FormMessage />
         </FormItem>
       </FormField>
-
       <FormField v-slot="{ componentField }" name="availability_status" v-if="!isNewForm">
         <FormItem>
           <FormLabel>{{ t('globals.terms.availabilityStatus') }}</FormLabel>
@@ -146,19 +142,17 @@
             </Select>
           </FormControl>
           <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ field }" name="new_password" v-if="!isNewForm">
-        <FormItem v-auto-animate>
-          <FormLabel>{{ t('globals.terms.setPassword') }}</FormLabel>
-          <FormControl>
-            <Input type="password" placeholder="" v-bind="field" />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
+        </FormItem> </FormField
+    ></FormGrid>
+    <FormField v-slot="{ field }" name="new_password" v-if="!isNewForm">
+      <FormItem class="max-w-xl">
+        <FormLabel>{{ t('globals.terms.setPassword') }}</FormLabel>
+        <FormControl>
+          <Input type="password" placeholder="" v-bind="field" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <!-- API Key Management Section -->
     <div class="bg-muted/30 box p-4 space-y-4" v-if="!isNewForm">
@@ -168,7 +162,7 @@
           <p class="text-base font-semibold text-foreground">
             {{ $t('globals.terms.apiKey', 2) }}
           </p>
-          <p class="text-sm text-muted-foreground">
+          <p class="ui-description">
             {{ $t('admin.agent.apiKey.description') }}
           </p>
         </div>
@@ -218,7 +212,7 @@
       <!-- No API Key State -->
       <div v-else class="text-center py-6">
         <Key class="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-        <p class="text-sm text-muted-foreground mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
+        <p class="ui-description mb-3">{{ $t('admin.agent.apiKey.noKey') }}</p>
         <Button type="button" @click="generateAPIKey" :disabled="isAPIKeyLoading">
           <Plus class="w-4 h-4" />
           {{ $t('agent.generateApiKey') }}
@@ -269,7 +263,9 @@
           </Alert>
         </div>
         <DialogFooter>
-          <Button @click="closeAPIKeyModal">{{ $t('globals.messages.close') }}</Button>
+          <Button type="button" @click="closeAPIKeyModal">{{
+            $t('globals.messages.close')
+          }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -291,6 +287,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, onMounted, ref, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -330,10 +327,10 @@ import {
 } from '@shared-ui/components/ui/dialog/index.js'
 import { Alert, AlertDescription, AlertTitle } from '@shared-ui/components/ui/alert/index.js'
 import { useI18n } from 'vue-i18n'
-import { useEmitter } from '../../../composables/useEmitter.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter.js'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { format } from 'date-fns'
-import api from '../../../api/index.js'
+import api from '@main/api/index.js'
 
 const props = defineProps({
   initialValues: {

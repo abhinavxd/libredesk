@@ -197,7 +197,7 @@ func handleApplyMacro(r *fastglue.Request) error {
 
 	// Decode incoming actions.
 	if err := r.Decode(&incomingActions, "json"); err != nil {
-		app.lo.Error("error unmashalling incoming actions", "error", err)
+		app.lo.Debug("macro request rejected: invalid actions JSON", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), err.Error(), envelope.InputError)
 	}
 

@@ -68,14 +68,14 @@ describe('Live chat widget config applied end to end', () => {
     cy.createLivechatInbox(withStart({ show_powered_by: true })).then((inbox) => {
       cy.openWidget(inbox)
       cy.widgetBody().contains(startText).click()
-      cy.widgetBody().find('a[href="https://libredesk.io"]').should('exist')
+      cy.widgetBody().find('a[href="https://libredesk.io/"]').should('exist')
     })
 
     cy.createLivechatInbox(withStart({ show_powered_by: false })).then((inbox) => {
       cy.openWidget(inbox)
       cy.widgetBody().contains(startText).click()
       cy.widgetBody().find('textarea').should('be.visible')
-      cy.widgetBody().find('a[href="https://libredesk.io"]').should('not.exist')
+      cy.widgetBody().find('a[href="https://libredesk.io/"]').should('not.exist')
     })
   })
 

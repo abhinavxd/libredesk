@@ -168,7 +168,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 		To:          m.To,
 		Cc:          m.CC,
 		Bcc:         m.BCC,
-		Subject:     m.Subject,
+		Subject:     strings.Join(strings.Fields(m.Subject), " "),
 		Attachments: attachments,
 		Headers:     textproto.MIMEHeader{},
 	}

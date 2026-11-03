@@ -324,7 +324,7 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
-		app.lo.Error("error parsing form data", "error", err)
+		app.lo.Debug("error parsing form data", "error", err)
 		return models.User{}, nil, envelope.NewError(envelope.GeneralError, app.i18n.T("errors.parsingRequest"), nil)
 	}
 

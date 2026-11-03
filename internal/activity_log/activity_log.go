@@ -194,12 +194,10 @@ func (al *Manager) UserAvailability(actorID int, actorEmail, status, ip, targetE
 		}
 	case umodels.AwayManual:
 		if err := al.Away(actorID, actorEmail, ip, targetID, targetEmail); err != nil {
-			al.lo.Error("error logging away activity", "error", err)
 			return err
 		}
 	case umodels.AwayAndReassigning:
 		if err := al.AwayReassigned(actorID, actorEmail, ip, targetID, targetEmail); err != nil {
-			al.lo.Error("error logging away and reassigning activity", "error", err)
 			return err
 		}
 	}
@@ -298,7 +296,7 @@ func (al *Manager) ContactDataExported(actorID int, actorEmail, ip string, conta
 // create creates a new activity log in DB.
 func (m *Manager) create(activityType, activityDescription string, actorID int, targetModelType string, targetModelID int, ip string) error {
 	if _, err := m.q.InsertActivity.Exec(activityType, activityDescription, actorID, targetModelType, targetModelID, ip); err != nil {
-		m.lo.Error("error inserting activity log", "error", err)
+		m.lo.Error("error inserting activity log", "actor_id", actorID, "target_model", targetModelType, "target_id", targetModelID, "activity_type", activityType, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return nil

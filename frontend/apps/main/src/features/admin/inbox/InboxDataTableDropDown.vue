@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only"></span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="editInbox(props.inbox.id)">
         <Pencil class="mr-2 h-4 w-4" />
@@ -49,14 +44,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
+import { Pencil, Power, PowerOff, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -68,7 +63,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 
 const alertOpen = ref(false)
 const props = defineProps({

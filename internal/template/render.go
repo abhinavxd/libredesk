@@ -2,10 +2,14 @@ package template
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
+	"text/template/parse"
 
+	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/valyala/fasthttp"
 )
 
@@ -32,15 +36,8 @@ const (
 // RenderString renders Go template variables in the given content string
 // without wrapping it in the base email template. Returns original content on any error.
 func (m *Manager) RenderString(data any, content string) string {
-	t, err := template.New("content").Funcs(m.funcMap).Parse(content)
-	if err != nil {
-		return content
-	}
-	var buf strings.Builder
-	if err := t.Execute(&buf, data); err != nil {
-		return content
-	}
-	return buf.String()
+	rendered, _ := renderString(data, content, m.funcMap)
+	return rendered
 }
 
 // RenderStoredTemplate fetches a template by name and renders its body with the provided data
@@ -50,16 +47,20 @@ func (m *Manager) RenderStoredTemplate(name string, data any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return m.RenderString(data, tmpl.Body), nil
+	rendered, err := renderString(data, tmpl.Body, m.funcMap)
+	if err != nil {
+		m.lo.Warn("saved template interpolation failed, using original content", "template", name, "error", err)
+	}
+	return rendered, nil
 }
 
-// RenderEmailWithTemplate renders content inside the default outgoing email template.
+// RenderEmailWithTemplate places content verbatim inside the default outgoing email template.
 func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	defaultTmpl, err := m.getDefaultOutgoingEmailTemplate()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrTemplateNotFound) {
 		m.lo.Error("error fetching default outgoing email template", "error", err)
 	}
 
@@ -72,7 +73,17 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 		return "", fmt.Errorf("parsing base template: %w", err)
 	}
 
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Parse(content)
+	// The reply is already rendered and can hold contact-supplied text, so it is inserted as a value and never parsed as a template.
+	contentCount := 0
+	contentFuncs := template.FuncMap{
+		"_libredeskTrackContent": func() string {
+			contentCount++
+			return ""
+		},
+		"_libredeskReplyContent": func() string { return content },
+	}
+	baseTemplate.Funcs(contentFuncs)
+	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Funcs(contentFuncs).Parse(`{{_libredeskTrackContent}}{{_libredeskReplyContent}}`)
 	if err != nil {
 		return "", fmt.Errorf("parsing content template: %w", err)
 	}
@@ -87,10 +98,12 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 		return "", fmt.Errorf("executing base template: %w", err)
 	}
 
+	if contentCount == 0 {
+		return "", fmt.Errorf("outgoing template did not render the reply")
+	}
 	return rendered.String(), nil
 }
 
-// RenderStoredEmailTemplate fetches and renders an email template from the database, including subject and body and returns the rendered content.
 func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, string, error) {
 	tmpl, err := m.getByName(name)
 	if err != nil {
@@ -112,33 +125,9 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 		return sb.String(), nil
 	}
 
-	defaultTmpl, err := m.getDefaultOutgoingEmailTemplate()
+	content, err := m.RenderNotificationEmail(tmpl.Body, data)
 	if err != nil {
-		m.lo.Error("error fetching default outgoing email template", "error", err)
-	}
-
-	if defaultTmpl.Body == "" {
-		defaultTmpl.Body = `{{ template "content" . }}`
-	}
-
-	baseTemplate, err := template.New(TmplBase).Funcs(m.funcMap).Parse(defaultTmpl.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("parsing base template: %w", err)
-	}
-
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Parse(tmpl.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("parsing content template: %w", err)
-	}
-
-	baseTemplate, err = baseTemplate.AddParseTree(TmplContent, contentTemplate.Tree)
-	if err != nil {
-		return "", "", fmt.Errorf("adding content template: %w", err)
-	}
-
-	var rendered strings.Builder
-	if err := baseTemplate.ExecuteTemplate(&rendered, TmplBase, data); err != nil {
-		return "", "", fmt.Errorf("executing base template: %w", err)
+		return "", "", err
 	}
 
 	subject, err := executeSubjectTemplate(tmpl.Subject.String)
@@ -146,7 +135,7 @@ func (m *Manager) RenderStoredEmailTemplate(name string, data any) (string, stri
 		return "", "", err
 	}
 
-	return rendered.String(), subject, nil
+	return content, subject, nil
 }
 
 // RenderInMemoryTemplate executes an in-memory template with data and returns the rendered content.
@@ -172,4 +161,122 @@ func (m *Manager) RenderWebPage(ctx *fasthttp.RequestCtx, tmplFile string, data 
 	ctx.Response.Header.Set("Pragma", "no-cache")
 	ctx.Response.Header.Set("Expires", "0")
 	return m.webTpls.ExecuteTemplate(ctx, tmplFile, data)
+}
+
+func (m *Manager) RenderNotificationEmail(content string, data any) (string, error) {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	if m.notificationTpls == nil {
+		return "", fmt.Errorf("notification templates are not loaded")
+	}
+	tmpl, err := m.notificationTpls.Clone()
+	if err != nil {
+		return "", fmt.Errorf("cloning notification templates: %w", err)
+	}
+	tmpl.Funcs(m.funcMap)
+	if _, err := tmpl.New(TmplContent).Parse(content); err != nil {
+		return "", fmt.Errorf("parsing notification content: %w", err)
+	}
+	tmpl, err = tmpl.New(TmplBase).Parse(`{{ template "header" . }}{{ template "content" . }}{{ template "footer" . }}`)
+	if err != nil {
+		return "", fmt.Errorf("parsing notification layout: %w", err)
+	}
+	var rendered strings.Builder
+	if err := tmpl.ExecuteTemplate(&rendered, TmplBase, data); err != nil {
+		return "", fmt.Errorf("rendering notification email: %w", err)
+	}
+	return rendered.String(), nil
+}
+
+func BuildConversationData(conversation cmodels.Conversation, recipient, author umodels.User) map[string]any {
+	isAIComposed := author.Type == umodels.UserTypeAIAssistant
+	authorData := personData(author)
+	if author.IsSystemUser() {
+		authorData = personData(umodels.User{})
+		authorData["FullName"] = ""
+	}
+	return map[string]any{
+		"Conversation": map[string]any{
+			"ReferenceNumber": conversation.ReferenceNumber,
+			"Subject":         conversation.Subject.String,
+			"Priority":        conversation.Priority.String,
+			"UUID":            conversation.UUID,
+		},
+		"Inbox": map[string]any{
+			"Name":    conversation.InboxName,
+			"Channel": conversation.InboxChannel,
+		},
+		"Contact": map[string]any{
+			"FirstName": conversation.Contact.FirstName,
+			"LastName":  conversation.Contact.LastName,
+			"FullName":  conversation.Contact.FullName(),
+			"Email":     conversation.Contact.Email.String,
+		},
+		"Recipient":    personData(recipient),
+		"Author":       authorData,
+		"IsAIComposed": isAIComposed,
+	}
+}
+
+func personData(person umodels.User) map[string]any {
+	return map[string]any{
+		"FirstName": person.FirstName,
+		"LastName":  person.LastName,
+		"FullName":  person.FullName(),
+		"Email":     person.Email.String,
+	}
+}
+
+// parseOutgoingTemplate checks syntax and requires a reply placeholder. Rendering checks that the reply actually appears.
+func parseOutgoingTemplate(body string, funcs template.FuncMap) (*template.Template, error) {
+	tmpl, err := template.New(TmplBase).Funcs(funcs).Parse(body)
+	if err != nil {
+		return nil, err
+	}
+	count := 0
+	for _, part := range tmpl.Templates() {
+		count += countContentTemplates(part.Tree.Root)
+	}
+	if count == 0 {
+		return nil, fmt.Errorf("outgoing template contains no reply template")
+	}
+	return tmpl, nil
+}
+
+func countContentTemplates(node parse.Node) int {
+	switch node := node.(type) {
+	case *parse.TemplateNode:
+		if node.Name == TmplContent {
+			return 1
+		}
+	case *parse.ListNode:
+		if node == nil {
+			return 0
+		}
+		count := 0
+		for _, child := range node.Nodes {
+			count += countContentTemplates(child)
+		}
+		return count
+	case *parse.IfNode:
+		return countContentTemplates(node.List) + countContentTemplates(node.ElseList)
+	case *parse.RangeNode:
+		return countContentTemplates(node.List) + countContentTemplates(node.ElseList)
+	case *parse.WithNode:
+		return countContentTemplates(node.List) + countContentTemplates(node.ElseList)
+	}
+	return 0
+}
+
+func renderString(data any, content string, funcs template.FuncMap) (string, error) {
+	t, err := template.New("content").Funcs(funcs).Parse(content)
+	if err != nil {
+		return content, err
+	}
+	var buf strings.Builder
+	if err := t.Execute(&buf, data); err != nil {
+		return content, err
+	}
+	return buf.String(), nil
 }

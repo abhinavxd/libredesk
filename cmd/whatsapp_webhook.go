@@ -136,7 +136,7 @@ func processWhatsAppPayload(ctx context.Context, app *App, inboxID int, payload 
 	}
 
 	for _, st := range payload.ExtractStatuses() {
-		if err := app.conversation.ApplyWhatsAppStatus(st.MessageID, st.Status, st.Timestamp, st.UserMsg); err != nil {
+		if err := app.conversation.ApplyWhatsAppStatus(st.MessageID, st.Status, st.Timestamp, st.UserMsg, st.ErrorCode); err != nil {
 			if errors.Is(err, conversation.ErrMessageNotFound) && time.Since(st.Timestamp) > whatsAppStatusNotFoundGrace {
 				app.lo.Warn("dropping whatsapp status for unknown message", "wa_message_id", st.MessageID, "status", st.Status, "event_at", st.Timestamp)
 			} else {

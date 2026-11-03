@@ -1,11 +1,9 @@
 <template>
-  <div class="space-y-2">
+  <div class="min-w-0 space-y-2 text-sm">
     <div class="flex justify-between items-start">
-      <div class="relative">
-        <Avatar class="size-20">
-          <AvatarImage
-            :src="conversation?.contact?.avatar_url || ''"
-          />
+      <div class="relative shrink-0">
+        <Avatar class="size-14">
+          <AvatarImage :src="conversation?.contact?.avatar_url || ''" />
           <AvatarFallback>
             {{ conversation?.contact?.first_name?.toUpperCase().substring(0, 2) }}
           </AvatarFallback>
@@ -14,17 +12,22 @@
           v-if="isLivechat"
           :status="contactStatus"
           size="lg"
-          class="absolute bottom-1 right-1 border-2 border-background"
+          class="absolute -bottom-[3px] -right-[3px]"
         />
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-11 w-11 md:h-7 md:w-7"
-        @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
-      >
-        <ViewVerticalIcon />
-      </Button>
+      <div class="flex items-center gap-1">
+        <slot name="actions" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          class="h-11 w-11 text-muted-foreground hover:text-foreground focus-visible:text-foreground lg:h-7 lg:w-7 [&_svg]:size-3.5"
+          :aria-label="t('globals.terms.collapse')"
+          @click="emitter.emit(EMITTER_EVENTS.CONVERSATION_SIDEBAR_TOGGLE)"
+        >
+          <ViewVerticalIcon aria-hidden="true" />
+        </Button>
+      </div>
     </div>
 
     <div class="min-h-6 flex items-center gap-2">
@@ -33,12 +36,12 @@
         :to="{ name: 'contact-detail', params: { id: conversation.contact_id } }"
         class="flex min-w-0 items-center gap-2 hover:underline cursor-pointer"
       >
-        <span class="min-w-0 break-words">
+        <span class="min-w-0 font-medium [overflow-wrap:anywhere]">
           {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
         </span>
         <ExternalLink size="16" class="text-muted-foreground flex-shrink-0" />
       </router-link>
-      <span v-else class="min-w-0 break-words">
+      <span v-else class="min-w-0 font-medium [overflow-wrap:anywhere]">
         {{ conversation?.contact?.first_name + ' ' + conversation?.contact?.last_name }}
       </span>
     </div>
@@ -57,7 +60,10 @@
         <span class="sidebar-value min-w-0 truncate" :title="conversation.contact.email">
           {{ conversation.contact.email }}
         </span>
-        <CopyButton :text="conversation.contact.email" class="h-6 w-6 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5" />
+        <CopyButton
+          :text="conversation.contact.email"
+          class="h-6 w-6 shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5"
+        />
       </template>
       <span v-else class="sidebar-label">
         {{ t('conversation.sidebar.notAvailable') }}
@@ -65,13 +71,13 @@
     </div>
     <div class="flex gap-2 items-center">
       <Phone size="16" class="text-muted-foreground flex-shrink-0" />
-      <span class="sidebar-value">
+      <span class="sidebar-value min-w-0 [overflow-wrap:anywhere]">
         {{ phoneNumber }}
       </span>
     </div>
     <div class="flex gap-2 items-center" v-if="conversation?.contact?.external_user_id">
       <IdCard size="16" class="text-muted-foreground flex-shrink-0" />
-      <span class="sidebar-value">
+      <span class="sidebar-value min-w-0 [overflow-wrap:anywhere]">
         {{ conversation.contact.external_user_id }}
       </span>
     </div>
@@ -201,7 +207,7 @@ onMounted(async () => {
     const resp = await api.getActiveContextLinks()
     contextLinks.value = resp.data.data || []
   } catch {
-    // Silently ignore — context links are optional.
+    return
   }
 })
 
@@ -213,7 +219,7 @@ const openContextLink = async (app) => {
     const resp = await api.getContextLinkURL(app.id, uuid)
     window.open(resp.data.data, '_blank', 'noopener,noreferrer')
   } catch {
-    // Silently ignore.
+    return
   } finally {
     loadingAppId.value = null
   }

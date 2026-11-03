@@ -6,7 +6,7 @@ const newPath = '/admin/inboxes/new'
 
 const openNewForm = () => {
   cy.visit(newPath)
-  cy.contains('h3', /^WhatsApp$/).click()
+  cy.contains('button', 'WhatsApp').click()
 }
 
 describe('WhatsApp inbox form', () => {
@@ -27,9 +27,7 @@ describe('WhatsApp inbox form', () => {
     cy.get('input[name="config.webhook_verify_token"]').should('exist')
     cy.get('input[name="config.api_version"]').should('have.value', 'v26.0')
 
-    // The callback URL only exists once the inbox has an id.
-    cy.contains('Save the inbox to generate the webhook URL.').scrollIntoView()
-    cy.contains('Save the inbox to generate the webhook URL.').should('be.visible')
+    cy.contains('Callback URL').should('not.exist')
   })
 
   it('keeps the CSAT template fields hidden until CSAT surveys are on', () => {

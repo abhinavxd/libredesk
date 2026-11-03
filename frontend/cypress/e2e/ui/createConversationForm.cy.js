@@ -34,7 +34,8 @@ describe('Create conversation dialog', () => {
   const typeBody = (text) =>
     cy.get('[role="dialog"]').find('.tiptap.ProseMirror').click().type(text)
 
-  const submit = () => cy.get('[role="dialog"]').find('button[type="submit"]').click()
+  const submit = () =>
+    cy.get('[role="dialog"]').find('button[type="submit"]:visible').should('have.length', 1).click()
 
   before(() => {
     cy.login()
@@ -208,7 +209,7 @@ describe('Create conversation dialog', () => {
     cy.get('[role="dialog"]').within(() => {
       cy.get('input[type="email"]').type(newEmail)
       cy.get('input[name="subject"]').type(subject)
-      cy.get('button[type="submit"]').click()
+      cy.get('button[type="submit"]:visible').should('have.length', 1).click()
       cy.contains(/required/i).should('exist')
     })
     cy.get('@createConversation.all').should('have.length', 0)

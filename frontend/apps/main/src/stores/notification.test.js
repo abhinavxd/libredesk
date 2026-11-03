@@ -21,6 +21,23 @@ beforeEach(() => {
 })
 
 describe('conversation read refresh', () => {
+  it('marks only matching assignment alerts read and counts each alert once', () => {
+    const store = useNotificationStore()
+    store.notifications = [
+      { ...notification(1, 'conversation-a'), notification_type: 'assignment' },
+      { ...notification(2, 'conversation-a'), notification_type: 'new_reply' },
+      { ...notification(3, 'conversation-b'), notification_type: 'assignment' }
+    ]
+    store.unreadCount = 3
+
+    store.markAssignmentAsReadForConversation('conversation-a')
+    store.markAssignmentAsReadForConversation('conversation-a')
+
+    expect(store.notifications.map(alert => alert.is_read)).toEqual([true, false, false])
+    expect(store.unreadCount).toBe(2)
+    expect(getNotifications).not.toHaveBeenCalled()
+  })
+
   it('reloads the list only when it shows an unread alert for the conversation', () => {
     const store = useNotificationStore()
     store.notifications = [notification(1, 'conversation-a', true), notification(2, 'conversation-b')]

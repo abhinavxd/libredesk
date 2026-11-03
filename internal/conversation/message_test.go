@@ -6,14 +6,15 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -790,7 +791,7 @@ func TestInlineArticleReferences(t *testing.T) {
 	if strings.Contains(mailContent, "ld-cite:") || strings.Contains(mailContent, "<sup>") {
 		t.Fatalf("email retained widget markers: %s", mailContent)
 	}
-	if !strings.Contains(data["ArticleReferences"].(string), ">(1)</a>") {
+	if !strings.Contains(mailContent, ">(1)</a>") {
 		t.Fatal("email lost its numbered references")
 	}
 }
@@ -808,6 +809,33 @@ func TestArticleReferencePublicURL(t *testing.T) {
 		if got := reference.PublicURL(tt.root); got != tt.want {
 			t.Errorf("PublicURL(%q, %q) = %q, want %q", tt.root, tt.custom, got, tt.want)
 		}
+	}
+}
+
+func TestContinuityEmailSubject(t *testing.T) {
+	m := &Manager{subjectRefFormat: "#{ref}"}
+	for _, tt := range []struct {
+		name, text, saved, want string
+	}{
+		{"multiline", " Hello\n\n\tthere\r\nfriend ", "", "Hello there friend - #127"},
+		{"normalize before truncation", "Hello\n" + strings.Repeat(" \t", 100) + "there", "", "Hello there - #127"},
+		{"truncate normalized text", "Hello\n\t" + strings.Repeat("a", 100), "", "Hello " + strings.Repeat("a", 94) + "... - #127"},
+		{"Unicode boundary", "\n" + strings.Repeat("界", 33) + "🙂", "", strings.Repeat("界", 33) + "... - #127"},
+		{"exact limit", strings.Repeat("a", 100), "", strings.Repeat("a", 100) + " - #127"},
+		{"empty", "", "", "#127"},
+		{"blank", "\n\r\t ", "", "#127"},
+		{"saved subject", "Different\nreply", "Original - #127", "Original - #127"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			conv := models.ContinuityConversation{ReferenceNumber: "127", ContinuityEmailSubject: null.StringFrom(tt.saved)}
+			got := m.buildContinuityEmailSubject(conv, tt.text)
+			if got != tt.want {
+				t.Fatalf("subject = %q, want %q", got, tt.want)
+			}
+			if !utf8.ValidString(got) {
+				t.Fatalf("subject contains invalid Unicode: %q", got)
+			}
+		})
 	}
 }
 
@@ -836,16 +864,7 @@ func TestContinuityEmailArticleReferences(t *testing.T) {
 	}
 	message := models.Message{Content: rendered, Meta: json.RawMessage(`{"continuity_email":true}`)}
 	data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
-	content := m.emailTemplateContent(&message, data)
-	tmpl, err := template.New("content").Parse(content)
-	if err != nil {
-		t.Fatalf("parsing offline email: %v", err)
-	}
-	var output strings.Builder
-	if err := tmpl.Execute(&output, data); err != nil {
-		t.Fatalf("rendering offline email: %v", err)
-	}
-	if output.String() != rendered || data["IsContinuityEmail"] != true {
+	if m.emailTemplateContent(&message, data) != rendered || data["IsContinuityEmail"] != true {
 		t.Fatal("offline email changed literal message content or lost its template flag")
 	}
 	if strings.Index(rendered, wantURL) > strings.Index(rendered, "Human answer.") {
@@ -886,19 +905,11 @@ func TestEmailTemplateArticleReferences(t *testing.T) {
 			}
 			data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
 			content := m.emailTemplateContent(&message, data)
-			tmpl, err := template.New("content").Parse(content)
-			if err != nil {
-				t.Fatalf("parsing email: %v", err)
+			want := `<p>Hello {{ .Author.FirstName }}.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
+			if content != want || data["IsContinuityEmail"] != false {
+				t.Fatalf("unexpected email content: %s", content)
 			}
-			var output strings.Builder
-			if err := tmpl.Execute(&output, data); err != nil {
-				t.Fatalf("rendering email: %v", err)
-			}
-			want := `<p>Hello Agent.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
-			if output.String() != want || data["IsContinuityEmail"] != false {
-				t.Fatalf("unexpected email content: %s", output.String())
-			}
-			plain := stringutil.HTML2TextMarkdownLinks(output.String())
+			plain := stringutil.HTML2TextMarkdownLinks(content)
 			for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery"} {
 				if !strings.Contains(plain, part) {
 					t.Errorf("plain text email is missing %q: %s", part, plain)

@@ -696,6 +696,23 @@ const router = createRouter({
   routes: routes
 })
 
+const preloadErrors = new WeakSet()
+const reloadKey = 'libredesk:preload-reload'
+
+window.addEventListener('vite:preloadError', (event) => {
+  preloadErrors.add(event.payload)
+})
+
+router.onError((error, to) => {
+  if (!preloadErrors.has(error) || sessionStorage.getItem(reloadKey) === to.fullPath) return
+  sessionStorage.setItem(reloadKey, to.fullPath)
+  window.location.assign(to.fullPath)
+})
+
+router.afterEach((to, from, failure) => {
+  if (!failure) sessionStorage.removeItem(reloadKey)
+})
+
 router.beforeEach((to, from, next) => {
   // Cancel in-flight requests.
   if (to.fullPath !== from.fullPath) {

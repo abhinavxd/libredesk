@@ -1,16 +1,16 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 
 export const createColumns = (t) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-role', params: { id: row.original.id } },
@@ -24,20 +24,21 @@ export const createColumns = (t) => [
   {
     accessorKey: 'description',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.description'))
+      return h('div', null, t('globals.terms.description'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, row.getValue('description'))
+      return h('div', null, row.getValue('description'))
     }
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center text-sm' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {

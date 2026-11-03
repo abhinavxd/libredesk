@@ -2,8 +2,14 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <MacroForm :initialValues="macro" :submitForm="submitForm" :isLoading="formLoading" v-else />
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <MacroForm
+      :initialValues="macro"
+      :submitForm="submitForm"
+      :isLoading="formLoading"
+      v-if="!isLoading"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -15,7 +21,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import MacroForm from '@main/features/admin/macros/MacroForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useI18n } from 'vue-i18n'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useMacroStore } from '@main/stores/macro'
 
 const macro = ref({})
@@ -38,9 +44,9 @@ const updateMacro = async (payload) => {
   try {
     formLoading.value = true
     await api.updateMacro(macro.value.id, payload)
-    
+
     macroStore.clearCache()
-    
+
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
     })

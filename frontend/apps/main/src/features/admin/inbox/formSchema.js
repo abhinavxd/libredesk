@@ -3,7 +3,7 @@ import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/s
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
 import { extractEmailAddress } from '@main/utils/email-sender'
 
-const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
+export const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
 export const createFormSchema = (t) => z.object({
   name: z.string().min(1, t('globals.messages.required')),
@@ -56,8 +56,8 @@ export const createFormSchema = (t) => z.object({
   smtp: z.object({
     host: z.string().min(1, t('globals.messages.required')),
     port: z.number().min(1).max(65535),
-    username: z.string().min(1, t('globals.messages.required')),
-    password: z.string().min(1, t('globals.messages.required')),
+    username: z.string().default(''),
+    password: z.string().default(''),
     max_conns: z.number().min(1),
     max_msg_retries: z.number().min(0).max(100),
     idle_timeout: z.string().min(1, t('globals.messages.required')).refine(isGoDuration, {
@@ -70,6 +70,13 @@ export const createFormSchema = (t) => z.object({
     tls_skip_verify: z.boolean().optional(),
     hello_hostname: z.string().optional(),
     auth_protocol: z.enum(['login', 'cram', 'plain', 'none'])
+  }).superRefine((smtp, ctx) => {
+    if (smtp.auth_protocol === 'none') return
+    for (const field of ['username', 'password']) {
+      if (!smtp[field]) {
+        ctx.addIssue({ code: 'custom', path: [field], message: t('globals.messages.required') })
+      }
+    }
   })
 }).superRefine((values, ctx) => {
   const primary = extractEmailAddress(values.from).toLowerCase()

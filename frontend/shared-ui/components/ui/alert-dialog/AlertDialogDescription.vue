@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { AlertDialogDescription } from 'radix-vue'
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -19,7 +19,7 @@ const delegatedProps = computed(() => {
 <template>
   <AlertDialogDescription
     v-bind="delegatedProps"
-    :class="cn('text-sm text-muted-foreground', props.class)"
+    :class="cn('ui-description', props.class)"
   >
     <slot />
   </AlertDialogDescription>
