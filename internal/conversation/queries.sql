@@ -35,11 +35,13 @@ RETURNING id, uuid;
 -- name: get-conversations
 -- $1 = viewing user ID for per-agent unread count
 -- $2 = include mentioned message UUID (true for mentioned inbox, false otherwise)
-WITH page AS MATERIALIZED (
-    %s
+WITH matching AS MATERIALIZED (
+    %[2]s
+), page AS MATERIALIZED (
+    %[1]s
 )
 SELECT
-    (SELECT COUNT(*) FROM (%s) matching) as total,
+    (SELECT COUNT(*) FROM matching) as total,
     conversations.id,
     conversations.created_at,
     conversations.updated_at,
@@ -133,13 +135,14 @@ SELECT
         ORDER BY se.created_at DESC
         LIMIT 1
     ) nxt_resp_event ON true
-ORDER BY page.sort_value %s NULLS LAST
+ORDER BY page.sort_value %[3]s NULLS LAST
 
 -- name: get-conversations-page-base
 SELECT conversations.id, %s AS sort_value
 FROM conversations
-JOIN users ON conversations.contact_id = users.id
-JOIN inboxes ON conversations.inbox_id = inboxes.id
+-- Foreign keys guarantee these rows exist. LEFT JOIN lets unused filter joins be removed.
+LEFT JOIN users ON conversations.contact_id = users.id
+LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
 LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
 WHERE 1=1 %s
 

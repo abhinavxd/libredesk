@@ -177,6 +177,9 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 	if err := db.Get(&team, `INSERT INTO teams (name, conversation_assignment_type) VALUES ('Team', 'Manual') RETURNING id`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Exec(`INSERT INTO team_members (team_id, user_id) VALUES ($1, $2)`, team, agent); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Get(&policy, `INSERT INTO sla_policies (name, first_response_time, resolution_time) VALUES ('SLA', '1h', '1d') RETURNING id`); err != nil {
 		t.Fatal(err)
 	}
@@ -226,6 +229,11 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
+		if n == 67 || n == 68 {
+			if _, err := db.Exec(`INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_team_id, mentioned_by_user_id) VALUES ($1, $2, $3, $4)`, conversationID, messageID, team, other); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	var tags [2]int
 	for n := range tags {
@@ -239,6 +247,7 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 	}
 	tagFilter := fmt.Sprintf(`[{"model":"conversations","field":"tags","operator":"contains","value":"[%d,%d,%d]"}]`, tags[0], tags[0], tags[1])
 	closedFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Closed"}]`
+	openFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Open"}]`
 	for _, tt := range []struct {
 		name, listType, order, orderBy, filters string
 		page, total                             int
@@ -247,9 +256,21 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 		{"closed second page", models.AllConversations, "desc", "", closedFilter, 2, 64, []string{"62", "61"}},
 		{"ascending", models.AllConversations, "asc", "conversations.created_at", closedFilter, 1, 64, []string{"1", "2"}},
 		{"assigned", models.AssignedConversations, "desc", "", closedFilter, 2, 16, []string{"56", "52"}},
+		{"assigned sparse open", models.AssignedConversations, "desc", "", openFilter, 1, 2, []string{"72", "68"}},
+		{"assigned sparse ascending", models.AssignedConversations, "asc", "", openFilter, 1, 2, []string{"68", "72"}},
+		{"assigned sparse past last page", models.AssignedConversations, "desc", "", openFilter, 2, 0, nil},
+		{"assigned tag union", models.AssignedConversations, "desc", "", tagFilter, 1, 18, []string{"72", "68"}},
+		{"assigned no filters", models.AssignedConversations, "desc", "", "", 1, 18, []string{"72", "68"}},
+		{"assigned no matches", models.AssignedConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
 		{"team", models.TeamUnassignedConversations, "desc", "", closedFilter, 1, 16, []string{"62", "58"}},
 		{"unassigned", models.UnassignedConversations, "desc", "", closedFilter, 1, 16, []string{"63", "59"}},
 		{"mentioned", models.MentionedConversations, "desc", "", closedFilter, 1, 16, []string{"64", "60"}},
+		{"mentioned open direct and team", models.MentionedConversations, "desc", "", openFilter, 1, 3, []string{"72", "68"}},
+		{"mentioned open second page", models.MentionedConversations, "desc", "", openFilter, 2, 3, []string{"67"}},
+		{"mentioned open ascending", models.MentionedConversations, "asc", "", openFilter, 1, 3, []string{"67", "68"}},
+		{"mentioned past last page", models.MentionedConversations, "desc", "", openFilter, 3, 0, nil},
+		{"mentioned no filters", models.MentionedConversations, "desc", "", "", 1, 19, []string{"72", "68"}},
+		{"mentioned no matches", models.MentionedConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
 		{"date filter", models.AllConversations, "desc", "", `[{"model":"conversations","field":"created_at","operator":"equals","value":"2026-01-01"}]`, 1, 72, []string{"72", "71"}},
 		{"contact filter", models.AllConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"user0@example.com"}]`, 1, 72, []string{"72", "71"}},
 		{"tag union", models.AllConversations, "desc", "", tagFilter, 1, 48, []string{"72", "70"}},
@@ -279,13 +300,52 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 		})
 	}
 
-	for _, orderBy := range []string{"users.email", "users.external_user_id", "inboxes.channel", "conversation_statuses.name", "conversations.next_sla_deadline_at"} {
-		t.Run(orderBy, func(t *testing.T) {
-			rows, err := m.GetConversations(agent, agent, nil /** teamIDs **/, []string{models.AllConversations}, "desc", orderBy, closedFilter, 1 /** page **/, 2 /** pageSize **/)
-			if err != nil || len(rows) != 2 || rows[0].Total != 64 {
-				t.Fatalf("joined ordering: rows=%d err=%v", len(rows), err)
+	if _, err := db.Exec(`UPDATE conversations SET last_message_at = NULL WHERE subject = '68'`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		listType, order string
+		want            []string
+	}{
+		{models.AssignedConversations, "asc", []string{"72", "68"}},
+		{models.AssignedConversations, "desc", []string{"72", "68"}},
+		{models.MentionedConversations, "asc", []string{"67", "72", "68"}},
+		{models.MentionedConversations, "desc", []string{"72", "67", "68"}},
+	} {
+		t.Run(tt.listType+" null activity "+tt.order, func(t *testing.T) {
+			rows, err := m.GetConversations(agent, agent, nil /** teamIDs **/, []string{tt.listType}, tt.order, "", openFilter, 1 /** page **/, 3 /** pageSize **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var subjects []string
+			for _, row := range rows {
+				subjects = append(subjects, row.Subject.String)
+				if row.Total != len(tt.want) {
+					t.Fatalf("total = %d, want %d", row.Total, len(tt.want))
+				}
+			}
+			if !slices.Equal(subjects, tt.want) || rows[len(rows)-1].LastMessageAt.Valid {
+				t.Fatalf("incorrect null ordering: %v", subjects)
 			}
 		})
+	}
+	if _, err := db.Exec(`UPDATE conversations SET last_message_at = created_at WHERE subject = '68'`); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, orderBy := range []string{"users.email", "users.external_user_id", "inboxes.channel", "conversation_statuses.name", "conversations.next_sla_deadline_at"} {
+		for _, listType := range []string{models.AllConversations, models.AssignedConversations, models.MentionedConversations} {
+			t.Run(listType+" "+orderBy, func(t *testing.T) {
+				rows, err := m.GetConversations(agent, agent, nil /** teamIDs **/, []string{listType}, "desc", orderBy, closedFilter, 1 /** page **/, 2 /** pageSize **/)
+				wantTotal := 16
+				if listType == models.AllConversations {
+					wantTotal = 64
+				}
+				if err != nil || len(rows) != 2 || rows[0].Total != wantTotal {
+					t.Fatalf("joined ordering: rows=%d err=%v", len(rows), err)
+				}
+			})
+		}
 	}
 	for _, orderBy := range []string{"conversations.id; SELECT 1", "missing.column"} {
 		if _, _, err := m.makeConversationsListQuery(agent, agent, nil /** teamIDs **/, []string{models.AllConversations}, m.q.GetConversations, "desc", orderBy, 1 /** page **/, 2 /** pageSize **/, closedFilter); err == nil {
@@ -293,39 +353,57 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 		}
 	}
 
-	query, args, err := m.makeConversationsListQuery(agent, agent, []int{team}, []string{models.AllConversations}, m.q.GetConversations, "desc", "", 1 /** page **/, 2 /** pageSize **/, closedFilter)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var raw []byte
-	if err := db.Get(&raw, "EXPLAIN (ANALYZE, FORMAT JSON) "+query, args...); err != nil {
-		t.Fatal(err)
-	}
 	type planNode struct {
 		Relation string     `json:"Relation Name"`
+		Subplan  string     `json:"Subplan Name"`
 		Loops    int        `json:"Actual Loops"`
 		Rows     int        `json:"Actual Rows"`
 		Plans    []planNode `json:"Plans"`
 	}
-	var plan []struct{ Plan planNode }
-	if err := jsonv2.Unmarshal(raw, &plan); err != nil {
-		t.Fatal(err)
-	}
-	pending := []planNode{plan[0].Plan}
-	seen := map[string]bool{}
-	for len(pending) > 0 {
-		node := pending[0]
-		pending = append(pending[1:], node.Plans...)
-		if node.Relation == "applied_slas" || node.Relation == "sla_events" {
-			seen[node.Relation] = true
-			if node.Loops > 2 {
-				t.Fatalf("%s looked up %d times for a two ticket page", node.Relation, node.Loops)
+	for _, listType := range []string{models.AllConversations, models.AssignedConversations, models.MentionedConversations, models.UnassignedConversations, models.TeamUnassignedConversations, models.TeamAllConversations} {
+		t.Run(listType+" plan", func(t *testing.T) {
+			query, args, err := m.makeConversationsListQuery(agent, agent, []int{team}, []string{listType}, m.q.GetConversations, "desc", "", 1 /** page **/, 2 /** pageSize **/, closedFilter)
+			if err != nil {
+				t.Fatal(err)
 			}
-			t.Logf("%s: loops=%d rows=%d", node.Relation, node.Loops, node.Rows)
-		}
-	}
-	if len(seen) != 2 {
-		t.Fatalf("missing SLA lookups in plan: %s", raw)
+			var raw []byte
+			if err := db.Get(&raw, "EXPLAIN (ANALYZE, FORMAT JSON) "+query, args...); err != nil {
+				t.Fatal(err)
+			}
+			var plan []struct{ Plan planNode }
+			if err := jsonv2.Unmarshal(raw, &plan); err != nil {
+				t.Fatal(err)
+			}
+			pending := []planNode{plan[0].Plan}
+			seen := map[string]bool{}
+			materialized := false
+			for len(pending) > 0 {
+				node := pending[0]
+				pending = append(pending[1:], node.Plans...)
+				if node.Subplan == "CTE matching" {
+					materialized = true
+					want := 16
+					if listType == models.AllConversations {
+						want = 64
+					}
+					if node.Rows != want || node.Loops != 1 {
+						t.Fatalf("filtered %d rows %d times, want %d rows once", node.Rows, node.Loops, want)
+					}
+				}
+				if node.Relation == "applied_slas" || node.Relation == "sla_events" {
+					seen[node.Relation] = true
+					if node.Loops > 2 {
+						t.Fatalf("%s looked up %d times for a two ticket page", node.Relation, node.Loops)
+					}
+				}
+			}
+			if !materialized {
+				t.Fatalf("incorrect filtering boundary for %s: %s", listType, raw)
+			}
+			if len(seen) != 2 {
+				t.Fatalf("missing SLA lookups in plan: %s", raw)
+			}
+		})
 	}
 	if _, err := db.Exec(`DELETE FROM applied_slas WHERE conversation_id IN (SELECT id FROM conversations WHERE subject = '64')`); err != nil {
 		t.Fatal(err)
@@ -339,6 +417,58 @@ func TestConversationListPaginationBeforeDetails(t *testing.T) {
 	}
 	if len(rows) != 2 || rows[0].Subject.String != "1" || rows[1].Subject.String != "64" || rows[1].Total != 64 || rows[1].LastMessageAt.Valid || rows[1].AppliedSLAID.Valid || rows[1].NextResponseDueAt.Valid {
 		t.Fatalf("incorrect null ordering or missing SLA details: %+v", rows)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_statuses (name) VALUES ('Waiting for approval');
+		UPDATE conversations SET status_id = (SELECT id FROM conversation_statuses WHERE name = 'Waiting for approval')
+		WHERE subject IN ('1', '2', '3', '4')`); err != nil {
+		t.Fatal(err)
+	}
+	rareFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Waiting for approval"}]`
+	for _, tt := range []struct {
+		name  string
+		lists []string
+		want  []string
+	}{
+		{"all", []string{models.AllConversations}, []string{"4", "3", "2", "1"}},
+		{"assigned", []string{models.AssignedConversations}, []string{"4"}},
+		{"mentioned", []string{models.MentionedConversations}, []string{"4"}},
+		{"unassigned", []string{models.UnassignedConversations}, []string{"3"}},
+		{"team inbox", []string{models.TeamUnassignedConversations}, []string{"2"}},
+		{"team all", []string{models.TeamAllConversations}, []string{"2"}},
+		{"combined view", []string{models.AssignedConversations, models.UnassignedConversations, models.TeamUnassignedConversations}, []string{"4", "3", "2"}},
+		{"overlapping view", []string{models.AssignedConversations, models.MentionedConversations}, []string{"4"}},
+	} {
+		t.Run("rare status "+tt.name, func(t *testing.T) {
+			rows, err := m.GetViewConversationsList(agent, agent, []int{team}, tt.lists, "desc", "", rareFilter, 1 /** page **/, 25 /** pageSize **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var subjects []string
+			for _, row := range rows {
+				subjects = append(subjects, row.Subject.String)
+				if row.Total != len(tt.want) {
+					t.Fatalf("total = %d, want %d", row.Total, len(tt.want))
+				}
+			}
+			if !slices.Equal(subjects, tt.want) {
+				t.Fatalf("subjects = %v, want %v", subjects, tt.want)
+			}
+		})
+	}
+	viewFilter := fmt.Sprintf(`{"logic":"AND","rules":[
+		{"model":"conversation_statuses","field":"name","operator":"equals","value":"Waiting for approval"},
+		{"logic":"OR","rules":[
+			{"model":"conversations","field":"tags","operator":"contains","value":"[%d,%d]"},
+			{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}
+		]},
+		{"model":"inboxes","field":"channel","operator":"equals","value":"email"}
+	]}`, tags[0], tags[0])
+	rows, err = m.GetViewConversationsList(agent, agent, []int{team}, []string{models.AllConversations}, "desc", "", viewFilter, 1 /** page **/, 25 /** pageSize **/)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].Subject.String != "4" || rows[1].Subject.String != "2" || rows[0].Total != 2 {
+		t.Fatalf("incorrect filtered view: %+v", rows)
 	}
 }
 

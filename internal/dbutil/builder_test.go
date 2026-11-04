@@ -41,23 +41,29 @@ func TestCountedPaginationSortValidation(t *testing.T) {
 		{"invalid field", "users.email; SELECT 1", "ASC", true},
 		{"unknown field", "users.password", "ASC", true},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
-			query, _, err := BuildCountedPaginatedQuery(
-				"WITH page AS MATERIALIZED (%s) SELECT page.*, (SELECT COUNT(*) FROM (%s) matching) AS total FROM page ORDER BY page.sort_value %s NULLS LAST",
-				"SELECT users.id, users.email AS sort_value FROM users WHERE users.deleted_at IS NULL",
-				nil, /** existingArgs **/
-				PaginationOptions{Page: 1, PageSize: 2, OrderBy: tt.orderBy, Order: tt.order},
-				"[]", testAllowed, nil /** renderers **/)
-			if (err != nil) != tt.wantError {
-				t.Fatalf("error = %v, want error %v", err, tt.wantError)
-			}
-			if strings.Contains(query, "SELECT 1") {
-				t.Fatal("unvalidated sort text reached the query")
-			}
-			if tt.name == "lowercase direction" && !strings.Contains(query, "ORDER BY page.sort_value ASC NULLS LAST") {
-				t.Fatalf("outer sort direction was lost: %s", query)
-			}
-		})
+		for _, reuse := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/reuse_%t", tt.name, reuse), func(t *testing.T) {
+				payload := "WITH page AS MATERIALIZED (%s) SELECT page.*, (SELECT COUNT(*) FROM (%s) matching) AS total FROM page ORDER BY page.sort_value %s NULLS LAST"
+				if reuse {
+					payload = "WITH matching AS MATERIALIZED (%[2]s), page AS MATERIALIZED (%[1]s) SELECT page.*, (SELECT COUNT(*) FROM matching) AS total FROM page ORDER BY page.sort_value %[3]s NULLS LAST"
+				}
+				query, _, err := BuildCountedPaginatedQuery(
+					payload,
+					"SELECT users.id, users.email AS sort_value FROM users WHERE users.deleted_at IS NULL",
+					nil, /** existingArgs **/
+					PaginationOptions{Page: 1, PageSize: 2, OrderBy: tt.orderBy, Order: tt.order, ReuseMatches: reuse},
+					"[]", testAllowed, nil /** renderers **/)
+				if (err != nil) != tt.wantError {
+					t.Fatalf("error = %v, want error %v", err, tt.wantError)
+				}
+				if strings.Contains(query, "SELECT 1") {
+					t.Fatal("unvalidated sort text reached the query")
+				}
+				if tt.name == "lowercase direction" && !strings.Contains(query, "ORDER BY page.sort_value ASC NULLS LAST") {
+					t.Fatalf("outer sort direction was lost: %s", query)
+				}
+			})
+		}
 	}
 }
 

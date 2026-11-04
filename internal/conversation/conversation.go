@@ -2052,7 +2052,7 @@ func (c *Manager) getConversationTags(uuid string) ([]string, error) {
 	return tags, nil
 }
 
-// makeConversationsListQuery paginates matching tickets before loading details and counts matches independently.
+// makeConversationsListQuery filters tickets once for counting and pagination before loading page details.
 func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []any, error) {
 	includeMentions := slices.Contains(listTypes, models.MentionedConversations)
 	qArgs := []any{viewingUserID, includeMentions}
@@ -2082,11 +2082,12 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 
 	pageBase := fmt.Sprintf(c.q.GetConversationsPageBase, orderBy, listTypeWhereClause(conditions))
 	return dbutil.BuildCountedPaginatedQuery(baseQuery, pageBase, qArgs, dbutil.PaginationOptions{
-		Order:    order,
-		OrderBy:  orderBy,
-		Page:     page,
-		PageSize: pageSize,
-		Location: c.FilterLocation(),
+		Order:        order,
+		OrderBy:      orderBy,
+		Page:         page,
+		PageSize:     pageSize,
+		Location:     c.FilterLocation(),
+		ReuseMatches: true,
 	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
 }
 

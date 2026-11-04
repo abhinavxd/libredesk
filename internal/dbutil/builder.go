@@ -44,10 +44,11 @@ const maxInValues = 100
 
 // PaginationOptions represents the options for paginating a query.
 type PaginationOptions struct {
-	Page     int
-	PageSize int
-	OrderBy  string
-	Order    string
+	Page         int
+	PageSize     int
+	OrderBy      string
+	Order        string
+	ReuseMatches bool
 	// Location is the IANA timezone date-only filters are resolved in; empty falls back to UTC.
 	Location string
 }
@@ -138,7 +139,7 @@ func BuildPaginatedQuery(baseQuery string, existingArgs []any, opts PaginationOp
 	return query, args, nil
 }
 
-// BuildCountedPaginatedQuery fills a payload template with the page, independent count query, and validated sort direction.
+// BuildCountedPaginatedQuery fills page, count, and sort slots, using the template's matching CTE when ReuseMatches is set.
 func BuildCountedPaginatedQuery(payloadQuery, pageBase string, existingArgs []any, opts PaginationOptions, filtersJSON string, allowedFields AllowedFields, renderers FieldRenderers) (string, []any, error) {
 	pageQuery, pageArgs, err := BuildPaginatedQuery(pageBase, existingArgs, opts, filtersJSON, allowedFields, renderers)
 	if err != nil {
@@ -151,6 +152,14 @@ func BuildCountedPaginatedQuery(payloadQuery, pageBase string, existingArgs []an
 	order := ""
 	if opts.OrderBy != "" {
 		order = strings.ToUpper(opts.Order)
+	}
+	if opts.ReuseMatches {
+		pageOrder := ""
+		if opts.OrderBy != "" {
+			pageOrder = fmt.Sprintf(" ORDER BY sort_value %s NULLS LAST", order)
+		}
+		pageQuery = fmt.Sprintf("SELECT id, sort_value FROM matching%s LIMIT $%d OFFSET $%d",
+			pageOrder, len(pageArgs)-1, len(pageArgs))
 	}
 	return fmt.Sprintf(payloadQuery, pageQuery, countQuery, order), pageArgs, nil
 }
