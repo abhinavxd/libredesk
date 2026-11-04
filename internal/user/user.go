@@ -637,8 +637,10 @@ func (u *Manager) makeUserListQuery(page, pageSize int, userTypes []string, orde
 		PageSize: pageSize,
 		Location: location,
 	}, filtersJSON, dbutil.AllowedFields{
-		"users": {"email", "created_at", "updated_at"},
-	}, nil /** renderers **/)
+		"users": {"email", "phone_number", "created_at", "updated_at"},
+	}, dbutil.FieldRenderers{
+		"users": {"full_name": renderUserFullNameFilter},
+	})
 }
 
 // verifyPassword compares the provided password with the stored password hash.
@@ -679,4 +681,14 @@ func (u *Manager) reserveFlush(id int) bool {
 func hashAPISecret(secret string) string {
 	sum := sha256.Sum256([]byte(secret))
 	return hex.EncodeToString(sum[:])
+}
+
+func renderUserFullNameFilter(operator, value string, paramIndex int) (string, []any, error) {
+	switch operator {
+	case "contains", "ilike":
+		query := fmt.Sprintf("(users.first_name || ' ' || COALESCE(users.last_name, '')) ILIKE $%d ESCAPE '\\'", paramIndex)
+		return query, []any{dbutil.ContainsPattern(value)}, nil
+	default:
+		return "", nil, fmt.Errorf("invalid operator for full name: %s", operator)
+	}
 }
