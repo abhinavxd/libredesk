@@ -185,6 +185,7 @@ func (a *Auth) Reload(cfg Config) error {
 	return nil
 }
 
+// RemoveProvider forgets a provider that was disabled or deleted, from the live maps and from the stored config, so it cannot be initialized again on first use.
 func (a *Auth) RemoveProvider(id int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
