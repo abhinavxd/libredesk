@@ -1487,6 +1487,47 @@ func TestIMAPConnTimeout(t *testing.T) {
 	}
 }
 
+func TestIMAPConnNonTimeoutErrors(t *testing.T) {
+	for _, operation := range []string{"read", "write"} {
+		for _, failure := range []string{"closed_connection", "peer_disconnect"} {
+			t.Run(operation+"/"+failure, func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					ctx, cancel := context.WithCancelCause(t.Context())
+					defer cancel(nil /* cause */)
+					local, peer := net.Pipe()
+					defer local.Close()
+					defer peer.Close()
+					conn := &imapConn{Conn: local, timeout: imapIOTimeout, cancel: cancel}
+					want := io.ErrClosedPipe
+					if failure == "closed_connection" {
+						require.NoError(t, local.Close())
+					} else {
+						go func() {
+							synctest.Wait()
+							peer.Close()
+						}()
+						if operation == "read" {
+							want = io.EOF
+						}
+					}
+					started := time.Now()
+					var n int
+					var err error
+					if operation == "read" {
+						n, err = conn.Read(make([]byte, 1))
+					} else {
+						n, err = conn.Write([]byte("x"))
+					}
+					require.Zero(t, n)
+					require.ErrorIs(t, err, want)
+					require.NoError(t, context.Cause(ctx))
+					require.Less(t, time.Since(started), imapIOTimeout)
+				})
+			})
+		}
+	}
+}
+
 func TestIMAPFetchContinuesWhileDataArrives(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, cancel := context.WithCancelCause(t.Context())
@@ -1587,8 +1628,8 @@ func TestIMAPClientStopsOnNetworkTimeout(t *testing.T) {
 
 func TestProcessMailboxStopsOnCancellation(t *testing.T) {
 	for _, stage := range []string{"greeting", "LOGIN", "SELECT", "SEARCH", "headers", "header_literal", "body", "literal", "LOGOUT", "STARTTLS", "tls_handshake"} {
-		for _, deadline := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/deadline=%t", stage, deadline), func(t *testing.T) {
+		for _, cancellation := range []string{"cancel", "deadline", "network_timeout"} {
+			t.Run(stage+"/"+cancellation, func(t *testing.T) {
 				t.Parallel()
 				listener, err := net.Listen("tcp", "127.0.0.1:0")
 				require.NoError(t, err)
@@ -1605,9 +1646,9 @@ func TestProcessMailboxStopsOnCancellation(t *testing.T) {
 					serverDone <- serveStalledMailbox(conn, stage, stalled)
 				}()
 
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				if deadline {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				defer cancel(nil /* cause */)
+				if cancellation == "deadline" {
 					var cancelDeadline context.CancelFunc
 					ctx, cancelDeadline = context.WithTimeout(ctx, 500*time.Millisecond)
 					defer cancelDeadline()
@@ -1639,9 +1680,13 @@ func TestProcessMailboxStopsOnCancellation(t *testing.T) {
 					t.Fatal("scan did not reach the stalled operation")
 				}
 				want := context.DeadlineExceeded
-				if !deadline {
-					cancel()
+				switch cancellation {
+				case "cancel":
+					cancel(nil /* cause */)
 					want = context.Canceled
+				case "network_timeout":
+					cancel(os.ErrDeadlineExceeded)
+					want = os.ErrDeadlineExceeded
 				}
 				select {
 				case err := <-done:
