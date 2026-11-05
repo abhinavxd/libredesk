@@ -633,6 +633,12 @@ SET priority_id = (SELECT id FROM conversation_priorities WHERE name = $2),
     updated_at = NOW()
 WHERE uuid = $1;
 
+-- name: update-conversation-subject
+UPDATE conversations
+SET subject = NULLIF($2::text, ''),
+    updated_at = NOW()
+WHERE uuid = $1;
+
 -- name: upsert-user-last-seen
 INSERT INTO conversation_last_seen (user_id, conversation_id, last_seen_at, updated_at)
 SELECT $1, c.id, COALESCE(m.created_at, NOW()), clock_timestamp()
