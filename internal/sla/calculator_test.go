@@ -10,6 +10,49 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestWithinBusinessHours(t *testing.T) {
+	hours := models.BusinessHours{
+		Hours: mustMarshalJSON(map[string]models.WorkingHours{
+			"Monday": {Open: "09:00", Close: "17:00"},
+		}),
+		Holidays: mustMarshalJSON([]models.Holiday{{Date: "2026-10-19"}}),
+	}
+	for _, tc := range []struct {
+		name, at, zone string
+		want           bool
+	}{
+		{"opening", "2026-10-26T09:00:00Z", "UTC", true},
+		{"before opening", "2026-10-26T08:59:59Z", "UTC", false},
+		{"closing", "2026-10-26T17:00:00Z", "UTC", false},
+		{"before closing", "2026-10-26T16:59:59Z", "UTC", true},
+		{"weekend", "2026-10-25T10:00:00Z", "UTC", false},
+		{"holiday", "2026-10-19T10:00:00Z", "UTC", false},
+		{"Kolkata opening", "2026-10-26T03:30:00Z", "Asia/Kolkata", true},
+		{"Kolkata before opening", "2026-10-26T03:29:59Z", "Asia/Kolkata", false},
+		{"DST before change", "2026-10-26T13:00:00Z", "America/New_York", true},
+		{"DST after change", "2026-11-02T14:00:00Z", "America/New_York", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			at, err := time.Parse(time.RFC3339, tc.at)
+			assert.NoError(t, err)
+			within, err := isWithinBusinessHours(hours, tc.zone, at)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, within)
+		})
+	}
+	_, err := isWithinBusinessHours(hours, "Invalid/Zone", time.Now())
+	assert.Error(t, err)
+	hours.IsAlwaysOpen = true
+	within, err := isWithinBusinessHours(hours, "UTC", time.Date(2026, 10, 19, 0, 0, 0, 0, time.UTC))
+	assert.NoError(t, err)
+	assert.True(t, within)
+	hours.IsAlwaysOpen = false
+	hours.Hours = mustMarshalJSON(map[string]models.WorkingHours{"Monday": {Open: "09:00", Close: "09:00"}})
+	within, err = isWithinBusinessHours(hours, "UTC", time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC))
+	assert.NoError(t, err)
+	assert.False(t, within)
+}
+
 func mustMarshalJSON(v interface{}) types.JSONText {
 	data, err := json.Marshal(v)
 	if err != nil {
@@ -408,7 +451,7 @@ func TestCalculateDeadline(t *testing.T) {
 					"Wednesday": {Open: "09:00", Close: "17:00"},
 				}),
 			},
-			timeZone: "UTC",
+			timeZone:       "UTC",
 			expectedResult: time.Date(2023, 10, 11, 10, 0, 0, 0, locUTC),
 		},
 		{
@@ -422,12 +465,12 @@ func TestCalculateDeadline(t *testing.T) {
 					"Wednesday": {Open: "09:00", Close: "17:00"},
 				}),
 			},
-			timeZone: "UTC",
+			timeZone:       "UTC",
 			expectedResult: time.Date(2025, 04, 9, 15, 30, 0, 0, locUTC),
 		},
 		{
-			name:      "Monday to Friday 10:00 to 18:00",
-			startTime: time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
+			name:       "Monday to Friday 10:00 to 18:00",
+			startTime:  time.Date(2025, 03, 22, 18, 1, 43, 0, locIST), // Sat
 			slaMinutes: 1439,
 			businessHours: models.BusinessHours{
 				Hours: mustMarshalJSON(map[string]models.WorkingHours{

@@ -15,6 +15,14 @@ var (
 	ErrInvalidTime        = fmt.Errorf("invalid time")
 )
 
+func (m *Manager) IsWithinBusinessHours(assignedTeamID int, at time.Time) (bool, error) {
+	hours, timezone, err := m.getBusinessHoursAndTimezone(assignedTeamID)
+	if err != nil {
+		return false, err
+	}
+	return isWithinBusinessHours(hours, timezone, at)
+}
+
 // CalculateDeadline computes the SLA deadline from a start time and SLA duration in minutes
 // considering the provided holidays, working hours, and time zone.
 func (m *Manager) CalculateDeadline(start time.Time, slaMinutes int, businessHours models.BusinessHours, timeZone string) (time.Time, error) {
@@ -120,6 +128,45 @@ func (m *Manager) CalculateDeadline(start time.Time, slaMinutes int, businessHou
 	}
 
 	return currentTime, nil
+}
+
+func isWithinBusinessHours(hours models.BusinessHours, timezone string, at time.Time) (bool, error) {
+	if hours.IsAlwaysOpen {
+		return true, nil
+	}
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return false, err
+	}
+	at = at.In(loc)
+	var holidays []models.Holiday
+	if len(hours.Holidays) > 0 {
+		if err := json.Unmarshal(hours.Holidays, &holidays); err != nil {
+			return false, err
+		}
+	}
+	for _, holiday := range holidays {
+		if holiday.Date == at.Format(time.DateOnly) {
+			return false, nil
+		}
+	}
+	var schedule map[string]models.WorkingHours
+	if err := json.Unmarshal(hours.Hours, &schedule); err != nil {
+		return false, err
+	}
+	day, ok := schedule[at.Weekday().String()]
+	if !ok {
+		return false, nil
+	}
+	open, err := parseTime(at, day.Open, loc)
+	if err != nil {
+		return false, err
+	}
+	close, err := parseTime(at, day.Close, loc)
+	if err != nil {
+		return false, err
+	}
+	return !at.Before(open) && at.Before(close), nil
 }
 
 // nextDay advances the time to the start of the next day in the specified time zone.

@@ -172,7 +172,7 @@ import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { SelectTag } from '@shared-ui/components/ui/select'
-import { OPERATOR } from '@main/constants/filterConfig'
+import { OPERATOR, AUTOMATION_ACTIONS_WITHOUT_VALUE } from '@main/constants/filterConfig'
 import { useI18n } from 'vue-i18n'
 import {
   Select,
@@ -235,7 +235,17 @@ const conversationEventOptions = [
   { label: t('admin.automation.event.priority.change'), value: 'conversation.priority.change' },
   { label: t('admin.automation.event.status.change'), value: 'conversation.status.change' },
   { label: t('admin.automation.event.message.outgoing'), value: 'conversation.message.outgoing' },
-  { label: t('admin.automation.event.message.incoming'), value: 'conversation.message.incoming' }
+  { label: t('admin.automation.event.message.incoming'), value: 'conversation.message.incoming' },
+  { label: t('admin.automation.event.tags.change'), value: 'conversation.tags.change' },
+  {
+    label: t('admin.automation.event.customAttributes.change'),
+    value: 'conversation.custom_attributes.change'
+  },
+  {
+    label: t('admin.automation.event.contactCustomAttributes.change'),
+    value: 'conversation.contact.custom_attributes.change'
+  },
+  { label: t('admin.automation.event.csat.submitted'), value: 'conversation.csat.submitted' }
 ]
 
 const props = defineProps({
@@ -392,6 +402,14 @@ const getRulesValidationError = () => {
       if (rule.operator !== OPERATOR.SET && rule.operator !== OPERATOR.NOT_SET && !rule.value) {
         return t('admin.automation.validation.setConditionValue')
       }
+      if (
+        rule.field === 'tags' &&
+        (rule.field_type || 'conversation') === 'conversation' &&
+        ![OPERATOR.SET, OPERATOR.NOT_SET].includes(rule.operator) &&
+        rule.value === '[]'
+      ) {
+        return t('admin.automation.validation.setConditionValue')
+      }
     }
   }
 
@@ -406,10 +424,7 @@ const getRulesValidationError = () => {
       return t('admin.automation.validation.selectActionType')
     }
 
-    // CSAT action does not require value, set dummy value.
-    if (action.type === 'send_csat') {
-      action.value = ['0']
-    }
+    if (AUTOMATION_ACTIONS_WITHOUT_VALUE.includes(action.type)) continue
 
     // Notify uses its own fields instead of value.
     if (action.type === 'notify') {
@@ -421,6 +436,13 @@ const getRulesValidationError = () => {
 
     // Empty array, no value selected.
     if (action.value.length === 0) {
+      return t('admin.automation.validation.setActionValue')
+    }
+
+    if (
+      ['set_contact_custom_attribute', 'set_conversation_custom_attribute'].includes(action.type) &&
+      action.value.length !== 2
+    ) {
       return t('admin.automation.validation.setActionValue')
     }
 

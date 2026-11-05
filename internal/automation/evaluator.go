@@ -1,8 +1,11 @@
 package automation
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
+	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -131,6 +134,73 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			valueToCompare = strconv.Itoa(conversation.StatusID.Int)
 		case models.ConversationPriority:
 			valueToCompare = strconv.Itoa(conversation.PriorityID.Int)
+		case models.ConversationTags:
+			var tags []string
+			if len(conversation.Tags.JSON) > 0 {
+				if err := json.Unmarshal(conversation.Tags.JSON, &tags); err != nil {
+					e.lo.Error("error parsing conversation tags", "error", err)
+					return false
+				}
+			}
+			return evaluateTagRule(tags, rule)
+		case models.ConversationChannel:
+			valueToCompare = conversation.InboxChannel
+		case models.ConversationStatusCategory:
+			valueToCompare = conversation.StatusCategory.String
+		case models.ConversationLastMessageSender:
+			valueToCompare = conversation.LastInteractionSender.String
+		case models.ContactCountry:
+			valueToCompare = conversation.Contact.Country.String
+		case models.ContactExternalID:
+			valueToCompare = conversation.Contact.ExternalUserID.String
+		case models.ContactPhone:
+			valueToCompare = conversation.Contact.PhoneNumber.String
+		case models.ContactType:
+			valueToCompare = conversation.Contact.Type
+		case models.ConversationSLAPolicy:
+			if conversation.SLAPolicyID.Valid {
+				valueToCompare = strconv.Itoa(conversation.SLAPolicyID.Int)
+			}
+		case models.ConversationSLABreached:
+			valueToCompare = strconv.FormatBool(conversation.SLABreached)
+		case models.ConversationHoursUntilSLADeadline:
+			if conversation.NextSLADeadlineAt.Valid {
+				valueToCompare = strconv.FormatFloat(time.Until(conversation.NextSLADeadlineAt.Time).Hours(), 'f', -1, 64)
+			}
+		case models.ConversationCSATRating:
+			if conversation.CSATRespondedAt.Valid && conversation.CSATRating.Valid && conversation.CSATRating.Int > 0 {
+				valueToCompare = strconv.Itoa(conversation.CSATRating.Int)
+			}
+		case models.ConversationCSATFeedback:
+			if conversation.CSATRespondedAt.Valid {
+				valueToCompare = conversation.CSATFeedback.String
+			}
+		case models.ConversationWithinBusinessHours:
+			if e.businessHoursChecker == nil {
+				return false
+			}
+			within, err := e.businessHoursChecker(conversation.AssignedTeamID.Int, time.Now())
+			if err != nil {
+				e.lo.Error("error checking business hours", "error", err, "conversation_uuid", conversation.UUID)
+				return false
+			}
+			valueToCompare = strconv.FormatBool(within)
+		case models.ConversationHoursWaiting, models.ConversationHoursSinceLastMessage,
+			models.ConversationHoursSinceLastIncoming, models.ConversationHoursSinceLastActivity:
+			var at time.Time
+			switch rule.Field {
+			case models.ConversationHoursWaiting:
+				at = conversation.WaitingSince.Time
+			case models.ConversationHoursSinceLastMessage:
+				at = conversation.LastInteractionAt.Time
+			case models.ConversationHoursSinceLastIncoming:
+				at = conversation.LastInboundAt.Time
+			case models.ConversationHoursSinceLastActivity:
+				at = conversation.LastMessageAt.Time
+			}
+			if !at.IsZero() {
+				valueToCompare = strconv.FormatFloat(time.Since(at).Hours(), 'f', -1, 64)
+			}
 		case models.ConversationAssignedTeam:
 			if conversation.AssignedTeamID.Valid {
 				valueToCompare = strconv.Itoa(conversation.AssignedTeamID.Int)
@@ -176,9 +246,12 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 			e.lo.Error("error unrecognized conversation field", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
 			return false
 		}
-	} else if rule.FieldType == models.FieldTypeContactCustomAttribute {
+	} else if rule.FieldType == models.FieldTypeContactCustomAttribute || rule.FieldType == models.FieldTypeConversationCustomAttribute {
 		// If the field type is custom attribute, need to extract the value from the custom attributes
 		var attributes json.RawMessage = conversation.Contact.CustomAttributes
+		if rule.FieldType == models.FieldTypeConversationCustomAttribute {
+			attributes = conversation.CustomAttributes
+		}
 		if len(attributes) == 0 {
 			attributes = json.RawMessage(`{}`)
 		}
@@ -192,6 +265,9 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 
 		// Only the set/not set operators can act on an attribute the contact does not have.
 		val, ok := customAttributes[rule.Field]
+		if val == nil {
+			ok = false
+		}
 		if !ok && rule.Operator != models.RuleOperatorSet && rule.Operator != models.RuleOperatorNotSet {
 			e.lo.Warn("field not found in custom attribute", "field", rule.Field, "field_type", rule.FieldType, "conversation_uuid", conversation.UUID)
 			return false
@@ -203,9 +279,8 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 				valueToCompare = v
 			case int:
 				valueToCompare = strconv.Itoa(v)
-			// Float type does not exist in the custom attributes.
 			case float64:
-				valueToCompare = strconv.FormatInt(int64(v), 10)
+				valueToCompare = strconv.FormatFloat(v, 'f', -1, 64)
 			case bool:
 				valueToCompare = strconv.FormatBool(v)
 			default:
@@ -301,13 +376,11 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 	case models.RuleOperatorNotSet:
 		conditionMet = len(valueToCompare) == 0
 	case models.RuleOperatorGreaterThan:
-		value1, _ := strconv.Atoi(valueToCompare)
-		value2, _ := strconv.Atoi(rule.Value)
-		conditionMet = value1 > value2
+		comparison, ok := compareRuleValues(valueToCompare, rule.Value)
+		conditionMet = ok && comparison > 0
 	case models.RuleOperatorLessThan:
-		value1, _ := strconv.Atoi(valueToCompare)
-		value2, _ := strconv.Atoi(rule.Value)
-		conditionMet = value1 < value2
+		comparison, ok := compareRuleValues(valueToCompare, rule.Value)
+		conditionMet = ok && comparison < 0
 	case models.RuleOperatorStartsWith:
 		conditionMet = strings.HasPrefix(valueToCompare, rule.Value)
 	default:
@@ -316,6 +389,42 @@ func (e *Engine) evaluateRule(rule models.RuleDetail, conversation cmodels.Conve
 	}
 	e.lo.Debug("conversation automation rule status", "has_met", conditionMet, "conversation_uuid", conversation.UUID)
 	return conditionMet
+}
+
+// Tag conditions compare whole names, including names containing commas.
+func evaluateTagRule(tags []string, rule models.RuleDetail) bool {
+	if rule.Operator == models.RuleOperatorSet {
+		return len(tags) > 0
+	}
+	if rule.Operator == models.RuleOperatorNotSet {
+		return len(tags) == 0
+	}
+	if rule.Operator != models.RuleOperatorContains && rule.Operator != models.RuleOperatorNotContains {
+		return false
+	}
+	var values []string
+	if err := json.Unmarshal([]byte(rule.Value), &values); err != nil || len(values) == 0 {
+		return false
+	}
+	matched := slices.ContainsFunc(values, func(value string) bool { return slices.Contains(tags, value) })
+	if rule.Operator == models.RuleOperatorNotContains {
+		return !matched
+	}
+	return matched
+}
+
+func compareRuleValues(left, right string) (int, bool) {
+	a, errA := strconv.ParseFloat(left, 64)
+	b, errB := strconv.ParseFloat(right, 64)
+	if errA == nil && errB == nil && !math.IsNaN(a) && !math.IsNaN(b) && !math.IsInf(a, 0) && !math.IsInf(b, 0) {
+		return cmp.Compare(a, b), true
+	}
+	dateA, errA := time.Parse(time.DateOnly, left)
+	dateB, errB := time.Parse(time.DateOnly, right)
+	if errA == nil && errB == nil {
+		return dateA.Compare(dateB), true
+	}
+	return 0, false
 }
 
 func evaluateRecipientRule(recipients []string, rule models.RuleDetail) bool {
