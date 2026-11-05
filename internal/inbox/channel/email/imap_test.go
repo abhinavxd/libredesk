@@ -1474,9 +1474,10 @@ func TestProcessMailboxStopsOnCancellation(t *testing.T) {
 					Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port,
 					Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none",
 				}
-				if stage == "STARTTLS" {
+				switch stage {
+				case "STARTTLS":
 					cfg.TLSType = "starttls"
-				} else if stage == "tls_handshake" {
+				case "tls_handshake":
 					cfg.TLSType = "tls"
 				}
 				done := make(chan error, 1)
