@@ -1144,7 +1144,7 @@ func (m *Manager) resolveByPlusAddress(in *models.IncomingMessage) (senderID, co
 
 	// Visitor upgrade requires email match - proves email ownership.
 	// If a different email replied, thread the message but don't upgrade.
-	if !strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
+	if in.ContactFromReplyTo || !strings.EqualFold(conversation.Contact.Email.String, in.Contact.Email.String) {
 		return 0, conversationID, conversationUUID, nil
 	}
 

@@ -555,7 +555,8 @@ type IncomingMessage struct {
 	InboxID int
 
 	// Contact
-	Contact IncomingContact
+	Contact            IncomingContact
+	ContactFromReplyTo bool // Contact came from Reply-To, which proves nothing about who sent the mail
 
 	// Message fields
 	Subject     string
