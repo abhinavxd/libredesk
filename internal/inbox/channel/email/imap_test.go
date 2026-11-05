@@ -17,6 +17,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 	"unicode/utf8"
 
@@ -1436,6 +1437,154 @@ func TestFetchCompletionFailureIsReturned(t *testing.T) {
 	}
 }
 
+func TestIMAPConnTimeout(t *testing.T) {
+	for _, operation := range []string{"read", "write"} {
+		for _, transfers := range []int{0, 4} {
+			t.Run(fmt.Sprintf("%s/transfers=%d", operation, transfers), func(t *testing.T) {
+				synctest.Test(t, func(t *testing.T) {
+					ctx, cancel := context.WithCancelCause(t.Context())
+					defer cancel(nil /* cause */)
+					local, peer := net.Pipe()
+					defer local.Close()
+					defer peer.Close()
+					conn := &imapConn{Conn: local, timeout: imapIOTimeout, cancel: cancel}
+					go func() {
+						for range transfers {
+							time.Sleep(imapIOTimeout / 2)
+							if operation == "read" {
+								_, err := peer.Write([]byte("x"))
+								require.NoError(t, err)
+							} else {
+								_, err := peer.Read(make([]byte, 1))
+								require.NoError(t, err)
+							}
+						}
+					}()
+					transfer := func() error {
+						require.NoError(t, conn.SetDeadline(time.Time{}))
+						if operation == "read" {
+							_, err := conn.Read(make([]byte, 1))
+							return err
+						}
+						_, err := conn.Write([]byte("x"))
+						return err
+					}
+					started := time.Now()
+					for range transfers {
+						require.NoError(t, transfer())
+						require.NoError(t, ctx.Err())
+					}
+					if transfers > 0 {
+						require.Greater(t, time.Since(started), imapIOTimeout)
+					}
+					started = time.Now()
+					require.ErrorIs(t, transfer(), os.ErrDeadlineExceeded)
+					require.Equal(t, imapIOTimeout, time.Since(started))
+					require.ErrorIs(t, context.Cause(ctx), os.ErrDeadlineExceeded)
+				})
+			})
+		}
+	}
+}
+
+func TestIMAPFetchContinuesWhileDataArrives(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithCancelCause(t.Context())
+		defer cancel(nil /* cause */)
+		local, peer := net.Pipe()
+		defer local.Close()
+		defer peer.Close()
+		conn := &imapConn{Conn: local, timeout: imapIOTimeout, cancel: cancel}
+		serverDone := make(chan error, 1)
+		go func() {
+			if _, err := io.WriteString(peer, "* PREAUTH [CAPABILITY IMAP4rev1] ready\r\n"); err != nil {
+				serverDone <- err
+				return
+			}
+			line, err := bufio.NewReader(peer).ReadString('\n')
+			if err != nil {
+				serverDone <- err
+				return
+			}
+			tag, _, _ := strings.Cut(line, " ")
+			response := "* 1 FETCH (BODY[] {8}\r\nmessage!)\r\n" + tag + " OK fetched\r\n"
+			for i := range len(response) {
+				time.Sleep(time.Minute)
+				if _, err := io.WriteString(peer, response[i:i+1]); err != nil {
+					serverDone <- err
+					return
+				}
+			}
+			serverDone <- nil
+		}()
+		client := imapclient.New(conn, nil /* options */)
+		defer client.Close()
+		started := time.Now()
+		messages, err := client.Fetch(imap.SeqSetNum(1), &imap.FetchOptions{BodySection: []*imap.FetchItemBodySection{{}}}).Collect()
+		require.NoError(t, err)
+		require.Len(t, messages, 1)
+		require.Equal(t, "message!", string(messages[0].FindBodySection(&imap.FetchItemBodySection{})))
+		require.Greater(t, time.Since(started), imapIOTimeout)
+		require.NoError(t, ctx.Err())
+		require.NoError(t, <-serverDone)
+	})
+}
+
+func TestIMAPClientStopsOnNetworkTimeout(t *testing.T) {
+	for _, stage := range []string{"greeting", "LOGIN", "SELECT", "SEARCH", "headers", "header_literal", "body", "literal", "LOGOUT", "STARTTLS", "tls_handshake"} {
+		t.Run(stage, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancelCause(t.Context())
+				defer cancel(nil /* cause */)
+				local, peer := net.Pipe()
+				defer local.Close()
+				defer peer.Close()
+				conn := &imapConn{Conn: local, timeout: time.Second, cancel: cancel}
+				stop := context.AfterFunc(ctx, func() { conn.Close() })
+				defer stop()
+				serverDone := make(chan error, 1)
+				go func() { serverDone <- serveStalledMailbox(peer, stage, make(chan struct{})) }()
+				options := &imapclient.Options{TLSConfig: &tls.Config{ServerName: "localhost"}}
+				var client *imapclient.Client
+				var err error
+				switch stage {
+				case "STARTTLS":
+					client, err = imapclient.NewStartTLS(conn, options)
+				case "tls_handshake":
+					err = tls.Client(conn, options.TLSConfig).HandshakeContext(ctx)
+				default:
+					client = imapclient.New(conn, options)
+					err = client.Login("test", "secret").Wait()
+					if err == nil {
+						_, err = client.Select("INBOX", nil /* options */).Wait()
+					}
+					var searchResults *imap.SearchData
+					if err == nil {
+						searchResults, err = client.Search(&imap.SearchCriteria{}, nil /* options */).Wait()
+					}
+					if err == nil {
+						logger := logf.New(logf.Opts{Writer: io.Discard})
+						e := &Email{
+							primary: "support@example.com", lo: &logger,
+							messageStore: &fakeMessageStore{}, userStore: fakeUserStore{},
+						}
+						err = e.fetchAndProcessMessages(ctx, client, searchResults, e.Identifier())
+					}
+					if err == nil {
+						err = client.Logout().Wait()
+					}
+				}
+				require.Error(t, err)
+				require.ErrorIs(t, context.Cause(ctx), os.ErrDeadlineExceeded)
+				if client != nil {
+					client.Close()
+				}
+				require.NoError(t, <-serverDone)
+			})
+		})
+	}
+}
+
 func TestProcessMailboxStopsOnCancellation(t *testing.T) {
 	for _, stage := range []string{"greeting", "LOGIN", "SELECT", "SEARCH", "headers", "header_literal", "body", "literal", "LOGOUT", "STARTTLS", "tls_handshake"} {
 		for _, deadline := range []bool{false, true} {
@@ -1576,9 +1725,8 @@ func TestProcessMailboxTLS(t *testing.T) {
 			e := &Email{
 				primary: "support@example.com", lo: &logger,
 				aliasExpiryCallback: func(ctx context.Context, _ time.Time) error {
-					deadline, ok := ctx.Deadline()
-					require.True(t, ok)
-					require.WithinDuration(t, time.Now().Add(mailboxScanTimeout), deadline, time.Second)
+					_, ok := ctx.Deadline()
+					require.False(t, ok)
 					expired = true
 					return nil
 				},

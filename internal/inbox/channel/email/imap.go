@@ -29,7 +29,7 @@ import (
 const (
 	defaultReadInterval      = time.Duration(5 * time.Minute)
 	defaultScanInboxSince    = time.Duration(48 * time.Hour)
-	mailboxScanTimeout       = 10 * time.Minute
+	imapIOTimeout            = 10 * time.Minute
 	imapDialTimeout          = 30 * time.Second
 	aliasVerificationTimeout = 10 * time.Minute
 )
@@ -39,6 +39,35 @@ var recipientHeaders = []string{"To", "Cc", "Bcc", "X-Original-To", "Original-Re
 
 // Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
 var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
+
+// imapConn renews network deadlines on each transfer, including reads after go-imap clears its deadline.
+type imapConn struct {
+	net.Conn
+	timeout time.Duration
+	cancel  context.CancelCauseFunc
+}
+
+func (c *imapConn) Read(p []byte) (int, error) {
+	if err := c.Conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	n, err := c.Conn.Read(p)
+	if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
+		c.cancel(err)
+	}
+	return n, err
+}
+
+func (c *imapConn) Write(p []byte) (int, error) {
+	if err := c.Conn.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	n, err := c.Conn.Write(p)
+	if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
+		c.cancel(err)
+	}
+	return n, err
+}
 
 // ReadIncomingMessages reads and processes incoming messages from an IMAP server based on the provided configuration.
 func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig) error {
@@ -92,11 +121,11 @@ func (e *Email) readMailbox(ctx context.Context, scanInboxSince time.Duration, c
 
 // processMailbox processes emails in the specified mailbox.
 func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, mailboxScanTimeout)
-	defer cancel()
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil /* cause */)
 	defer func() {
 		if ctx.Err() != nil {
-			err = ctx.Err()
+			err = context.Cause(ctx)
 		}
 	}()
 
@@ -112,6 +141,7 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 	if err != nil {
 		return fmt.Errorf("failed to connect to IMAP server: %w", err)
 	}
+	conn = &imapConn{Conn: conn, timeout: imapIOTimeout, cancel: cancel}
 	defer conn.Close()
 	// IMAP waits do not accept a context, so cancellation must close the connection.
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
