@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,6 +197,99 @@ func TestRemovedProviderStaysDisabledWhenReloadFails(t *testing.T) {
 	}
 	if _, _, err := a.ExchangeOIDCToken(t.Context(), 1, "code"); err == nil {
 		t.Fatal("removed provider still accepts callbacks")
+	}
+}
+
+func TestProviderUnavailableAtStartupInitializesOnFirstUse(t *testing.T) {
+	var up, hold atomic.Bool
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !up.Load() || r.URL.Path != "/.well-known/openid-configuration" {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		if hold.Load() {
+			entered <- struct{}{}
+			<-release
+		}
+		issuer := "http://" + r.Host
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "jwks_uri": issuer + "/jwks"})
+	}))
+	defer server.Close()
+	defer close(release)
+	lo := logf.New(logf.Opts{})
+	provider := Provider{ID: 1, ProviderURL: server.URL, ClientID: "desk", RedirectURL: func() (string, error) { return "https://app.example.com/finish", nil }}
+	tightened, removed := provider, provider
+	tightened.ID, removed.ID = 3, 4
+	a, err := New(Config{Providers: []Provider{provider, tightened, removed}}, testutil.NewI18n(t), nil /** rd **/, &lo, nil /** dialControl **/)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.LoginURL(1, "state"); err == nil {
+		t.Fatal("login URL without discovery")
+	}
+	provider.VerifyEmail = true
+	if err := a.Reload(Config{Providers: []Provider{provider}}); err == nil {
+		t.Fatal("expected failed discovery")
+	}
+
+	up.Store(true)
+	if _, err := a.LoginURL(1, "state"); err != nil {
+		t.Fatal(err)
+	}
+	if !a.providers[1].verifyEmail {
+		t.Fatal("failed reload did not enforce verification for the provider initialized on first use")
+	}
+
+	// Discovery on first use runs without the lock, and what changed meanwhile wins.
+	duringDiscovery := func(id int, change func()) {
+		hold.Store(true)
+		done := make(chan struct{})
+		go func() {
+			a.LoginURL(id, "state")
+			close(done)
+		}()
+		select {
+		case <-entered:
+		case <-time.After(5 * time.Second):
+			t.Fatal("no discovery on first use")
+		}
+		hold.Store(false)
+		changed := make(chan struct{})
+		go func() {
+			change()
+			close(changed)
+		}()
+		select {
+		case <-changed:
+		case <-time.After(5 * time.Second):
+			t.Fatal("discovery on first use holds the lock")
+		}
+		release <- struct{}{}
+		<-done
+	}
+	tightened.VerifyEmail = true
+	duringDiscovery(3, func() {
+		if err := a.Reload(Config{Providers: []Provider{provider, tightened, removed, {ID: 2, ProviderURL: server.URL + "/unavailable"}}}); err == nil {
+			t.Error("expected failed discovery")
+		}
+	})
+	if p, ok := a.providers[3]; !ok || !p.verifyEmail {
+		t.Fatal("failed reload during discovery did not enforce verification")
+	}
+	duringDiscovery(4, func() { a.RemoveProvider(4) })
+	if _, ok := a.providers[4]; ok {
+		t.Fatal("provider removed during discovery was stored")
+	}
+
+	a.RemoveProvider(1)
+	if err := a.Reload(Config{Providers: []Provider{{ID: 2, ProviderURL: server.URL + "/unavailable"}}}); err == nil {
+		t.Fatal("expected failed discovery")
+	}
+	if _, err := a.LoginURL(1, "state"); err == nil {
+		t.Fatal("removed provider initialized again on first use")
 	}
 }
 
