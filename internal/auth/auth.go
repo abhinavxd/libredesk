@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -95,27 +96,6 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 
 	oidcClient := newOIDCClient(dialControl)
 
-	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), oidcClient), provider.ProviderURL)
-		if err != nil {
-			logger.Error("error initializing oidc provider", "error", err, "provider", provider.Provider)
-			continue
-		}
-
-		oauthCfg := oauth2.Config{
-			ClientID:     provider.ClientID,
-			ClientSecret: provider.ClientSecret,
-			Endpoint:     oidcProv.Endpoint(),
-			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		}
-
-		verifier := oidcProv.Verifier(&oidc.Config{ClientID: provider.ClientID})
-
-		oauthCfgs[provider.ID] = oauthCfg
-		providers[provider.ID] = oidcProvider{provider: oidcProv, verifier: verifier, verifyEmail: provider.VerifyEmail}
-		redirectURLs[provider.ID] = provider.RedirectURL
-	}
-
 	lifetime := cfg.SessionLifetime
 	if lifetime <= 0 {
 		lifetime = defaultSessionLifetime
@@ -140,7 +120,7 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 	sess.UseStore(st)
 	sess.SetCookieHooks(simpleSessGetCookieCB, simpleSessSetCookieCB)
 
-	return &Auth{
+	a := &Auth{
 		cfg:          cfg,
 		i18n:         i18n,
 		oauthCfgs:    oauthCfgs,
@@ -150,7 +130,12 @@ func New(cfg Config, i18n *i18n.I18n, rd *redis.Client, logger *logf.Logger, dia
 		logger:       logger,
 		rd:           rd,
 		oidcClient:   oidcClient,
-	}, nil
+	}
+	// A provider that fails here stays in cfg.Providers and is initialized on first use.
+	for _, provider := range cfg.Providers {
+		a.initProvider(provider, oauthCfgs, providers, redirectURLs)
+	}
+	return a, nil
 }
 
 // TestProvider tests the OIDC provider url by doing a discovery on it.
@@ -174,6 +159,12 @@ func (a *Auth) Reload(cfg Config) error {
 			current.verifyEmail = true
 			a.providers[provider.ID] = current
 		}
+		// a.cfg too, since a provider that is not initialized yet is initialized from it on first use.
+		for i, p := range a.cfg.Providers {
+			if p.ID == provider.ID && provider.VerifyEmail {
+				a.cfg.Providers[i].VerifyEmail = true
+			}
+		}
 	}
 
 	oauthCfgs := make(map[int]oauth2.Config)
@@ -181,24 +172,9 @@ func (a *Auth) Reload(cfg Config) error {
 	redirectURLs := make(map[int]func() (string, error))
 
 	for _, provider := range cfg.Providers {
-		oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
-		if err != nil {
-			a.logger.Error("error initializing oidc provider", "provider", provider.Provider, "provider_url", provider.ProviderURL, "error", err)
+		if err := a.initProvider(provider, oauthCfgs, providers, redirectURLs); err != nil {
 			return envelope.NewError(envelope.GeneralError, err.Error(), nil)
 		}
-
-		oauthCfg := oauth2.Config{
-			ClientID:     provider.ClientID,
-			ClientSecret: provider.ClientSecret,
-			Endpoint:     oidcProv.Endpoint(),
-			Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
-		}
-
-		verifier := oidcProv.Verifier(&oidc.Config{ClientID: provider.ClientID})
-
-		oauthCfgs[provider.ID] = oauthCfg
-		providers[provider.ID] = oidcProvider{provider: oidcProv, verifier: verifier, verifyEmail: provider.VerifyEmail}
-		redirectURLs[provider.ID] = provider.RedirectURL
 	}
 
 	a.cfg.Providers = cfg.Providers
@@ -215,10 +191,85 @@ func (a *Auth) RemoveProvider(id int) {
 	delete(a.oauthCfgs, id)
 	delete(a.providers, id)
 	delete(a.redirectURLs, id)
+	a.cfg.Providers = slices.DeleteFunc(a.cfg.Providers, func(p Provider) bool { return p.ID == id })
+}
+
+// initProvider runs OIDC discovery for the provider and adds it to the given maps.
+func (a *Auth) initProvider(provider Provider, oauthCfgs map[int]oauth2.Config, providers map[int]oidcProvider, redirectURLs map[int]func() (string, error)) error {
+	oauthCfg, oidcProv, err := a.buildProvider(provider)
+	if err != nil {
+		return err
+	}
+	oauthCfgs[provider.ID] = oauthCfg
+	providers[provider.ID] = oidcProv
+	redirectURLs[provider.ID] = provider.RedirectURL
+	return nil
+}
+
+// buildProvider runs OIDC discovery for the provider; it does not touch the Auth state, so it can run without a.mu.
+func (a *Auth) buildProvider(provider Provider) (oauth2.Config, oidcProvider, error) {
+	oidcProv, err := oidc.NewProvider(oidc.ClientContext(context.Background(), a.oidcClient), provider.ProviderURL)
+	if err != nil {
+		a.logger.Error("error initializing oidc provider", "provider", provider.Provider, "provider_url", provider.ProviderURL, "error", err)
+		return oauth2.Config{}, oidcProvider{}, err
+	}
+
+	oauthCfg := oauth2.Config{
+		ClientID:     provider.ClientID,
+		ClientSecret: provider.ClientSecret,
+		Endpoint:     oidcProv.Endpoint(),
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+	}
+
+	verifier := oidcProv.Verifier(&oidc.Config{ClientID: provider.ClientID})
+
+	return oauthCfg, oidcProvider{provider: oidcProv, verifier: verifier, verifyEmail: provider.VerifyEmail}, nil
+}
+
+// configuredProvider returns the provider with the given id from a.cfg; callers hold a.mu.
+func (a *Auth) configuredProvider(id int) (Provider, bool) {
+	for _, provider := range a.cfg.Providers {
+		if provider.ID == id {
+			return provider, true
+		}
+	}
+	return Provider{}, false
+}
+
+// ensureProvider initializes a configured provider whose discovery failed earlier, e.g. because the identity provider started after Libredesk.
+// Discovery runs without the lock, so an unreachable identity provider does not block other requests.
+func (a *Auth) ensureProvider(id int) {
+	a.mu.RLock()
+	_, ok := a.providers[id]
+	provider, configured := a.configuredProvider(id)
+	a.mu.RUnlock()
+	if ok || !configured {
+		return
+	}
+
+	oauthCfg, oidcProv, err := a.buildProvider(provider)
+	if err != nil {
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	// Reload, RemoveProvider or another request may have run during discovery.
+	current, configured := a.configuredProvider(id)
+	if _, ok := a.providers[id]; ok || !configured {
+		return
+	}
+	// A failed Reload may have tightened email verification in the meantime.
+	oidcProv.verifyEmail = current.VerifyEmail
+	a.oauthCfgs[id] = oauthCfg
+	a.providers[id] = oidcProv
+	a.redirectURLs[id] = current.RedirectURL
+	a.logger.Info("initialized oidc provider on first use", "provider", current.Provider, "provider_id", id)
 }
 
 // LoginURL returns the login URL for the given provider.
 func (a *Auth) LoginURL(providerID int, state string) (string, error) {
+	a.ensureProvider(providerID)
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	oauthCfg, ok := a.oauthCfgs[providerID]
@@ -234,6 +285,7 @@ func (a *Auth) LoginURL(providerID int, state string) (string, error) {
 	return oauthCfg.AuthCodeURL(state), nil
 }
 func (a *Auth) ExchangeOIDCToken(ctx context.Context, providerID int, code string) (string, OIDCclaim, error) {
+	a.ensureProvider(providerID)
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
