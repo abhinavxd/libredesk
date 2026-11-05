@@ -56,6 +56,11 @@ UPDATE inbox_email_addresses
 SET verification_status = 'not_verified', verification_token = NULL, verification_started_at = NULL, verified_at = NULL
 WHERE inbox_id = $1 AND kind = 'alias';
 
+-- name: reset-pending-alias-verification
+UPDATE inbox_email_addresses
+SET verification_status = 'not_verified', verification_token = NULL, verification_started_at = NULL
+WHERE inbox_id = $1 AND kind = 'alias' AND verification_status = 'pending';
+
 -- name: insert-inbox-email-address
 INSERT INTO inbox_email_addresses (inbox_id, email, kind, position, verification_status)
 VALUES ($1, $2, $3, $4, $5)
