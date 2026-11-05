@@ -4,15 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"net"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unicode/utf8"
@@ -1433,6 +1436,163 @@ func TestFetchCompletionFailureIsReturned(t *testing.T) {
 	}
 }
 
+func TestProcessMailboxStopsOnCancellation(t *testing.T) {
+	for _, stage := range []string{"greeting", "LOGIN", "SELECT", "SEARCH", "headers", "header_literal", "body", "literal", "LOGOUT", "STARTTLS", "tls_handshake"} {
+		for _, deadline := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/deadline=%t", stage, deadline), func(t *testing.T) {
+				t.Parallel()
+				listener, err := net.Listen("tcp", "127.0.0.1:0")
+				require.NoError(t, err)
+				t.Cleanup(func() { listener.Close() })
+				stalled := make(chan struct{})
+				serverDone := make(chan error, 1)
+				go func() {
+					conn, err := listener.Accept()
+					if err != nil {
+						serverDone <- err
+						return
+					}
+					defer conn.Close()
+					serverDone <- serveStalledMailbox(conn, stage, stalled)
+				}()
+
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				if deadline {
+					var cancelDeadline context.CancelFunc
+					ctx, cancelDeadline = context.WithTimeout(ctx, 500*time.Millisecond)
+					defer cancelDeadline()
+				}
+				logger := logf.New(logf.Opts{Writer: io.Discard})
+				authFailed := false
+				e := &Email{
+					primary: "support@example.com", lo: &logger,
+					messageStore: &fakeMessageStore{}, userStore: fakeUserStore{},
+					authStatusCallback: func(_ int, ok bool) { authFailed = !ok },
+				}
+				cfg := imodels.IMAPConfig{
+					Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port,
+					Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none",
+				}
+				if stage == "STARTTLS" {
+					cfg.TLSType = "starttls"
+				} else if stage == "tls_handshake" {
+					cfg.TLSType = "tls"
+				}
+				done := make(chan error, 1)
+				go func() { done <- e.processMailbox(ctx, time.Hour, cfg) }()
+				select {
+				case <-stalled:
+				case err := <-serverDone:
+					t.Fatalf("server stopped before %s: %v", stage, err)
+				case <-time.After(3 * time.Second):
+					t.Fatal("scan did not reach the stalled operation")
+				}
+				want := context.DeadlineExceeded
+				if !deadline {
+					cancel()
+					want = context.Canceled
+				}
+				select {
+				case err := <-done:
+					require.ErrorIs(t, err, want)
+				case <-time.After(3 * time.Second):
+					t.Fatal("cancellation did not release the stalled scan")
+				}
+				require.False(t, authFailed, "cancellation must not mark credentials invalid")
+				if stage != "LOGOUT" {
+					require.Empty(t, e.messageStore.(*fakeMessageStore).enqueued)
+				}
+				require.NoError(t, <-serverDone)
+			})
+		}
+	}
+}
+
+func TestReadMailboxLogsDeadlineAndAllowsNextScan(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { listener.Close() })
+	serverDone := make(chan error, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			serverDone <- err
+			return
+		}
+		defer conn.Close()
+		serverDone <- serveStalledMailbox(conn, "SELECT", make(chan struct{}))
+	}()
+	var logs bytes.Buffer
+	logger := logf.New(logf.Opts{Writer: &logs})
+	e := &Email{
+		id: 803, primary: "support@example.com", lo: &logger,
+		messageStore: &fakeMessageStore{}, userStore: fakeUserStore{},
+	}
+	cfg := imodels.IMAPConfig{
+		Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port,
+		Username: "test", Password: "secret", Mailbox: "INBOX", TLSType: "none",
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	e.readMailbox(ctx, time.Hour, cfg)
+	require.NoError(t, <-serverDone)
+	require.Contains(t, logs.String(), "context deadline exceeded")
+	require.Contains(t, logs.String(), "inbox_id=803")
+
+	go func() { serverDone <- serveEncodedSenderEnvelope(listener, "Customer") }()
+	require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+	require.NoError(t, <-serverDone)
+	require.Len(t, e.messageStore.(*fakeMessageStore).enqueued, 1)
+}
+
+func TestProcessMailboxTLS(t *testing.T) {
+	certServer := httptest.NewTLSServer(nil /* handler */)
+	t.Cleanup(certServer.Close)
+	for _, tlsType := range []string{"tls", "starttls"} {
+		t.Run(tlsType, func(t *testing.T) {
+			user := imapmemserver.NewUser("test", "secret")
+			require.NoError(t, user.Create("INBOX", nil /* options */))
+			mem := imapmemserver.New()
+			mem.AddUser(user)
+			tlsConfig := certServer.TLS.Clone()
+			tlsConfig.NextProtos = []string{"imap"}
+			server := imapserver.New(&imapserver.Options{
+				NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+					return mem.NewSession(), nil, nil
+				},
+				Caps: imap.CapSet{imap.CapIMAP4rev1: {}}, TLSConfig: tlsConfig,
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { server.Close() })
+			if tlsType == "tls" {
+				listener = tls.NewListener(listener, tlsConfig)
+			}
+			go server.Serve(listener)
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			expired := false
+			e := &Email{
+				primary: "support@example.com", lo: &logger,
+				aliasExpiryCallback: func(ctx context.Context, _ time.Time) error {
+					deadline, ok := ctx.Deadline()
+					require.True(t, ok)
+					require.WithinDuration(t, time.Now().Add(mailboxScanTimeout), deadline, time.Second)
+					expired = true
+					return nil
+				},
+			}
+			cfg := imodels.IMAPConfig{
+				Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port,
+				Username: "test", Password: "secret", Mailbox: "INBOX",
+				TLSType: tlsType, TLSSkipVerify: true,
+			}
+			require.NoError(t, e.processMailbox(t.Context(), time.Hour, cfg))
+			require.True(t, expired)
+		})
+	}
+}
+
 func mailboxProcessor(t testing.TB) func(*testing.T, string, string) models.IncomingMessage {
 	t.Helper()
 	user := imapmemserver.NewUser("test", "secret")
@@ -1538,4 +1698,82 @@ func serveEncodedSenderEnvelope(listener net.Listener, from string) error {
 		}
 	}
 	return nil
+}
+
+func serveStalledMailbox(conn net.Conn, stage string, stalled chan<- struct{}) error {
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return err
+	}
+	waitForClose := func() error {
+		close(stalled)
+		_, err := io.Copy(io.Discard, conn)
+		if errors.Is(err, syscall.ECONNRESET) {
+			return nil
+		}
+		return err
+	}
+	if stage == "greeting" || stage == "tls_handshake" {
+		return waitForClose()
+	}
+	if _, err := io.WriteString(conn, "* OK [CAPABILITY IMAP4rev1 STARTTLS] ready\r\n"); err != nil {
+		return err
+	}
+	reader := bufio.NewReader(conn)
+	headers := "Message-ID: <stall-test@example.com>\r\n\r\n"
+	raw := "From: customer@example.com\r\nTo: support@example.com\r\n" + headers + "body"
+	envelope := "(NIL \"test\" ((NIL NIL \"customer\" \"example.com\")) NIL NIL NIL NIL NIL NIL \"<stall-test@example.com>\")"
+	fetches := 0
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return err
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			return fmt.Errorf("invalid command: %q", line)
+		}
+		tag, command := fields[0], fields[1]
+		if command == stage {
+			return waitForClose()
+		}
+		var response string
+		switch command {
+		case "LOGIN":
+			response = tag + " OK [CAPABILITY IMAP4rev1] logged in\r\n"
+		case "SELECT":
+			response = "* 1 EXISTS\r\n* OK [UIDVALIDITY 1] valid\r\n" + tag + " OK selected\r\n"
+		case "SEARCH":
+			response = "* SEARCH 1\r\n" + tag + " OK searched\r\n"
+		case "FETCH":
+			fetches++
+			if fetches == 1 {
+				if stage == "headers" {
+					return waitForClose()
+				}
+				if stage == "header_literal" {
+					if _, err := fmt.Fprintf(conn, "* 1 FETCH (UID 1 ENVELOPE %s BODY[HEADER.FIELDS (MESSAGE-ID)] {1024}\r\npartial header", envelope); err != nil {
+						return err
+					}
+					return waitForClose()
+				}
+				response = fmt.Sprintf("* 1 FETCH (UID 1 ENVELOPE %s BODY[HEADER.FIELDS (MESSAGE-ID)] {%d}\r\n%s)\r\n%s OK fetched\r\n", envelope, len(headers), headers, tag)
+			} else {
+				if stage == "body" {
+					return waitForClose()
+				}
+				if stage == "literal" {
+					if _, err := io.WriteString(conn, "* 1 FETCH (BODY[] {1024}\r\npartial body"); err != nil {
+						return err
+					}
+					return waitForClose()
+				}
+				response = fmt.Sprintf("* 1 FETCH (BODY[] {%d}\r\n%s)\r\n%s OK fetched\r\n", len(raw), raw, tag)
+			}
+		default:
+			return fmt.Errorf("unexpected command: %q", line)
+		}
+		if _, err := io.WriteString(conn, response); err != nil {
+			return err
+		}
+	}
 }

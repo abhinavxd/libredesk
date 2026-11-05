@@ -8,7 +8,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.33.0
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/disintegration/imaging v1.6.2
-	github.com/emersion/go-imap/v2 v2.0.0-beta.3
+	github.com/emersion/go-imap/v2 v2.0.0-beta.7
 	github.com/emersion/go-message v0.18.1
 	github.com/fasthttp/websocket v1.5.9
 	github.com/ferluci/fast-realip v1.0.1
