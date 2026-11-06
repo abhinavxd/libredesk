@@ -224,6 +224,7 @@
         <FormControl class="flex-1 flex flex-col min-h-0">
           <div class="flex flex-col h-full">
             <Editor
+              ref="editorRef"
               v-model:htmlContent="componentField.modelValue"
               @update:htmlContent="(value) => componentField.onChange(value)"
               :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
@@ -347,6 +348,7 @@ const loading = ref(false)
 const emailQuery = ref('')
 const conversationStore = useConversationStore()
 const insertContent = ref('')
+const editorRef = ref(null)
 const selectedContact = ref(null)
 const emailInputRef = ref(null)
 const draft = useNewConversationDraft('email')
@@ -543,13 +545,12 @@ const createConversation = form.handleSubmit(async (values) => {
   }
 })
 
+// Watches the macro object rather than its id so the same macro can be applied more than once.
 watch(
-  () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).id,
-  () => {
-    const content = conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION).message_content
-    if (content) form.setFieldValue('content', content)
-  },
-  { deep: true }
+  () => conversationStore.getMacro(MACRO_CONTEXT.NEW_CONVERSATION),
+  (macro) => {
+    if (macro.message_content) editorRef.value?.insertHtml(macro.message_content)
+  }
 )
 
 const hasDraftContent = (values) =>

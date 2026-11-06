@@ -79,7 +79,7 @@ const { startTyping, stopTyping } = useTypingIndicator(conversationStore.sendTyp
   }
 })
 
-const { editor, extractMentions, focus } = useTextEditor({
+const { editor, extractMentions, focus, insertHtml } = useTextEditor({
   extensions: buildConversationExtensions({ getPlaceholder: () => props.placeholder }),
   htmlContent,
   textContent,
@@ -111,7 +111,7 @@ watch(
   (disabled) => editor.value?.setEditable(!disabled, false)
 )
 
-defineExpose({ focus, extractMentions })
+defineExpose({ focus, extractMentions, insertHtml })
 </script>
 
 <style lang="scss" src="./editorStyles.scss"></style>
