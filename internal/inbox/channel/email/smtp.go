@@ -30,18 +30,20 @@ const (
 	dispositionInline = "inline"
 )
 
-// NewSmtpPool returns a smtppool
-func NewSmtpPool(configs []imodels.SMTPConfig, oauth *imodels.OAuthConfig) ([]*smtppool.Pool, error) {
+// NewSmtpPool returns a smtppool. With useXOAUTH2 every server authenticates with XOAUTH2 and the token is required.
+func NewSmtpPool(configs []imodels.SMTPConfig, xoauth2Token string, useXOAUTH2 bool) ([]*smtppool.Pool, error) {
+	if useXOAUTH2 && xoauth2Token == "" {
+		return nil, fmt.Errorf("XOAUTH2 SMTP authentication needs an access token")
+	}
 	pools := make([]*smtppool.Pool, 0, len(configs))
 
 	for _, cfg := range configs {
 		var auth smtp.Auth
 
-		// Check if OAuth authentication should be used
-		if oauth != nil && oauth.AccessToken != "" {
+		if useXOAUTH2 {
 			auth = &XOAuth2SMTPAuth{
 				Username: cfg.Username,
-				Token:    oauth.AccessToken,
+				Token:    xoauth2Token,
 			}
 		} else {
 			// Use traditional authentication methods
@@ -127,7 +129,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 	}
 
 	// Recreate SMTP pools if token changed (handles both: we refreshed or IMAP refreshed)
-	if e.authType == imodels.AuthTypeOAuth2 && oauthConfig != nil {
+	if e.usesXOAUTH2() && oauthConfig != nil {
 		e.smtpPoolsMu.Lock()
 		if e.smtpPoolsToken != oauthConfig.AccessToken {
 			// Close existing pools
@@ -136,7 +138,7 @@ func (e *Email) Send(m models.OutboundMessage) error {
 			}
 
 			// Create new pools with current token
-			newPools, err := NewSmtpPool(e.smtpCfg, oauthConfig)
+			newPools, err := NewSmtpPool(e.smtpCfg, oauthConfig.AccessToken, true)
 			if err != nil {
 				e.smtpPoolsMu.Unlock()
 				e.lo.Error("failed to recreate smtp pools after token refresh", "inbox_id", e.Identifier(), "error", err)

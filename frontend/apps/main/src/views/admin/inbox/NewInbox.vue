@@ -67,6 +67,7 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
+import { AUTH_TYPE_OAUTH2_APP } from '@/constants/auth.js'
 
 const { t } = useI18n()
 const emitter = useEmitter()
@@ -150,6 +151,10 @@ const submitForm = (values) => {
       imap: [values.imap],
       smtp: [values.smtp]
     }
+  }
+  if (values.auth_type === AUTH_TYPE_OAUTH2_APP) {
+    payload.config.auth_type = values.auth_type
+    payload.config.oauth = values.oauth
   }
   createInbox(payload)
 }

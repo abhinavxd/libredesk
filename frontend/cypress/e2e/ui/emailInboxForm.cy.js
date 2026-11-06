@@ -416,6 +416,83 @@ describe('Email inbox form', () => {
     cy.get('@updateInbox.all').should('have.length', 1)
   })
 
+  it('creates a Microsoft app-only inbox without a redirect', () => {
+    cy.visit(newPath)
+    cy.contains('Create an email inbox').click()
+    cy.contains('button', 'Microsoft (app-only)').click()
+    field('name').type('Shared support')
+    field('from').type('Shared Support <shared@contoso.com>')
+    field('imap.host').should('have.value', 'outlook.office365.com')
+    field('smtp.host').should('have.value', 'smtp.office365.com')
+    field('imap.username').should('have.value', 'shared@contoso.com')
+    field('smtp.username').should('have.value', 'shared@contoso.com')
+    field('imap.password').should('not.be.visible')
+    field('smtp.password').should('not.be.visible')
+    field('oauth.tenant_id').type('common')
+    submit()
+    field('oauth.tenant_id').should('have.attr', 'aria-invalid', 'true')
+    field('oauth.client_id').should('have.attr', 'aria-invalid', 'true')
+    field('oauth.client_secret').should('have.attr', 'aria-invalid', 'true')
+    cy.get('@createInbox.all').should('have.length', 0)
+    field('oauth.tenant_id').clear().type('contoso.onmicrosoft.com')
+    field('oauth.client_id').type('app-id')
+    field('oauth.client_secret').type('app-secret')
+    submit()
+    cy.wait('@createInbox').then(({ request }) => {
+      const { config } = request.body
+      expect(config.auth_type).to.eq('oauth2_app')
+      expect(config.oauth).to.deep.eq({
+        provider: 'microsoft',
+        tenant_id: 'contoso.onmicrosoft.com',
+        client_id: 'app-id',
+        client_secret: 'app-secret'
+      })
+      expect(config.imap[0]).to.include({
+        host: 'outlook.office365.com',
+        port: 993,
+        tls_type: 'tls',
+        username: 'shared@contoso.com'
+      })
+      expect(config.smtp[0]).to.include({
+        host: 'smtp.office365.com',
+        port: 587,
+        tls_type: 'starttls',
+        username: 'shared@contoso.com'
+      })
+    })
+    cy.location('pathname').should('eq', '/admin/inboxes')
+  })
+
+  it('keeps the stored app-only secret and offers no reconnect', () => {
+    inbox.config.auth_type = 'oauth2_app'
+    inbox.config.oauth = {
+      provider: 'microsoft',
+      tenant_id: 'contoso.onmicrosoft.com',
+      client_id: 'app-id',
+      client_secret: maskedSecret,
+      access_token: maskedSecret,
+      refresh_token: maskedSecret
+    }
+    cy.visit(editPath)
+    cy.get('[data-testid="app-only-status"]').should('contain.text', 'Microsoft (app-only)')
+    cy.contains('button', 'Reconnect').should('not.be.visible')
+    field('oauth.tenant_id').should('have.value', 'contoso.onmicrosoft.com')
+    field('oauth.client_secret').should('have.value', maskedSecret)
+    field('name').clear().type('Renamed shared')
+    submit()
+    cy.wait('@updateInbox').then(({ request }) => {
+      expect(request.body.config.auth_type).to.eq('oauth2_app')
+      expect(request.body.config.oauth).to.deep.eq({
+        provider: 'microsoft',
+        tenant_id: 'contoso.onmicrosoft.com',
+        client_id: 'app-id',
+        client_secret: '',
+        access_token: '',
+        refresh_token: ''
+      })
+    })
+  })
+
   it('reveals OAuth advanced validation errors', () => {
     inbox.config.auth_type = 'oauth2'
     inbox.config.oauth = { provider: 'microsoft', client_id: 'test-client' }

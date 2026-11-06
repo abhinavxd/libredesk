@@ -20,7 +20,12 @@ import (
 
 const (
 	ChannelEmail = "email"
+
+	appOnlyTokenTimeout = 10 * time.Second
 )
+
+// clientCredentialsToken requests app-only tokens. Tests replace it.
+var clientCredentialsToken = oauth.ClientCredentialsToken
 
 var _ inbox.EmailInbox = (*Email)(nil)
 
@@ -37,6 +42,8 @@ type Email struct {
 	oauth                     *models.OAuthConfig
 	oauthMu                   sync.RWMutex
 	authType                  string
+	xoauth2                   bool
+	appOnly                   bool
 	headers                   map[string]string
 	lo                        *logf.Logger
 	from                      string
@@ -55,8 +62,8 @@ type Email struct {
 }
 
 // TokenRefreshCallback is called when OAuth tokens are refreshed.
-// It receives the inbox ID and the updated config with new tokens.
-type TokenRefreshCallback func(inboxID int, updatedConfig models.Config) error
+// The previous credentials allow persistence to reject stale refreshes after an admin edit.
+type TokenRefreshCallback func(inboxID int, previous *models.OAuthConfig, updatedConfig models.Config) error
 
 // AuthStatusCallback reports the provider's latest verdict on the inbox credentials. Ok=true clears a previously flagged failure.
 type AuthStatusCallback func(inboxID int, ok bool)
@@ -78,14 +85,27 @@ type Opts struct {
 
 // New returns a new instance of the email inbox.
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email, error) {
-	pools, err := NewSmtpPool(opts.Config.SMTP, opts.Config.OAuth)
-	if err != nil {
-		return nil, err
+	// App-only tokens are never stored, so any token in the config belongs to something else. Fetch our own.
+	if opts.Config.UsesXOAUTH2() && opts.Config.IsAppOnly() {
+		appOAuth := *opts.Config.OAuth
+		appOAuth.AccessToken, appOAuth.RefreshToken, appOAuth.ExpiresAt = "", "", time.Time{}
+		opts.Config.OAuth = &appOAuth
 	}
 
-	var poolsToken string
-	if opts.Config.OAuth != nil {
-		poolsToken = opts.Config.OAuth.AccessToken
+	// XOAUTH2 pools need a token; without one they are built on the first Send, never with an empty credential.
+	var (
+		pools      []*smtppool.Pool
+		poolsToken string
+		err        error
+	)
+	if !opts.Config.UsesXOAUTH2() {
+		pools, err = NewSmtpPool(opts.Config.SMTP, "", false)
+	} else if token := opts.Config.OAuth.AccessToken; token != "" {
+		pools, err = NewSmtpPool(opts.Config.SMTP, token, true)
+		poolsToken = token
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	primary, err := inbox.NormalizeEmailAddress(opts.Config.From)
@@ -127,11 +147,26 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		userStore:                 userStore,
 		oauth:                     opts.Config.OAuth,
 		authType:                  opts.Config.AuthType,
+		xoauth2:                   opts.Config.UsesXOAUTH2(),
+		appOnly:                   opts.Config.UsesXOAUTH2() && opts.Config.IsAppOnly(),
 		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
 		tokenRefreshCallback:      opts.TokenRefreshCallback,
 		aliasVerificationCallback: opts.AliasVerificationCallback,
 		aliasExpiryCallback:       opts.AliasExpiryCallback,
 		authStatusCallback:        opts.AuthStatusCallback,
+	}
+
+	// Fetch the app-only token up front so the first SMTP pool authenticates with it. A failure is
+	// already logged and flagged; Send retries and builds the pools later.
+	if e.appOnly {
+		if oauthCfg, _, err := e.refreshOAuthIfNeeded(); err == nil {
+			pools, err := NewSmtpPool(e.smtpCfg, oauthCfg.AccessToken, true)
+			if err != nil {
+				return nil, err
+			}
+			e.smtpPools = pools
+			e.smtpPoolsToken = oauthCfg.AccessToken
+		}
 	}
 	return e, nil
 }
@@ -236,7 +271,7 @@ func (e *Email) getCurrentConfig() models.Config {
 // refreshOAuthIfNeeded checks if OAuth token is expired and refreshes it if needed.
 // Returns a copy of the oauth config and whether it was refreshed.
 func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
-	if e.authType != models.AuthTypeOAuth2 {
+	if !e.usesXOAUTH2() {
 		return nil, false, nil
 	}
 
@@ -250,10 +285,26 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 		return oauthCopy, false, nil
 	}
 
+	// App-only tokens are fetched again rather than refreshed, and stay in memory only.
+	if e.appOnly {
+		newOAuth, err := e.acquireAppOnlyToken()
+		if err != nil {
+			e.oauthMu.Unlock()
+			e.lo.Error("error acquiring app-only OAuth token", "inbox_id", e.Identifier(), "error", err)
+			e.flagAuthError()
+			return nil, false, fmt.Errorf("acquiring app-only OAuth token for inbox %d: %w", e.Identifier(), err)
+		}
+		e.oauth = newOAuth
+		e.oauthMu.Unlock()
+		e.clearAuthError()
+		return newOAuth, true, nil
+	}
+
 	e.lo.Info("OAuth token expired, attempting refresh", "inbox_id", e.Identifier(), "expires_at", e.oauth.ExpiresAt)
 
 	// Attempt to refresh the token
-	newOAuth, err := RefreshOAuthConfig(e.oauth)
+	previousOAuth := e.oauth
+	newOAuth, err := RefreshOAuthConfig(models.Config{AuthType: e.authType, OAuth: previousOAuth})
 	if err != nil {
 		e.oauthMu.Unlock()
 		e.lo.Error("Failed to refresh OAuth token", "inbox_id", e.Identifier(), "error", err)
@@ -269,7 +320,8 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	// Persist tokens via callback if available.
 	if e.tokenRefreshCallback != nil {
 		updatedConfig := e.getCurrentConfig()
-		if err := e.tokenRefreshCallback(e.Identifier(), updatedConfig); err != nil {
+		updatedConfig.OAuth = newOAuth
+		if err := e.tokenRefreshCallback(e.Identifier(), previousOAuth, updatedConfig); err != nil {
 			e.lo.Error("Failed to persist refreshed tokens", "inbox_id", e.Identifier(), "error", err)
 		}
 	}
@@ -277,6 +329,11 @@ func (e *Email) refreshOAuthIfNeeded() (*models.OAuthConfig, bool, error) {
 	e.lo.Info("Successfully refreshed OAuth token", "inbox_id", e.Identifier())
 	e.clearAuthError()
 	return oauthCopy, true, nil
+}
+
+// usesXOAUTH2 reports whether IMAP and SMTP authenticate with XOAUTH2.
+func (e *Email) usesXOAUTH2() bool {
+	return e.xoauth2
 }
 
 func (e *Email) flagAuthError() {
@@ -291,6 +348,22 @@ func (e *Email) clearAuthError() {
 	}
 }
 
+// acquireAppOnlyToken requests a client credentials token and returns an updated copy of the OAuth config.
+// The caller must hold oauthMu.
+func (e *Email) acquireAppOnlyToken() (*models.OAuthConfig, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), appOnlyTokenTimeout)
+	defer cancel()
+	token, err := clientCredentialsToken(ctx, e.oauth.ClientID, e.oauth.ClientSecret, e.oauth.TenantID)
+	if err != nil {
+		return nil, oauth.SafeTokenError(err)
+	}
+	updated := *e.oauth
+	updated.AccessToken = token.AccessToken
+	updated.ExpiresAt = token.Expiry
+	updated.RefreshToken = ""
+	return &updated, nil
+}
+
 // closeSMTPPool closes the smtp pool.
 func (e *Email) closeSMTPPool() error {
 	e.smtpPoolsMu.Lock()
@@ -302,7 +375,11 @@ func (e *Email) closeSMTPPool() error {
 }
 
 // RefreshOAuthConfig refreshes an expired OAuth token and returns a new OAuth config.
-func RefreshOAuthConfig(currentToken *models.OAuthConfig) (*models.OAuthConfig, error) {
+func RefreshOAuthConfig(config models.Config) (*models.OAuthConfig, error) {
+	if config.AuthType != models.AuthTypeOAuth2 || config.OAuth == nil {
+		return nil, fmt.Errorf("delegated OAuth config required")
+	}
+	currentToken := config.OAuth
 	if currentToken.RefreshToken == "" {
 		return nil, fmt.Errorf("no refresh token available")
 	}

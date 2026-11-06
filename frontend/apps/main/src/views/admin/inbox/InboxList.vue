@@ -67,6 +67,8 @@ onMounted(async () => {
       msg = t('inbox.oauthNotFound')
     } else if (errorCode === 'email_mismatch') {
       msg = t('inbox.oauthEmailMismatch')
+    } else if (errorCode === 'reconnect_not_supported') {
+      msg = t('admin.inbox.oauth.appOnly.reconnectNotSupported')
     } else {
       msg = t('toast.errorConnectingInbox')
     }

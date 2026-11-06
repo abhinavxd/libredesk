@@ -52,7 +52,7 @@ import CopyButton from '@/components/button/CopyButton.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
+import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2, AUTH_TYPE_OAUTH2_APP } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
@@ -85,7 +85,8 @@ const submitForm = (values) => {
       smtp: [{ ...values.smtp }]
     }
 
-    if (values.auth_type === AUTH_TYPE_OAUTH2) {
+    const usesOAuth = [AUTH_TYPE_OAUTH2, AUTH_TYPE_OAUTH2_APP].includes(values.auth_type)
+    if (usesOAuth) {
       config.oauth = values.oauth
     }
 
@@ -99,7 +100,7 @@ const submitForm = (values) => {
       payload.config.imap[0].password = ''
     }
 
-    if (payload.config.auth_type === AUTH_TYPE_OAUTH2) {
+    if (usesOAuth) {
       if (payload.config.oauth.access_token?.includes('•')) {
         payload.config.oauth.access_token = ''
       }

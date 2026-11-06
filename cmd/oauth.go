@@ -61,6 +61,13 @@ func handleOAuthAuthorize(r *fastglue.Request) error {
 		req.FlowType = FlowTypeNewInbox
 	}
 
+	// App-only inboxes have no user to sign in; reconnecting would replace their credentials with delegated ones.
+	if req.FlowType == FlowTypeReconnect {
+		if target, err := app.inbox.GetDBRecord(req.InboxID); err == nil && isAppOnlyInbox(target) {
+			return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("admin.inbox.oauth.appOnly.reconnectNotSupported"), nil, envelope.InputError)
+		}
+	}
+
 	// Build redirect URI
 	redirectURI := app.consts.Load().(*constants).AppBaseURL + "/api/v1/inboxes/oauth/" + provider + "/callback"
 
@@ -244,6 +251,12 @@ func handleOAuthCallback(r *fastglue.Request) error {
 			return r.Redirect("/admin/inboxes?error=inbox_not_found", fasthttp.StatusFound, nil, "")
 		}
 
+		// Re-checked here because the inbox may have switched to app-only after the flow started.
+		if isAppOnlyInbox(*targetInbox) {
+			app.lo.Error("Reconnect rejected for app-only inbox", "inbox_id", inboxIDStr)
+			return r.Redirect("/admin/inboxes?error=reconnect_not_supported", fasthttp.StatusFound, nil, "")
+		}
+
 		// Verify the authorized email matches the target inbox's email
 		targetEmailAddr, _ := stringutil.ExtractEmail(targetInbox.From)
 		if targetEmailAddr != userEmailAddr {
@@ -275,18 +288,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 			ClientSecret: clientSecret,
 			TenantID:     tenantID,
 		}
-		existingConfig.OAuth = oauthConfig
-		existingConfig.AuthType = imodels.AuthTypeOAuth2
-
-		// Marshal updated config
-		configJSON, err := json.Marshal(existingConfig)
-		if err != nil {
-			app.lo.Error("Failed to marshal updated config", "error", err)
-			return r.Redirect("/admin/inboxes?error=config_update_failed", fasthttp.StatusFound, nil, "")
-		}
-
-		// Update inbox config directly (bypasses preservation logic that could corrupt OAuth tokens)
-		if err := app.inbox.UpdateConfig(existingInbox.ID, json.RawMessage(configJSON)); err != nil {
+		if err := app.inbox.UpdateOAuthConfig(existingInbox.ID, existingConfig.AuthType, existingConfig.OAuth, oauthConfig); err != nil {
 			app.lo.Error("Failed to update inbox config", "error", err)
 			return r.Redirect("/admin/inboxes?error=inbox_update_failed", fasthttp.StatusFound, nil, "")
 		}
@@ -352,6 +354,18 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	}
 
 	return r.Redirect("/admin/inboxes?success=oauth_connected", fasthttp.StatusFound, nil, "")
+}
+
+// isAppOnlyInbox reports whether an email inbox authenticates with client credentials.
+func isAppOnlyInbox(inb imodels.Inbox) bool {
+	if inb.Channel != inbox.ChannelEmail {
+		return false
+	}
+	var cfg imodels.Config
+	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+		return false
+	}
+	return cfg.IsAppOnly()
 }
 
 // getUserEmailFromProvider fetches the user's email from the OAuth provider.

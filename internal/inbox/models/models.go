@@ -16,6 +16,8 @@ import (
 const (
 	AuthTypePassword = "password"
 	AuthTypeOAuth2   = "oauth2"
+	// AuthTypeOAuth2App authenticates as the app itself (OAuth 2.0 client credentials), with no signed-in user.
+	AuthTypeOAuth2App = "oauth2_app"
 )
 
 // Alias send verification states.
@@ -84,14 +86,24 @@ func (a EmailAliases) Value() (driver.Value, error) {
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
 type Config struct {
-	AuthType             string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
-	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
+	AuthType             string       `json:"auth_type"` // AuthTypePassword, AuthTypeOAuth2 or AuthTypeOAuth2App
+	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2" or "oauth2_app"
 	SMTP                 []SMTPConfig `json:"smtp"`
 	IMAP                 []IMAPConfig `json:"imap"`
 	From                 string       `json:"from"`
 	FromNameTemplate     string       `json:"from_name_template"`
 	ReplyTo              string       `json:"reply_to"`
 	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+}
+
+// UsesXOAUTH2 reports whether IMAP and SMTP authenticate with SASL XOAUTH2.
+func (c Config) UsesXOAUTH2() bool {
+	return (c.AuthType == AuthTypeOAuth2 || c.AuthType == AuthTypeOAuth2App) && c.OAuth != nil
+}
+
+// IsAppOnly reports whether the inbox authenticates with the client credentials grant.
+func (c Config) IsAppOnly() bool {
+	return c.AuthType == AuthTypeOAuth2App
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.
