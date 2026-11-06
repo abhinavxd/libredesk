@@ -1,5 +1,14 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+WITH page AS MATERIALIZED (
+    %s
+)
+SELECT (SELECT COUNT(*) FROM (%s) matching) AS total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+FROM page
+JOIN users ON users.id = page.id
+ORDER BY page.sort_value %s NULLS LAST
+
+-- name: get-users-page-base
+SELECT users.id, %s AS sort_value
 FROM users
 -- Contacts and AI assistants may lack email, while anonymous visitors stay hidden.
 WHERE (users.email != 'System' OR (users.email IS NULL AND users.type IN ('contact', 'ai_assistant')))

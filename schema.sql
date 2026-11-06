@@ -315,6 +315,7 @@ CREATE INDEX index_conversations_on_priority_id ON conversations (priority_id);
 CREATE INDEX index_conversations_on_created_at ON conversations (created_at);
 CREATE INDEX index_conversations_on_resolved_at ON conversations (resolved_at);
 CREATE INDEX index_conversations_on_last_message_at ON conversations (last_message_at);
+CREATE INDEX index_conversations_on_last_message_at_desc ON conversations (last_message_at DESC NULLS LAST);
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
@@ -345,6 +346,7 @@ CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages 
 CREATE INDEX index_conversation_messages_on_source_id ON conversation_messages (source_id);
 CREATE INDEX index_conversation_messages_on_status ON conversation_messages (status);
 CREATE INDEX index_conversation_messages_on_conversation_id_and_created_at ON conversation_messages (conversation_id, created_at);
+CREATE INDEX index_conversation_messages_on_sender_id_and_created_at ON conversation_messages (sender_id, created_at);
 
 DROP TABLE IF EXISTS automation_rules CASCADE;
 CREATE TABLE automation_rules (
@@ -565,6 +567,7 @@ CREATE TABLE conversation_tags (
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id);
+CREATE INDEX index_conversation_tags_on_tag_id_and_conversation_id ON conversation_tags (tag_id, conversation_id);
 
 DROP TABLE IF EXISTS csat_responses CASCADE;
 CREATE TABLE csat_responses (

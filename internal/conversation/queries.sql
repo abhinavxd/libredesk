@@ -35,8 +35,13 @@ RETURNING id, uuid;
 -- name: get-conversations
 -- $1 = viewing user ID for per-agent unread count
 -- $2 = include mentioned message UUID (true for mentioned inbox, false otherwise)
+WITH matching AS MATERIALIZED (
+    %[2]s
+), page AS MATERIALIZED (
+    %[1]s
+)
 SELECT
-    COUNT(*) OVER() as total,
+    (SELECT COUNT(*) FROM matching) as total,
     conversations.id,
     conversations.created_at,
     conversations.updated_at,
@@ -108,7 +113,8 @@ SELECT
         ORDER BY cm2.created_at DESC
         LIMIT 1
     ) ELSE NULL END as mentioned_message_uuid
-    FROM conversations
+    FROM page
+    JOIN conversations ON conversations.id = page.id
     JOIN users ON contact_id = users.id
     LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
         AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
@@ -129,6 +135,15 @@ SELECT
         ORDER BY se.created_at DESC
         LIMIT 1
     ) nxt_resp_event ON true
+ORDER BY page.sort_value %[3]s NULLS LAST
+
+-- name: get-conversations-page-base
+SELECT conversations.id, %s AS sort_value
+FROM conversations
+-- Foreign keys guarantee these rows exist. LEFT JOIN lets unused filter joins be removed.
+LEFT JOIN users ON conversations.contact_id = users.id
+LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
 WHERE 1=1 %s
 
 -- name: get-conversation-list-item
@@ -705,7 +720,8 @@ SELECT
     inb.name as inbox_name
 FROM conversations c
     JOIN inboxes inb ON c.inbox_id = inb.id 
-WHERE assigned_user_id IS NULL AND assigned_team_id IS NOT NULL
+WHERE c.assigned_user_id IS NULL
+  AND c.assigned_team_id IN (SELECT id FROM teams WHERE conversation_assignment_type = 'Round robin')
 ORDER BY c.created_at ASC;
 
 -- name: add-conversation-tags
@@ -918,6 +934,13 @@ ORDER BY (m.type = 'outgoing') DESC, m.id DESC
 LIMIT 1;
 
 -- name: get-outgoing-pending-messages
+WITH pending AS MATERIALIZED (
+    SELECT DISTINCT ON (conversation_id) id
+    FROM conversation_messages
+    WHERE status = 'pending' AND type = 'outgoing' AND private = false
+      AND NOT (conversation_id = ANY($1::INT[]))
+    ORDER BY conversation_id, id
+)
 SELECT
     m.id,
     m.created_at,
@@ -947,19 +970,9 @@ SELECT
     c.contact_id as message_receiver_id,
     c.subject,
     c.reference_number
-FROM conversation_messages m
+FROM pending
+JOIN conversation_messages m ON m.id = pending.id
 INNER JOIN conversations c ON c.id = m.conversation_id
-WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
-AND NOT (m.conversation_id = ANY($1::INT[]))
-AND NOT EXISTS (
-    SELECT 1
-    FROM conversation_messages earlier
-    WHERE earlier.conversation_id = m.conversation_id
-      AND earlier.status = 'pending'
-      AND earlier.type = 'outgoing'
-      AND earlier.private = false
-      AND earlier.id < m.id
-)
 ORDER BY m.id
 
 -- name: get-csat-messages

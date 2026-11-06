@@ -226,16 +226,17 @@ func (e *Engine) assignConversations() error {
 				continue
 			}
 
-			activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
-			if err != nil {
-				e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
-				continue
-			}
-
-			if teamMax != 0 && activeConversationsCount >= teamMax {
-				e.lo.Debug("user has reached max auto assigned conversations limit, trying next user", "user_id", userID,
-					"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMax)
-				continue
+			if teamMax != 0 {
+				activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
+				if err != nil {
+					e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
+					continue
+				}
+				if activeConversationsCount >= teamMax {
+					e.lo.Debug("user has reached max auto assigned conversations limit, trying next user", "user_id", userID,
+						"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMax)
+					continue
+				}
 			}
 
 			if err := e.conversationStore.ClaimUnassignedConversation(conv.UUID, userID, teamID, e.systemUser); err != nil {
