@@ -61,22 +61,19 @@
           <FormMessage />
         </FormItem>
       </FormField>
-      <FormField v-slot="{ componentField }" name="timezone">
+      <FormField v-slot="{ value, handleChange, handleBlur, meta }" name="timezone">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
           <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.general.timezone.placeholder')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
-                    {{ label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <ComboBox
+              :model-value="value"
+              :items="timeZoneOptions"
+              virtual
+              :default-label="value"
+              :placeholder="$t('admin.general.timezone.placeholder')"
+              @update:model-value="(v) => handleChange(v, meta.validated)"
+              @blur="handleBlur"
+            />
           </FormControl>
           <FormDescription>{{ $t('admin.team.timezone.description') }}</FormDescription>
           <FormMessage />
@@ -167,7 +164,8 @@ import { useEmitter } from '@main/composables/useEmitter.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useSlaStore } from '@main/stores/sla.js'
-import { timeZones } from '@main/constants/timezones.js'
+import { timeZoneOptions } from '@main/constants/timezones.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import api from '@main/api/index.js'
 import { useI18n } from 'vue-i18n'
 
