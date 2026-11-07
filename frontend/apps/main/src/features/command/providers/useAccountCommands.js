@@ -6,6 +6,7 @@ import {
   Clock,
   Keyboard,
   LogOut,
+  Monitor,
   Moon,
   Sun,
   UserRoundCog
@@ -17,9 +18,15 @@ import { SECTIONS } from '@main/features/command/sections'
 
 const AWAY_STATUSES = ['away_manual', 'away_and_reassigning']
 
+const THEME_COMMANDS = [
+  { value: 'auto', label: 'command.switchToSystemTheme', icon: Monitor },
+  { value: 'light', label: 'command.switchToLightMode', icon: Sun },
+  { value: 'dark', label: 'command.switchToDarkMode', icon: Moon }
+]
+
 export function useAccountCommands() {
   const { t } = useI18n()
-  const mode = useColorMode()
+  const { store: themePreference, state: activeTheme } = useColorMode()
   const userStore = useUserStore()
   const shortcutsDialog = useKeyboardShortcutsDialog()
   const logout = useLogout()
@@ -28,19 +35,23 @@ export function useAccountCommands() {
     const status = userStore.user.availability_status
     const isAway = AWAY_STATUSES.includes(status)
     const isReassigning = status === 'away_and_reassigning'
-    const isDark = mode.value === 'dark'
+
+    // Skip the saved choice and the theme already on screen, e.g. "dark" while the system theme is dark.
+    const themeCommands = THEME_COMMANDS.filter(
+      (option) => option.value !== themePreference.value && option.value !== activeTheme.value
+    ).map((option) => ({
+      id: `account.theme.${option.value}`,
+      label: t(option.label),
+      keywords: [t('globals.terms.theme'), 'theme'],
+      section: SECTIONS.ACCOUNT,
+      icon: option.icon,
+      run: () => {
+        themePreference.value = option.value
+      }
+    }))
 
     return [
-      {
-        id: 'account.theme',
-        label: t(isDark ? 'command.switchToLightMode' : 'command.switchToDarkMode'),
-        keywords: [t('navigation.darkMode'), 'theme'],
-        section: SECTIONS.ACCOUNT,
-        icon: isDark ? Sun : Moon,
-        run: () => {
-          mode.value = isDark ? 'light' : 'dark'
-        }
-      },
+      ...themeCommands,
       {
         id: 'account.availability',
         label: t(isAway ? 'command.setOnline' : 'command.setAway'),

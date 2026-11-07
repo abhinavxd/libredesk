@@ -45,13 +45,24 @@
         </div>
 
         <div class="space-y-2">
-          <!-- Dark-mode toggle -->
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">{{ t('navigation.darkMode') }}</span>
-            <Switch
-              :checked="mode === 'dark'"
-              @update:checked="(val) => (mode = val ? 'dark' : 'light')"
-            />
+            <span class="text-muted-foreground">{{ t('globals.terms.theme') }}</span>
+            <Tabs v-model="themePreference">
+              <TabsList class="h-7 p-0.5">
+                <Tooltip v-for="option in THEME_OPTIONS" :key="option.value">
+                  <TooltipTrigger as-child>
+                    <TabsTrigger
+                      :value="option.value"
+                      class="px-2 py-1"
+                      :aria-label="t(option.label)"
+                    >
+                      <component :is="option.icon" class="size-3.5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ t(option.label) }}</TooltipContent>
+                </Tooltip>
+              </TabsList>
+            </Tabs>
           </div>
 
           <div class="border-t border-border pt-3 space-y-3">
@@ -121,7 +132,17 @@ import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
-import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-next'
+import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import {
+  ChevronsUpDown,
+  CircleUserRound,
+  Keyboard,
+  LogOut,
+  Monitor,
+  Moon,
+  Sun
+} from 'lucide-vue-next'
 import { useUserStore } from '@main/stores/user'
 import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
@@ -130,8 +151,15 @@ import { useLogout } from '@main/composables/useLogout'
 
 import { useColorMode } from '@vueuse/core'
 
+// 'auto' follows the OS color scheme.
+const THEME_OPTIONS = [
+  { value: 'auto', label: 'globals.terms.system', icon: Monitor },
+  { value: 'light', label: 'globals.terms.light', icon: Sun },
+  { value: 'dark', label: 'globals.terms.dark', icon: Moon }
+]
+
 const isMobile = useIsMobile()
-const mode = useColorMode()
+const { store: themePreference } = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
 const { t } = useI18n()
