@@ -566,7 +566,7 @@
   "admin.team.maxAutoAssigned": "Maximum auto-assigned conversations",
   "admin.team.maxAutoAssigned.description": "Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the \"Open\" category count toward this limit. Set to 0 for unlimited.",
   "admin.team.skipOfflineAgents": "Skip offline agents",
-  "admin.team.skipOfflineAgents.description": "Offline agents are agents with no libredesk tab open. Round robin skips them until they come back online, and leaves new conversations unassigned if the whole team is offline.",
+  "admin.team.skipOfflineAgents.description": "Offline agents are agents with no libredesk tab open. Round robin skips them until they come back online.",
   "admin.team.noPermissionBusinessHours": "You do not have permission to view business hours.",
   "admin.team.slaPolicy.description": "SLA policy to be auto applied to conversations, when conversations are assigned to this team.",
   "admin.team.slaPolicy.placeholder": "Select policy",
