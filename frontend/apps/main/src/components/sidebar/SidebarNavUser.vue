@@ -45,13 +45,24 @@
         </div>
 
         <div class="space-y-2">
-          <!-- Dark-mode toggle -->
+          <!-- Theme: follow the system, or force light / dark -->
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">{{ t('navigation.darkMode') }}</span>
-            <Switch
-              :checked="mode === 'dark'"
-              @update:checked="(val) => (mode = val ? 'dark' : 'light')"
-            />
+            <span class="text-muted-foreground">{{ t('globals.terms.theme') }}</span>
+            <div class="flex rounded-md border border-border p-0.5">
+              <Button
+                v-for="option in themeOptions"
+                :key="option.value"
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :class="themeChoice === option.value && 'bg-accent text-accent-foreground'"
+                :title="t(option.label)"
+                :aria-pressed="themeChoice === option.value"
+                @click="mode = option.value"
+              >
+                <component :is="option.icon" />
+              </Button>
+            </div>
           </div>
 
           <div class="border-t border-border pt-3 space-y-3">
@@ -121,7 +132,16 @@ import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
-import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-next'
+import { Button } from '@shared-ui/components/ui/button'
+import {
+  ChevronsUpDown,
+  CircleUserRound,
+  Keyboard,
+  LogOut,
+  Monitor,
+  Moon,
+  Sun
+} from 'lucide-vue-next'
 import { useUserStore } from '@main/stores/user'
 import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
@@ -131,7 +151,15 @@ import { useLogout } from '@main/composables/useLogout'
 import { useColorMode } from '@vueuse/core'
 
 const isMobile = useIsMobile()
+// useColorMode's 'auto' follows the OS preference, so it needs no own listener.
 const mode = useColorMode()
+// mode reads as the resolved light/dark; the stored choice is what can be 'auto'.
+const themeChoice = mode.store
+const themeOptions = [
+  { value: 'auto', label: 'navigation.themeSystem', icon: Monitor },
+  { value: 'light', label: 'navigation.themeLight', icon: Sun },
+  { value: 'dark', label: 'navigation.themeDark', icon: Moon }
+]
 const userStore = useUserStore()
 const router = useRouter()
 const { t } = useI18n()
