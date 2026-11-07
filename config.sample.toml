@@ -170,6 +170,10 @@ continuity_scan_interval = "5m"
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
 
+[livechat]
+# Maximum number of simultaneous live chat connections allowed per user (e.g. multiple tabs/devices)
+max_connections_per_user = 10
+
 # Per-IP rate limits (requests per minute) for unauthenticated endpoints.
 # Setting enabled = false disables that rule entirely.
 

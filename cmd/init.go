@@ -787,11 +787,12 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	}
 
 	inbox, err := livechat.New(msgStore, usrStore, livechat.Opts{
-		ID:            inboxRecord.ID,
-		Name:          inboxRecord.Name,
-		Config:        config,
-		Lo:            lo,
-		SignAvatarURL: signAvatarURL,
+		ID:                    inboxRecord.ID,
+		Name:                  inboxRecord.Name,
+		Config:                config,
+		Lo:                    lo,
+		SignAvatarURL:         signAvatarURL,
+		MaxConnectionsPerUser: ko.Int("livechat.max_connections_per_user"),
 	})
 
 	if err != nil {
