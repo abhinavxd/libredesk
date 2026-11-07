@@ -387,6 +387,42 @@
                       />
                     </FormItem>
                   </FormField>
+
+                  <FormField
+                    v-slot="{ componentField, handleChange, meta }"
+                    name="imap.append_sent"
+                  >
+                    <FormItem>
+                      <SwitchField
+                        :title="$t('admin.inbox.appendSent')"
+                        :description="$t('admin.inbox.appendSent.description')"
+                        :checked="componentField.modelValue"
+                        @update:checked="(v) => handleChange(v, meta.validated)"
+                      />
+                    </FormItem>
+                  </FormField>
+
+                  <FormField
+                    v-slot="{ componentField, handleChange, meta }"
+                    name="imap.sent_mailbox"
+                  >
+                    <FormItem v-show="form.values.imap?.append_sent">
+                      <FormLabel>{{ $t('admin.inbox.sentMailbox') }}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="Sent"
+                          :name="componentField.name"
+                          :model-value="componentField.modelValue"
+                          @update:model-value="(v) => handleChange(v, meta.validated)"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {{ $t('admin.inbox.sentMailbox.description') }}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -991,7 +1027,9 @@ const IMAP_ADVANCED_FIELDS = [
   'imap.mailbox',
   'imap.read_interval',
   'imap.scan_inbox_since',
-  'imap.tls_skip_verify'
+  'imap.tls_skip_verify',
+  'imap.append_sent',
+  'imap.sent_mailbox'
 ]
 const SMTP_ADVANCED_FIELDS = [
   'smtp.max_conns',
@@ -1091,7 +1129,9 @@ const form = useForm({
       tls_type: 'none',
       read_interval: '5m',
       scan_inbox_since: '48h',
-      tls_skip_verify: false
+      tls_skip_verify: false,
+      append_sent: false,
+      sent_mailbox: ''
     },
     smtp: {
       host: 'smtp.gmail.com',
