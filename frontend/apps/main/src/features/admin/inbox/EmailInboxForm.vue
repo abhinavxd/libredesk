@@ -216,8 +216,7 @@
             >
               <FormItem>
                 <SwitchField
-                  :title="$t('admin.inbox.imapEnabled')"
-                  :description="$t('admin.inbox.imapEnabled.description')"
+                  :title="$t('globals.terms.enabled')"
                   :checked="componentField.modelValue"
                   @update:checked="(v) => handleChange(v, meta.validated)"
                 />
