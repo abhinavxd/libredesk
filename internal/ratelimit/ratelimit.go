@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	realip "github.com/ferluci/fast-realip"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/redis/go-redis/v9"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/logf"
@@ -20,17 +20,19 @@ type Rule struct {
 
 // Limiter handles rate limiting using Redis.
 type Limiter struct {
-	redis *redis.Client
-	rules map[string]Rule
-	lo    *logf.Logger
+	redis          *redis.Client
+	rules          map[string]Rule
+	lo             *logf.Logger
+	clientIPHeader string
 }
 
 // New creates a new rate limiter.
-func New(redisClient *redis.Client, lo *logf.Logger) *Limiter {
+func New(redisClient *redis.Client, lo *logf.Logger, clientIPHeader string) *Limiter {
 	return &Limiter{
-		redis: redisClient,
-		lo:    lo,
-		rules: make(map[string]Rule),
+		redis:          redisClient,
+		clientIPHeader: clientIPHeader,
+		lo:             lo,
+		rules:          make(map[string]Rule),
 	}
 }
 
@@ -46,7 +48,7 @@ func (l *Limiter) Check(ctx *fasthttp.RequestCtx, ruleName string) error {
 		return nil
 	}
 
-	clientIP := realip.FromRequest(ctx)
+	clientIP := httputil.ClientIP(ctx, l.clientIPHeader)
 	key := fmt.Sprintf("rate_limit:%s:%s", ruleName, clientIP)
 
 	now := time.Now()

@@ -22,10 +22,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastcache/v4"
@@ -1105,7 +1105,7 @@ func handleHelpCenterArticleFeedback(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	dedupKey := fmt.Sprintf("help_center:feedback:%d:%s", article.ID, realip.FromRequest(r.RequestCtx))
+	dedupKey := fmt.Sprintf("help_center:feedback:%d:%s", article.ID, httputil.ClientIP(r.RequestCtx, app.clientIPHeader))
 	if ok, err := app.redis.SetNX(r.RequestCtx, dedupKey, "1", articleFeedbackDedupTTL).Result(); err == nil && !ok {
 		return r.SendEnvelope(true)
 	}
