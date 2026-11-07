@@ -616,9 +616,6 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 // applyOriginalSender selects the first usable configured header while preserving the actual From in message metadata.
 func (e *Email) applyOriginalSender(envelope *enmime.Envelope, message *models.IncomingMessage) error {
 	for _, header := range e.originalSenderHeaders {
-		if strings.EqualFold(header, "From") {
-			continue
-		}
 		addresses, err := enmime.ParseAddressList(envelope.GetHeader(header))
 		if err != nil {
 			continue

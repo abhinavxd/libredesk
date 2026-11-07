@@ -1552,6 +1552,7 @@ func TestOriginalSenderHeaders(t *testing.T) {
 		want       string
 		wantHeader string
 		blocked    bool
+		fromOwned  bool
 	}{
 		{name: "disabled", raw: "Reply-To: customer@example.com\r\n", want: "forms@example.com"},
 		{name: "missing", headers: []string{"Reply-To"}, want: "forms@example.com"},
@@ -1564,7 +1565,12 @@ func TestOriginalSenderHeaders(t *testing.T) {
 		{name: "case insensitive", headers: []string{"reply-to"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "reply-to"},
 		{name: "same address", headers: []string{"Reply-To"}, raw: "Reply-To: FORMS@example.com\r\n", want: "forms@example.com"},
 		{name: "owned address skipped", headers: []string{"Reply-To"}, raw: "Reply-To: support@example.com, customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
-		{name: "from stays fallback", headers: []string{"From", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "from before reply address", headers: []string{"From", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "forms@example.com"},
+		{name: "from after reply address", headers: []string{"Reply-To", "From"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "case insensitive from", headers: []string{"fRoM", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "forms@example.com"},
+		{name: "repeated from", headers: []string{"From", "From", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "forms@example.com"},
+		{name: "owned from skipped", headers: []string{"From", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To", fromOwned: true},
+		{name: "custom header before from", headers: []string{"X-Original-Sender", "From", "Reply-To"}, raw: "X-Original-Sender: other@example.com\r\nReply-To: customer@example.com\r\n", want: "other@example.com", wantHeader: "X-Original-Sender"},
 		{name: "blocked contact", headers: []string{"Reply-To"}, raw: "Reply-To: customer@example.com\r\n", blocked: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1576,6 +1582,9 @@ func TestOriginalSenderHeaders(t *testing.T) {
 				lo:                    &logger,
 				messageStore:          store,
 				userStore:             fakeUserStore{blocked: map[string]bool{"customer@example.com": tt.blocked}},
+			}
+			if tt.fromOwned {
+				e.receiveAddresses["forms@example.com"] = struct{}{}
 			}
 			message := models.IncomingMessage{
 				Contact: models.IncomingContact{FirstName: "Forms", Email: null.StringFrom("forms@example.com")},
