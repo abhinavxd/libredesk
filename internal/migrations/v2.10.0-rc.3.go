@@ -6,7 +6,7 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-func V2_9_1_RC2(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
+func V2_10_0_RC3(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	_, err := db.Exec(`
 		ALTER TABLE teams ADD COLUMN IF NOT EXISTS skip_offline_agents BOOLEAN DEFAULT false NOT NULL;
 	`)

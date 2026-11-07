@@ -167,6 +167,7 @@ const oidcErrorKeys = {
   oidc_session_expired: 'auth.oidcSessionExpired',
   oidc_no_account: 'auth.oidcNoAccount',
   oidc_account_disabled: 'user.accountDisabled',
+  oidc_email_not_verified: 'auth.oidcEmailNotVerified',
   oidc_login_failed: 'auth.oidcLoginFailed'
 }
 

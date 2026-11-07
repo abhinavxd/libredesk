@@ -213,6 +213,7 @@ CREATE TABLE users (
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
+CREATE INDEX index_tgrm_users_on_full_name ON users USING GIN ((first_name || ' ' || COALESCE(last_name, '')) gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
@@ -471,6 +472,7 @@ CREATE TABLE oidc (
 	client_id TEXT NOT NULL,
 	client_secret TEXT NOT NULL,
 	enabled bool DEFAULT TRUE NOT NULL,
+	verify_email BOOLEAN DEFAULT TRUE NOT NULL,
 	provider VARCHAR NULL,
 	logo_url TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_oidc_on_name CHECK (length("name") <= 140)

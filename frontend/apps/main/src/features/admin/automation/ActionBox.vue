@@ -32,11 +32,12 @@
                 </Select>
               </div>
 
-              <HelpPopover
+              <div
                 v-if="action.type && conversationActions[action.type]?.type === 'richtext'"
-                :text="messageVariablesHelp"
-                class="self-center"
-              />
+                class="flex self-center"
+              >
+                <HelpPopover :text="messageVariablesHelp" />
+              </div>
 
               <!-- Value -->
               <div

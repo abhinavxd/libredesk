@@ -426,7 +426,10 @@ article.hc-article .hc-meta-byline { display: flex; align-items: center; gap: .6
 }
 
 @media (max-width: 640px) {
-    .hc-lang-btn, .hc-theme-btn, .hc-announcement button { min-width: 44px; min-height: 44px; }
+    .hc-lang-btn, .hc-theme-btn { min-width: 44px; min-height: 44px; }
+    .hc-announcement { padding-block: 0; }
+    .hc-announcement p { min-width: 0; padding-block: .55rem; overflow-wrap: anywhere; }
+    .hc-announcement button { flex-shrink: 0; justify-content: center; }
     .hc-nav { padding: 1.5rem 1.25rem; gap: .85rem; position: relative; }
     .hc-nav-toggle {
         display: inline-flex; align-items: center; justify-content: center;
