@@ -158,6 +158,14 @@ WHERE
   AND availability_status NOT IN ('offline', 'away_and_reassigning', 'away_manual')
 RETURNING id, type;
 
+-- name: set-agent-offline
+-- Manual away statuses are left alone so they survive the agent closing the dashboard.
+UPDATE users
+SET availability_status = 'offline'
+WHERE id = $1
+  AND type = 'agent'
+  AND availability_status IN ('online', 'away');
+
 -- name: get-availability-status
 SELECT availability_status FROM users WHERE id = $1;
 

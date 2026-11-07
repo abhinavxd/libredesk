@@ -193,3 +193,39 @@ func TestPasswordChangesAndResetToken(t *testing.T) {
 	}
 	check("Test-Password-456!")
 }
+
+func TestMarkAgentOffline(t *testing.T) {
+	m, db := newTestManager(t)
+	cases := []struct {
+		userType    string
+		status      string
+		wantChanged bool
+		wantStatus  string
+	}{
+		{"agent", "online", true, "offline"},
+		{"agent", "away", true, "offline"},
+		{"agent", "away_manual", false, "away_manual"},
+		{"agent", "away_and_reassigning", false, "away_and_reassigning"},
+		{"agent", "offline", false, "offline"},
+		{"contact", "online", false, "online"},
+	}
+	for i, tc := range cases {
+		t.Run(tc.userType+"/"+tc.status, func(t *testing.T) {
+			var id int
+			if err := db.Get(&id, `INSERT INTO users (type, email, first_name, last_name, availability_status) VALUES ($1, $2, 'User', '', $3) RETURNING id`,
+				tc.userType, fmt.Sprintf("offline%d@example.com", i), tc.status); err != nil {
+				t.Fatal(err)
+			}
+			if got := m.MarkAgentOffline(id); got != tc.wantChanged {
+				t.Fatalf("MarkAgentOffline = %v, want %v", got, tc.wantChanged)
+			}
+			var status string
+			if err := db.Get(&status, `SELECT availability_status FROM users WHERE id = $1`, id); err != nil {
+				t.Fatal(err)
+			}
+			if status != tc.wantStatus {
+				t.Fatalf("status = %q, want %q", status, tc.wantStatus)
+			}
+		})
+	}
+}

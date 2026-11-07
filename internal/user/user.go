@@ -95,6 +95,7 @@ type queries struct {
 	UpdateAvailability               *sqlx.Stmt `query:"update-availability"`
 	UpdateLastActiveAt               *sqlx.Stmt `query:"update-last-active-at"`
 	UpdateInactiveOffline            *sqlx.Stmt `query:"update-inactive-offline"`
+	SetAgentOffline                  *sqlx.Stmt `query:"set-agent-offline"`
 	GetAvailabilityStatus            *sqlx.Stmt `query:"get-availability-status"`
 	UpdateLastLoginAt                *sqlx.Stmt `query:"update-last-login-at"`
 	SoftDeleteAgent                  *sqlx.Stmt `query:"soft-delete-agent"`
