@@ -32,6 +32,11 @@ import (
 	"github.com/zerodha/logf"
 )
 
+const (
+	defaultRetryBackoff = 5 * time.Second
+	maxRetryBackoff     = 10 * time.Minute
+)
+
 var (
 	//go:embed queries.sql
 	efs embed.FS
@@ -80,15 +85,6 @@ type DeliveryTask struct {
 	body             []byte
 	webhookUpdatedAt time.Time
 }
-
-func (t DeliveryTask) staleFor(webhook models.Webhook) bool {
-	return !t.webhookUpdatedAt.IsZero() && !t.webhookUpdatedAt.Equal(webhook.UpdatedAt)
-}
-
-const (
-	defaultRetryBackoff = 5 * time.Second
-	maxRetryBackoff     = 10 * time.Minute
-)
 
 // queries contains prepared SQL queries.
 type queries struct {
@@ -484,11 +480,6 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 	}
 }
 
-func retryableStatus(code int) bool {
-	return code == http.StatusRequestTimeout || code == http.StatusTooEarly || code == http.StatusTooManyRequests ||
-		code >= http.StatusInternalServerError
-}
-
 func (m *Manager) retryDelay(attempt int) time.Duration {
 	delay := m.retryBackoff
 	for i := 1; i < attempt && delay < maxRetryBackoff; i++ {
@@ -566,4 +557,13 @@ func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	m.decryptWebhooks(webhooks)
 
 	return webhooks, nil
+}
+
+func (t DeliveryTask) staleFor(webhook models.Webhook) bool {
+	return !t.webhookUpdatedAt.IsZero() && !t.webhookUpdatedAt.Equal(webhook.UpdatedAt)
+}
+
+func retryableStatus(code int) bool {
+	return code == http.StatusRequestTimeout || code == http.StatusTooEarly || code == http.StatusTooManyRequests ||
+		code >= http.StatusInternalServerError
 }

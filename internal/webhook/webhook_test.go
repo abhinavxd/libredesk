@@ -35,6 +35,54 @@ func newRecordingReceiver(statuses ...int) *recordingReceiver {
 	return &recordingReceiver{statuses: statuses, arrived: make(chan struct{}, 16)}
 }
 
+func newDeliveryManager(maxRetries int) *Manager {
+	lo := logf.New(logf.Opts{})
+	return &Manager{
+		lo:            &lo,
+		deliveryQueue: make(chan DeliveryTask, 4),
+		httpClient:    &http.Client{Timeout: 2 * time.Second},
+		maxRetries:    max(maxRetries, 0),
+		retryBackoff:  time.Millisecond,
+	}
+}
+
+func newStoredWebhook(t *testing.T, url string, retryBackoff time.Duration) (*Manager, models.Webhook) {
+	t.Helper()
+	db := testutil.NewDB(t, "webhook_delivery")
+	lo := logf.New(logf.Opts{})
+	m, err := New(Opts{
+		DB:            db,
+		Lo:            &lo,
+		I18n:          testutil.NewI18n(t),
+		Workers:       2,
+		QueueSize:     16,
+		Timeout:       2 * time.Second,
+		EncryptionKey: testEncryptionKey,
+		MaxRetries:    2,
+		RetryBackoff:  retryBackoff,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	webhook, err := m.Create(models.Webhook{
+		Name:     "receiver",
+		URL:      url,
+		Events:   []string{string(models.EventConversationCreated)},
+		Secret:   "receiver-secret",
+		IsActive: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.Run(ctx)
+	t.Cleanup(func() {
+		cancel()
+		m.Close()
+	})
+	return m, webhook
+}
+
 func (r *recordingReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	body, _ := io.ReadAll(req.Body)
 	r.mu.Lock()
@@ -53,61 +101,6 @@ func (r *recordingReceiver) ServeHTTP(w http.ResponseWriter, req *http.Request) 
 	r.mu.Unlock()
 	w.WriteHeader(status)
 	r.arrived <- struct{}{}
-}
-
-func (r *recordingReceiver) received() []receivedDelivery {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return append([]receivedDelivery(nil), r.deliveries...)
-}
-
-func (r *recordingReceiver) waitFor(t *testing.T, count int) []receivedDelivery {
-	t.Helper()
-	deadline := time.After(5 * time.Second)
-	for len(r.received()) < count {
-		select {
-		case <-r.arrived:
-		case <-deadline:
-			t.Fatalf("received %d deliveries, want %d", len(r.received()), count)
-		}
-	}
-	return r.received()
-}
-
-func newDeliveryManager(maxRetries int) *Manager {
-	lo := logf.New(logf.Opts{})
-	return &Manager{
-		lo:            &lo,
-		deliveryQueue: make(chan DeliveryTask, 4),
-		httpClient:    &http.Client{Timeout: 2 * time.Second},
-		maxRetries:    max(maxRetries, 0),
-		retryBackoff:  time.Millisecond,
-	}
-}
-
-func scheduledRetry(t *testing.T, m *Manager) (DeliveryTask, bool) {
-	t.Helper()
-	select {
-	case task := <-m.deliveryQueue:
-		return task, true
-	case <-time.After(100 * time.Millisecond):
-		return DeliveryTask{}, false
-	}
-}
-
-func deliverUntilSettled(t *testing.T, m *Manager, webhook models.Webhook, first DeliveryTask) {
-	t.Helper()
-	m.deliverSingleWebhook(webhook, first)
-	for {
-		next, ok := scheduledRetry(t, m)
-		if !ok {
-			return
-		}
-		if next.WebhookID != webhook.ID {
-			t.Fatalf("retry targets webhook %d, want %d", next.WebhookID, webhook.ID)
-		}
-		m.deliverSingleWebhook(webhook, next)
-	}
 }
 
 func TestRetriedDeliveriesKeepTheirIdentityBodyAndSignature(t *testing.T) {
@@ -287,43 +280,6 @@ func TestRetryDelayDoublesUpToTheCap(t *testing.T) {
 	}
 }
 
-func newStoredWebhook(t *testing.T, url string, retryBackoff time.Duration) (*Manager, models.Webhook) {
-	t.Helper()
-	db := testutil.NewDB(t, "webhook_delivery")
-	lo := logf.New(logf.Opts{})
-	m, err := New(Opts{
-		DB:            db,
-		Lo:            &lo,
-		I18n:          testutil.NewI18n(t),
-		Workers:       2,
-		QueueSize:     16,
-		Timeout:       2 * time.Second,
-		EncryptionKey: testEncryptionKey,
-		MaxRetries:    2,
-		RetryBackoff:  retryBackoff,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	webhook, err := m.Create(models.Webhook{
-		Name:     "receiver",
-		URL:      url,
-		Events:   []string{string(models.EventConversationCreated)},
-		Secret:   "receiver-secret",
-		IsActive: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	m.Run(ctx)
-	t.Cleanup(func() {
-		cancel()
-		m.Close()
-	})
-	return m, webhook
-}
-
 func TestRetriesGoThroughTheWorkerAndReadTheWebhookAgain(t *testing.T) {
 	receiver := newRecordingReceiver(http.StatusServiceUnavailable, http.StatusOK)
 	server := httptest.NewServer(receiver)
@@ -357,5 +313,49 @@ func TestARetryIsDroppedWhenTheWebhookWasEdited(t *testing.T) {
 
 	if got := len(oldReceiver.received()) + len(newReceiver.received()); got != 1 {
 		t.Fatalf("received %d deliveries after the webhook was edited, want only the first one", got)
+	}
+}
+
+func (r *recordingReceiver) received() []receivedDelivery {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]receivedDelivery(nil), r.deliveries...)
+}
+
+func (r *recordingReceiver) waitFor(t *testing.T, count int) []receivedDelivery {
+	t.Helper()
+	deadline := time.After(5 * time.Second)
+	for len(r.received()) < count {
+		select {
+		case <-r.arrived:
+		case <-deadline:
+			t.Fatalf("received %d deliveries, want %d", len(r.received()), count)
+		}
+	}
+	return r.received()
+}
+
+func scheduledRetry(t *testing.T, m *Manager) (DeliveryTask, bool) {
+	t.Helper()
+	select {
+	case task := <-m.deliveryQueue:
+		return task, true
+	case <-time.After(100 * time.Millisecond):
+		return DeliveryTask{}, false
+	}
+}
+
+func deliverUntilSettled(t *testing.T, m *Manager, webhook models.Webhook, first DeliveryTask) {
+	t.Helper()
+	m.deliverSingleWebhook(webhook, first)
+	for {
+		next, ok := scheduledRetry(t, m)
+		if !ok {
+			return
+		}
+		if next.WebhookID != webhook.ID {
+			t.Fatalf("retry targets webhook %d, want %d", next.WebhookID, webhook.ID)
+		}
+		m.deliverSingleWebhook(webhook, next)
 	}
 }

@@ -151,7 +151,7 @@ timeout = "15s"
 # Retries preserve the body, signature and X-Libredesk-Delivery-Id so receivers can drop duplicates.
 # Pending retries live in memory and are lost on restart.
 max_retries = 3
-# Delay before the first retry. Doubles after each failure, up to 10 minutes.
+# Initial retry delay. Doubles between retries (5s, 10s, 20s), capped at 10 minutes.
 retry_backoff = "5s"
 
 # SSRF guard for admin-configured outbound URLs (webhooks, OIDC discovery, AI provider and tool calls).
