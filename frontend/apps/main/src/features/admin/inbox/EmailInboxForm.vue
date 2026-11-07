@@ -728,6 +728,52 @@
                 </FormItem>
               </FormField>
             </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <FormField
+                v-slot="{ componentField, handleChange, meta }"
+                name="original_sender_headers"
+              >
+                <FormItem>
+                  <FormLabel>{{ $t('admin.inbox.originalSenderHeader', 2) }}</FormLabel>
+                  <FormControl>
+                    <TagsInput
+                      :model-value="componentField.modelValue"
+                      add-on-blur
+                      add-on-paste
+                      @update:model-value="(v) => handleChange(v, meta.validated)"
+                    >
+                      <TagsInputItem
+                        v-for="header in componentField.modelValue"
+                        :key="header"
+                        :value="header"
+                      >
+                        <TagsInputItemText />
+                        <TagsInputItemDelete
+                          type="button"
+                          :aria-label="$t('globals.terms.remove')"
+                        />
+                      </TagsInputItem>
+                      <TagsInputInput
+                        :placeholder="componentField.modelValue?.length ? '' : 'Reply-To'"
+                        :aria-label="$t('admin.inbox.originalSenderHeader', 2)"
+                      />
+                    </TagsInput>
+                  </FormControl>
+                  <FormDescription>
+                    {{ $t('admin.inbox.originalSenderHeader.description') }}
+                  </FormDescription>
+                  <FormMessage />
+                  <div
+                    v-if="form.values.original_sender_headers?.length"
+                    class="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+                    role="note"
+                  >
+                    <TriangleAlert class="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                    <p>{{ $t('admin.inbox.originalSenderHeader.warning') }}</p>
+                  </div>
+                </FormItem>
+              </FormField>
+            </div>
             <FormField
               v-slot="{ componentField, handleChange, meta }"
               name="enable_plus_addressing"
@@ -927,6 +973,13 @@ import {
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
+import {
+  TagsInput,
+  TagsInputInput,
+  TagsInputItem,
+  TagsInputItemDelete,
+  TagsInputItemText
+} from '@shared-ui/components/ui/tags-input/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import HelpPopover from '@main/components/HelpPopover.vue'
@@ -1094,6 +1147,7 @@ const form = useForm({
     aliases: [],
     from_name_template: '',
     reply_to: '',
+    original_sender_headers: [],
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
@@ -1177,6 +1231,7 @@ const getFieldSection = (key) => {
     [
       'from_name_template',
       'reply_to',
+      'original_sender_headers',
       'enable_plus_addressing',
       'csat_enabled',
       'prompt_tags_on_reply'

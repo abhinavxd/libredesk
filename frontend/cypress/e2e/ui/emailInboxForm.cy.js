@@ -23,6 +23,7 @@ const inboxFixture = () => ({
   config: {
     auth_type: 'password',
     reply_to: 'replies@example.com',
+    original_sender_headers: ['X-Original-Sender', 'Reply-To'],
     enable_plus_addressing: true,
     imap: [
       {
@@ -135,6 +136,7 @@ describe('Email inbox form', () => {
       expect(request.body.config.imap[0].read_interval).to.eq('5m')
       expect(request.body.config.smtp[0].max_conns).to.eq(10)
       expect(request.body.config.enable_plus_addressing).to.eq(true)
+      expect(request.body.config.original_sender_headers).to.deep.eq([])
     })
     cy.location('pathname').should('eq', '/admin/inboxes')
     cy.contains('New support inbox').should('be.visible')

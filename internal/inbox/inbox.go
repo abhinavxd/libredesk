@@ -421,20 +421,22 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 	switch current.Channel {
 	case "email":
 		var currentCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AuthType              string            `json:"auth_type"`
+			OAuth                 map[string]string `json:"oauth"`
+			IMAP                  []map[string]any  `json:"imap"`
+			SMTP                  []map[string]any  `json:"smtp"`
+			ReplyTo               string            `json:"reply_to"`
+			EnablePlusAddressing  bool              `json:"enable_plus_addressing"`
+			OriginalSenderHeaders []string          `json:"original_sender_headers"`
 		}
 		var updateCfg struct {
-			AuthType             string            `json:"auth_type"`
-			OAuth                map[string]string `json:"oauth"`
-			IMAP                 []map[string]any  `json:"imap"`
-			SMTP                 []map[string]any  `json:"smtp"`
-			ReplyTo              string            `json:"reply_to"`
-			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			AuthType              string            `json:"auth_type"`
+			OAuth                 map[string]string `json:"oauth"`
+			IMAP                  []map[string]any  `json:"imap"`
+			SMTP                  []map[string]any  `json:"smtp"`
+			ReplyTo               string            `json:"reply_to"`
+			EnablePlusAddressing  bool              `json:"enable_plus_addressing"`
+			OriginalSenderHeaders []string          `json:"original_sender_headers"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {

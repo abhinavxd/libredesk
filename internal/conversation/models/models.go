@@ -555,7 +555,8 @@ type IncomingMessage struct {
 	InboxID int
 
 	// Contact
-	Contact IncomingContact
+	Contact           IncomingContact
+	ContactFromHeader bool
 
 	// Message fields
 	Subject     string

@@ -80,6 +80,7 @@ const submitForm = (values) => {
     const config = {
       auth_type: values.auth_type,
       reply_to: values.reply_to,
+      original_sender_headers: values.original_sender_headers || [],
       enable_plus_addressing: values.enable_plus_addressing,
       imap: values.imap_enabled === false ? [] : [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
@@ -239,6 +240,7 @@ const setInboxData = (inboxData) => {
   inboxData.oauth = inboxData?.config?.oauth || {}
   inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
   inboxData.reply_to = inboxData?.config?.reply_to || ''
+  inboxData.original_sender_headers = inboxData?.config?.original_sender_headers || []
   inboxData.aliases = inboxData?.aliases || []
   inbox.value = inboxData
   setAliasVerificationState(inboxData.aliases)

@@ -535,6 +535,19 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		e.lo.Warn("error parsing email envelope", "error", err.Error(), "message_id", incomingMsg.SourceID.String)
 	}
 
+	if err := e.applyOriginalSender(envelope, &incomingMsg); err != nil {
+		return err
+	}
+	if incomingMsg.ContactFromHeader {
+		blocked, err := e.userStore.IsEmailBlocked(incomingMsg.Contact.Email.String)
+		if err != nil {
+			return fmt.Errorf("checking original sender block status: %w", err)
+		}
+		if blocked {
+			return nil
+		}
+	}
+
 	// Extract all HTML content by traversing the tree
 	var allHTML strings.Builder
 	if envelope.Root != nil {
@@ -598,6 +611,45 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		"other_parts", len(envelope.OtherParts))
 
 	return e.messageStore.EnqueueIncoming(incomingMsg)
+}
+
+// applyOriginalSender selects the first usable configured header while preserving the actual From in message metadata.
+func (e *Email) applyOriginalSender(envelope *enmime.Envelope, message *models.IncomingMessage) error {
+	for _, header := range e.originalSenderHeaders {
+		addresses, err := enmime.ParseAddressList(envelope.GetHeader(header))
+		if err != nil {
+			continue
+		}
+		for _, candidate := range addresses {
+			address, err := inbox.NormalizeEmailAddress(candidate.Address)
+			if err != nil || e.ReceivesAddress(address) {
+				continue
+			}
+			if strings.EqualFold(address, message.Contact.Email.String) {
+				return nil
+			}
+			first, last := stringutil.SplitName(candidate.Name)
+			if first == "" {
+				mailbox, _, _ := strings.Cut(address, "@")
+				first = stringutil.CapitalizeFirst(mailbox)
+			}
+			message.Contact = models.IncomingContact{
+				FirstName: first,
+				LastName:  last,
+				Email:     null.StringFrom(address),
+			}
+			message.ContactFromHeader = true
+			var meta map[string]any
+			if err := json.Unmarshal(message.Meta, &meta); err != nil {
+				return fmt.Errorf("reading original sender metadata: %w", err)
+			}
+			meta["contact_address"] = address
+			meta["contact_header"] = header
+			message.Meta, err = json.Marshal(meta)
+			return err
+		}
+	}
+	return nil
 }
 
 // collectAttachments builds the attachment list from an envelope's attachment, inline, and unclassified parts.

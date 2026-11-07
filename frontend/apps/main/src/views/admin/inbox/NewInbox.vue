@@ -146,6 +146,7 @@ const submitForm = (values) => {
     prompt_tags_on_reply: values.prompt_tags_on_reply ?? false,
     config: {
       reply_to: values.reply_to,
+      original_sender_headers: values.original_sender_headers || [],
       enable_plus_addressing: values.enable_plus_addressing,
       imap: values.imap_enabled === false ? [] : [values.imap],
       smtp: [values.smtp]

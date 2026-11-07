@@ -84,14 +84,15 @@ func (a EmailAliases) Value() (driver.Value, error) {
 
 // Config holds the email inbox configuration with multiple SMTP servers and IMAP clients.
 type Config struct {
-	AuthType             string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
-	OAuth                *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
-	SMTP                 []SMTPConfig `json:"smtp"`
-	IMAP                 []IMAPConfig `json:"imap"`
-	From                 string       `json:"from"`
-	FromNameTemplate     string       `json:"from_name_template"`
-	ReplyTo              string       `json:"reply_to"`
-	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+	AuthType              string       `json:"auth_type"` // AuthTypePassword or AuthTypeOAuth2
+	OAuth                 *OAuthConfig `json:"oauth"`     // OAuth config when auth_type is "oauth2"
+	SMTP                  []SMTPConfig `json:"smtp"`
+	IMAP                  []IMAPConfig `json:"imap"`
+	From                  string       `json:"from"`
+	FromNameTemplate      string       `json:"from_name_template"`
+	ReplyTo               string       `json:"reply_to"`
+	EnablePlusAddressing  bool         `json:"enable_plus_addressing"`
+	OriginalSenderHeaders []string     `json:"original_sender_headers"`
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.

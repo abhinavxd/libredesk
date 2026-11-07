@@ -42,6 +42,9 @@ export const createFormSchema = (t) => z.object({
     .refine((v) => !v || validateEmail(v), {
       message: t('validation.invalidEmail')
     }),
+  original_sender_headers: z.array(
+    z.string().trim().regex(/^[A-Za-z0-9-]+$/, t('admin.inbox.originalSenderHeader.invalid'))
+  ).default([]),
   enabled: z.boolean().optional(),
   csat_enabled: z.boolean().optional(),
   prompt_tags_on_reply: z.boolean().optional(),
