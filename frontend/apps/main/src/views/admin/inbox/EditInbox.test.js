@@ -70,7 +70,6 @@ afterEach(() => {
 it('refreshes shared sender data after saving aliases', async () => {
   await mount([alias('billing@example.com', 'verified')])
   updateInbox.mockResolvedValue(response([]))
-  getInbox.mockResolvedValue(response([]))
   form.props.submitForm({ imap: {}, smtp: {}, aliases: [] })
   await settle()
   expect(updateInbox).toHaveBeenCalled()
@@ -83,26 +82,23 @@ it('replaces deleted IMAP settings with the saved backend state', async () => {
   const saved = response([])
   saved.data.data.config.imap = []
   saved.data.data.config.smtp = [{ password: '••••••••' }]
-  getInbox.mockResolvedValue(saved)
   updateInbox.mockResolvedValue(saved)
 
   await form.props.submitForm({ imap_enabled: false, imap: { password: '••••••••' }, smtp: {} })
   await settle()
 
   expect(updateInbox.mock.calls[0][1].config.imap).toEqual([])
-  expect(getInbox).toHaveBeenCalledTimes(2)
+  expect(getInbox).toHaveBeenCalledTimes(1)
   expect(form.props.initialValues.imap_enabled).toBe(false)
   expect(form.props.initialValues.imap).toEqual({})
   expect(form.props.initialValues.smtp.password).toBe('••••••••')
 })
 
-it('stays loading until saving, refetching, and refreshing shared inboxes finish', async () => {
+it('stays loading until saving and refreshing shared inboxes finish', async () => {
   await mount([])
   let finishSave
-  let finishRefetch
   let finishSharedRefresh
   updateInbox.mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
-  getInbox.mockReturnValueOnce(new Promise((resolve) => { finishRefetch = resolve }))
   fetchInboxes.mockReturnValueOnce(new Promise((resolve) => { finishSharedRefresh = resolve }))
 
   let finished = false
@@ -115,12 +111,7 @@ it('stays loading until saving, refetching, and refreshing shared inboxes finish
   await settle()
   expect(form.props.isLoading).toBe(true)
   expect(finished).toBe(false)
-  expect(getInbox).toHaveBeenCalledTimes(2)
-
-  finishRefetch(response([]))
-  await settle()
-  expect(form.props.isLoading).toBe(true)
-  expect(finished).toBe(false)
+  expect(getInbox).toHaveBeenCalledTimes(1)
 
   finishSharedRefresh()
   await saving

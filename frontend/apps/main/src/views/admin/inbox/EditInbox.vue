@@ -147,8 +147,8 @@ const submitForm = (values) => {
 const updateInbox = async (payload) => {
   try {
     isLoading.value = true
-    await api.updateInbox(inbox.value.id, payload)
-    await fetchInbox()
+    const response = await api.updateInbox(inbox.value.id, payload)
+    setInboxData(response.data.data)
     await inboxStore.fetchInboxes(true /* force */)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
@@ -228,10 +228,7 @@ const startVerificationPolling = () => {
   verificationPollTimer = setInterval(pollAliasVerification, 5000)
 }
 
-const fetchInbox = async () => {
-  const response = await api.getInbox(props.id)
-  const inboxData = response.data.data
-
+const setInboxData = (inboxData) => {
   // OAuth inboxes always receive over IMAP.
   inboxData.imap_enabled = inboxData?.config?.auth_type === AUTH_TYPE_OAUTH2 || (inboxData?.config?.imap?.length ?? 0) > 0
   inboxData.imap = inboxData?.config?.imap?.[0] || {}
@@ -253,11 +250,12 @@ const fetchInbox = async () => {
 onMounted(async () => {
   try {
     formLoading.value = true
-    const [, langsResp] = await Promise.all([
-      fetchInbox(),
+    const [resp, langsResp] = await Promise.all([
+      api.getInbox(props.id),
       api.getAvailableLanguages()
     ])
     availableLanguages.value = langsResp.data.data
+    setInboxData(resp.data.data)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
