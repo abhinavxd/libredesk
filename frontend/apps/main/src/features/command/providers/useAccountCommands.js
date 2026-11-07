@@ -26,7 +26,7 @@ const THEME_COMMANDS = [
 
 export function useAccountCommands() {
   const { t } = useI18n()
-  const { store: themePreference, state: activeTheme } = useColorMode()
+  const { store: themePreference } = useColorMode()
   const userStore = useUserStore()
   const shortcutsDialog = useKeyboardShortcutsDialog()
   const logout = useLogout()
@@ -36,9 +36,8 @@ export function useAccountCommands() {
     const isAway = AWAY_STATUSES.includes(status)
     const isReassigning = status === 'away_and_reassigning'
 
-    // Skip the saved choice and the theme already on screen, e.g. "dark" while the system theme is dark.
     const themeCommands = THEME_COMMANDS.filter(
-      (option) => option.value !== themePreference.value && option.value !== activeTheme.value
+      (option) => option.value !== themePreference.value
     ).map((option) => ({
       id: `account.theme.${option.value}`,
       label: t(option.label),
