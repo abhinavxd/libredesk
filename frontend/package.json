@@ -70,7 +70,7 @@
     "vee-validate": "^4.15.0",
     "vue": "^3.5.44",
     "vue-easy-lightbox": "^1.19.0",
-    "vue-i18n": "^9.14.5",
+    "vue-i18n": "^11.4.14",
     "vue-letter": "^0.2.1",
     "vue-picture-cropper": "^0.7.0",
     "vue-router": "^4.5.0",
