@@ -601,7 +601,10 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
     main#hc-main { padding: 1.75rem 1.5rem 3rem; }
 }
 @media (max-width: 640px) {
-    .hc-lang-btn, .hc-theme-btn, .hc-announcement button { min-width: 44px; min-height: 44px; }
+    .hc-lang-btn, .hc-theme-btn { min-width: 44px; min-height: 44px; }
+    .hc-announcement { padding-block: 0; }
+    .hc-announcement p { min-width: 0; padding-block: .55rem; overflow-wrap: anywhere; }
+    .hc-announcement button { flex-shrink: 0; justify-content: center; }
     .hcd-topbar-inner { padding: 0 1rem; gap: .8rem; }
     .hcd-search-btn { width: auto; min-width: 44px; min-height: 44px; justify-content: center; justify-self: end; padding: .45rem; border: 1px solid var(--hc-border); }
     .hcd-search-btn-label, .hcd-search-btn .hcd-kbd-combo { display: none; }

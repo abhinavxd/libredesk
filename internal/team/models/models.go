@@ -20,6 +20,7 @@ type Team struct {
 	BusinessHoursID              null.Int    `db:"business_hours_id" json:"business_hours_id"`
 	SLAPolicyID                  null.Int    `db:"sla_policy_id" json:"sla_policy_id"`
 	MaxAutoAssignedConversations int         `db:"max_auto_assigned_conversations" json:"max_auto_assigned_conversations"`
+	SkipOfflineAgents            bool        `db:"skip_offline_agents" json:"skip_offline_agents"`
 }
 
 type TeamCompact struct {
