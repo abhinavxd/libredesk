@@ -163,6 +163,12 @@ func (e *Engine) populateTeamBalancer() error {
 				continue
 			}
 
+			// Skip offline users if the team has opted out of assigning to them.
+			if team.SkipOfflineAgents && user.AvailabilityStatus == umodels.Offline {
+				e.lo.Debug("user is offline, skipping autoassignment", "team_id", team.ID, "user_id", user.ID)
+				continue
+			}
+
 			// Add user to the balancer pool
 			uid := strconv.Itoa(user.ID)
 			existingUsers[uid] = struct{}{}
