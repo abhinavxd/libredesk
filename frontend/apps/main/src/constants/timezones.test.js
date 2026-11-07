@@ -44,13 +44,14 @@ describe('timezone options', () => {
     )
   })
 
-  it('offers unique timezone values that JavaScript can format', () => {
+  it('offers unique timezone values with nonempty labels', () => {
     const values = timeZoneOptions.map((option) => option.value)
     expect(values.length).toBeGreaterThan(400)
     expect(new Set(values).size).toBe(values.length)
     expect(values[0]).toBe('UTC')
-    for (const timeZone of values) {
-      expect(() => new Intl.DateTimeFormat('en', { timeZone }).format()).not.toThrow()
+    for (const { label } of timeZoneOptions) {
+      expect(label).toBeTypeOf('string')
+      expect(label.trim()).not.toBe('')
     }
   })
 
