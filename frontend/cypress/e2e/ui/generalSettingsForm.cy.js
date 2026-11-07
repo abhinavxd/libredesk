@@ -49,7 +49,7 @@ describe('General settings form', () => {
     cy.get('input[name="site_name"]').should('have.value', original['app.site_name'])
     cy.get('input[name="root_url"]').should('have.value', original['app.root_url'])
     cy.get('input[name="favicon_url"]').should('have.value', original['app.favicon_url'])
-    timezoneField().should('contain.text', original['app.timezone'])
+    timezoneField().should('contain.text', `${original['app.timezone'].replaceAll('_', ' ')} (`)
   })
 
   it('saves a changed site name and reloads it', () => {
@@ -76,7 +76,7 @@ describe('General settings form', () => {
     cy.intercept('PUT', '**/api/v1/settings/general').as('saveGeneral')
 
     cy.visit(path)
-    timezoneField().should('contain.text', original['app.timezone']).click()
+    timezoneField().should('contain.text', `${original['app.timezone'].replaceAll('_', ' ')} (`).click()
     cy.get('[role="option"]').should('have.length.lessThan', 50)
     cy.get('input[role="combobox"]').type('Amsterdam', { delay: 0 }).should('have.value', 'Amsterdam')
     cy.contains('[role="option"]', 'Europe/Amsterdam').click()

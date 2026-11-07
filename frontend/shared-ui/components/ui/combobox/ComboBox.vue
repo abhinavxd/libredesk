@@ -10,6 +10,7 @@
           role="combobox"
           :aria-expanded="open"
           :class="['w-full justify-between bg-transparent px-3', buttonClass]"
+          @blur="emit('blur', $event)"
         >
           <span class="flex min-w-0 flex-1 items-center text-left">
             <slot name="selected" :selected="selectedItem">
@@ -28,6 +29,7 @@
         :items="filteredItems"
         :placeholder="placeholder"
         @select="selectItem"
+        @blur="emit('blur', $event)"
       >
         <template #default="{ item }">
           <slot name="item" :item="item">{{ item.label }}</slot>
@@ -109,7 +111,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'blur'])
 const value = defineModel()
 const open = ref(false)
 const searchTerm = ref('')

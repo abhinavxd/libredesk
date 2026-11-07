@@ -3,6 +3,7 @@ import timezones from '@shared-ui/constants/timezones.json'
 const now = new Date()
 
 const formatLabel = (timeZone) => {
+  const label = timeZone.replaceAll('_', ' ')
   try {
     const offset = new Intl.DateTimeFormat('en', {
       timeZone,
@@ -10,9 +11,9 @@ const formatLabel = (timeZone) => {
     })
       .formatToParts(now)
       .find((part) => part.type === 'timeZoneName').value
-    return `${timeZone} (${offset === 'GMT' ? 'UTC+00:00' : offset.replace('GMT', 'UTC')})`
+    return `${label} (${offset === 'GMT' ? 'UTC+00:00' : offset.replace('GMT', 'UTC')})`
   } catch {
-    return timeZone
+    return label
   }
 }
 

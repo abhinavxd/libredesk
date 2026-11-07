@@ -13,7 +13,7 @@ defineProps({
   modelValue: Object,
   placeholder: String
 })
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'blur'])
 const searchTerm = defineModel('searchTerm', { type: String, default: '' })
 </script>
 
@@ -29,6 +29,7 @@ const searchTerm = defineModel('searchTerm', { type: String, default: '' })
       :display-value="() => searchTerm"
       :placeholder="placeholder"
       :aria-label="placeholder"
+      @blur="emit('blur', $event)"
       class="flex h-9 w-full border-b bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
     />
     <div v-if="!items.length" class="py-6 text-center text-sm">

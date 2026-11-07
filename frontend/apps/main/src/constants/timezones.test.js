@@ -39,7 +39,9 @@ describe('timezone options', () => {
     vi.setSystemTime(new Date(date))
     vi.resetModules()
     const { timeZoneOptions: options } = await import('./timezones.js')
-    expect(options.find((option) => option.value === zone).label).toBe(`${zone} (${offset})`)
+    expect(options.find((option) => option.value === zone).label).toBe(
+      `${zone.replaceAll('_', ' ')} (${offset})`
+    )
   })
 
   it('offers unique timezone values that JavaScript can format', () => {
