@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 import { getI18n } from '@main/i18n'
-import { abortRouteScope } from '@main/api'
+import api, { abortRouteScope } from '@main/api'
 
 const routes = [
   {
@@ -13,6 +13,12 @@ const routes = [
         name: 'login',
         component: () => import('@main/views/auth/UserLoginView.vue'),
         meta: { titleKey: 'auth.signInButton' }
+      },
+      {
+        path: 'setup',
+        name: 'setup',
+        component: () => import('@main/views/auth/SetupView.vue'),
+        meta: { titleKey: 'setup.createAdmin' }
       },
       {
         path: 'reset-password',
@@ -713,7 +719,15 @@ router.afterEach((to, from, failure) => {
   if (!failure) sessionStorage.removeItem(reloadKey)
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
+  if (to.name === 'login') {
+    try {
+      const response = await api.getSetupStatus()
+      if (response.data.data.required) return next({ name: 'setup' })
+    } catch {
+      // Sign in remains reachable when the setup status cannot be loaded.
+    }
+  }
   // Cancel in-flight requests.
   if (to.fullPath !== from.fullPath) {
     abortRouteScope()

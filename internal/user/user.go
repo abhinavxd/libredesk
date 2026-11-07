@@ -539,7 +539,7 @@ func ChangeSystemUserPassword(ctx context.Context, db *sqlx.DB) (int, error) {
 }
 
 // CreateSystemUser creates a system user with the provided password or a random one.
-func CreateSystemUser(ctx context.Context, password string, db *sqlx.DB) error {
+func CreateSystemUser(ctx context.Context, password string, db sqlx.Ext) error {
 	var err error
 
 	// Set random password if not provided.

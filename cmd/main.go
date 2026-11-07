@@ -176,6 +176,15 @@ func main() {
 
 	// Load the config files into Koanf.
 	initConfig(ko)
+	if ko.Bool("check") {
+		if err := checkInstallation(ctx, ko); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if ko.Bool("reset-database") && !ko.Bool("install") {
+		log.Fatal("--reset-database requires --install")
+	}
 
 	// Validate custom static directory if provided.
 	if dir := getCustomStaticDir(); dir != "" {
@@ -191,7 +200,9 @@ func main() {
 	db := initDB()
 
 	if ko.Bool("install") {
-		install(ctx, db, fs, ko.Bool("idempotent-install"), !ko.Bool("yes"))
+		if err := install(ctx, db, fs, ko.Bool("idempotent-install"), !ko.Bool("yes")); err != nil {
+			log.Fatal(err)
+		}
 		os.Exit(0)
 	}
 
@@ -222,6 +233,12 @@ func main() {
 	loadSettings(settings)
 
 	validateConfig(ko)
+	if err := checkUploadDirectory(ko); err != nil {
+		log.Printf("WARNING: %v", err)
+	}
+	if err := issueSetupToken(ctx, db); err != nil {
+		log.Fatal(err)
+	}
 
 	startPprof(initLogger("pprof"))
 

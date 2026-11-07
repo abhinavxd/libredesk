@@ -1,106 +1,102 @@
 <template>
-  <div class="placeholder-container">
-    <Spinner v-if="isLoading" />
-    <template v-else>
-      <div v-if="showGettingStarted" class="getting-started-wrapper">
-        <div class="text-center">
-          <h2 class="ui-display-heading mb-6">
-            {{ $t('setup.completeYourSetup') }}
-          </h2>
-
-          <div class="space-y-4 mb-6">
-            <div class="checklist-item" :class="{ completed: hasInboxes }">
-              <CheckCircle v-if="hasInboxes" class="check-icon completed" />
-              <Circle v-else class="w-5 h-5 text-muted-foreground" />
-              <span class="flex-1 text-left ml-3 text-foreground">
-                {{ $t('setup.createFirstInbox') }}
-              </span>
-              <Button
-                v-if="!hasInboxes"
-                variant="ghost"
-                size="sm"
-                @click="router.push({ name: 'inbox-list' })"
-                class="ml-auto"
-              >
-                {{ $t('globals.messages.setUp') }}
+  <div class="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto rounded-xl border border-border bg-card p-6">
+    <Spinner v-if="loading && !checklist" />
+    <div v-else-if="showGettingStarted" class="w-full max-w-lg space-y-5">
+      <h2 class="ui-display-heading">{{ t('setup.completeYourSetup') }}</h2>
+      <p class="text-sm text-muted-foreground">{{ t('setup.checklistHelp') }}</p>
+      <ol class="space-y-3">
+        <li v-for="step in steps" :key="step.key" class="flex items-start gap-3 rounded-lg border p-3">
+          <CheckCircle v-if="step.done" class="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+          <Circle v-else class="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div class="min-w-0 flex-1 space-y-1">
+            <p class="text-sm font-medium">
+              {{ t(step.label) }}
+              <span v-if="step.done" class="text-muted-foreground">({{ t('setup.complete') }})</span>
+            </p>
+            <p v-if="step.help" class="text-sm text-muted-foreground">{{ t(step.help) }}</p>
+            <div v-if="!step.done" class="flex flex-wrap gap-2 pt-1">
+              <Button type="button" variant="outline" size="sm" @click="router.push(step.to)">
+                {{ t('globals.messages.setUp') }}
               </Button>
-            </div>
-
-            <div class="checklist-item" :class="{ completed: hasAgents, disabled: !hasInboxes }">
-              <CheckCircle v-if="hasAgents" class="check-icon completed" />
-              <Circle v-else class="w-5 h-5 text-muted-foreground" />
-              <span class="flex-1 text-left ml-3 text-foreground">
-                {{ $t('setup.inviteTeammates') }}
-              </span>
-              <Button
-                v-if="!hasAgents && hasInboxes"
-                variant="ghost"
-                size="sm"
-                @click="router.push({ name: 'agent-list' })"
-                class="ml-auto"
-              >
-                {{ $t('globals.messages.invite') }}
+              <Button v-if="step.key === 'notifications'" type="button" variant="ghost" size="sm" :disabled="loading" @click="skipNotifications">
+                {{ t('setup.skipForNow') }}
               </Button>
             </div>
           </div>
-        </div>
+        </li>
+      </ol>
+      <p class="text-sm text-muted-foreground">{{ t('setup.teammatesOptional') }}</p>
+      <div class="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" @click="router.push({ name: 'agent-list' })">
+          {{ t('setup.inviteTeammates') }}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" :disabled="loading" @click="refresh">
+          {{ t('setup.checkProgress') }}
+        </Button>
       </div>
-      <div v-else class="flex max-w-sm flex-col items-center gap-3 px-6 text-center">
-        <p class="text-sm text-muted-foreground">{{ $t('conversation.placeholder') }}</p>
-      </div>
-    </template>
+    </div>
+    <p v-else-if="!error" class="max-w-sm text-center text-sm text-muted-foreground">{{ t('conversation.placeholder') }}</p>
+    <Error v-if="error" :errorMessage="error" role="alert" class="mt-4 max-w-lg" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { CheckCircle, Circle } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Spinner } from '@shared-ui/components/ui/spinner'
-import { useInboxStore } from '@/stores/inbox'
-import { useUsersStore } from '@/stores/users'
+import { Error } from '@shared-ui/components/ui/error'
+import { handleHTTPError } from '@shared-ui/utils/http.js'
+import { useUserStore } from '@/stores/user'
+import api from '@/api'
 
+const { t } = useI18n()
 const router = useRouter()
-const inboxStore = useInboxStore()
-const usersStore = useUsersStore()
-const isLoading = ref(true)
-
-onMounted(async () => {
-  try {
-    await Promise.all([inboxStore.fetchInboxes(), usersStore.fetchUsers()])
-  } finally {
-    isLoading.value = false
-  }
+const userStore = useUserStore()
+const loading = ref(false)
+const error = ref('')
+const checklist = ref(null)
+const steps = computed(() => {
+  const status = checklist.value || {}
+  const items = [
+    { key: 'workspace', label: 'setup.workspace', help: 'setup.workspaceHelp', done: status.workspace, to: { name: 'general' } },
+    { key: 'inbox', label: 'setup.createFirstInbox', done: status.inbox, to: { name: 'inbox-list' } },
+    { key: 'notifications', label: 'setup.notifications', help: 'setup.notificationsHelp', done: status.notifications, to: '/admin/notification' },
+    { key: 'conversation', label: 'setup.testConversation', help: 'setup.testConversationHelp', done: Boolean(status.conversation), to: { name: 'inbox-list' } }
+  ]
+  return status.managed ? items : items.filter((step) => step.key === 'inbox')
 })
+const showGettingStarted = computed(() => checklist.value && steps.value.some((step) => !step.done))
 
-const hasInboxes = computed(() => inboxStore.inboxes.length > 0)
-const hasAgents = computed(() => usersStore.users.length > 0)
-const showGettingStarted = computed(() => !hasInboxes.value || !hasAgents.value)
+const refresh = async () => {
+  if (!userStore.can('general_settings:manage')) return
+  loading.value = true
+  error.value = ''
+  try {
+    const response = await api.getSetupChecklist()
+    checklist.value = response.data.data
+  } catch (err) {
+    error.value = handleHTTPError(err).message
+  } finally {
+    loading.value = false
+  }
+}
+
+const skipNotifications = async () => {
+  loading.value = true
+  try {
+    await api.skipSetupNotifications()
+    await refresh()
+  } catch (err) {
+    error.value = handleHTTPError(err).message
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => userStore.can('general_settings:manage'), (canManage) => {
+  if (canManage) refresh()
+}, { immediate: true })
 </script>
-
-<style scoped>
-.placeholder-container {
-  @apply relative flex h-full min-h-0 w-full min-w-0 items-center justify-center rounded-xl border border-border bg-card;
-}
-
-.getting-started-wrapper {
-  @apply w-full max-w-md mx-auto px-4;
-}
-
-.checklist-item {
-  @apply flex items-center justify-between py-3 px-4 rounded-lg border border-border;
-}
-
-.checklist-item.completed {
-  @apply bg-muted/50;
-}
-
-.checklist-item.disabled {
-  @apply opacity-50;
-}
-
-.check-icon.completed {
-  @apply w-5 h-5 text-primary;
-}
-</style>

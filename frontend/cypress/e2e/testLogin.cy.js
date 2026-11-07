@@ -1,6 +1,7 @@
-// cypress/e2e/login.cy.js
+const existingInstallation = Cypress.env('FRESH_INSTALL') ? describe.skip : describe
+const freshInstallation = Cypress.env('FRESH_INSTALL') ? describe : describe.skip
 
-describe('Login Component', () => {
+existingInstallation('Login Component', () => {
     beforeEach(() => {
         // Mock the API response for OIDC providers
         cy.intercept('GET', '**/api/v1/config', {
@@ -159,7 +160,7 @@ describe('Login Component', () => {
     })
 })
 
-describe('Logout', () => {
+existingInstallation('Logout', () => {
     beforeEach(() => {
         cy.viewport(1440, 900)
         cy.login()
@@ -212,5 +213,91 @@ describe('Logout', () => {
             url: '/api/v1/agents/me',
             failOnStatusCode: false
         }).its('status').should('eq', 401)
+    })
+})
+
+existingInstallation('Existing installation setup', () => {
+    it('keeps setup closed and preserves sign in on an existing installation', () => {
+        cy.request('/api/v1/setup').its('body.data.required').should('eq', false)
+        cy.visit('/setup')
+        cy.location('pathname').should('eq', '/')
+        cy.get('#email').should('be.visible')
+        cy.login()
+        cy.request('/api/v1/agents/me').its('status').should('eq', 200)
+    })
+})
+
+freshInstallation('Fresh installation setup', () => {
+    it('creates the first admin and completes setup after a delivered reply', () => {
+        cy.viewport(1440, 1000)
+        const code = Cypress.env('SETUP_CODE')
+        const password = 'SetupPass!123'
+        cy.visit('/')
+        cy.location('pathname').should('eq', '/setup')
+        cy.get('#token').type('x'.repeat(40), { log: false })
+        cy.get('#first_name').type('Setup Admin')
+        cy.get('#email').type('setup-admin@example.com')
+        cy.get('#password').type(password, { log: false })
+        cy.get('#confirmation').type(password, { log: false })
+        cy.get('[role="alert"]').should('not.exist')
+        cy.contains('button', 'Create admin account').click()
+        cy.contains('[role="alert"]', 'Setup code is invalid or expired').should('be.visible')
+        cy.get('#token').clear()
+        cy.get('#token').type(code, { log: false })
+        cy.get('#confirmation').type('{enter}', { log: false })
+        cy.location('pathname').should('eq', '/')
+        cy.get('#email').type('setup-admin@example.com')
+        cy.get('#password').type(`${password}{enter}`, { log: false })
+        cy.location('pathname').should('eq', '/inboxes/assigned')
+        cy.contains('Check your workspace settings').should('be.visible')
+
+        cy.visit('/admin/general')
+        cy.get('form button[type="submit"]').click()
+        cy.get('form button[type="submit"]').should('not.be.disabled')
+        cy.request('/api/v1/setup/checklist').its('body.data.workspace').should('eq', true)
+
+        cy.visit('/admin/inboxes/new')
+        cy.contains('button', 'Live Chat').click()
+        cy.get('[data-section="basics"] > h3 > button').click()
+        cy.get('input[name="name"]').type('Setup test inbox')
+        cy.get('input[name="config.brand_name"]').type('Support')
+        cy.get('form button[type="submit"]').click()
+        cy.location('pathname').should('eq', '/admin/inboxes')
+        cy.api('GET', '/api/v1/inboxes').then(({ body }) => {
+            const inbox = body.data.find((item) => item.name === 'Setup test inbox')
+            expect(inbox).to.have.property('uuid')
+            cy.request({
+                method: 'POST',
+                url: '/api/v1/widget/chat/conversations/init',
+                headers: { 'X-Libredesk-Inbox-ID': inbox.uuid },
+                body: { message: 'Can you help me finish setup?' }
+            }).then(({ body }) => {
+                const conversation = body.data.conversation.uuid
+                const token = body.data.session_token
+                cy.api('POST', `/api/v1/conversations/${conversation}/messages`, {
+                    message: 'Setup is working.', private: false, sender_type: 'agent'
+                })
+                cy.visit('/inboxes/assigned')
+                cy.contains('button', 'Check progress').click()
+                cy.contains('button', 'Skip for now').click()
+                cy.contains('Complete your setup').should('not.exist')
+                cy.request({
+                    url: `/api/v1/widget/chat/conversations/${conversation}`,
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'X-Libredesk-Inbox-ID': inbox.uuid
+                    }
+                }).then(({ body }) => {
+                    expect(JSON.stringify(body.data.messages)).to.include('Setup is working.')
+                })
+            })
+        })
+        cy.request('/api/v1/setup').its('body.data.required').should('eq', false)
+        cy.request({
+            method: 'POST', url: '/api/v1/setup/account', failOnStatusCode: false,
+            body: { token: code, first_name: 'Second admin', email: 'second@example.com', password }
+        }).its('status').should('eq', 409)
+        cy.visit('/setup')
+        cy.location('pathname').should('eq', '/inboxes/assigned')
     })
 })

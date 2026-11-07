@@ -70,6 +70,9 @@ func handleUpdateGeneralSettings(r *fastglue.Request) error {
 	if err := app.setting.Update(req); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	if err := markSetupWorkspaceComplete(app.db); err != nil {
+		app.lo.Error("error saving setup progress", "error", err)
+	}
 	// Reload the settings and templates.
 	if err := reloadSettings(app); err != nil {
 		app.lo.Error("error reloading settings", "error", err)

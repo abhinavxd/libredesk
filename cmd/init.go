@@ -122,6 +122,10 @@ func validateConfig(ko *koanf.Koanf) {
 		log.Fatalf("encryption_key must be exactly 32 characters, got %d", len(encKey))
 	}
 
+	if err := checkCookieConfiguration(ko); err != nil {
+		log.Printf("WARNING: %v", err)
+	}
+
 	// Warn if using sample config value.
 	if encKey == sampleEncKey {
 		colorlog.Red("WARNING: You are using the sample encryption_key from config.sample.toml. Change it immediately. Generate a secure key with `openssl rand -hex 16`")
@@ -143,6 +147,8 @@ func initFlags() {
 		"path to one or more config files (will be merged in order)")
 	f.Bool("version", false, "show current version of the build")
 	f.Bool("install", false, "setup database")
+	f.Bool("reset-database", false, "allow --install to erase existing database contents")
+	f.Bool("check", false, "check configuration and dependencies without starting the server")
 	f.Bool("idempotent-install", false, "run idempotent installation, i.e., skip installion if schema is already installed useful for the first time setup")
 	f.Bool("yes", false, "skip confirmation prompt")
 	f.Bool("upgrade", false, "upgrade the database schema")
@@ -193,7 +199,7 @@ func initFS(staticDir string) stuffbin.FileSystem {
 			// Running in local/dev mode, use the local filesystem.
 			// Only include frontend dirs if they exist (frontend build is optional in dev).
 			colorlog.Red("binary unstuff failed, using local filesystem for static files")
-			files := []string{"i18n", "static"}
+			files := []string{"i18n", "static", "schema.sql"}
 			for _, d := range []string{"frontend/dist/main", "frontend/dist/widget"} {
 				if _, err := os.Stat(d); err == nil {
 					files = append(files, d)
@@ -1043,20 +1049,11 @@ func initFastCache(rdb *redis.Client) *fastcache.FastCache {
 
 // initRedis inits postgres DB.
 func initDB() *sqlx.DB {
-	dsn := fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s %s",
-		ko.MustString("db.host"),
-		ko.MustInt("db.port"),
-		ko.MustString("db.user"),
-		ko.MustString("db.password"),
-		ko.MustString("db.database"),
-		ko.String("db.ssl_mode"),
-		ko.String("db.params"),
-	)
+	dsn := databaseDSN(ko)
 
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
-		log.Fatalf("error connecting to DB: %v", err)
+		log.Fatalf("PostgreSQL is unavailable. Check db.host, db.port, db.user, db.password, and db.database: %v", err)
 	}
 
 	db.SetMaxOpenConns(ko.MustInt("db.max_open"))

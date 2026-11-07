@@ -65,38 +65,35 @@ __________________
 
 ### Docker
 
-The latest image is available on DockerHub at [`libredesk/libredesk:latest`](https://hub.docker.com/r/libredesk/libredesk/tags?page=1&ordering=last_updated&name=latest)
+Download `setup.sh` from the [latest release](https://github.com/abhinavxd/libredesk/releases/latest/download/setup.sh) into an empty directory, then run:
 
-```shell
-# Download the compose file and sample config file in the current directory.
-curl -LO https://github.com/abhinavxd/libredesk/raw/main/docker-compose.yml
-curl -LO https://github.com/abhinavxd/libredesk/raw/main/config.sample.toml
-
-# Copy the config.sample.toml to config.toml and edit it as needed.
-cp config.sample.toml config.toml
-
-# Run the services in the background.
-docker compose up -d
-
-# Setting System user password.
-docker exec -it libredesk_app ./libredesk --set-system-user-password
+```sh
+sh setup.sh local
 ```
 
-Go to `http://localhost:9000` and login with username `System` and the password you set using the `--set-system-user-password` command.
+Open http://localhost:9000/setup and create your admin account using the temporary code printed in the terminal.
 
-See [installation docs](https://docs.libredesk.io/getting-started/installation)
+For a server with a domain:
 
-__________________
+```sh
+sh setup.sh production https://support.example.com
+```
+
+See [installation instructions](INSTALL.md) for HTTPS configuration, dependency checks, and upgrades.
 
 ### Binary
-- Download the [latest release](https://github.com/abhinavxd/libredesk/releases) and extract the libredesk binary.
-- Edit config.toml as needed.
-- `./libredesk --install` to setup the Postgres DB.
-- Run `./libredesk --set-system-user-password` to set the password for the System user.
-- Run `./libredesk` and visit `http://localhost:9000` and login with email `System` and the password you set using the --set-system-user-password command.
 
-See [installation docs](https://docs.libredesk.io/getting-started/installation)
-__________________
+Extract the [release archive](https://github.com/abhinavxd/libredesk/releases), configure PostgreSQL and Redis in `config.toml`, then run:
+
+```sh
+mkdir -p uploads
+./libredesk --install
+./libredesk --upgrade --yes
+./libredesk --check
+./libredesk
+```
+
+Open `/setup` and enter the temporary code printed on startup. See [installation instructions](INSTALL.md) for configuration details.
 
 ## Developers
 

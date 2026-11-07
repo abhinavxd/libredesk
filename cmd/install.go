@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	"github.com/abhinavxd/libredesk/internal/colorlog"
@@ -16,55 +15,66 @@ import (
 	"github.com/knadh/stuffbin"
 )
 
-// Install checks if the schema is already installed, prompts for confirmation, and installs the schema if needed.
-// idempotent install skips the installation if the database schema is already installed.
+// install preserves an existing schema unless --reset-database explicitly allows replacement.
 func install(ctx context.Context, db *sqlx.DB, fs stuffbin.FileSystem, idempotentInstall, prompt bool) error {
 	schemaInstalled, err := checkSchema(db)
 	if err != nil {
-		log.Fatalf("error checking existing db schema: %v", err)
+		return fmt.Errorf("checking database schema: %w", err)
+	}
+	reset := ko.Bool("reset-database")
+	if schemaInstalled && !reset {
+		log.Println("database already installed. Existing data is unchanged. Use --upgrade to apply migrations.")
+		return nil
+	}
+	if !reset {
+		var occupied bool
+		if err := db.GetContext(ctx, &occupied, `SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = current_schema())`); err != nil {
+			return fmt.Errorf("checking database contents: %w", err)
+		}
+		if occupied {
+			return fmt.Errorf("database contains tables. Installation stopped to preserve existing data. Use an empty database or explicitly pass --reset-database")
+		}
 	}
 
 	// Make sure the system user password is strong enough.
 	password := os.Getenv("LIBREDESK_SYSTEM_USER_PASSWORD")
-	if password != "" && !user.IsStrongPassword(password) && !schemaInstalled {
-		log.Fatalf("system user password is not strong, %s", user.PasswordHint)
+	if password != "" && !user.IsStrongPassword(password) {
+		return fmt.Errorf("system user password is not strong, %s", user.PasswordHint)
 	}
 
-	if !idempotentInstall {
-		log.Println("running first time setup...")
+	if reset {
 		colorlog.Red(fmt.Sprintf("WARNING: This will wipe your entire database - '%s'", ko.String("db.database")))
 	}
 
-	if prompt {
+	if prompt && (!idempotentInstall || reset) {
 		log.Print("Continue (y/n)? ")
 		var ok string
 		fmt.Scanf("%s", &ok)
 		if !strings.EqualFold(ok, "y") {
-			log.Fatalf("installation cancelled")
+			return fmt.Errorf("installation cancelled")
 		}
 	}
 
-	if idempotentInstall {
-		if schemaInstalled {
-			log.Println("skipping installation as schema is already installed")
-			os.Exit(0)
-		}
-	} else {
-		log.Println("installing database schema...")
-		time.Sleep(5 * time.Second)
+	tx, err := db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if err := installSchema(tx, fs); err != nil {
+		return fmt.Errorf("installing database schema: %w", err)
 	}
 
-	// Install schema.
-	if err := installSchema(db, fs); err != nil {
-		log.Fatalf("error installing schema: %v", err)
+	if err := user.CreateSystemUser(ctx, password, tx); err != nil {
+		return fmt.Errorf("creating system user: %w", err)
 	}
-
+	if err := initializeSetup(tx, password == ""); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	log.Println("database schema installed successfully")
-
-	// Create system user.
-	if err := user.CreateSystemUser(ctx, password, db); err != nil {
-		log.Fatalf("error creating system user: %v", err)
-	}
 	return nil
 }
 
@@ -79,12 +89,15 @@ func setSystemUserPass(ctx context.Context, db *sqlx.DB) {
 	if err := auth_.DestroyUserSessions(ctx, rd, id); err != nil {
 		log.Fatalf("error destroying system user sessions: %v", err)
 	}
+	if _, err := db.ExecContext(ctx, `UPDATE settings SET value = '{"required":false}' WHERE key = 'setup.bootstrap'`); err != nil {
+		log.Fatalf("error closing browser setup: %v", err)
+	}
 	fmt.Println("password updated successfully. Login with email 'System' and the new password.")
 }
 
 // checkSchema verifies if the DB schema is already installed by querying a table.
 func checkSchema(db *sqlx.DB) (bool, error) {
-	if _, err := db.Exec(`SELECT * FROM settings LIMIT 1`); err != nil {
+	if _, err := db.Exec(`SELECT 1 FROM settings LIMIT 1`); err != nil {
 		if dbutil.IsTableNotExistError(err) {
 			return false, nil
 		}
@@ -94,7 +107,7 @@ func checkSchema(db *sqlx.DB) (bool, error) {
 }
 
 // installSchema reads the schema file and installs it in the database.
-func installSchema(db *sqlx.DB, fs stuffbin.FileSystem) error {
+func installSchema(db sqlx.Ext, fs stuffbin.FileSystem) error {
 	q, err := fs.Read("/schema.sql")
 	if err != nil {
 		return err
