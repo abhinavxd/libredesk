@@ -142,13 +142,13 @@ const submitForm = (values) => {
     }
   }
 
-  updateInbox(payload)
+  return updateInbox(payload)
 }
 const updateInbox = async (payload) => {
   try {
     isLoading.value = true
-    const response = await api.updateInbox(inbox.value.id, payload)
-    setAliasVerificationState(response.data.data?.aliases || [])
+    await api.updateInbox(inbox.value.id, payload)
+    await fetchInbox()
     await inboxStore.fetchInboxes(true /* force */)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
@@ -228,35 +228,36 @@ const startVerificationPolling = () => {
   verificationPollTimer = setInterval(pollAliasVerification, 5000)
 }
 
+const fetchInbox = async () => {
+  const response = await api.getInbox(props.id)
+  const inboxData = response.data.data
+
+  // OAuth inboxes always receive over IMAP.
+  inboxData.imap_enabled = inboxData?.config?.auth_type === AUTH_TYPE_OAUTH2 || (inboxData?.config?.imap?.length ?? 0) > 0
+  inboxData.imap = inboxData?.config?.imap?.[0] || {}
+  if (inboxData?.config?.smtp) {
+    inboxData.smtp = inboxData?.config?.smtp[0]
+  }
+  inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
+  inboxData.oauth = inboxData?.config?.oauth || {}
+  inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
+  inboxData.reply_to = inboxData?.config?.reply_to || ''
+  inboxData.aliases = inboxData?.aliases || []
+  inbox.value = inboxData
+  setAliasVerificationState(inboxData.aliases)
+  if (hasPendingAlias()) {
+    startVerificationPolling()
+  }
+}
+
 onMounted(async () => {
   try {
     formLoading.value = true
-    const [resp, langsResp] = await Promise.all([
-      api.getInbox(props.id),
+    const [, langsResp] = await Promise.all([
+      fetchInbox(),
       api.getAvailableLanguages()
     ])
     availableLanguages.value = langsResp.data.data
-    let inboxData = resp.data.data
-
-    // Modify the inbox data as per the zod schema.
-    // OAuth inboxes always receive over IMAP.
-    inboxData.imap_enabled = inboxData?.config?.auth_type === AUTH_TYPE_OAUTH2 || (inboxData?.config?.imap?.length ?? 0) > 0
-    if (inboxData.imap_enabled) {
-      inboxData.imap = inboxData.config.imap[0]
-    }
-    if (inboxData?.config?.smtp) {
-      inboxData.smtp = inboxData?.config?.smtp[0]
-    }
-    inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
-    inboxData.oauth = inboxData?.config?.oauth || {}
-    inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
-    inboxData.reply_to = inboxData?.config?.reply_to || ''
-    inboxData.aliases = inboxData?.aliases || []
-    inbox.value = inboxData
-    setAliasVerificationState(inboxData.aliases)
-    if (hasPendingAlias()) {
-      startVerificationPolling()
-    }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

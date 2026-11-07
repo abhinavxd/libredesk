@@ -1309,7 +1309,7 @@ watch(
       isOAuthInbox.value = false
       setupMethod.value = 'manual'
     }
-    form.resetForm({ values: newValues })
+    form.resetForm({ values: newValues }, { force: true })
   },
   { deep: true, immediate: true }
 )

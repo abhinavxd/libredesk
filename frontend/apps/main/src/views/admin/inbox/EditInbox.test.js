@@ -70,11 +70,76 @@ afterEach(() => {
 it('refreshes shared sender data after saving aliases', async () => {
   await mount([alias('billing@example.com', 'verified')])
   updateInbox.mockResolvedValue(response([]))
+  getInbox.mockResolvedValue(response([]))
   form.props.submitForm({ imap: {}, smtp: {}, aliases: [] })
   await settle()
   expect(updateInbox).toHaveBeenCalled()
   expect(fetchInboxes).toHaveBeenCalledWith(true)
   expect(form.props.aliasVerificationState).toEqual({})
+})
+
+it('replaces deleted IMAP settings with the saved backend state', async () => {
+  await mount([])
+  const saved = response([])
+  saved.data.data.config.imap = []
+  saved.data.data.config.smtp = [{ password: '••••••••' }]
+  getInbox.mockResolvedValue(saved)
+  updateInbox.mockResolvedValue(saved)
+
+  await form.props.submitForm({ imap_enabled: false, imap: { password: '••••••••' }, smtp: {} })
+  await settle()
+
+  expect(updateInbox.mock.calls[0][1].config.imap).toEqual([])
+  expect(getInbox).toHaveBeenCalledTimes(2)
+  expect(form.props.initialValues.imap_enabled).toBe(false)
+  expect(form.props.initialValues.imap).toEqual({})
+  expect(form.props.initialValues.smtp.password).toBe('••••••••')
+})
+
+it('stays loading until saving, refetching, and refreshing shared inboxes finish', async () => {
+  await mount([])
+  let finishSave
+  let finishRefetch
+  let finishSharedRefresh
+  updateInbox.mockReturnValueOnce(new Promise((resolve) => { finishSave = resolve }))
+  getInbox.mockReturnValueOnce(new Promise((resolve) => { finishRefetch = resolve }))
+  fetchInboxes.mockReturnValueOnce(new Promise((resolve) => { finishSharedRefresh = resolve }))
+
+  let finished = false
+  const saving = form.props.submitForm({ imap: {}, smtp: {} }).then(() => { finished = true })
+  await settle()
+  expect(form.props.isLoading).toBe(true)
+  expect(getInbox).toHaveBeenCalledTimes(1)
+
+  finishSave(response([]))
+  await settle()
+  expect(form.props.isLoading).toBe(true)
+  expect(finished).toBe(false)
+  expect(getInbox).toHaveBeenCalledTimes(2)
+
+  finishRefetch(response([]))
+  await settle()
+  expect(form.props.isLoading).toBe(true)
+  expect(finished).toBe(false)
+
+  finishSharedRefresh()
+  await saving
+  await settle()
+  expect(form.props.isLoading).toBe(false)
+  expect(finished).toBe(true)
+})
+
+it('keeps the form values when saving fails and releases the loading state', async () => {
+  await mount([])
+  const initialValues = form.props.initialValues
+  updateInbox.mockRejectedValueOnce(new Error('save failed'))
+
+  await form.props.submitForm({ imap_enabled: false, imap: {}, smtp: {} })
+  await settle()
+
+  expect(getInbox).toHaveBeenCalledTimes(1)
+  expect(form.props.initialValues).toBe(initialValues)
+  expect(form.props.isLoading).toBe(false)
 })
 
 it('refreshes shared senders as each alias verifies while others remain pending', async () => {
