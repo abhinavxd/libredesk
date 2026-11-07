@@ -222,8 +222,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 
-	private := false
-	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, m.maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, _, err := m.convo.GetAIConversationMessages(conv.UUID, 1 /** page **/, m.maxHistoryMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -268,6 +267,9 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 
 	contactLines := contactFieldLines(conv.Contact)
 	systemPrompt := buildSystemPrompt(assistant)
+	if msgs[0].Total > len(msgs) {
+		systemPrompt += "\n\nOnly the latest public messages are included. Earlier messages are omitted."
+	}
 	if len(contactLines) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
@@ -727,6 +729,9 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 				text += "\n"
 			}
 			text += strings.Join(markers, "\n")
+		}
+		if !msg.CreatedAt.IsZero() {
+			text = "[" + msg.CreatedAt.UTC().Format(time.RFC3339) + "]\n" + text
 		}
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}

@@ -194,9 +194,10 @@ type ChatImage struct {
 
 // CopilotMessage is one persisted turn of an agent's copilot chat on a conversation.
 type CopilotMessage struct {
-	Role     string        `db:"role" json:"role"`
-	Content  string        `db:"content" json:"content"`
-	Approval *ToolApproval `db:"-" json:"approval,omitempty"`
+	CreatedAt time.Time     `db:"created_at" json:"-"`
+	Role      string        `db:"role" json:"role"`
+	Content   string        `db:"content" json:"content"`
+	Approval  *ToolApproval `db:"-" json:"approval,omitempty"`
 }
 
 // MarshalJSON emits plain string content when there are no images, or the OpenAI multimodal

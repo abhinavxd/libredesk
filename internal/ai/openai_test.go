@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/zerodha/logf"
@@ -139,12 +142,84 @@ func TestToolCallExtraContentRoundTrip(t *testing.T) {
 		t.Fatalf("second request: %v", err)
 	}
 
-	toolCall := bodies[1]["messages"].([]any)[1].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)
+	toolCall := bodies[1]["messages"].([]any)[2].(map[string]any)["tool_calls"].([]any)[0].(map[string]any)
 	got, err := json.Marshal(toolCall["extra_content"])
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(got) != extra {
 		t.Fatalf("replayed tool call extra_content = %s, want %s", got, extra)
+	}
+}
+
+func TestTimeContextPreservesHistory(t *testing.T) {
+	now := time.Date(2026, time.November, 2, 0, 15, 0, 0, time.FixedZone("NPT", 5*3600+45*60))
+	for _, msgs := range [][]models.ChatMessage{
+		nil,
+		{{Role: models.RoleUser, Content: "What day is it?"}},
+		{{Role: models.RoleSystem, Content: "Help the customer."}, {Role: models.RoleUser, Content: "Hi"}},
+		{{Role: models.RoleUser, Images: []models.ChatImage{{MediaType: "image/png", Data: "image"}}}},
+	} {
+		before := slices.Clone(msgs)
+		got := withTimeContext(msgs, now)
+		if got[0].Role != models.RoleSystem || !strings.Contains(got[0].Content, "Current date and time: 2026-11-01T18:30:00Z (Sunday, UTC).") {
+			t.Fatalf("missing UTC clock: %#v", got)
+		}
+		if !reflect.DeepEqual(msgs, before) {
+			t.Fatalf("input history mutated: %#v", msgs)
+		}
+		if len(msgs) > 0 && msgs[0].Role == models.RoleSystem {
+			if len(got) != len(msgs) || !strings.HasPrefix(got[0].Content, msgs[0].Content+"\n\n") || !reflect.DeepEqual(got[1:], msgs[1:]) {
+				t.Fatalf("existing instructions or history changed: %#v", got)
+			}
+		} else if len(got) != len(msgs)+1 || !reflect.DeepEqual(got[1:], msgs) && len(msgs) > 0 {
+			t.Fatalf("history changed when adding the system message: %#v", got)
+		}
+		next := withTimeContext(msgs, now.Add(24*time.Hour))
+		if !strings.Contains(next[0].Content, "2026-11-02T18:30:00Z (Monday, UTC)") || strings.Count(next[0].Content, "Current date and time:") != 1 {
+			t.Fatalf("clock was stale or repeated: %#v", next)
+		}
+	}
+}
+
+func TestCompletionRequestsIncludeCurrentTime(t *testing.T) {
+	var requests [][]models.ChatMessage
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Messages []models.ChatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding request: %v", err)
+		}
+		requests = append(requests, body.Messages)
+		w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+	lo := logf.New(logf.Opts{})
+	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test"}, &lo, srv.Client())
+	before := time.Now().UTC().Truncate(time.Second)
+	if _, err := client.SendPrompt(t.Context(), models.PromptPayload{SystemPrompt: "Summarize.", UserPrompt: "Conversation"}); err != nil {
+		t.Fatal(err)
+	}
+	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: models.RoleSystem, Content: "Help."}, {Role: models.RoleUser, Content: "Hi"}}}
+	for range 2 {
+		if _, err := client.SendChatCompletion(t.Context(), payload); err != nil {
+			t.Fatal(err)
+		}
+	}
+	after := time.Now().UTC()
+	if len(requests) != 3 || payload.Messages[0].Content != "Help." {
+		t.Fatalf("unexpected requests or mutated input: %d, %#v", len(requests), payload.Messages)
+	}
+	for _, messages := range requests {
+		if len(messages) != 2 || messages[0].Role != models.RoleSystem {
+			t.Fatalf("unexpected request messages: %#v", messages)
+		}
+		_, clock, ok := strings.Cut(messages[0].Content, "Current date and time: ")
+		stamp, _, _ := strings.Cut(clock, " ")
+		at, err := time.Parse(time.RFC3339, stamp)
+		if !ok || err != nil || at.Before(before) || at.After(after) || strings.Count(messages[0].Content, "Current date and time:") != 1 {
+			t.Fatalf("missing or stale request clock: %q", messages[0].Content)
+		}
 	}
 }

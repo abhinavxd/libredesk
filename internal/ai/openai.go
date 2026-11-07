@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +48,9 @@ const (
 	// The API rejects an empty/whitespace-only string in the input array with a 400 that fails the
 	// whole batch; a lone space is a harmless stand-in that keeps input/output indices aligned.
 	emptyEmbeddingPlaceholder = " "
+
+	timeContextPrompt = `Current date and time: %s (%s, UTC).
+Message timestamps use UTC. Interpret relative dates in a message using that message's timestamp.`
 )
 
 // Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
@@ -122,7 +126,7 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 		maxTokens = 1024
 	}
 
-	messages := payload.Messages
+	messages := withTimeContext(payload.Messages, time.Now() /** now **/)
 	sentImages := 0
 	for _, msg := range messages {
 		sentImages += len(msg.Images)
@@ -454,4 +458,15 @@ func embeddingBatches(inputs []string) []embeddingBatch {
 		batches = append(batches, embeddingBatch{start, len(inputs)})
 	}
 	return batches
+}
+
+func withTimeContext(msgs []models.ChatMessage, now time.Time) []models.ChatMessage {
+	now = now.UTC()
+	timeContext := fmt.Sprintf(timeContextPrompt, now.Format(time.RFC3339), now.Weekday())
+	if len(msgs) > 0 && msgs[0].Role == models.RoleSystem {
+		out := slices.Clone(msgs)
+		out[0].Content += "\n\n" + timeContext
+		return out
+	}
+	return append([]models.ChatMessage{{Role: models.RoleSystem, Content: timeContext}}, msgs...)
 }
