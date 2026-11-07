@@ -159,7 +159,6 @@ WHERE
 RETURNING id, type;
 
 -- name: set-agent-offline
--- Manual away statuses are left alone so they survive the agent closing the dashboard.
 UPDATE users
 SET availability_status = 'offline'
 WHERE id = $1
