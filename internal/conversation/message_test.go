@@ -7,12 +7,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -807,6 +809,33 @@ func TestArticleReferencePublicURL(t *testing.T) {
 		if got := reference.PublicURL(tt.root); got != tt.want {
 			t.Errorf("PublicURL(%q, %q) = %q, want %q", tt.root, tt.custom, got, tt.want)
 		}
+	}
+}
+
+func TestContinuityEmailSubject(t *testing.T) {
+	m := &Manager{subjectRefFormat: "#{ref}"}
+	for _, tt := range []struct {
+		name, text, saved, want string
+	}{
+		{"multiline", " Hello\n\n\tthere\r\nfriend ", "", "Hello there friend - #127"},
+		{"normalize before truncation", "Hello\n" + strings.Repeat(" \t", 100) + "there", "", "Hello there - #127"},
+		{"truncate normalized text", "Hello\n\t" + strings.Repeat("a", 100), "", "Hello " + strings.Repeat("a", 94) + "... - #127"},
+		{"Unicode boundary", "\n" + strings.Repeat("界", 33) + "🙂", "", strings.Repeat("界", 33) + "... - #127"},
+		{"exact limit", strings.Repeat("a", 100), "", strings.Repeat("a", 100) + " - #127"},
+		{"empty", "", "", "#127"},
+		{"blank", "\n\r\t ", "", "#127"},
+		{"saved subject", "Different\nreply", "Original - #127", "Original - #127"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			conv := models.ContinuityConversation{ReferenceNumber: "127", ContinuityEmailSubject: null.StringFrom(tt.saved)}
+			got := m.buildContinuityEmailSubject(conv, tt.text)
+			if got != tt.want {
+				t.Fatalf("subject = %q, want %q", got, tt.want)
+			}
+			if !utf8.ValidString(got) {
+				t.Fatalf("subject contains invalid Unicode: %q", got)
+			}
+		})
 	}
 }
 

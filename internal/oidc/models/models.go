@@ -21,6 +21,7 @@ type OIDC struct {
 	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
 	Name         string    `db:"name" json:"name"`
 	Enabled      bool      `db:"enabled" json:"enabled"`
+	VerifyEmail  bool      `db:"verify_email" json:"verify_email"`
 	ClientID     string    `db:"client_id" json:"client_id,omitempty"`
 	ClientSecret string    `db:"client_secret" json:"client_secret,omitempty"`
 	Provider     string    `db:"provider" json:"provider"`

@@ -8,20 +8,21 @@ import (
 	auth_ "github.com/abhinavxd/libredesk/internal/auth"
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
 )
 
 const (
-	oidcErrLoginFailed     = "oidc_login_failed"
-	oidcErrSessionExpired  = "oidc_session_expired"
-	oidcErrInvalidClient   = "oidc_invalid_client"
-	oidcErrAccessDenied    = "oidc_access_denied"
-	oidcErrNoAccount       = "oidc_no_account"
-	oidcErrAccountDisabled = "oidc_account_disabled"
+	oidcErrLoginFailed      = "oidc_login_failed"
+	oidcErrSessionExpired   = "oidc_session_expired"
+	oidcErrInvalidClient    = "oidc_invalid_client"
+	oidcErrAccessDenied     = "oidc_access_denied"
+	oidcErrNoAccount        = "oidc_no_account"
+	oidcErrAccountDisabled  = "oidc_account_disabled"
+	oidcErrEmailNotVerified = "oidc_email_not_verified"
 )
 
 var (
@@ -74,7 +75,7 @@ func handleOIDCCallback(r *fastglue.Request) error {
 		code            = string(r.RequestCtx.QueryArgs().Peek("code"))
 		state           = string(r.RequestCtx.QueryArgs().Peek("state"))
 		providerID, err = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
-		ip              = realip.FromRequest(r.RequestCtx)
+		ip              = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 	)
 	next, _ := app.auth.GetSessionValue(r, oidcNextSessKey)
 	nextStr, _ := next.(string)
@@ -112,6 +113,9 @@ func handleOIDCCallback(r *fastglue.Request) error {
 	if err != nil {
 		if errors.Is(err, auth_.ErrOIDCInvalidClient) {
 			return redirectLoginError(r, oidcErrInvalidClient, nextStr)
+		}
+		if errors.Is(err, auth_.ErrOIDCEmailNotVerified) {
+			return redirectLoginError(r, oidcErrEmailNotVerified, nextStr)
 		}
 		return redirectLoginError(r, oidcErrLoginFailed, nextStr)
 	}

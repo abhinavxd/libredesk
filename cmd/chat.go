@@ -21,12 +21,12 @@ import (
 	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -40,6 +40,7 @@ const (
 	defaultSessionTTL               = 180 * 24 * time.Hour
 	minSessionTTL                   = 1 * time.Hour
 	maxChatMessageLength            = 10000
+	maxChatSubjectLength            = 255
 	maxEmailLength                  = 254
 	maxNameLength                   = 128
 	maxExternalUserIDLength         = 128
@@ -87,6 +88,7 @@ type chatInitReq struct {
 	DeliveryID string         `json:"delivery_id"`
 	BrowserKey string         `json:"browser_key"`
 	Message    string         `json:"message"`
+	Subject    string         `json:"subject"`
 	FormData   map[string]any `json:"form_data"`
 }
 
@@ -186,7 +188,7 @@ func handleChatInit(r *fastglue.Request) error {
 	var (
 		app               = r.Context.(*App)
 		req               = chatInitReq{}
-		clientIP          = realip.FromRequest(r.RequestCtx)
+		clientIP          = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		userAgent         = string(r.RequestCtx.Request.Header.Peek("User-Agent"))
 		contactID         int
 		isVisitor         bool
@@ -206,6 +208,7 @@ func handleChatInit(r *fastglue.Request) error {
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
+	req.Subject = normalizeChatSubject(req.Subject)
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
@@ -258,7 +261,7 @@ func handleChatInit(r *fastglue.Request) error {
 		inbox.ID,
 		"",
 		time.Now(),
-		"",
+		req.Subject,
 		false,
 		meta,
 		conversationAttrs,
@@ -1039,6 +1042,10 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	}
 
 	return *claims, nil
+}
+
+func normalizeChatSubject(subject string) string {
+	return stringutil.TruncateRunes(strings.Join(strings.Fields(subject), " "), maxChatSubjectLength)
 }
 
 // generateSessionToken creates a random session token and stores it in Redis.
