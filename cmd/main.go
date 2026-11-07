@@ -131,6 +131,8 @@ type App struct {
 	search             *search.Manager
 	activityLog        *activitylog.Manager
 	notifier           *notifier.Service
+	notifEmailQueue    *notifier.EmailQueue
+	emailSettingsMu    sync.Mutex
 	userNotification   *notifier.UserNotificationManager
 	notificationPref   *notifier.PreferenceManager
 	pushNotification   *notifier.PushManager
@@ -153,8 +155,6 @@ type App struct {
 
 	// Global state that stores data on an available app update.
 	update *AppUpdate
-	// Flag to indicate if app restart is required for settings to take effect.
-	restartRequired bool
 	sync.Mutex
 }
 
@@ -262,13 +262,13 @@ func main() {
 		user                        = initUser(i18n, db)
 		auth                        = initAuth(oidc, rdb, i18n, ssrfControl)
 		wsHub                       = initWS(user)
-		notifier                    = initNotifier()
+		notifier                    = initNotifier(settings)
 		userNotification            = initUserNotification(db, i18n)
 		notificationPreference      = initNotificationPreference(db, i18n)
 		replyDeliveryChecker        = initReplyDeliveryChecker(userNotification, user, notificationPreference)
 		pushNotification            = initPushNotification(db, settings, i18n, replyDeliveryChecker)
-		notificationEmailQueue      = initNotificationEmailQueue(db, notifier, replyDeliveryChecker)
-		notifDispatcher             = initNotifDispatcher(userNotification, notificationPreference, pushNotification, notificationEmailQueue, wsHub, ko.Bool("notification.email.enabled"))
+		notificationEmailQueue      = initNotificationEmailQueue(db, notifier, replyDeliveryChecker, ko.Bool("notification.email.enabled"))
+		notifDispatcher             = initNotifDispatcher(userNotification, notificationPreference, pushNotification, notificationEmailQueue, wsHub)
 		automation                  = initAutomationEngine(db, i18n)
 		ai                          = initAI(ctx, db, i18n, ssrfControl)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
@@ -306,9 +306,7 @@ func main() {
 	go conversation.RunDraftCleaner(ctx, draftRetentionDuration)
 	go userNotification.RunNotificationCleaner(ctx)
 	go helpCenter.RunSearchLogCleaner(ctx)
-	if ko.Bool("notification.email.enabled") {
-		go notificationEmailQueue.Run(ctx)
-	}
+	go notificationEmailQueue.Run(ctx)
 	go pushNotification.Run(ctx)
 	go aiAgent.Run(ctx, cmp.Or(ko.Int("ai_agent.worker_count"), 10))
 	go ai.Run(ctx)
@@ -331,6 +329,7 @@ func main() {
 		priority:         priority,
 		tmpl:             template,
 		notifier:         notifier,
+		notifEmailQueue:  notificationEmailQueue,
 		consts:           atomic.Value{},
 		conversation:     conversation,
 		automation:       automation,
