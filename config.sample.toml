@@ -19,6 +19,11 @@ encryption_key = "your-32-char-random-string-here!"
 address = "0.0.0.0:9000"
 # Unix socket path (leave empty to use TCP address instead)
 socket = ""
+# Read the client IP only from this header. The reverse proxy must overwrite it.
+# Block direct access to the app port to prevent clients from spoofing this header.
+# Empty defaults to X-Client-IP, or X-Real-IP when RAILWAY_ENVIRONMENT_ID is set.
+# Missing or invalid header values use the connection IP.
+client_ip_header = ""
 # Do NOT disable secure cookies in production environment if you don't know exactly what you're doing!
 disable_secure_cookies = false
 # Session lifetime duration.

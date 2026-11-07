@@ -139,6 +139,7 @@ type App struct {
 	webhook            *webhook.Manager
 	contextLink        *contextlink.Manager
 	rateLimit          *ratelimit.Limiter
+	clientIPHeader     string
 	redis              *redis.Client
 	db                 *sqlx.DB
 	fc                 *fastcache.FastCache
@@ -276,7 +277,7 @@ func main() {
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, inbox, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
-		rateLimiter                 = initRateLimit(rdb)
+		rateLimiter                 = initRateLimit(rdb, ko.String("app.server.client_ip_header"))
 	)
 
 	wsHub.SetConversationStore(conversation)
@@ -315,6 +316,7 @@ func main() {
 
 	var app = &App{
 		ctx:              ctx,
+		clientIPHeader:   ko.String("app.server.client_ip_header"),
 		lo:               lo,
 		fs:               fs,
 		sla:              sla,
