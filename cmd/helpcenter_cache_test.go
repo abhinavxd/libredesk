@@ -152,6 +152,32 @@ func TestHelpCenterPageCacheReportsHitOrMiss(t *testing.T) {
 	}
 }
 
+func TestHelpCenterPageCacheDiscardsPagesBeforeOriginIsolation(t *testing.T) {
+	app := &App{fc: newTestFastCache(t)}
+	old := request("/hc/support/en", "" /** ifNoneMatch **/)
+	old.RequestCtx.SetUserValue(helpCenterCacheNamespaceKey, "hc")
+	legacy := app.fc.Cached(func(r *fastglue.Request) error {
+		r.RequestCtx.Response.SetBodyString("<script>legacyCustomCode()</script>")
+		return nil
+	}, helpCenterCacheOpts, helpCenterCacheGroup)
+	if err := legacy(old); err != nil {
+		t.Fatal(err)
+	}
+
+	current := request("/hc/support/en", "" /** ifNoneMatch **/)
+	current.Context = app
+	handler := cachedHCPage(func(r *fastglue.Request) error {
+		r.RequestCtx.Response.SetBodyString("<h1>safe</h1>")
+		return nil
+	})
+	if err := handler(current); err != nil {
+		t.Fatal(err)
+	}
+	if got := string(current.RequestCtx.Response.Body()); got != "<h1>safe</h1>" {
+		t.Fatalf("page before origin isolation was reused: %q", got)
+	}
+}
+
 func TestHelpCenterPageCacheKeepsNoIndexOnHits(t *testing.T) {
 	app := &App{fc: newTestFastCache(t)}
 	body := func(r *fastglue.Request) error {

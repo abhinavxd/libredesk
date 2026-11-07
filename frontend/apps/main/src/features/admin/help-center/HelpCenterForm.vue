@@ -716,6 +716,9 @@
             :open="openSection === 'code'"
             @toggle="toggleSection('code')"
           >
+            <p class="text-sm text-muted-foreground">
+              {{ t('helpCenter.customCodeHint') }}
+            </p>
             <FormField v-slot="{ componentField }" name="custom_css">
               <FormItem>
                 <FormLabel>{{ t('helpCenter.customCSS') }}</FormLabel>

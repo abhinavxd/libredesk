@@ -58,7 +58,7 @@ const (
 	helpCenterCacheGroup = "helpcenter"
 
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
-	helpCenterCacheNamespace    = "hc"
+	helpCenterCacheNamespace    = "hc:v2"
 
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
@@ -1828,6 +1828,15 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	}
 	embed := isEmbedRequest(r)
 	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
+	var customCSS template.CSS
+	var customJS template.JS
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	customHost := urlHostname(helpCenterCustomOrigin(hc))
+	// Custom code requires the configured help center host to isolate it from agent sessions.
+	if customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host) {
+		customCSS = template.CSS(hc.CustomCSS)
+		customJS = template.JS(hc.CustomJS)
+	}
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1855,8 +1864,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
-		"CustomCSS":         template.CSS(hc.CustomCSS),
-		"CustomJS":          template.JS(hc.CustomJS),
+		"CustomCSS":         customCSS,
+		"CustomJS":          customJS,
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
 		"Embed":             embed,
