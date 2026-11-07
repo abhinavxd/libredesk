@@ -17,7 +17,7 @@
         <span class="text-muted-foreground">Bcc:</span> {{ message.meta.bcc.join(', ') }}
       </p>
     </div>
-    <Popover v-if="showSenderWarning && senderHeader && senderAddress">
+    <Popover v-if="senderHeader && senderAddress">
       <PopoverTrigger as-child>
         <Button
           type="button"
@@ -57,10 +57,6 @@ import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 
 const props = defineProps({
-  showSenderWarning: {
-    type: Boolean,
-    default: false
-  },
   message: {
     type: Object,
     required: true

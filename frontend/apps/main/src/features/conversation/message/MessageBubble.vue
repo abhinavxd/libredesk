@@ -89,13 +89,9 @@
           </div>
           <template v-else>
             <!-- Message Envelope -->
-            <MessageEnvelope
-              v-if="showEnvelope || hasSenderWarning"
-              :message="message"
-              :show-sender-warning="hasSenderWarning"
-            />
+            <MessageEnvelope :message="message" v-if="showEnvelope" />
 
-            <hr class="mb-2 border-muted-foreground/20" v-if="showEnvelope || hasSenderWarning" />
+            <hr class="mb-2 border-muted-foreground/20" v-if="showEnvelope" />
 
             <!-- Message Content -->
             <div
@@ -347,10 +343,6 @@ onMounted(async () => {
 
 const props = defineProps({
   message: Object,
-  showSenderWarning: {
-    type: Boolean,
-    default: false
-  },
   direction: {
     type: String,
     validator: (v) => ['incoming', 'outgoing'].includes(v)
@@ -525,12 +517,6 @@ const onMessageContentClick = (event) => {
   inlineLightboxIndex.value = idx >= 0 ? idx : 0
   inlineLightboxOpen.value = true
 }
-
-const hasSenderWarning = computed(() => Boolean(
-  props.showSenderWarning &&
-  props.message.meta?.contact_header &&
-  props.message.meta?.contact_address
-))
 
 const showEnvelope = computed(() => {
   return (
