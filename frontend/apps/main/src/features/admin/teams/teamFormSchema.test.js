@@ -76,6 +76,15 @@ describe('Team Form Schema', () => {
         expect(() => schema.parse({ ...validForm, max_auto_assigned_conversations: 'abc' })).toThrow()
     })
 
+    // Skip offline agents
+    test('skip_offline_agents defaults to false', () => {
+        expect(schema.parse(validForm).skip_offline_agents).toBe(false)
+    })
+
+    test('skip_offline_agents accepts true', () => {
+        expect(schema.parse({ ...validForm, skip_offline_agents: true }).skip_offline_agents).toBe(true)
+    })
+
     test('business_hours_id accepts null', () => {
         expect(() => schema.parse({ ...validForm, business_hours_id: null })).not.toThrow()
     })

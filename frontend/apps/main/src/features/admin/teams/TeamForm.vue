@@ -29,38 +29,6 @@
           <FormMessage />
         </FormItem>
       </FormField>
-      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
-        <FormItem>
-          <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
-          <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
-                    {{ at.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormControl>
-          <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
-        <FormItem>
-          <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
-          <FormControl>
-            <Input type="number" placeholder="0" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
       <FormField v-slot="{ componentField }" name="timezone">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
@@ -132,7 +100,51 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
+        <FormItem>
+          <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
+                    {{ at.label }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
+        <FormItem>
+          <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
+          <FormControl>
+            <Input type="number" placeholder="0" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </FormGrid>
+
+    <FormField v-slot="{ componentField, handleChange }" name="skip_offline_agents">
+      <FormItem>
+        <SwitchField
+          :title="$t('admin.team.skipOfflineAgents')"
+          :description="$t('admin.team.skipOfflineAgents.description')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
@@ -140,6 +152,7 @@
 
 <script setup>
 import FormGrid from '@shared-ui/components/FormGrid.vue'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button/index.js'
