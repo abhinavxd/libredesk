@@ -3,6 +3,10 @@ package conversation
 import (
 	"encoding/json"
 	"errors"
+	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/envelope"
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/abhinavxd/libredesk/internal/ws"
 	"reflect"
 	"strings"
 	"testing"
@@ -997,6 +1001,72 @@ func TestArticleReferenceBatchLookups(t *testing.T) {
 			renderer.render(&m, nil /* messages */)
 			if articleLookups != 0 || settingsLookups != 0 {
 				t.Fatal("uncited or empty batches performed reference lookups")
+			}
+		})
+	}
+}
+
+type headerUpgradeUserStore struct {
+	userStore
+	upgrades int
+}
+
+func (s *headerUpgradeUserStore) Get(int, string, []string) (umodels.User, error) {
+	return umodels.User{}, envelope.NewError(envelope.NotFoundError, "no contact", nil)
+}
+
+func (s *headerUpgradeUserStore) UpgradeVisitorToContact(int) error {
+	s.upgrades++
+	return nil
+}
+
+func TestOriginalSenderHeaderDoesNotUpgradeVisitor(t *testing.T) {
+	db := testutil.NewDB(t, "original_sender_header_upgrade")
+	lo := logf.New(logf.Opts{})
+	var visitorID, inboxID int
+	if err := db.Get(&visitorID, `INSERT INTO users (type, email, first_name, last_name) VALUES ('visitor', 'visitor@example.com', 'Visitor', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Chat', 'livechat') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	var conv models.Conversation
+	if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, visitorID, inboxID); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name        string
+		email       string
+		fromHeader  bool
+		wantSender  int
+		wantUpgrade int
+	}{
+		{name: "visitor's address in From", email: "Visitor@example.com", wantSender: visitorID, wantUpgrade: 1},
+		{name: "visitor's address in configured header", email: "visitor@example.com", fromHeader: true},
+		{name: "other address", email: "other@example.com"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			users := &headerUpgradeUserStore{}
+			m := &Manager{lo: &lo, i18n: testutil.NewI18n(t), userStore: users, wsHub: ws.NewHub(&lo, nil /** userStore **/)}
+			if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+				t.Fatal(err)
+			}
+			in := &models.IncomingMessage{
+				Contact:                     models.IncomingContact{Email: null.StringFrom(tc.email)},
+				ContactFromHeader:           tc.fromHeader,
+				ConversationUUIDFromReplyTo: conv.UUID,
+			}
+			sender, conversationID, _, err := m.resolveByPlusAddress(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sender != tc.wantSender || users.upgrades != tc.wantUpgrade {
+				t.Fatalf("sender = %d, upgrades = %d, want %d, %d", sender, users.upgrades, tc.wantSender, tc.wantUpgrade)
+			}
+			if conversationID != conv.ID {
+				t.Fatalf("conversation = %d, want %d: the mail should still thread", conversationID, conv.ID)
 			}
 		})
 	}

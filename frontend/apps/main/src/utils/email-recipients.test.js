@@ -172,3 +172,19 @@ describe('computeRecipientsFromMessage', () => {
         })
     })
 })
+
+ test('replies to the selected original sender while preserving the actual From', () => {
+    const message = {
+        type: 'incoming',
+        meta: {
+            from: ['forms@example.com'],
+            contact_address: 'customer@example.com',
+            contact_header: 'Reply-To',
+            to: ['support@example.com'],
+            cc: ['colleague@example.com']
+        }
+    }
+    expect(computeRecipientsFromMessage(message, 'customer@example.com', ['support@example.com']))
+        .toEqual({ to: ['customer@example.com'], cc: ['colleague@example.com'], bcc: [] })
+    expect(message.meta.from).toEqual(['forms@example.com'])
+})

@@ -45,6 +45,7 @@ type Email struct {
 	fromNameTemplate          string
 	replyTo                   string
 	enablePlusAddressing      bool
+	originalSenderHeaders     []string
 	messageStore              inbox.MessageStore
 	userStore                 inbox.UserStore
 	wg                        sync.WaitGroup
@@ -128,6 +129,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		oauth:                     opts.Config.OAuth,
 		authType:                  opts.Config.AuthType,
 		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
+		originalSenderHeaders:     opts.Config.OriginalSenderHeaders,
 		tokenRefreshCallback:      opts.TokenRefreshCallback,
 		aliasVerificationCallback: opts.AliasVerificationCallback,
 		aliasExpiryCallback:       opts.AliasExpiryCallback,
@@ -222,14 +224,15 @@ func (e *Email) getCurrentConfig() models.Config {
 	e.oauthMu.RUnlock()
 
 	return models.Config{
-		SMTP:                 e.smtpCfg,
-		IMAP:                 e.imapCfg,
-		From:                 e.from,
-		FromNameTemplate:     e.fromNameTemplate,
-		ReplyTo:              e.replyTo,
-		OAuth:                oauth,
-		AuthType:             e.authType,
-		EnablePlusAddressing: e.enablePlusAddressing,
+		SMTP:                  e.smtpCfg,
+		IMAP:                  e.imapCfg,
+		From:                  e.from,
+		FromNameTemplate:      e.fromNameTemplate,
+		ReplyTo:               e.replyTo,
+		OAuth:                 oauth,
+		AuthType:              e.authType,
+		EnablePlusAddressing:  e.enablePlusAddressing,
+		OriginalSenderHeaders: e.originalSenderHeaders,
 	}
 }
 

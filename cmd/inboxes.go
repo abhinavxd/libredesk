@@ -32,6 +32,8 @@ const (
 
 var hexColorRegex = regexp.MustCompile(`^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`)
 
+var emailHeaderNameRegex = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
+
 // csatTemplateLocks serializes CSAT template reconciliation per inbox. EnsureReserved reads then creates.
 var csatTemplateLocks = &keyedLock{entries: make(map[string]*keyedLockEntry)}
 
@@ -706,6 +708,11 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
+	for _, header := range cfg.OriginalSenderHeaders {
+		if !emailHeaderNameRegex.MatchString(header) {
+			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.originalSenderHeader.invalid"), nil)
+		}
+	}
 
 	// Validate auth_type.
 	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 {
@@ -807,6 +814,9 @@ func trimInboxFields(inb *imodels.Inbox) error {
 // Passwords and secrets are intentionally NOT trimmed.
 func trimEmailConfig(cfg *imodels.Config) {
 	cfg.ReplyTo = strings.TrimSpace(cfg.ReplyTo)
+	for i := range cfg.OriginalSenderHeaders {
+		cfg.OriginalSenderHeaders[i] = strings.TrimSpace(cfg.OriginalSenderHeaders[i])
+	}
 
 	// Trim IMAP configs.
 	for i := range cfg.IMAP {

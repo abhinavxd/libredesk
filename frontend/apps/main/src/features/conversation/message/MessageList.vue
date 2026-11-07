@@ -27,6 +27,7 @@
                 :direction="row.message.type"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
+                :show-sender-warning="row.message.uuid === firstIncomingMessageUUID"
               />
             </div>
             <div v-else-if="row.message.type === 'outgoing' && row.message.private">
@@ -336,6 +337,13 @@ const fillShortThread = () => {
 }
 
 watch([threadHeight, readReady], fillShortThread, { flush: 'post' })
+
+const firstIncomingMessageUUID = computed(() => {
+  if (conversationStore.currentConversationHasMoreMessages) return null
+  return conversationStore.conversationMessages.find(
+    (message) => message.type === 'incoming' && !message.private
+  )?.uuid
+})
 
 const messageRows = computed(() => {
   const messages = conversationStore.conversationMessages

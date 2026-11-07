@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +29,7 @@ import (
 	"github.com/emersion/go-message/mail"
 	"github.com/jhillyerd/enmime/v2"
 	"github.com/stretchr/testify/require"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
@@ -40,7 +42,9 @@ type fakeMessageStore struct {
 	enqueued []models.IncomingMessage
 }
 
-type fakeUserStore struct{}
+type fakeUserStore struct {
+	blocked map[string]bool
+}
 
 type failingFetchSession struct {
 	imapserver.Session
@@ -56,7 +60,7 @@ func (f *fakeMessageStore) EnqueueIncoming(m models.IncomingMessage) error {
 
 func (fakeUserStore) GetAgent(int, string) (umodels.User, error) { return umodels.User{}, nil }
 
-func (fakeUserStore) IsEmailBlocked(string) (bool, error) { return false, nil }
+func (f fakeUserStore) IsEmailBlocked(email string) (bool, error) { return f.blocked[email], nil }
 
 func (s *failingFetchSession) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
 	if options.Envelope == s.failEnvelope {
@@ -1538,4 +1542,65 @@ func serveEncodedSenderEnvelope(listener net.Listener, from string) error {
 		}
 	}
 	return nil
+}
+
+func TestOriginalSenderHeaders(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		headers    []string
+		raw        string
+		want       string
+		wantHeader string
+		blocked    bool
+	}{
+		{name: "disabled", raw: "Reply-To: customer@example.com\r\n", want: "forms@example.com"},
+		{name: "missing", headers: []string{"Reply-To"}, want: "forms@example.com"},
+		{name: "empty", headers: []string{"Reply-To"}, raw: "Reply-To: \r\n", want: "forms@example.com"},
+		{name: "reply address", headers: []string{"Reply-To"}, raw: "Reply-To: Customer Name <CUSTOMER@example.com>\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "priority", headers: []string{"Reply-To", "X-Original-Sender"}, raw: "Reply-To: customer@example.com\r\nX-Original-Sender: other@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "reversed priority", headers: []string{"X-Original-Sender", "Reply-To"}, raw: "Reply-To: customer@example.com\r\nX-Original-Sender: other@example.com\r\n", want: "other@example.com", wantHeader: "X-Original-Sender"},
+		{name: "invalid fallback", headers: []string{"Reply-To", "X-Original-Sender"}, raw: "Reply-To: invalid\r\nX-Original-Sender: customer@example.com\r\n", want: "customer@example.com", wantHeader: "X-Original-Sender"},
+		{name: "custom header", headers: []string{"X-Form-Customer"}, raw: "X-Form-Customer: customer@example.com\r\n", want: "customer@example.com", wantHeader: "X-Form-Customer"},
+		{name: "case insensitive", headers: []string{"reply-to"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "reply-to"},
+		{name: "same address", headers: []string{"Reply-To"}, raw: "Reply-To: FORMS@example.com\r\n", want: "forms@example.com"},
+		{name: "owned address skipped", headers: []string{"Reply-To"}, raw: "Reply-To: support@example.com, customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "from stays fallback", headers: []string{"From", "Reply-To"}, raw: "Reply-To: customer@example.com\r\n", want: "customer@example.com", wantHeader: "Reply-To"},
+		{name: "blocked contact", headers: []string{"Reply-To"}, raw: "Reply-To: customer@example.com\r\n", blocked: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			logger := logf.New(logf.Opts{Writer: io.Discard})
+			store := &fakeMessageStore{}
+			e := &Email{
+				originalSenderHeaders: tt.headers,
+				receiveAddresses:      map[string]struct{}{"support@example.com": {}},
+				lo:                    &logger,
+				messageStore:          store,
+				userStore:             fakeUserStore{blocked: map[string]bool{"customer@example.com": tt.blocked}},
+			}
+			message := models.IncomingMessage{
+				Contact: models.IncomingContact{FirstName: "Forms", Email: null.StringFrom("forms@example.com")},
+				Meta:    json.RawMessage(`{"from":["forms@example.com"],"to":["support@example.com"]}`),
+			}
+			raw := "From: Forms <forms@example.com>\r\nTo: support@example.com\r\n" + tt.raw + "\r\nHello"
+			err := e.processFullMessage(imapclient.FetchItemDataBodySection{Literal: strings.NewReader(raw)}, message)
+			require.NoError(t, err)
+			if tt.blocked {
+				require.Empty(t, store.enqueued)
+				return
+			}
+			require.Len(t, store.enqueued, 1)
+			got := store.enqueued[0]
+			require.Equal(t, tt.want, got.Contact.Email.String)
+			require.Equal(t, tt.wantHeader != "", got.ContactFromHeader)
+			var meta map[string]any
+			require.NoError(t, json.Unmarshal(got.Meta, &meta))
+			require.Equal(t, []any{"forms@example.com"}, meta["from"])
+			if tt.wantHeader != "" {
+				require.Equal(t, tt.wantHeader, meta["contact_header"])
+				require.Equal(t, tt.want, meta["contact_address"])
+			} else {
+				require.NotContains(t, meta, "contact_header")
+			}
+		})
+	}
 }
