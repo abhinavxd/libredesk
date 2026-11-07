@@ -1238,7 +1238,7 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhoo
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
-		MaxAttempts:   ko.Int("webhook.max_attempts"),
+		MaxRetries:    ko.Int("webhook.max_retries"),
 		RetryBackoff:  ko.Duration("webhook.retry_backoff"),
 	})
 	if err != nil {

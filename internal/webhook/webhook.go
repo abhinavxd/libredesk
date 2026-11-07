@@ -50,7 +50,7 @@ type Manager struct {
 	closedMu      sync.RWMutex
 	wg            sync.WaitGroup
 	encryptionKey string
-	maxAttempts   int
+	maxRetries    int
 	retryBackoff  time.Duration
 }
 
@@ -64,7 +64,7 @@ type Opts struct {
 	Timeout       time.Duration
 	EncryptionKey string
 	DialControl   ssrf.Control
-	MaxAttempts   int
+	MaxRetries    int
 	RetryBackoff  time.Duration
 }
 
@@ -112,10 +112,6 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 
-	maxAttempts := opts.MaxAttempts
-	if maxAttempts < 1 {
-		maxAttempts = 1
-	}
 	retryBackoff := opts.RetryBackoff
 	if retryBackoff <= 0 {
 		retryBackoff = defaultRetryBackoff
@@ -137,7 +133,7 @@ func New(opts Opts) (*Manager, error) {
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
-		maxAttempts:   maxAttempts,
+		maxRetries:    max(opts.MaxRetries, 0),
 		retryBackoff:  retryBackoff,
 	}, nil
 }
@@ -505,8 +501,8 @@ func (m *Manager) retryLater(webhook models.Webhook, task DeliveryTask) {
 	if task.Event == models.EventWebhookTest {
 		return
 	}
-	if task.attempt >= m.maxAttempts {
-		if m.maxAttempts > 1 {
+	if task.attempt > m.maxRetries {
+		if m.maxRetries > 0 {
 			m.lo.Error("webhook delivery failed after all attempts, giving up",
 				"webhook_id", webhook.ID,
 				"event", task.Event,

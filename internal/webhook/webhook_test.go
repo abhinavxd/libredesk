@@ -74,13 +74,13 @@ func (r *recordingReceiver) waitFor(t *testing.T, count int) []receivedDelivery 
 	return r.received()
 }
 
-func newDeliveryManager(maxAttempts int) *Manager {
+func newDeliveryManager(maxRetries int) *Manager {
 	lo := logf.New(logf.Opts{})
 	return &Manager{
 		lo:            &lo,
 		deliveryQueue: make(chan DeliveryTask, 4),
 		httpClient:    &http.Client{Timeout: 2 * time.Second},
-		maxAttempts:   max(maxAttempts, 1),
+		maxRetries:    max(maxRetries, 0),
 		retryBackoff:  time.Millisecond,
 	}
 }
@@ -114,7 +114,7 @@ func TestRetriedDeliveriesKeepTheirIdentityBodyAndSignature(t *testing.T) {
 	receiver := newRecordingReceiver(http.StatusServiceUnavailable, http.StatusTooManyRequests, http.StatusOK)
 	server := httptest.NewServer(receiver)
 	defer server.Close()
-	m := newDeliveryManager(4)
+	m := newDeliveryManager(3 /** maxRetries **/)
 	webhook := models.Webhook{ID: 7, URL: server.URL, Secret: "receiver-secret", IsActive: true}
 
 	deliverUntilSettled(t, m, webhook, DeliveryTask{Event: models.EventConversationCreated, Payload: map[string]any{"uuid": "c-1"}})
@@ -144,7 +144,7 @@ func TestEveryDeliveryGetsItsOwnIdentity(t *testing.T) {
 	receiver := newRecordingReceiver()
 	server := httptest.NewServer(receiver)
 	defer server.Close()
-	m := newDeliveryManager(4)
+	m := newDeliveryManager(3 /** maxRetries **/)
 	webhook := models.Webhook{ID: 7, URL: server.URL, IsActive: true}
 
 	m.deliverSingleWebhook(webhook, DeliveryTask{Event: models.EventConversationCreated, Payload: map[string]any{"uuid": "c-1"}})
@@ -174,7 +174,7 @@ func TestOnlyTransientFailuresAreRetried(t *testing.T) {
 			receiver := newRecordingReceiver(tt.status, http.StatusOK)
 			server := httptest.NewServer(receiver)
 			defer server.Close()
-			m := newDeliveryManager(4)
+			m := newDeliveryManager(3 /** maxRetries **/)
 
 			deliverUntilSettled(t, m, models.Webhook{ID: 7, URL: server.URL, IsActive: true}, DeliveryTask{Event: models.EventConversationCreated})
 
@@ -189,7 +189,7 @@ func TestUnreachableReceiversAreRetried(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	url := server.URL
 	server.Close()
-	m := newDeliveryManager(2)
+	m := newDeliveryManager(1 /** maxRetries **/)
 	edited := time.Date(2026, 10, 27, 9, 0, 0, 0, time.UTC)
 
 	m.deliverSingleWebhook(models.Webhook{ID: 7, URL: url, IsActive: true, UpdatedAt: edited}, DeliveryTask{Event: models.EventConversationCreated})
@@ -224,29 +224,33 @@ func TestARetryIsStaleOnlyWhenTheWebhookChanged(t *testing.T) {
 	}
 }
 
-func TestDeliveryStopsAfterMaxAttempts(t *testing.T) {
-	receiver := newRecordingReceiver(http.StatusInternalServerError, http.StatusInternalServerError, http.StatusInternalServerError)
-	server := httptest.NewServer(receiver)
-	defer server.Close()
-	m := newDeliveryManager(2)
+func TestDeliveryStopsAfterMaxRetries(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		maxRetries int
+		want       int
+	}{
+		{"negative", -1, 1},
+		{"zero", 0, 1},
+		{"one", 1, 2},
+		{"three", 3, 4},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			statuses := make([]int, tt.want+1)
+			for i := range statuses {
+				statuses[i] = http.StatusServiceUnavailable
+			}
+			receiver := newRecordingReceiver(statuses...)
+			server := httptest.NewServer(receiver)
+			defer server.Close()
+			m := newDeliveryManager(tt.maxRetries)
 
-	deliverUntilSettled(t, m, models.Webhook{ID: 7, URL: server.URL, IsActive: true}, DeliveryTask{Event: models.EventConversationCreated})
+			deliverUntilSettled(t, m, models.Webhook{ID: 7, URL: server.URL, IsActive: true}, DeliveryTask{Event: models.EventConversationCreated})
 
-	if got := len(receiver.received()); got != 2 {
-		t.Fatalf("received %d deliveries with max_attempts 2, want 2", got)
-	}
-}
-
-func TestOneAttemptKeepsTheFormerBehaviour(t *testing.T) {
-	receiver := newRecordingReceiver(http.StatusServiceUnavailable)
-	server := httptest.NewServer(receiver)
-	defer server.Close()
-	m := newDeliveryManager(0)
-
-	deliverUntilSettled(t, m, models.Webhook{ID: 7, URL: server.URL, IsActive: true}, DeliveryTask{Event: models.EventConversationCreated})
-
-	if got := len(receiver.received()); got != 1 {
-		t.Fatalf("received %d deliveries without max_attempts, want 1", got)
+			if got := len(receiver.received()); got != tt.want {
+				t.Fatalf("received %d deliveries with max_retries %d, want %d", got, tt.maxRetries, tt.want)
+			}
+		})
 	}
 }
 
@@ -254,7 +258,7 @@ func TestTestDeliveriesAreNotRetried(t *testing.T) {
 	receiver := newRecordingReceiver(http.StatusServiceUnavailable)
 	server := httptest.NewServer(receiver)
 	defer server.Close()
-	m := newDeliveryManager(4)
+	m := newDeliveryManager(3 /** maxRetries **/)
 
 	deliverUntilSettled(t, m, models.Webhook{ID: 7, URL: server.URL, IsActive: true}, DeliveryTask{Event: models.EventWebhookTest})
 
@@ -264,7 +268,7 @@ func TestTestDeliveriesAreNotRetried(t *testing.T) {
 }
 
 func TestNoRetryIsQueuedAfterClose(t *testing.T) {
-	m := newDeliveryManager(4)
+	m := newDeliveryManager(3 /** maxRetries **/)
 	m.Close()
 
 	m.enqueueRetry(DeliveryTask{Event: models.EventConversationCreated, WebhookID: 7, attempt: 2})
@@ -295,7 +299,7 @@ func newStoredWebhook(t *testing.T, url string, retryBackoff time.Duration) (*Ma
 		QueueSize:     16,
 		Timeout:       2 * time.Second,
 		EncryptionKey: testEncryptionKey,
-		MaxAttempts:   3,
+		MaxRetries:    2,
 		RetryBackoff:  retryBackoff,
 	})
 	if err != nil {
