@@ -60,6 +60,8 @@ const (
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
 	helpCenterCacheNamespace    = "hc"
 
+	hcAppDomainCustomCodeKey = "help_center.dangerously_allow_custom_code_on_app_domain"
+
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
 	// articleFeedbackDedupTTL is how long a reader IP's vote on an article suppresses further votes.
@@ -277,7 +279,7 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title":       helpCenter.PageTitle,
 			"LandingHero": true,
-			"HelpCenter":  helpCenterTemplateData(app, r, helpCenter, locale),
+			"HelpCenter":  helpCenterPreviewData(app, r, helpCenter, locale),
 			"Tree":        tree.Tree,
 			"Popular":     popular,
 		},
@@ -1321,6 +1323,34 @@ func isRootHost(app *App, host string) bool {
 	return strings.EqualFold(urlHostname(helpCenterRootURL(app)), host)
 }
 
+func helpCenterCustomCodeAllowed(app *App, r *fastglue.Request, hc hcmodels.HelpCenter) bool {
+	if ko.Bool(hcAppDomainCustomCodeKey) {
+		return true
+	}
+	// Any host other than the help center's own domain can share an origin with agent sessions.
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	customHost := urlHostname(helpCenterCustomOrigin(hc))
+	return customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host)
+}
+
+func isHelpCenterHost(app *App, r *fastglue.Request) (bool, error) {
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	if isRootHost(app, host) {
+		return false, nil
+	}
+	// Inactive domains can still serve cached custom code.
+	helpCenters, err := app.helpcenter.GetAllHelpCenters()
+	if err != nil {
+		return false, err
+	}
+	for _, hc := range helpCenters {
+		if helpCenterCustomOrigin(hc) != "" && strings.EqualFold(urlHostname(hc.CustomDomain), host) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // helpCenterByHost returns the active help center whose custom domain hostname is host.
 func helpCenterByHost(app *App, host string) (hcmodels.HelpCenter, bool) {
 	if isRootHost(app, host) {
@@ -1817,6 +1847,14 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 	return tree.Tree
 }
 
+// The admin preview iframe blocks scripts, so previews show custom CSS on any host and never custom JS.
+func helpCenterPreviewData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
+	data := helpCenterTemplateData(app, r, hc, locale)
+	data["CustomCSS"] = template.CSS(hc.CustomCSS)
+	data["CustomJS"] = template.JS("")
+	return data
+}
+
 // helpCenterTemplateData shapes a help center row for the public templates.
 func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
 	theme := helpCenterTheme(hc)
@@ -1828,6 +1866,12 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	}
 	embed := isEmbedRequest(r)
 	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
+	var customCSS template.CSS
+	var customJS template.JS
+	if helpCenterCustomCodeAllowed(app, r, hc) {
+		customCSS = template.CSS(hc.CustomCSS)
+		customJS = template.JS(hc.CustomJS)
+	}
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1855,8 +1899,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
-		"CustomCSS":         template.CSS(hc.CustomCSS),
-		"CustomJS":          template.JS(hc.CustomJS),
+		"CustomCSS":         customCSS,
+		"CustomJS":          customJS,
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
 		"Embed":             embed,
@@ -2173,7 +2217,7 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 		"Data": map[string]interface{}{
 			"Title":         article.Title,
 			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterTemplateData(app, r, helpCenter, locale),
+			"HelpCenter":    helpCenterPreviewData(app, r, helpCenter, locale),
 			"Article":       article,
 			"AuthorInitial": authorInitial(article),
 			"Collection":    collection,

@@ -294,6 +294,12 @@ func main() {
 	conversation.SetWhatsAppTemplateStore(waTemplates)
 	conversation.SetArticleReferenceStore(helpCenter)
 
+	fc := initFastCache(rdb)
+	// Help center pages cached in Redis outlive restarts and can predate the current config.
+	if err := fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+		log.Fatalf("error clearing help center cache: %v", err)
+	}
+
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
 	go conversation.RunUnsnoozer(ctx, unsnoozeInterval)
@@ -356,7 +362,7 @@ func main() {
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		db:               db,
-		fc:               initFastCache(rdb),
+		fc:               fc,
 		userNotification: userNotification,
 		whatsappClient:   waClient,
 		whatsappTemplate: waTemplates,

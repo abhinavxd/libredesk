@@ -711,12 +711,12 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	lo := initLogger("email_inbox")
 	var config imodels.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
@@ -784,12 +784,12 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	lo := initLogger("livechat_inbox")
 	var config livechat.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 

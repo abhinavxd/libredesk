@@ -1392,6 +1392,7 @@
   "helpCenter.collectionLocaleMismatch": "The collection is in a different language than the article. Pick a collection in the article's language.",
   "helpCenter.createdBy": "Created by",
   "helpCenter.customCSS": "Custom CSS",
+  "helpCenter.customCodeHint": "Custom CSS and JS run only on a custom domain.",
   "helpCenter.customDomain": "Custom domain (optional)",
   "helpCenter.customDomainHint": "Serve this help center on its own domain instead of the app URL. Point the domain at Libredesk in your DNS and reverse proxy first.",
   "helpCenter.customDomainInUse": "Another help center already uses this domain. Visitors on it would see that help center. Remove the domain there first or pick a different one.",
