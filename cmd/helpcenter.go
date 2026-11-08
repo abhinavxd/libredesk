@@ -58,7 +58,9 @@ const (
 	helpCenterCacheGroup = "helpcenter"
 
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
-	helpCenterCacheNamespace    = "hc:v2"
+	helpCenterCacheNamespace    = "hc"
+
+	hcAppDomainCustomCodeKey = "help_center.allow_custom_code_on_app_domain"
 
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
@@ -260,6 +262,8 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	// Preview responses come from an authenticated agent API, so they never carry custom code.
+	helpCenter.CustomCSS, helpCenter.CustomJS = "", ""
 	locale := helpCenter.DefaultLocale
 	if string(r.RequestCtx.QueryArgs().Peek("page")) == previewPageArticle {
 		return renderHelpCenterArticlePreview(r, helpCenter, locale)
@@ -1280,12 +1284,15 @@ func clearsHCCache(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		err := h(r)
 		if r.RequestCtx.Response.StatusCode() < fasthttp.StatusMultipleChoices {
-			app := r.Context.(*App)
-			if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
-				app.lo.Error("error clearing help center cache", "error", err)
-			}
+			clearHelpCenterCache(r.Context.(*App))
 		}
 		return err
+	}
+}
+
+func clearHelpCenterCache(app *App) {
+	if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+		app.lo.Error("error clearing help center cache", "error", err)
 	}
 }
 
@@ -1319,6 +1326,16 @@ func helpCenterCustomOrigin(hc hcmodels.HelpCenter) string {
 // isRootHost reports whether host is the app root URL's hostname.
 func isRootHost(app *App, host string) bool {
 	return strings.EqualFold(urlHostname(helpCenterRootURL(app)), host)
+}
+
+func helpCenterCustomCodeAllowed(app *App, r *fastglue.Request, hc hcmodels.HelpCenter) bool {
+	if ko.Bool(hcAppDomainCustomCodeKey) {
+		return true
+	}
+	// Any host other than the help center's own domain can share an origin with agent sessions.
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	customHost := urlHostname(helpCenterCustomOrigin(hc))
+	return customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host)
 }
 
 // helpCenterByHost returns the active help center whose custom domain hostname is host.
@@ -1830,10 +1847,7 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
 	var customCSS template.CSS
 	var customJS template.JS
-	host := hostWithoutPort(string(r.RequestCtx.Host()))
-	customHost := urlHostname(helpCenterCustomOrigin(hc))
-	// Custom code requires the configured help center host to isolate it from agent sessions.
-	if customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host) {
+	if helpCenterCustomCodeAllowed(app, r, hc) {
 		customCSS = template.CSS(hc.CustomCSS)
 		customJS = template.JS(hc.CustomJS)
 	}
