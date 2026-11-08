@@ -41,6 +41,7 @@ const (
 	insightsTermLimit     = 20
 	markdownSlugExtension = ".md"
 	previewPageArticle    = "article"
+	previewPageCollection = "collection"
 
 	// sitemapURLLimit is the per-sitemap URL cap set by the sitemap protocol.
 	sitemapURLLimit = 50000
@@ -261,8 +262,11 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	locale := helpCenter.DefaultLocale
-	if string(r.RequestCtx.QueryArgs().Peek("page")) == previewPageArticle {
+	switch string(r.RequestCtx.QueryArgs().Peek("page")) {
+	case previewPageArticle:
 		return renderHelpCenterArticlePreview(r, helpCenter, locale)
+	case previewPageCollection:
+		return renderHelpCenterCollectionPreview(r, helpCenter, locale)
 	}
 	popular, err := app.helpcenter.GetPopularArticles(helpCenter.Slug, locale, popularArticlesLimit)
 	if err != nil {
@@ -2130,6 +2134,40 @@ func localeDir(locale string) string {
 		return "rtl"
 	}
 	return "ltr"
+}
+
+func renderHelpCenterCollectionPreview(r *fastglue.Request, helpCenter hcmodels.HelpCenter, locale string) error {
+	var (
+		app        = r.Context.(*App)
+		i18n       = localeI18n(app, locale)
+		excerpt    = i18n.T("helpCenter.preview.sampleArticleExcerpt")
+		collection = hcmodels.TreeCollection{
+			Collection: hcmodels.Collection{
+				Slug:        "sample-collection",
+				Name:        i18n.T("helpCenter.preview.sampleCollection"),
+				Description: i18n.T("helpCenter.preview.sampleCollectionDescription"),
+			},
+			Articles: []hcmodels.Article{
+				{Slug: "sample-1", Title: i18n.T("helpCenter.preview.sampleArticleHeading1"), Excerpt: excerpt},
+				{Slug: "sample-2", Title: i18n.T("helpCenter.preview.sampleArticleHeading2"), Excerpt: excerpt},
+				{Slug: "sample-3", Title: i18n.T("helpCenter.preview.sampleArticleHeading3"), Excerpt: excerpt},
+			},
+		}
+	)
+	if err := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-collection"), map[string]interface{}{
+		"L": i18n,
+		"Data": map[string]interface{}{
+			"Title":            fmt.Sprintf("%s - %s", collection.Name, helpCenter.Name),
+			"HelpCenter":       helpCenterTemplateData(app, r, helpCenter, locale),
+			"Collection":       collection,
+			"Tree":             sidebarTree(app, helpCenter, locale),
+			"ActiveCollection": collection.Slug,
+		},
+	}); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
+	return nil
 }
 
 // renderHelpCenterArticlePreview renders a sample article page from unsaved settings; TOC and related list are built server-side because the preview iframe is sandboxed without scripts.

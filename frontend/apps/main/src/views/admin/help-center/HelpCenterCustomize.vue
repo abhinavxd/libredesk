@@ -26,6 +26,7 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="landing">{{ t('helpCenter.styling.landingPage') }}</SelectItem>
+                <SelectItem value="collection">{{ t('helpCenter.styling.collectionPage') }}</SelectItem>
                 <SelectItem value="article">{{ t('helpCenter.styling.articlePage') }}</SelectItem>
               </SelectContent>
             </Select>
@@ -140,6 +141,7 @@ const previewBox = ref(null)
 const previewTitle = computed(() => {
   const values = lastFormValues.value || helpCenter.value || {}
   if (previewPage.value === 'article') return t('helpCenter.preview.sampleArticleTitle')
+  if (previewPage.value === 'collection') return t('helpCenter.preview.sampleCollection')
   return values.page_title || values.name || ''
 })
 
@@ -151,9 +153,9 @@ const helpCenterPath = (values) => `/hc/${values.slug || ''}/${values.default_lo
 
 const previewURL = computed(() => {
   const path = helpCenterPath(lastFormValues.value || helpCenter.value || {})
-  return previewPage.value === 'article'
-    ? `${origin.value}${path}/articles/sample-article`
-    : `${origin.value}${path}`
+  if (previewPage.value === 'article') return `${origin.value}${path}/articles/sample-article`
+  if (previewPage.value === 'collection') return `${origin.value}${path}/collections/sample-collection`
+  return `${origin.value}${path}`
 })
 // Uses the saved slug, not the form: an unsaved slug has no live page yet.
 const previewLiveURL = computed(() => `${origin.value}${helpCenterPath(helpCenter.value || {})}`)
