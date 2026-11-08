@@ -399,7 +399,7 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 		}
 		cfg.APIKey = stored.APIKey
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.appLocation())
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.WorkspaceLocation())
 
 	if providerType == models.ProviderTypeCompletion {
 		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
@@ -417,6 +417,18 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
 	}
 	return nil
+}
+
+// WorkspaceLocation returns UTC when the workspace timezone is unset or invalid.
+func (m *Manager) WorkspaceLocation() *time.Location {
+	if m.settings == nil {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(m.settings.GetAppTimezone())
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 func (m *Manager) validatePrompt(title, content string) error {
@@ -479,16 +491,7 @@ func (m *Manager) getProviderClient(providerType string) (ProviderClient, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.appLocation()), nil
-}
-
-// appLocation returns the workspace time zone, or UTC when it is unset or invalid.
-func (m *Manager) appLocation() *time.Location {
-	loc, err := time.LoadLocation(m.settings.GetAppTimezone())
-	if err != nil {
-		return time.UTC
-	}
-	return loc
+	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.WorkspaceLocation()), nil
 }
 
 func (m *Manager) providerError(err error) error {

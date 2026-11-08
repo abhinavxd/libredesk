@@ -49,10 +49,10 @@ const (
 	// whole batch; a lone space is a harmless stand-in that keeps input/output indices aligned.
 	emptyEmbeddingPlaceholder = " "
 
-	timeContextPrompt = `Current date and time: %s (%s, UTC).
-Message timestamps use UTC. Interpret relative dates in a message using that message's timestamp.`
-	localTimeContextPrompt = `Workspace time zone: %s. Local date and time: %s (%s).
-Read today, tomorrow and other relative dates in the workspace time zone.`
+	timeContextPrompt = `Workspace time zone: %s.
+Current date and time: %s (%s).
+Message timestamps use the workspace time zone. Interpret relative dates in a message using that message's timestamp.
+Read today, tomorrow and other relative dates in the workspace time zone unless another time zone is explicitly provided.`
 )
 
 // Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
@@ -464,12 +464,8 @@ func embeddingBatches(inputs []string) []embeddingBatch {
 }
 
 func withTimeContext(msgs []models.ChatMessage, now time.Time, loc *time.Location) []models.ChatMessage {
-	utc := now.UTC()
-	timeContext := fmt.Sprintf(timeContextPrompt, utc.Format(time.RFC3339), utc.Weekday())
-	if loc != time.UTC {
-		local := now.In(loc)
-		timeContext += "\n" + fmt.Sprintf(localTimeContextPrompt, loc, local.Format(time.RFC3339), local.Weekday())
-	}
+	local := now.In(loc)
+	timeContext := fmt.Sprintf(timeContextPrompt, loc, local.Format(time.RFC3339), local.Weekday())
 	if len(msgs) > 0 && msgs[0].Role == models.RoleSystem {
 		out := slices.Clone(msgs)
 		out[0].Content += "\n\n" + timeContext

@@ -162,7 +162,7 @@ func TestTimeContextPreservesHistory(t *testing.T) {
 	} {
 		before := slices.Clone(msgs)
 		got := withTimeContext(msgs, now, time.UTC)
-		if got[0].Role != models.RoleSystem || !strings.Contains(got[0].Content, "Current date and time: 2026-11-01T18:30:00Z (Sunday, UTC).") {
+		if got[0].Role != models.RoleSystem || !strings.Contains(got[0].Content, "Current date and time: 2026-11-01T18:30:00Z (Sunday).") {
 			t.Fatalf("missing UTC clock: %#v", got)
 		}
 		if !reflect.DeepEqual(msgs, before) {
@@ -176,7 +176,7 @@ func TestTimeContextPreservesHistory(t *testing.T) {
 			t.Fatalf("history changed when adding the system message: %#v", got)
 		}
 		next := withTimeContext(msgs, now.Add(24*time.Hour), time.UTC)
-		if !strings.Contains(next[0].Content, "2026-11-02T18:30:00Z (Monday, UTC)") || strings.Count(next[0].Content, "Current date and time:") != 1 {
+		if !strings.Contains(next[0].Content, "2026-11-02T18:30:00Z (Monday)") || strings.Count(next[0].Content, "Current date and time:") != 1 {
 			t.Fatalf("clock was stale or repeated: %#v", next)
 		}
 	}
@@ -184,17 +184,29 @@ func TestTimeContextPreservesHistory(t *testing.T) {
 
 func TestTimeContextUsesWorkspaceTimezone(t *testing.T) {
 	now := time.Date(2026, time.November, 9, 20, 30, 0, 0, time.UTC)
-	got := withTimeContext(nil, now, time.FixedZone("Asia/Kolkata", 5*3600+30*60))[0].Content
-	for _, want := range []string{
-		"Current date and time: 2026-11-09T20:30:00Z (Monday, UTC).",
-		"Workspace time zone: Asia/Kolkata. Local date and time: 2026-11-10T02:00:00+05:30 (Tuesday).",
+	for _, tc := range []struct {
+		zone  string
+		clock string
+	}{
+		{zone: "Asia/Kolkata", clock: "2026-11-10T02:00:00+05:30 (Tuesday)"},
+		{zone: "America/New_York", clock: "2026-11-09T15:30:00-05:00 (Monday)"},
+		{zone: "UTC", clock: "2026-11-09T20:30:00Z (Monday)"},
 	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("time context missing %q: %q", want, got)
-		}
-	}
-	if utcOnly := withTimeContext(nil, now, time.UTC)[0].Content; strings.Contains(utcOnly, "Workspace time zone") {
-		t.Fatalf("UTC workspace repeated the clock: %q", utcOnly)
+		t.Run(tc.zone, func(t *testing.T) {
+			loc, err := time.LoadLocation(tc.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := withTimeContext(nil, now, loc)[0].Content
+			for _, want := range []string{"Workspace time zone: " + tc.zone, "Current date and time: " + tc.clock, "Message timestamps use the workspace time zone"} {
+				if !strings.Contains(got, want) {
+					t.Fatalf("time context missing %q: %q", want, got)
+				}
+			}
+			if strings.Count(got, "Current date and time:") != 1 || strings.Contains(got, "Local date and time:") || strings.Contains(got, "timestamps use UTC") {
+				t.Fatalf("conflicting clocks or instructions: %q", got)
+			}
+		})
 	}
 }
 

@@ -35,7 +35,7 @@ func TestTranscript(t *testing.T) {
 		},
 	}
 
-	got := Transcript(msgs, 50)
+	got := Transcript(msgs, 50, time.UTC)
 	want := "Customer: My payment on [this page](https://example.com/pay) failed.\n" +
 		"Agent: Looking into it.\n" +
 		"Customer: Any update?\n"
@@ -50,7 +50,7 @@ func TestTranscriptMaxMessages(t *testing.T) {
 		{SenderType: SenderTypeAgent, ContentType: ContentTypeText, TextContent: "second"},
 		{SenderType: SenderTypeContact, ContentType: ContentTypeText, TextContent: "third"},
 	}
-	got := Transcript(msgs, 2)
+	got := Transcript(msgs, 2, time.UTC)
 	if strings.Contains(got, "first") {
 		t.Errorf("expected first message dropped, got %q", got)
 	}
@@ -70,7 +70,7 @@ func TestTranscriptMessageContext(t *testing.T) {
 		}},
 		{SenderType: SenderTypeContact},
 	}
-	got := Transcript(msgs, 50 /** max **/)
+	got := Transcript(msgs, 50 /** max **/, time.UTC)
 	for _, part := range []string{
 		"[2026-11-01T18:30:00Z] Customer: It failed yesterday.",
 		"[2026-11-01T19:30:00Z] Agent: Please attach your invoice.",
@@ -100,12 +100,43 @@ func TestTranscriptReportsOmittedHistory(t *testing.T) {
 		{name: "empty", max: 50},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Transcript(tc.msgs, tc.max)
+			got := Transcript(tc.msgs, tc.max, time.UTC)
 			if strings.Contains(got, "Earlier messages are omitted") != tc.truncated {
 				t.Fatalf("incorrect history notice: %q", got)
 			}
 			if len(tc.msgs) > 0 && !strings.Contains(got, "Latest message") || strings.Contains(got, "Old message") {
 				t.Fatalf("incorrect messages included: %q", got)
+			}
+		})
+	}
+}
+
+func TestTranscriptUsesWorkspaceTimezone(t *testing.T) {
+	for _, tc := range []struct {
+		zone string
+		at   string
+		want string
+	}{
+		{zone: "Asia/Kolkata", at: "2026-11-09T20:30:00Z", want: "2026-11-10T02:00:00+05:30"},
+		{zone: "America/New_York", at: "2026-11-01T05:30:00Z", want: "2026-11-01T01:30:00-04:00"},
+		{zone: "America/New_York", at: "2026-11-01T06:30:00Z", want: "2026-11-01T01:30:00-05:00"},
+	} {
+		t.Run(tc.zone+tc.at, func(t *testing.T) {
+			loc, err := time.LoadLocation(tc.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			at, err := time.Parse(time.RFC3339, tc.at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			msgs := []Message{{SenderType: SenderTypeContact, CreatedAt: at, TextContent: "Yesterday's payment failed."}}
+			got := Transcript(msgs, 50 /** max **/, loc)
+			if want := "[" + tc.want + "] Customer: Yesterday's payment failed.\n"; got != want {
+				t.Errorf("transcript = %q, want %q", got, want)
+			}
+			if msgs[0].CreatedAt != at {
+				t.Fatal("context rendering changed the source timestamp")
 			}
 		})
 	}

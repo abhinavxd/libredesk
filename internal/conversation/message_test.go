@@ -118,7 +118,7 @@ func TestAIConversationMessagesFilterBeforePagination(t *testing.T) {
 					t.Fatalf("incorrect AI history: %#v", messages)
 				}
 			}
-			if got := strings.Contains(models.Transcript(messages, tc.limit), "Earlier messages are omitted"); got != (tc.replies > tc.limit) {
+			if got := strings.Contains(models.Transcript(messages, tc.limit, time.UTC), "Earlier messages are omitted"); got != (tc.replies > tc.limit) {
 				t.Fatalf("incorrect history notice for %d replies and %d surveys", tc.replies, tc.surveys)
 			}
 			private := false

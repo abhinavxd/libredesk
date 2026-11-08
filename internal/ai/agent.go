@@ -45,7 +45,7 @@ func (m *Manager) newAgentRun(systemPrompt string, history []models.ChatMessage,
 	if err != nil {
 		return nil, err
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.appLocation())
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.WorkspaceLocation())
 	if instructions := strings.TrimSpace(cfg.Instructions); appendWorkspaceInstructions && instructions != "" {
 		if systemPrompt != "" {
 			systemPrompt += "\n\n"

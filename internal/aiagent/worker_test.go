@@ -180,6 +180,18 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 	previous[1].CreatedAt = previous[0].CreatedAt.Add(time.Hour)
 	firstContent := "[2026-11-01T18:30:00Z]\n" + previous[0].TextContent
 	secondContent := "[2026-11-01T19:30:00Z]\n" + previous[1].TextContent
+	t.Run("workspace date crosses midnight", func(t *testing.T) {
+		loc, err := time.LoadLocation("Asia/Kolkata")
+		if err != nil {
+			t.Fatal(err)
+		}
+		history := m.buildHistory(previous, contactID, loc)
+		for i, want := range []string{"[2026-11-02T00:00:00+05:30]\n", "[2026-11-02T01:00:00+05:30]\n"} {
+			if !strings.HasPrefix(history[i].Content, want) {
+				t.Errorf("history timestamp = %q, want prefix %q", history[i].Content, want)
+			}
+		}
+	})
 	tests := []struct {
 		name        string
 		content     string
@@ -215,7 +227,7 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 			if tt.contentType == cmodels.ContentTypeHTML {
 				latest.TextContent = stringutil.HTML2Text(tt.content)
 			}
-			history := m.buildHistory(append(previous, latest), contactID)
+			history := m.buildHistory(append(previous, latest), contactID, time.UTC)
 			want := []aimodels.ChatMessage{
 				{Role: aimodels.RoleUser, Content: firstContent},
 				{Role: aimodels.RoleAssistant, Content: secondContent},
@@ -227,9 +239,9 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		})
 	}
 	t.Run("subject without body", func(t *testing.T) {
-		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeContact, SenderID: contactID, Type: cmodels.MessageIncoming}}, contactID)
+		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeContact, SenderID: contactID, Type: cmodels.MessageIncoming}}, contactID, time.UTC)
 		conv := cmodels.Conversation{Subject: null.StringFrom("How do I reset my password?")}
-		block := customerContextBlock(conv, nil /** contactLines **/)
+		block := customerContextBlock(conv, nil /** contactLines **/, time.UTC)
 		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 		if len(history) != 2 || !strings.Contains(history[0].Content, conv.Subject.String) || history[1].Content != emptyMessage {
 			t.Fatalf("subject or customer message missing: %#v", history)
@@ -237,7 +249,7 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 	})
 	t.Run("consecutive blank messages", func(t *testing.T) {
 		blank := cmodels.Message{SenderType: cmodels.SenderTypeContact, SenderID: contactID, Type: cmodels.MessageIncoming}
-		history := m.buildHistory([]cmodels.Message{previous[0], blank, blank}, contactID)
+		history := m.buildHistory([]cmodels.Message{previous[0], blank, blank}, contactID, time.UTC)
 		want := []aimodels.ChatMessage{
 			{Role: aimodels.RoleUser, Content: firstContent},
 			{Role: aimodels.RoleUser, Content: emptyMessage},
@@ -248,13 +260,13 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		}
 	})
 	t.Run("empty assistant message", func(t *testing.T) {
-		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeAgent, Type: cmodels.MessageOutgoing, CreatedAt: previous[0].CreatedAt}}, contactID)
+		history := m.buildHistory([]cmodels.Message{{SenderType: cmodels.SenderTypeAgent, Type: cmodels.MessageOutgoing, CreatedAt: previous[0].CreatedAt}}, contactID, time.UTC)
 		if len(history) != 0 {
 			t.Fatalf("empty assistant message kept: %#v", history)
 		}
 	})
 	t.Run("empty history", func(t *testing.T) {
-		if history := m.buildHistory(nil /** msgs **/, contactID); len(history) != 0 {
+		if history := m.buildHistory(nil /** msgs **/, contactID, time.UTC); len(history) != 0 {
 			t.Fatalf("unexpected history: %#v", history)
 		}
 	})

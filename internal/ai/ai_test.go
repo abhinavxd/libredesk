@@ -16,6 +16,27 @@ import (
 	"github.com/zerodha/logf"
 )
 
+type timezoneSettings string
+
+func (s timezoneSettings) GetAppTimezone() string { return string(s) }
+
+func TestWorkspaceLocation(t *testing.T) {
+	for _, tc := range []struct {
+		settings settingsStore
+		want     string
+	}{
+		{want: "UTC"},
+		{settings: timezoneSettings(""), want: "UTC"},
+		{settings: timezoneSettings("invalid/timezone"), want: "UTC"},
+		{settings: timezoneSettings("Asia/Kolkata"), want: "Asia/Kolkata"},
+	} {
+		m := &Manager{settings: tc.settings}
+		if got := m.WorkspaceLocation().String(); got != tc.want {
+			t.Errorf("workspace timezone = %q, want %q", got, tc.want)
+		}
+	}
+}
+
 func TestProviderErrorKeepsTransportDetailsPrivate(t *testing.T) {
 	translations := testutil.NewI18n(t)
 	for _, tc := range []struct {

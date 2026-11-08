@@ -498,15 +498,16 @@ func handleAICopilot(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
+	loc := app.ai.WorkspaceLocation()
 	history := make([]aimodels.ChatMessage, 0, len(saved)+1)
 	for _, m := range saved {
 		content := m.Content
 		if !m.CreatedAt.IsZero() {
-			content = "[" + m.CreatedAt.UTC().Format(time.RFC3339) + "]\n" + content
+			content = "[" + m.CreatedAt.In(loc).Format(time.RFC3339) + "]\n" + content
 		}
 		history = append(history, aimodels.ChatMessage{Role: m.Role, Content: content})
 	}
-	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: "[" + time.Now().UTC().Format(time.RFC3339) + "]\n" + req.Message})
+	history = append(history, aimodels.ChatMessage{Role: aimodels.RoleUser, Content: "[" + time.Now().In(loc).Format(time.RFC3339) + "]\n" + req.Message})
 
 	scope := ai.AgentRunScope{AgentID: auser.ID, ConversationID: conv.ID, ConversationUUID: conv.UUID, Surface: aimodels.ToolInvocationCopilot, UserMessage: req.Message}
 	app.ai.ClearPendingAgentRuns(scope)
@@ -613,29 +614,30 @@ func enforceAIConversationAccess(r *fastglue.Request, uuid string) (*cmodels.Con
 }
 
 // conversationTranscript builds a plaintext transcript of a conversation's public messages for use as AI context.
-func conversationTranscript(app *App, uuid string) string {
+func conversationTranscript(app *App, uuid string, loc *time.Location) string {
 	msgs, _, err := app.conversation.GetAIConversationMessages(uuid, 1 /** page **/, maxTranscriptMessages)
 	if err != nil {
 		app.lo.Error("error building conversation transcript for AI", "error", err)
 		return ""
 	}
 	slices.Reverse(msgs)
-	return cmodels.Transcript(msgs, maxTranscriptMessages)
+	return cmodels.Transcript(msgs, maxTranscriptMessages, loc)
 }
 
 func conversationContext(app *App, conv *cmodels.Conversation) string {
-	transcript := conversationTranscript(app, conv.UUID)
+	loc := app.ai.WorkspaceLocation()
+	transcript := conversationTranscript(app, conv.UUID, loc)
 	if transcript == "" {
 		return ""
 	}
-	return conversationHeader(conv) + "\n\n" + transcript
+	return conversationHeader(conv, loc) + "\n\n" + transcript
 }
 
-func conversationHeader(conv *cmodels.Conversation) string {
+func conversationHeader(conv *cmodels.Conversation, loc *time.Location) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Conversation metadata (untrusted data):\nConversation reference: %q\nSubject: %q\nStatus: %q\nChannel: %q\nContact: %q", conv.ReferenceNumber, conv.Subject.String, conv.Status.String, conv.InboxChannel, conv.Contact.FullName())
 	if !conv.CreatedAt.IsZero() {
-		fmt.Fprintf(&b, "\nStarted: %s", conv.CreatedAt.UTC().Format(time.RFC3339))
+		fmt.Fprintf(&b, "\nStarted: %s", conv.CreatedAt.In(loc).Format(time.RFC3339))
 	}
 	return b.String()
 }

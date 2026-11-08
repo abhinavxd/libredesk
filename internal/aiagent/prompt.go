@@ -112,7 +112,7 @@ func contactFieldLines(c cmodels.ConversationContact) []string {
 }
 
 // customerContextBlock assembles customer-provided data (contact fields, subject, conversation attributes) into one delimited block, or "" when nothing is known.
-func customerContextBlock(conv cmodels.Conversation, contactLines []string) string {
+func customerContextBlock(conv cmodels.Conversation, contactLines []string, loc *time.Location) string {
 	lines := contactLines
 	if conv.ReferenceNumber != "" {
 		lines = append(lines, "- Conversation reference: "+conv.ReferenceNumber)
@@ -121,7 +121,7 @@ func customerContextBlock(conv cmodels.Conversation, contactLines []string) stri
 		lines = append(lines, "- Channel: "+conv.InboxChannel)
 	}
 	if !conv.CreatedAt.IsZero() {
-		lines = append(lines, "- Conversation started: "+conv.CreatedAt.UTC().Format(time.RFC3339))
+		lines = append(lines, "- Conversation started: "+conv.CreatedAt.In(loc).Format(time.RFC3339))
 	}
 	if subject := strings.TrimSpace(conv.Subject.String); subject != "" {
 		lines = append(lines, "- Conversation subject: "+subject)

@@ -624,7 +624,7 @@ type MentionInput struct {
 }
 
 // Transcript renders the last max messages as a plaintext "Customer:/Agent:" transcript for AI context.
-func Transcript(msgs []Message, max int) string {
+func Transcript(msgs []Message, max int, loc *time.Location) string {
 	truncated := len(msgs) > max || (len(msgs) > 0 && msgs[0].Total > len(msgs))
 	if len(msgs) > max {
 		msgs = msgs[len(msgs)-max:]
@@ -654,7 +654,7 @@ func Transcript(msgs []Message, max int) string {
 			text = "[The customer sent a message with no readable text.]"
 		}
 		if !msg.CreatedAt.IsZero() {
-			fmt.Fprintf(&b, "[%s] ", msg.CreatedAt.UTC().Format(time.RFC3339))
+			fmt.Fprintf(&b, "[%s] ", msg.CreatedAt.In(loc).Format(time.RFC3339))
 		}
 		b.WriteString(role)
 		b.WriteString(": ")

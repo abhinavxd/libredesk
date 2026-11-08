@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/abhinavxd/libredesk/internal/ai"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -27,7 +29,19 @@ func TestConversationTranscriptPreservesContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := &App{conversation: manager, lo: &lo}
+	settings, err := setting.New(setting.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO settings (key, value) VALUES ('app.timezone', '"Asia/Kolkata"') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`); err != nil {
+		t.Fatal(err)
+	}
+	aiManager, err := ai.New(ai.Opts{Ctx: t.Context(), DB: db, Lo: &lo, I18n: lang, Settings: settings})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(aiManager.Close)
+	app := &App{conversation: manager, ai: aiManager, lo: &lo}
 	var contactID, inboxID int
 	if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Alice', '') RETURNING id`); err != nil {
 		t.Fatal(err)
@@ -68,8 +82,8 @@ func TestConversationTranscriptPreservesContext(t *testing.T) {
 	got := conversationContext(app, &conv)
 	for _, part := range []string{
 		`Conversation reference: "123"`, `Subject: "Payment failed"`, `Status: "Open"`, `Channel: "email"`, `Contact: "Alice"`,
-		"Started: 2026-11-01T10:00:00Z", "Earlier messages are omitted", "[2026-11-01T10:55:00Z] Customer: message 55",
-		`[2026-11-01T11:00:00Z] Customer: [Attachment: "invoice.pdf" (application/pdf). Contents are unavailable in this transcript.]`,
+		"Started: 2026-11-01T15:30:00+05:30", "Earlier messages are omitted", "[2026-11-01T16:25:00+05:30] Customer: message 55",
+		`[2026-11-01T16:30:00+05:30] Customer: [Attachment: "invoice.pdf" (application/pdf). Contents are unavailable in this transcript.]`,
 	} {
 		if !strings.Contains(got, part) {
 			t.Errorf("missing %q in context: %s", part, got)
@@ -92,7 +106,7 @@ func TestConversationHeaderQuotesMetadata(t *testing.T) {
 			Status: null.StringFrom(value), InboxChannel: value,
 			Contact: cmodels.ConversationContact{FirstName: value},
 		}
-		lines := strings.Split(conversationHeader(&conv), "\n")
+		lines := strings.Split(conversationHeader(&conv, time.UTC), "\n")
 		if len(lines) != 6 || lines[0] != "Conversation metadata (untrusted data):" {
 			t.Fatalf("metadata escaped its block: %q", lines)
 		}

@@ -136,7 +136,7 @@ func (t *listContactConversationsTool) Execute(ctx context.Context, args string)
 	if len(rows) == 0 {
 		return "No previous conversations found for this customer.", nil
 	}
-	return renderAIConversations(rows), nil
+	return renderAIConversations(rows, t.app.ai.WorkspaceLocation()), nil
 }
 
 func (t *searchConversationsByEmailTool) Name() string { return toolSearchConversationsByEmail }
@@ -163,7 +163,7 @@ func (t *searchConversationsByEmailTool) Execute(ctx context.Context, args strin
 	if len(rows) == 0 {
 		return "No conversations found for that email.", nil
 	}
-	return renderAIConversations(rows), nil
+	return renderAIConversations(rows, t.app.ai.WorkspaceLocation()), nil
 }
 
 func (t *fetchConversationTool) Name() string { return toolFetchConversation }
@@ -202,9 +202,10 @@ func (t *fetchConversationTool) Execute(ctx context.Context, args string) (strin
 
 	var b strings.Builder
 	b.WriteString(untrustedConversationData)
-	b.WriteString(conversationHeader(&conv))
+	loc := t.app.ai.WorkspaceLocation()
+	b.WriteString(conversationHeader(&conv, loc))
 	b.WriteString("\n\n")
-	b.WriteString(capTranscript(conversationTranscript(t.app, conv.UUID)))
+	b.WriteString(capTranscript(conversationTranscript(t.app, conv.UUID, loc)))
 	return b.String(), nil
 }
 
@@ -265,7 +266,7 @@ func filterAccessibleAIConversations(app *App, user umodels.User, rows []cmodels
 	return out
 }
 
-func renderAIConversations(rows []cmodels.AIConversationSummary) string {
+func renderAIConversations(rows []cmodels.AIConversationSummary, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString(untrustedConversationData)
 	for i, r := range rows {
@@ -279,9 +280,9 @@ func renderAIConversations(rows []cmodels.AIConversationSummary) string {
 		if r.Status.Valid && r.Status.String != "" {
 			fmt.Fprintf(&b, " | Status: %s", r.Status.String)
 		}
-		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.UTC().Format(time.RFC3339))
+		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.In(loc).Format(time.RFC3339))
 		if r.LastMessageAt.Valid {
-			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.UTC().Format(time.RFC3339))
+			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.In(loc).Format(time.RFC3339))
 		}
 		b.WriteString("\n")
 	}
