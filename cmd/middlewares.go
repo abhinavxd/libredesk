@@ -42,7 +42,9 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 	}
 
 	// Help center custom code runs on its custom domain, so agent sessions are never honored there.
-	if isHelpCenterHost(app, r) {
+	if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+		return user, err
+	} else if isHelpCenter {
 		return user, envelope.NewError(envelope.GeneralError, app.i18n.T("auth.invalidOrExpiredSession"), nil)
 	}
 
@@ -191,7 +193,9 @@ func perm(handler fastglue.FastRequestHandler, perm string) fastglue.FastRequest
 func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
-		if isHelpCenterHost(app, r) {
+		if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+			return sendErrorEnvelope(r, err)
+		} else if isHelpCenter {
 			fastglue.NotFoundHandler(r.RequestCtx)
 			return nil
 		}
@@ -220,7 +224,9 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
-		if isHelpCenterHost(app, r) {
+		if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+			return sendErrorEnvelope(r, err)
+		} else if isHelpCenter {
 			fastglue.NotFoundHandler(r.RequestCtx)
 			return nil
 		}

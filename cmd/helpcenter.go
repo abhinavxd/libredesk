@@ -1333,9 +1333,22 @@ func helpCenterCustomCodeAllowed(app *App, r *fastglue.Request, hc hcmodels.Help
 	return customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host)
 }
 
-func isHelpCenterHost(app *App, r *fastglue.Request) bool {
-	_, ok := helpCenterByHost(app, hostWithoutPort(string(r.RequestCtx.Host())))
-	return ok
+func isHelpCenterHost(app *App, r *fastglue.Request) (bool, error) {
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	if isRootHost(app, host) {
+		return false, nil
+	}
+	// Inactive domains can still serve cached custom code.
+	helpCenters, err := app.helpcenter.GetAllHelpCenters()
+	if err != nil {
+		return false, err
+	}
+	for _, hc := range helpCenters {
+		if helpCenterCustomOrigin(hc) != "" && strings.EqualFold(urlHostname(hc.CustomDomain), host) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // helpCenterByHost returns the active help center whose custom domain hostname is host.
