@@ -172,8 +172,10 @@ func (m *Manager) GetAIConversationMessages(conversationUUID string, page, pageS
 var replyPrefix = regexp.MustCompile(`(?i)^(re|aw|antw|sv|vs)(\[\d+\])?:`)
 
 // replySubject returns the subject a reply goes out with: prefixed with "Re: " as mail clients do,
-// unless it already carries a reply marker, e.g. because the contact's own subject had one.
+// unless it already carries a reply marker, e.g. because the contact's own subject had one. Leading
+// whitespace, as some clients send it, doesn't hide a marker or end up between the prefix and the text.
 func replySubject(subject string) string {
+	subject = strings.TrimSpace(subject)
 	if replyPrefix.MatchString(subject) {
 		return subject
 	}

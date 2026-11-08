@@ -902,6 +902,8 @@ func TestReplySubject(t *testing.T) {
 		{"Fwd: Login broken", "Re: Fwd: Login broken"},
 		{"Reset password", "Re: Reset password"},
 		{"Aware of the issue", "Re: Aware of the issue"},
+		{" Re: Login broken", "Re: Login broken"},
+		{"  Login broken ", "Re: Login broken"},
 	} {
 		if got := replySubject(tt.subject); got != tt.want {
 			t.Errorf("replySubject(%q) = %q, want %q", tt.subject, got, tt.want)
