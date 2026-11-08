@@ -78,6 +78,34 @@ func TestHelpCenterCustomCodeAllowedHosts(t *testing.T) {
 	}
 }
 
+func TestHelpCenterPreviewShowsCSSWithoutJS(t *testing.T) {
+	app := newValidatorTestApp(t)
+	for _, allowAppDomain := range []bool{false, true} {
+		ko.Delete(hcAppDomainCustomCodeKey)
+		if allowAppDomain {
+			if err := ko.Set(hcAppDomainCustomCodeKey, true); err != nil {
+				t.Fatalf("set config: %v", err)
+			}
+		}
+		for _, uri := range []string{"https://desk.example.com/api/v1/help-centers/1/preview", "https://help.example.com/api/v1/help-centers/1/preview"} {
+			hc := hcmodels.HelpCenter{
+				Slug:         "docs",
+				CustomDomain: "https://help.example.com",
+				CustomCSS:    `body { color: red }`,
+				CustomJS:     `window.jsExecuted = true`,
+			}
+			data := helpCenterPreviewData(app, request(uri, "" /** ifNoneMatch **/), hc, "en")
+			if got := string(data["CustomCSS"].(template.CSS)); got != hc.CustomCSS {
+				t.Errorf("%s (allowAppDomain=%v): CustomCSS = %q, want %q", uri, allowAppDomain, got, hc.CustomCSS)
+			}
+			if got := string(data["CustomJS"].(template.JS)); got != "" {
+				t.Errorf("%s (allowAppDomain=%v): CustomJS = %q, want empty", uri, allowAppDomain, got)
+			}
+		}
+	}
+	ko.Delete(hcAppDomainCustomCodeKey)
+}
+
 func TestResolveQueryLocale(t *testing.T) {
 	tests := []struct {
 		name          string

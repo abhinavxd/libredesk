@@ -262,8 +262,6 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	// Preview responses come from an authenticated agent API, so they never carry custom code.
-	helpCenter.CustomCSS, helpCenter.CustomJS = "", ""
 	locale := helpCenter.DefaultLocale
 	if string(r.RequestCtx.QueryArgs().Peek("page")) == previewPageArticle {
 		return renderHelpCenterArticlePreview(r, helpCenter, locale)
@@ -281,7 +279,7 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title":       helpCenter.PageTitle,
 			"LandingHero": true,
-			"HelpCenter":  helpCenterTemplateData(app, r, helpCenter, locale),
+			"HelpCenter":  helpCenterPreviewData(app, r, helpCenter, locale),
 			"Tree":        tree.Tree,
 			"Popular":     popular,
 		},
@@ -1836,6 +1834,14 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 	return tree.Tree
 }
 
+// The admin preview iframe blocks scripts, so previews show custom CSS on any host and never custom JS.
+func helpCenterPreviewData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
+	data := helpCenterTemplateData(app, r, hc, locale)
+	data["CustomCSS"] = template.CSS(hc.CustomCSS)
+	data["CustomJS"] = template.JS("")
+	return data
+}
+
 // helpCenterTemplateData shapes a help center row for the public templates.
 func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
 	theme := helpCenterTheme(hc)
@@ -2198,7 +2204,7 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 		"Data": map[string]interface{}{
 			"Title":         article.Title,
 			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterTemplateData(app, r, helpCenter, locale),
+			"HelpCenter":    helpCenterPreviewData(app, r, helpCenter, locale),
 			"Article":       article,
 			"AuthorInitial": authorInitial(article),
 			"Collection":    collection,
