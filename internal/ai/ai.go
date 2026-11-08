@@ -51,11 +51,16 @@ var (
 	ErrProviderUnavailable = errors.New("AI provider unavailable")
 )
 
+type settingsStore interface {
+	GetAppTimezone() string
+}
+
 type Manager struct {
 	q             queries
 	db            *sqlx.DB
 	lo            *logf.Logger
 	i18n          *i18n.I18n
+	settings      settingsStore
 	encryptionKey string
 	chunkCfg      stringutil.ChunkConfig
 	index         *embeddingIndex
@@ -87,6 +92,7 @@ type Opts struct {
 	Lo            *logf.Logger
 	EncryptionKey string
 	DialControl   ssrf.Control
+	Settings      settingsStore
 }
 
 // ProviderConfigView is the sanitized provider config returned to admins, with the API key dummy-masked.
@@ -149,6 +155,7 @@ func New(opts Opts) (*Manager, error) {
 		db:            opts.DB,
 		lo:            opts.Lo,
 		i18n:          opts.I18n,
+		settings:      opts.Settings,
 		encryptionKey: opts.EncryptionKey,
 		chunkCfg:      stringutil.DefaultChunkConfig(),
 		index:         newEmbeddingIndex(),
@@ -392,7 +399,7 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 		}
 		cfg.APIKey = stored.APIKey
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.appLocation())
 
 	if providerType == models.ProviderTypeCompletion {
 		if _, err := client.SendPrompt(context.Background(), models.PromptPayload{SystemPrompt: "You are a connection test.", UserPrompt: "Reply with OK."}); err != nil {
@@ -472,7 +479,16 @@ func (m *Manager) getProviderClient(providerType string) (ProviderClient, error)
 	if err != nil {
 		return nil, err
 	}
-	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient), nil
+	return NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.appLocation()), nil
+}
+
+// appLocation returns the workspace time zone, or UTC when it is unset or invalid.
+func (m *Manager) appLocation() *time.Location {
+	loc, err := time.LoadLocation(m.settings.GetAppTimezone())
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 func (m *Manager) providerError(err error) error {

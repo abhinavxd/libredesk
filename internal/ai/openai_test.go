@@ -38,7 +38,7 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "learned-param-test-model"}
 	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
 
-	if _, err := NewOpenAIClient(cfg, &lo, srv.Client()).SendChatCompletion(context.Background(), payload); err != nil {
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), payload); err != nil {
 		t.Fatalf("first request should succeed after adaptation, got %v", err)
 	}
 	if len(bodies) != 2 {
@@ -50,7 +50,7 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}
 
 	// A fresh client must remember the swap and send max_completion_tokens up front.
-	if _, err := NewOpenAIClient(cfg, &lo, srv.Client()).SendChatCompletion(context.Background(), payload); err != nil {
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), payload); err != nil {
 		t.Fatalf("second request should succeed, got %v", err)
 	}
 	if len(bodies) != 3 {
@@ -127,7 +127,7 @@ func TestToolCallExtraContentRoundTrip(t *testing.T) {
 	defer srv.Close()
 
 	lo := logf.New(logf.Opts{})
-	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "extra-content-test-model"}, &lo, srv.Client())
+	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "extra-content-test-model"}, &lo, srv.Client(), time.UTC)
 	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
 
 	res, err := client.SendChatCompletion(context.Background(), payload)
@@ -161,7 +161,7 @@ func TestTimeContextPreservesHistory(t *testing.T) {
 		{{Role: models.RoleUser, Images: []models.ChatImage{{MediaType: "image/png", Data: "image"}}}},
 	} {
 		before := slices.Clone(msgs)
-		got := withTimeContext(msgs, now)
+		got := withTimeContext(msgs, now, time.UTC)
 		if got[0].Role != models.RoleSystem || !strings.Contains(got[0].Content, "Current date and time: 2026-11-01T18:30:00Z (Sunday, UTC).") {
 			t.Fatalf("missing UTC clock: %#v", got)
 		}
@@ -175,10 +175,26 @@ func TestTimeContextPreservesHistory(t *testing.T) {
 		} else if len(got) != len(msgs)+1 || !reflect.DeepEqual(got[1:], msgs) && len(msgs) > 0 {
 			t.Fatalf("history changed when adding the system message: %#v", got)
 		}
-		next := withTimeContext(msgs, now.Add(24*time.Hour))
+		next := withTimeContext(msgs, now.Add(24*time.Hour), time.UTC)
 		if !strings.Contains(next[0].Content, "2026-11-02T18:30:00Z (Monday, UTC)") || strings.Count(next[0].Content, "Current date and time:") != 1 {
 			t.Fatalf("clock was stale or repeated: %#v", next)
 		}
+	}
+}
+
+func TestTimeContextUsesWorkspaceTimezone(t *testing.T) {
+	now := time.Date(2026, time.November, 9, 20, 30, 0, 0, time.UTC)
+	got := withTimeContext(nil, now, time.FixedZone("Asia/Kolkata", 5*3600+30*60))[0].Content
+	for _, want := range []string{
+		"Current date and time: 2026-11-09T20:30:00Z (Monday, UTC).",
+		"Workspace time zone: Asia/Kolkata. Local date and time: 2026-11-10T02:00:00+05:30 (Tuesday).",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("time context missing %q: %q", want, got)
+		}
+	}
+	if utcOnly := withTimeContext(nil, now, time.UTC)[0].Content; strings.Contains(utcOnly, "Workspace time zone") {
+		t.Fatalf("UTC workspace repeated the clock: %q", utcOnly)
 	}
 }
 
@@ -196,7 +212,7 @@ func TestCompletionRequestsIncludeCurrentTime(t *testing.T) {
 	}))
 	defer srv.Close()
 	lo := logf.New(logf.Opts{})
-	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test"}, &lo, srv.Client())
+	client := NewOpenAIClient(models.ProviderConfig{BaseURL: srv.URL, APIKey: "test"}, &lo, srv.Client(), time.UTC)
 	before := time.Now().UTC().Truncate(time.Second)
 	if _, err := client.SendPrompt(t.Context(), models.PromptPayload{SystemPrompt: "Summarize.", UserPrompt: "Conversation"}); err != nil {
 		t.Fatal(err)
