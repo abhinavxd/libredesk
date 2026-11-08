@@ -1114,7 +1114,7 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control, settings *setting.Manager) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
 		Ctx:           ctx,
@@ -1123,6 +1123,7 @@ func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		Settings:      settings,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)

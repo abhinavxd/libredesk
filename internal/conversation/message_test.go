@@ -3,6 +3,7 @@ package conversation
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/dbutil"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
@@ -55,6 +57,80 @@ func (s citationSettingsStore) GetAppRootURL() (string, error) {
 		(*s.lookups)++
 	}
 	return s.rootURL, nil
+}
+
+func TestAIConversationMessagesFilterBeforePagination(t *testing.T) {
+	db := testutil.NewDB(t, "ai_message_history")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{db: db, lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contactID, inboxID int
+	if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Customer', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Support', 'livechat') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name    string
+		replies int
+		surveys int
+		limit   int
+	}{
+		{name: "complete page with a survey", replies: 14, surveys: 1, limit: 15},
+		{name: "newer surveys fill a page", replies: 1, surveys: 20, limit: 15},
+		{name: "older replies omitted", replies: 16, surveys: 3, limit: 15},
+		{name: "single message limit", replies: 2, surveys: 20, limit: 1},
+		{name: "surveys only", surveys: 20, limit: 15},
+		{name: "empty", limit: 15},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var conv models.Conversation
+			if err := db.QueryRow(`INSERT INTO conversations (contact_id, inbox_id, status_id)
+				VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, contactID, inboxID).Scan(&conv.ID, &conv.UUID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, created_at)
+				SELECT $1, 'incoming', 'received', $2, 'contact', 'reply ' || n, 'reply ' || n, 'text', '2026-11-01 10:00:00Z'::timestamptz
+				FROM generate_series(1, $3::int) AS n`, conv.ID, contactID, tc.replies); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, meta, created_at)
+				SELECT $1, 'outgoing', 'sent', $2, 'agent', 'rate us', 'rate us', 'text', '{"is_csat":true}'::jsonb, '2026-11-02 10:00:00Z'::timestamptz
+				FROM generate_series(1, $3::int)`, conv.ID, contactID, tc.surveys); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, private)
+				VALUES ($1, 'outgoing', 'sent', $2, 'agent', 'private note', 'private note', 'text', true)`, conv.ID, contactID); err != nil {
+				t.Fatal(err)
+			}
+			messages, _, err := m.GetAIConversationMessages(conv.UUID, 1 /** page **/, tc.limit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(messages) != min(tc.replies, tc.limit) {
+				t.Fatalf("eligible replies missing: got %d, want %d", len(messages), min(tc.replies, tc.limit))
+			}
+			for i, msg := range messages {
+				if msg.Total != tc.replies || msg.Private || msg.HasCSAT() || msg.TextContent != fmt.Sprintf("reply %d", tc.replies-i) {
+					t.Fatalf("incorrect AI history: %#v", messages)
+				}
+			}
+			if got := strings.Contains(models.Transcript(messages, tc.limit, time.UTC), "Earlier messages are omitted"); got != (tc.replies > tc.limit) {
+				t.Fatalf("incorrect history notice for %d replies and %d surveys", tc.replies, tc.surveys)
+			}
+			private := false
+			all, _, err := m.GetConversationMessages(conv.UUID, 1 /** page **/, tc.limit, &private, []string{models.MessageIncoming, models.MessageOutgoing})
+			if err != nil || len(all) != min(tc.replies+tc.surveys, tc.limit) {
+				t.Fatalf("generic history changed: %#v, error %v", all, err)
+			}
+			if len(all) > 0 && all[0].Total != tc.replies+tc.surveys {
+				t.Fatalf("generic total lost surveys: %#v", all)
+			}
+		})
+	}
 }
 
 func TestImgSrcUploadsPattern(t *testing.T) {
