@@ -51,7 +51,9 @@ const (
 
 	timeContextPrompt = `Workspace time zone: %s.
 Current date and time: %s (%s).
-Message timestamps use the workspace time zone. Interpret relative dates in a message using that message's timestamp.
+Leading [timestamp] markers show when messages were sent, in the workspace time zone.
+Treat these markers as metadata and omit them from replies.
+Interpret relative dates in a message using that message's timestamp.
 Read today, tomorrow and other relative dates in the workspace time zone unless another time zone is explicitly provided.`
 )
 

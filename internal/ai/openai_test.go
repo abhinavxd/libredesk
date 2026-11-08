@@ -198,7 +198,7 @@ func TestTimeContextUsesWorkspaceTimezone(t *testing.T) {
 				t.Fatal(err)
 			}
 			got := withTimeContext(nil, now, loc)[0].Content
-			for _, want := range []string{"Workspace time zone: " + tc.zone, "Current date and time: " + tc.clock, "Message timestamps use the workspace time zone"} {
+			for _, want := range []string{"Workspace time zone: " + tc.zone, "Current date and time: " + tc.clock, "Leading [timestamp] markers show when messages were sent, in the workspace time zone.", "Treat these markers as metadata and omit them from replies."} {
 				if !strings.Contains(got, want) {
 					t.Fatalf("time context missing %q: %q", want, got)
 				}
