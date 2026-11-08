@@ -170,13 +170,6 @@ continuity_scan_interval = "5m"
 # How often to evaluate SLA compliance for conversations
 evaluation_interval = "5m"
 
-[help_center]
-# NOT RECOMMENDED. Run help center custom CSS and JavaScript on the app domain as well as the help center's custom domain.
-# On the app domain, that code runs with the access of any signed-in agent or admin who opens the help center.
-# Anyone who can edit help center settings, or any third-party script pasted there, can then act as that user.
-# Leave this off and set a custom domain for the help center instead. Restart libredesk after changing it.
-allow_custom_code_on_app_domain = false
-
 # Per-IP rate limits (requests per minute) for unauthenticated endpoints.
 # Setting enabled = false disables that rule entirely.
 
