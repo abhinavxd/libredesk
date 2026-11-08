@@ -60,7 +60,7 @@ const (
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
 	helpCenterCacheNamespace    = "hc"
 
-	hcAppDomainCustomCodeKey = "help_center.allow_custom_code_on_app_domain"
+	hcAppDomainCustomCodeKey = "help_center.dangerously_allow_custom_code_on_app_domain"
 
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
