@@ -365,7 +365,9 @@ func main() {
 	app.consts.Store(constants)
 	helpCenterCacheOpts.Logger = log.New(helpCenterCacheLogWriter{lo: app.lo}, "", 0)
 	// Help center pages cached in Redis outlive restarts and can predate the current config.
-	clearHelpCenterCache(app)
+	if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+		lo.Fatal("error clearing help center cache", "error", err)
+	}
 
 	waClient.SetAuthErrorHook(makeWhatsAppAuthErrorHook(app))
 	if err := ensureWhatsAppIngester(app); err != nil {

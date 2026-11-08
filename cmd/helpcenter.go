@@ -1284,15 +1284,12 @@ func clearsHCCache(h fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		err := h(r)
 		if r.RequestCtx.Response.StatusCode() < fasthttp.StatusMultipleChoices {
-			clearHelpCenterCache(r.Context.(*App))
+			app := r.Context.(*App)
+			if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+				app.lo.Error("error clearing help center cache", "error", err)
+			}
 		}
 		return err
-	}
-}
-
-func clearHelpCenterCache(app *App) {
-	if err := app.fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
-		app.lo.Error("error clearing help center cache", "error", err)
 	}
 }
 
