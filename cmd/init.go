@@ -1037,8 +1037,13 @@ func initRedis() *redis.Client {
 	})
 }
 
+// initFastCache drops help center pages cached by the previous build, which pair old markup with the new CSS and JS.
 func initFastCache(rdb *redis.Client) *fastcache.FastCache {
-	return fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
+	fc := fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
+	if err := fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+		log.Printf("error clearing help center page cache: %v", err)
+	}
+	return fc
 }
 
 // initRedis inits postgres DB.

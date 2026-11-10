@@ -1,0 +1,23 @@
+/* Search suggestions and previews for both templates. Loads after the template stylesheet so these rules win. */
+.hc-typeahead { scrollbar-width: thin; scrollbar-color: var(--hc-border) transparent; }
+.hc-typeahead a[aria-selected="true"] { background: var(--hc-accent-tint-2); }
+.hc-typeahead-title { display: block; font-weight: 600; }
+.hc-typeahead-collection { display: block; margin-top: .15rem; color: var(--hc-muted); font-size: .78rem; font-weight: 400; }
+/* One line keeps enough suggestions on screen to compare. The results page shows the longer preview. */
+.hc-typeahead-excerpt {
+    display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    margin-top: .2rem; color: var(--hc-muted); font-size: .85rem; font-weight: 400; line-height: 1.5;
+}
+.hc-typeahead mark, [data-hc-search-text] mark {
+    background: var(--hc-accent-tint-2); color: var(--hc-ink); border-radius: 3px;
+}
+.hc-typeahead a[aria-selected="true"] mark, .hc-typeahead a:hover mark { background: var(--hc-accent-line); }
+.hc-search-count { margin: -.5rem 0 1.25rem; font-size: .85rem; color: var(--hc-muted); }
+
+/* The delay keeps a fast response from flashing the pending state. */
+.hc-search[data-hc-searching] .hc-search-icon { animation: hc-search-pending .9s ease-in-out .2s infinite alternate; }
+.hc-search[data-hc-searching] .hc-typeahead { opacity: .55; transition: opacity .15s .2s; }
+@keyframes hc-search-pending { to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) {
+    .hc-search[data-hc-searching] .hc-search-icon { animation: none; }
+}

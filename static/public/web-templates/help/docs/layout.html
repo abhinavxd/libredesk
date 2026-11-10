@@ -15,7 +15,7 @@
                     {{ if .Data.HelpCenter.LogoURL }}<img class="hc-logo-light" src="{{ .Data.HelpCenter.LogoURL }}" alt="{{ .Data.HelpCenter.Name }}" />{{ if .Data.HelpCenter.LogoURLDark }}<img class="hc-logo-dark" src="{{ .Data.HelpCenter.LogoURLDark }}" alt="{{ .Data.HelpCenter.Name }}" />{{ end }}{{ else }}<span class="hcd-brand-name">{{ .Data.HelpCenter.Name }}</span>{{ end }}
                 </a>
             </div>
-            <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open>
+            <a class="hcd-search-btn" href="{{ .Data.HelpCenter.BasePath }}/search" data-hcd-search-open aria-label="{{ .L.T "globals.terms.search" }}">
                 {{ template "hc-search-icon" }}
                 <span class="hcd-search-btn-label">{{ .L.T "globals.terms.search" }}</span>
                 <span class="hcd-kbd-combo" aria-hidden="true"><kbd class="hcd-kbd hcd-kbd-mod">Ctrl</kbd><kbd class="hcd-kbd">K</kbd></span>
@@ -37,10 +37,11 @@
     <div class="hcd-search-layer" data-hcd-search hidden>
         <div class="hcd-search-backdrop" data-hcd-search-close></div>
         <div class="hcd-search-panel" role="dialog" aria-modal="true" aria-label="{{ .L.T "globals.terms.search" }}">
-            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ .L.T "helpCenter.noResults" }}" data-hc-results-one="{{ .L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ .L.Tc "helpCenter.resultsCount" 2 }}">
+            <button type="button" class="hcd-search-close" data-hcd-search-close aria-label="{{ .L.T "globals.messages.close" }}">{{ LucideIcon "x" }}</button>
+            <form class="hc-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search" data-hc-autoselect data-hc-base="{{ .Data.HelpCenter.BasePath }}" data-hc-slug="{{ .Data.HelpCenter.Slug }}" data-hc-locale="{{ .Data.HelpCenter.CurrentLocale }}" data-hc-empty="{{ .L.T "helpCenter.noResults" }}" data-hc-results-one="{{ .L.Tc "helpCenter.resultsCount" 1 }}" data-hc-results="{{ .L.Tc "helpCenter.resultsCount" 2 }}">
                 {{ template "hc-search-icon" "hc-search-icon" }}
-                <input type="search" name="q" value="" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
-                <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+                <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
+                <button type="submit" class="hc-sr-only" tabindex="-1">{{ .L.T "globals.terms.search" }}</button>
             </form>
             <div class="hcd-search-hints">
                 <span><kbd class="hcd-kbd">↑</kbd><kbd class="hcd-kbd">↓</kbd> {{ .L.T "command.navigate" }}</span>
@@ -53,6 +54,12 @@
     <div class="hcd-shell">
         <div class="hcd-sidebar-backdrop" data-hcd-sidebar-close></div>
         <aside class="hcd-sidebar" id="hcd-sidebar">
+            <div class="hcd-nav-summary hcd-nav-home">
+                <a class="hcd-nav-head" href="{{ .Data.HelpCenter.BasePath }}"{{ if .Data.LandingHero }} aria-current="page"{{ end }}>
+                    <span class="hcd-nav-icon">{{ LucideIcon "house" }}</span>
+                    <span>{{ .L.T "globals.terms.home" }}</span>
+                </a>
+            </div>
             {{ if .Data.Tree }}
             <nav class="hcd-nav" aria-label="{{ .L.Tc "globals.terms.collection" 2 }}">
                 {{ range .Data.Tree }}
@@ -117,29 +124,38 @@
         var layer = document.querySelector('[data-hcd-search]');
         var input = layer && layer.querySelector('input[name="q"]');
         var lastOpener = null;
+        // Hiding the page scrollbar widens the page. The same width goes back as padding so the content stays put.
+        function lockScroll(name, on) {
+            if (document.body.hasAttribute(name) === on) return;
+            var gap = window.innerWidth - document.documentElement.clientWidth;
+            document.body.toggleAttribute(name, on);
+            document.body.style.paddingInlineEnd = on && gap > 0 ? gap + 'px' : '';
+        }
         function openSearch() {
             lastOpener = document.activeElement;
             layer.hidden = false;
-            document.body.setAttribute('data-hcd-modal-open', '');
+            lockScroll('data-hcd-modal-open', true);
             if (input) {
-                input.value = '';
-                input.dispatchEvent(new Event('input'));
                 input.focus();
+                // A term left from the last search is replaced by the next keystroke.
+                input.select();
             }
         }
         function closeSearch() {
             layer.hidden = true;
-            document.body.removeAttribute('data-hcd-modal-open');
+            lockScroll('data-hcd-modal-open', false);
             if (lastOpener && lastOpener.focus) lastOpener.focus();
         }
         if (layer) {
             document.querySelectorAll('[data-hcd-search-open]').forEach(function (el) {
                 el.addEventListener('click', function (e) { e.preventDefault(); openSearch(); });
             });
-            layer.querySelector('[data-hcd-search-close]').addEventListener('click', closeSearch);
+            layer.querySelectorAll('[data-hcd-search-close]').forEach(function (el) {
+                el.addEventListener('click', closeSearch);
+            });
             layer.addEventListener('keydown', function (e) {
                 if (e.key !== 'Tab') return;
-                var items = Array.from(layer.querySelectorAll('a[href], button, input')).filter(function (el) { return el.getClientRects().length && !el.disabled; });
+                var items = Array.from(layer.querySelectorAll('a[href], button, input')).filter(function (el) { return el.getClientRects().length && !el.disabled && el.tabIndex >= 0; });
                 if (!items.length) return;
                 var first = items[0], last = items[items.length - 1];
                 if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -152,9 +168,8 @@
                     return;
                 }
                 if (e.key === 'Escape' && !layer.hidden) {
-                    // The typeahead's own Escape handler closes the suggestion panel first.
-                    var panel = layer.querySelector('.hc-typeahead');
-                    if (!panel || panel.hidden) closeSearch();
+                    e.preventDefault();
+                    closeSearch();
                     return;
                 }
                 if (e.key === '/' && layer.hidden) {
@@ -174,7 +189,7 @@
             var syncSidebar = function () {
                 var open = shell.hasAttribute('data-sidebar-open');
                 sidebar.inert = mobile.matches && !open;
-                document.body.toggleAttribute('data-hcd-sidebar-open', mobile.matches && open);
+                lockScroll('data-hcd-sidebar-open', mobile.matches && open);
             };
             var closeSidebar = function () {
                 if (sidebar.contains(document.activeElement) && mobile.matches) toggle.focus();
@@ -211,16 +226,22 @@
             if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
         };
         document.querySelectorAll('.hcd-nav-toggle').forEach(function (btn) {
+            var group = btn.closest('.hcd-nav-group');
+            var key = 'hc-nav:' + group.querySelector('.hcd-nav-head').getAttribute('href');
+            try {
+                var saved = sessionStorage.getItem(key);
+                if (saved !== null) setOpen(group, saved === 'true');
+            } catch (e) {}
             btn.addEventListener('click', function () {
-                var group = btn.closest('.hcd-nav-group');
                 setOpen(group, !group.hasAttribute('data-open'));
+                try { sessionStorage.setItem(key, String(group.hasAttribute('data-open'))); } catch (e) {}
             });
         });
         var current = document.querySelector('.hcd-nav [aria-current="page"]');
         if (current) {
             for (var g = current.closest('.hcd-nav-group'); g; g = g.parentElement && g.parentElement.closest('.hcd-nav-group')) setOpen(g, true);
             var rail = current.closest('.hcd-sidebar');
-            if (rail && !rail.inert) rail.scrollTop += current.getBoundingClientRect().top - rail.getBoundingClientRect().top - rail.clientHeight / 2 + current.clientHeight / 2;
+            if (rail) rail.scrollTop += current.getBoundingClientRect().top - rail.getBoundingClientRect().top - rail.clientHeight / 2 + current.clientHeight / 2;
         }
     })();
     </script>
@@ -236,9 +257,9 @@
 <nav class="hcd-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
-        {{ if .Collection }}{{ if .Collection.Name }}
-        <li><a href="{{ .Data.HelpCenter.BasePath }}/collections/{{ .Collection.Slug }}">{{ .Collection.Name }}</a></li>
-        {{ end }}{{ end }}
+        {{ range .Data.CollectionTrail }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">{{ .Name }}</a></li>
+        {{ end }}
         {{ if .Current }}<li><span class="hcd-crumb-current" aria-current="page">{{ .Current }}</span></li>{{ end }}
     </ol>
 </nav>
@@ -249,7 +270,6 @@
     {{ range .Articles }}
     <li>
         <a href="{{ $.Base }}/articles/{{ .Slug }}">
-            {{ template "hc-doc-icon" }}
             <span class="hcd-row-body">
                 <span class="hcd-row-title">{{ .Title }}</span>
                 {{ if .Excerpt }}<span class="hcd-row-excerpt">{{ .Excerpt }}</span>{{ end }}
