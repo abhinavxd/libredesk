@@ -139,6 +139,7 @@ type App struct {
 	webhook            *webhook.Manager
 	contextLink        *contextlink.Manager
 	rateLimit          *ratelimit.Limiter
+	clientIPHeader     string
 	redis              *redis.Client
 	db                 *sqlx.DB
 	fc                 *fastcache.FastCache
@@ -270,13 +271,13 @@ func main() {
 		notificationEmailQueue      = initNotificationEmailQueue(db, notifier, replyDeliveryChecker)
 		notifDispatcher             = initNotifDispatcher(userNotification, notificationPreference, pushNotification, notificationEmailQueue, wsHub, ko.Bool("notification.email.enabled"))
 		automation                  = initAutomationEngine(db, i18n)
-		ai                          = initAI(ctx, db, i18n, ssrfControl)
+		ai                          = initAI(ctx, db, i18n, ssrfControl, settings)
 		sla                         = initSLA(db, team, settings, businessHours, template, user, i18n, notifDispatcher)
 		conversation                = initConversations(i18n, sla, status, priority, wsHub, db, inbox, user, team, media, settings, csat, automation, template, webhook, notifDispatcher)
 		aiAgent                     = initAIAgent(db, i18n, ai, conversation, inbox, media, settings, user, notifier, rdb)
 		helpCenter                  = initHelpCenter(db, i18n, ai)
 		autoassigner                = initAutoAssigner(team, user, conversation)
-		rateLimiter                 = initRateLimit(rdb)
+		rateLimiter                 = initRateLimit(rdb, ko.String("app.server.client_ip_header"))
 	)
 
 	wsHub.SetConversationStore(conversation)
@@ -292,6 +293,12 @@ func main() {
 	waTemplates := initWhatsAppTemplates(db, i18n, waClient, inbox)
 	conversation.SetWhatsAppTemplateStore(waTemplates)
 	conversation.SetArticleReferenceStore(helpCenter)
+
+	fc := initFastCache(rdb)
+	// Help center pages cached in Redis outlive restarts and can predate the current config.
+	if err := fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
+		log.Fatalf("error clearing help center cache: %v", err)
+	}
 
 	go automation.Run(ctx, automationWorkers)
 	go autoassigner.Run(ctx, autoAssignInterval)
@@ -315,6 +322,7 @@ func main() {
 
 	var app = &App{
 		ctx:              ctx,
+		clientIPHeader:   ko.String("app.server.client_ip_header"),
 		lo:               lo,
 		fs:               fs,
 		sla:              sla,
@@ -354,7 +362,7 @@ func main() {
 		rateLimit:        rateLimiter,
 		redis:            rdb,
 		db:               db,
-		fc:               initFastCache(rdb),
+		fc:               fc,
 		userNotification: userNotification,
 		whatsappClient:   waClient,
 		whatsappTemplate: waTemplates,

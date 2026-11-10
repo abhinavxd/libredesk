@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -624,7 +625,8 @@ type MentionInput struct {
 }
 
 // Transcript renders the last max messages as a plaintext "Customer:/Agent:" transcript for AI context.
-func Transcript(msgs []Message, max int) string {
+func Transcript(msgs []Message, max int, loc *time.Location) string {
+	truncated := len(msgs) > max || (len(msgs) > 0 && msgs[0].Total > len(msgs))
 	if len(msgs) > max {
 		msgs = msgs[len(msgs)-max:]
 	}
@@ -640,13 +642,28 @@ func Transcript(msgs []Message, max int) string {
 				text = t
 			}
 		}
+		for _, att := range msg.Attachments {
+			if text != "" {
+				text += "\n"
+			}
+			text += fmt.Sprintf("[Attachment: %q (%s). Contents are unavailable in this transcript.]", att.Name, att.ContentType)
+		}
 		if text == "" {
-			continue
+			if msg.SenderType != SenderTypeContact {
+				continue
+			}
+			text = "[The customer sent a message with no readable text.]"
+		}
+		if !msg.CreatedAt.IsZero() {
+			fmt.Fprintf(&b, "[%s] ", msg.CreatedAt.In(loc).Format(time.RFC3339))
 		}
 		b.WriteString(role)
 		b.WriteString(": ")
 		b.WriteString(text)
 		b.WriteString("\n")
+	}
+	if truncated && b.Len() > 0 {
+		return "[Earlier messages are omitted. This transcript contains only the latest public messages.]\n" + b.String()
 	}
 	return b.String()
 }

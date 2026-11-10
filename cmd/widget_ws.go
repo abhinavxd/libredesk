@@ -14,7 +14,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/fasthttp/websocket"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/fastglue"
@@ -118,7 +117,7 @@ func (sc *safeConn) allow(kind string, minInterval time.Duration) bool {
 func handleWidgetWS(r *fastglue.Request) error {
 	var app = r.Context.(*App)
 
-	clientIP := realip.FromRequest(r.RequestCtx)
+	clientIP := httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 
 	if err := widgetUpgrader.Upgrade(r.RequestCtx, func(conn *websocket.Conn) {
 		conn.SetReadLimit(wsReadLimitBytes)

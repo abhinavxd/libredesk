@@ -4,10 +4,22 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/zerodha/logf"
 )
+
+type fakeUserStore struct {
+	offline chan int
+}
+
+func (f *fakeUserStore) UpdateLastActive(int) (bool, error) { return false, nil }
+
+func (f *fakeUserStore) MarkAgentOffline(userID int) bool {
+	f.offline <- userID
+	return true
+}
 
 func TestRemoveClient(t *testing.T) {
 	newHubWith := func(n int) (*Hub, []*Client) {
@@ -102,4 +114,80 @@ func TestClientBufferDropIsVisible(t *testing.T) {
 	if logs.Len() != 0 {
 		t.Fatal("normal closed connection produced a warning")
 	}
+}
+
+func TestAgentMarkedOfflineAfterLastSocketCloses(t *testing.T) {
+	cases := []struct {
+		name        string
+		run         func(h *Hub)
+		wantOffline bool
+	}{
+		{"last socket closes", func(h *Hub) {
+			tab := &Client{ID: 7, Hub: h}
+			h.AddClient(tab)
+			h.RemoveClient(tab)
+		}, true},
+		{"page reload reconnects within grace", func(h *Hub) {
+			tab := &Client{ID: 7, Hub: h}
+			h.AddClient(tab)
+			h.RemoveClient(tab)
+			h.AddClient(&Client{ID: 7, Hub: h})
+		}, false},
+		{"another tab stays open", func(h *Hub) {
+			first, second := &Client{ID: 7, Hub: h}, &Client{ID: 7, Hub: h}
+			h.AddClient(first)
+			h.AddClient(second)
+			h.RemoveClient(first)
+		}, false},
+		{"closed socket removed twice", func(h *Hub) {
+			tab := &Client{ID: 7, Hub: h}
+			h.AddClient(tab)
+			h.RemoveClient(tab)
+			h.RemoveClient(tab)
+		}, true},
+		{"server shutting down", func(h *Hub) {
+			tab := &Client{ID: 7, Hub: h}
+			h.AddClient(tab)
+			h.closing.Store(true)
+			h.RemoveClient(tab)
+		}, false},
+		{"shutdown starts during grace", func(h *Hub) {
+			tab := &Client{ID: 7, Hub: h}
+			h.AddClient(tab)
+			h.RemoveClient(tab)
+			h.closing.Store(true)
+		}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h, store := offlineTestHub()
+			tc.run(h)
+			select {
+			case id := <-store.offline:
+				if !tc.wantOffline {
+					t.Fatalf("agent %d marked offline", id)
+				}
+				if id != 7 {
+					t.Fatalf("marked agent %d offline, want 7", id)
+				}
+				select {
+				case <-store.offline:
+					t.Fatal("agent marked offline twice")
+				case <-time.After(5 * h.offlineGrace):
+				}
+			case <-time.After(10 * h.offlineGrace):
+				if tc.wantOffline {
+					t.Fatal("agent was not marked offline")
+				}
+			}
+		})
+	}
+}
+
+func offlineTestHub() (*Hub, *fakeUserStore) {
+	lo := logf.New(logf.Opts{})
+	store := &fakeUserStore{offline: make(chan int, 4)}
+	h := NewHub(&lo, store)
+	h.offlineGrace = 20 * time.Millisecond
+	return h, store
 }

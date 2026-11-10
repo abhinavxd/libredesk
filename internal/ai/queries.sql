@@ -132,8 +132,8 @@ WHERE id = $1 RETURNING *;
 DELETE FROM ai_tools WHERE id = $1;
 
 -- name: get-copilot-messages
-SELECT role, content FROM (
-    SELECT id, role, content FROM copilot_messages WHERE conversation_id = $1 AND user_id = $2 ORDER BY id DESC LIMIT $3
+SELECT role, content, created_at FROM (
+    SELECT id, role, content, created_at FROM copilot_messages WHERE conversation_id = $1 AND user_id = $2 ORDER BY id DESC LIMIT $3
 ) latest ORDER BY id;
 
 -- name: insert-copilot-message

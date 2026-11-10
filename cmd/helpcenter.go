@@ -22,10 +22,10 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/helpcenter"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/media"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/knadh/stuffbin"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastcache/v4"
@@ -41,6 +41,7 @@ const (
 	insightsTermLimit     = 20
 	markdownSlugExtension = ".md"
 	previewPageArticle    = "article"
+	previewPageCollection = "collection"
 
 	// sitemapURLLimit is the per-sitemap URL cap set by the sitemap protocol.
 	sitemapURLLimit = 50000
@@ -59,6 +60,8 @@ const (
 
 	helpCenterCacheNamespaceKey = "hc_cache_ns"
 	helpCenterCacheNamespace    = "hc"
+
+	hcAppDomainCustomCodeKey = "help_center.dangerously_allow_custom_code_on_app_domain"
 
 	helpCenterXMLCacheControl = "public, max-age=300, stale-while-revalidate=3600"
 
@@ -261,8 +264,11 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	locale := helpCenter.DefaultLocale
-	if string(r.RequestCtx.QueryArgs().Peek("page")) == previewPageArticle {
+	switch string(r.RequestCtx.QueryArgs().Peek("page")) {
+	case previewPageArticle:
 		return renderHelpCenterArticlePreview(r, helpCenter, locale)
+	case previewPageCollection:
+		return renderHelpCenterCollectionPreview(r, helpCenter, locale)
 	}
 	popular, err := app.helpcenter.GetPopularArticles(helpCenter.Slug, locale, popularArticlesLimit)
 	if err != nil {
@@ -277,7 +283,7 @@ func handleHelpCenterPreview(r *fastglue.Request) error {
 		"Data": map[string]interface{}{
 			"Title":       helpCenter.PageTitle,
 			"LandingHero": true,
-			"HelpCenter":  helpCenterTemplateData(app, r, helpCenter, locale),
+			"HelpCenter":  helpCenterPreviewData(app, r, helpCenter, locale),
 			"Tree":        tree.Tree,
 			"Popular":     popular,
 		},
@@ -1119,7 +1125,7 @@ func handleHelpCenterArticleFeedback(r *fastglue.Request) error {
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
-	dedupKey := fmt.Sprintf("help_center:feedback:%d:%s", article.ID, realip.FromRequest(r.RequestCtx))
+	dedupKey := fmt.Sprintf("help_center:feedback:%d:%s", article.ID, httputil.ClientIP(r.RequestCtx, app.clientIPHeader))
 	if ok, err := app.redis.SetNX(r.RequestCtx, dedupKey, "1", articleFeedbackDedupTTL).Result(); err == nil && !ok {
 		return r.SendEnvelope(true)
 	}
@@ -1333,6 +1339,34 @@ func helpCenterCustomOrigin(hc hcmodels.HelpCenter) string {
 // isRootHost reports whether host is the app root URL's hostname.
 func isRootHost(app *App, host string) bool {
 	return strings.EqualFold(urlHostname(helpCenterRootURL(app)), host)
+}
+
+func helpCenterCustomCodeAllowed(app *App, r *fastglue.Request, hc hcmodels.HelpCenter) bool {
+	if ko.Bool(hcAppDomainCustomCodeKey) {
+		return true
+	}
+	// Any host other than the help center's own domain can share an origin with agent sessions.
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	customHost := urlHostname(helpCenterCustomOrigin(hc))
+	return customHost != "" && strings.EqualFold(host, customHost) && !isRootHost(app, host)
+}
+
+func isHelpCenterHost(app *App, r *fastglue.Request) (bool, error) {
+	host := hostWithoutPort(string(r.RequestCtx.Host()))
+	if isRootHost(app, host) {
+		return false, nil
+	}
+	// Inactive domains can still serve cached custom code.
+	helpCenters, err := app.helpcenter.GetAllHelpCenters()
+	if err != nil {
+		return false, err
+	}
+	for _, hc := range helpCenters {
+		if helpCenterCustomOrigin(hc) != "" && strings.EqualFold(urlHostname(hc.CustomDomain), host) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // helpCenterByHost returns the active help center whose custom domain hostname is host.
@@ -1844,6 +1878,14 @@ func sidebarTree(app *App, hc hcmodels.HelpCenter, locale string) []hcmodels.Tre
 	return tree.Tree
 }
 
+// The admin preview iframe blocks scripts, so previews show custom CSS on any host and never custom JS.
+func helpCenterPreviewData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
+	data := helpCenterTemplateData(app, r, hc, locale)
+	data["CustomCSS"] = template.CSS(hc.CustomCSS)
+	data["CustomJS"] = template.JS("")
+	return data
+}
+
 // helpCenterTemplateData shapes a help center row for the public templates.
 func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCenter, locale string) map[string]interface{} {
 	theme := helpCenterTheme(hc)
@@ -1855,6 +1897,12 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 	}
 	embed := isEmbedRequest(r)
 	scheme := resolveColorScheme(theme.ColorScheme, string(r.RequestCtx.QueryArgs().Peek("theme")), embed)
+	var customCSS template.CSS
+	var customJS template.JS
+	if helpCenterCustomCodeAllowed(app, r, hc) {
+		customCSS = template.CSS(hc.CustomCSS)
+		customJS = template.JS(hc.CustomJS)
+	}
 	return map[string]interface{}{
 		"Slug":              hc.Slug,
 		"Name":              hc.Name,
@@ -1882,8 +1930,8 @@ func helpCenterTemplateData(app *App, r *fastglue.Request, hc hcmodels.HelpCente
 		"TaglineHTML":       template.HTML(helpcenter.RenderInlineMarkdown(theme.Tagline)),
 		"FooterTaglineHTML": template.HTML(helpcenter.RenderInlineMarkdown(theme.Footer.Tagline)),
 		"AnnouncementHTML":  template.HTML(helpcenter.RenderInlineMarkdown(theme.Announcement.Text)),
-		"CustomCSS":         template.CSS(hc.CustomCSS),
-		"CustomJS":          template.JS(hc.CustomJS),
+		"CustomCSS":         customCSS,
+		"CustomJS":          customJS,
 		"WidgetInboxUUID":   livechatWidgetInboxUUID(app, hc),
 		"WidgetRootURL":     helpCenterRootURL(app),
 		"Embed":             embed,
@@ -2159,6 +2207,41 @@ func localeDir(locale string) string {
 	return "ltr"
 }
 
+func renderHelpCenterCollectionPreview(r *fastglue.Request, helpCenter hcmodels.HelpCenter, locale string) error {
+	var (
+		app        = r.Context.(*App)
+		i18n       = localeI18n(app, locale)
+		excerpt    = i18n.T("helpCenter.preview.sampleArticleExcerpt")
+		collection = hcmodels.TreeCollection{
+			Collection: hcmodels.Collection{
+				Slug:        "sample-collection",
+				Name:        i18n.T("helpCenter.preview.sampleCollection"),
+				Description: i18n.T("helpCenter.preview.sampleCollectionDescription"),
+			},
+			Articles: []hcmodels.Article{
+				{Slug: "sample-1", Title: i18n.T("helpCenter.preview.sampleArticleHeading1"), Excerpt: excerpt},
+				{Slug: "sample-2", Title: i18n.T("helpCenter.preview.sampleArticleHeading2"), Excerpt: excerpt},
+				{Slug: "sample-3", Title: i18n.T("helpCenter.preview.sampleArticleHeading3"), Excerpt: excerpt},
+			},
+			ArticleCount: 3,
+		}
+	)
+	if err := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-collection"), map[string]interface{}{
+		"L": i18n,
+		"Data": map[string]interface{}{
+			"Title":            fmt.Sprintf("%s - %s", collection.Name, helpCenter.Name),
+			"HelpCenter":       helpCenterTemplateData(app, r, helpCenter, locale),
+			"Collection":       collection,
+			"Tree":             sidebarTree(app, helpCenter, locale),
+			"ActiveCollection": collection.Slug,
+		},
+	}); err != nil {
+		return sendErrorEnvelope(r, err)
+	}
+	r.RequestCtx.Response.Header.Set("Cache-Control", "no-store")
+	return nil
+}
+
 // renderHelpCenterArticlePreview renders a sample article page from unsaved settings; TOC and related list are built server-side because the preview iframe is sandboxed without scripts.
 func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.HelpCenter, locale string) error {
 	var (
@@ -2198,16 +2281,17 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 	if err := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-article"), map[string]interface{}{
 		"L": i18n,
 		"Data": map[string]interface{}{
-			"Title":         article.Title,
-			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterTemplateData(app, r, helpCenter, locale),
-			"Article":       article,
-			"AuthorInitial": authorInitial(article),
-			"Collection":    collection,
-			"Related":       related,
-			"TOC":           toc,
-			"Tree":          sidebarTree(app, helpCenter, locale),
-			"Content":       template.HTML(article.Content),
+			"Title":           article.Title,
+			"ModifiedTime":    article.UpdatedAt.Format(time.RFC3339),
+			"HelpCenter":      helpCenterPreviewData(app, r, helpCenter, locale),
+			"Article":         article,
+			"AuthorInitial":   authorInitial(article),
+			"Collection":      collection,
+			"CollectionTrail": []hcmodels.Collection{collection},
+			"Related":         related,
+			"TOC":             toc,
+			"Tree":            sidebarTree(app, helpCenter, locale),
+			"Content":         template.HTML(article.Content),
 		},
 	}); err != nil {
 		return sendErrorEnvelope(r, err)

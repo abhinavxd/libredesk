@@ -112,6 +112,13 @@ func initConfig(ko *koanf.Koanf) {
 			return key, val
 		},
 	}), nil)
+	if ko.String("app.server.client_ip_header") == "" {
+		header := "X-Client-IP"
+		if os.Getenv("RAILWAY_ENVIRONMENT_ID") != "" {
+			header = "X-Real-IP"
+		}
+		ko.Set("app.server.client_ip_header", header)
+	}
 }
 
 // validateConfig logs warnings/fatals for invalid config values.
@@ -704,12 +711,12 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 	lo := initLogger("email_inbox")
 	var config imodels.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
@@ -777,12 +784,12 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 	lo := initLogger("livechat_inbox")
 	var config livechat.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
@@ -1037,13 +1044,8 @@ func initRedis() *redis.Client {
 	})
 }
 
-// initFastCache drops help center pages cached by the previous build, which pair old markup with the new CSS and JS.
 func initFastCache(rdb *redis.Client) *fastcache.FastCache {
-	fc := fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
-	if err := fc.DelGroup(helpCenterCacheNamespace, helpCenterCacheGroup); err != nil {
-		log.Printf("error clearing help center page cache: %v", err)
-	}
-	return fc
+	return fastcache.New(goredis.New(goredis.Config{Prefix: fastCachePrefix}, rdb))
 }
 
 // initRedis inits postgres DB.
@@ -1112,7 +1114,7 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control, settings *setting.Manager) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
 		Ctx:           ctx,
@@ -1121,6 +1123,7 @@ func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		Settings:      settings,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
@@ -1244,6 +1247,8 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhoo
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		MaxRetries:    ko.Int("webhook.max_retries"),
+		RetryBackoff:  ko.Duration("webhook.retry_backoff"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
@@ -1375,8 +1380,8 @@ func getLogLevel(lvl string) logf.Level {
 
 // initRateLimit initializes the rate limiter with default rules.
 // Defaults are used unless overridden in config.toml under [rate_limit.<name>].
-func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
-	limiter := ratelimit.New(redisClient, initLogger("rate_limit"))
+func initRateLimit(redisClient *redis.Client, clientIPHeader string) *ratelimit.Limiter {
+	limiter := ratelimit.New(redisClient, initLogger("rate_limit"), clientIPHeader)
 
 	defaults := []struct {
 		Name string

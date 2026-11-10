@@ -198,6 +198,20 @@ func (u *Manager) MarkInactiveUsersOffline() []models.OfflineUser {
 	return users
 }
 
+// MarkAgentOffline sets an online or idle agent offline and reports whether the status changed.
+func (u *Manager) MarkAgentOffline(id int) bool {
+	res, err := u.q.SetAgentOffline.Exec(id)
+	if err != nil {
+		u.lo.Error("error setting agent offline", "user_id", id, "error", err)
+		return false
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false
+	}
+	u.InvalidateAgentCache(id)
+	return true
+}
+
 // GetAllAgents returns a list of all agents.
 func (u *Manager) GetAgents() ([]models.UserCompact, error) {
 	// Some dirty hack.
