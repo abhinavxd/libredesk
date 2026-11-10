@@ -208,6 +208,8 @@
     document.addEventListener('click', function (e) {
         if (!form.contains(e.target)) { flush(); close(); }
     });
+    // Keeps focus in the input while a suggestion is pressed. A browser that does not focus links on click would otherwise close the panel before the click lands.
+    panel.addEventListener('mousedown', function (e) { e.preventDefault(); });
     form.addEventListener('focusout', function (e) {
         if (!form.contains(e.relatedTarget)) { flush(); close(); }
     });
