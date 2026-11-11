@@ -21,24 +21,31 @@ var agentUpgrader = websocket.FastHTTPUpgrader{
 	WriteBufferSize: 8192,
 	WriteBufferPool: wsWriteBufferPool,
 	CheckOrigin: func(ctx *fasthttp.RequestCtx) bool {
-		origin := string(ctx.Request.Header.Peek("Origin"))
-		if origin == "" {
-			return false
-		}
-		u, err := url.Parse(origin)
-		if err != nil || u.Host == "" {
-			return false
-		}
-		isLocalhost := u.Hostname() == "localhost"
-		if u.Scheme != "https" && !isLocalhost {
-			return false
-		}
-		if strings.EqualFold(u.Host, string(ctx.Request.Host())) {
-			return true
-		}
-		return isLocalhost
+		return isAllowedAgentOrigin(string(ctx.Request.Header.Peek("Origin")), string(ctx.Request.Host()))
 	},
 	Error: ErrHandler,
+}
+
+func isAllowedAgentOrigin(origin, host string) bool {
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	isLocalhost := u.Hostname() == "localhost"
+	if u.Scheme != "https" && !isLocalhost {
+		return false
+	}
+	if strings.EqualFold(u.Host, host) {
+		return true
+	}
+	if root, err := url.Parse(ko.String("app.root_url")); err == nil && root.Host != "" &&
+		strings.EqualFold(u.Scheme, root.Scheme) && strings.EqualFold(u.Host, root.Host) {
+		return true
+	}
+	return isLocalhost
 }
 
 // widgetUpgrader: cross-origin by design.
