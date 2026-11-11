@@ -5,6 +5,7 @@ import {
   queryFromFilters,
   hasActiveFilters,
   toFiltersJSON,
+  toggleFilter,
   UNASSIGNED
 } from './searchFilters'
 
@@ -55,5 +56,13 @@ describe('searchFilters', () => {
 
   it('returns an empty string when nothing is set', () => {
     expect(toFiltersJSON(emptyFilters())).toBe('')
+  })
+
+  it('clears a filter when its current value is picked again', () => {
+    const filters = { ...emptyFilters(), status: '2', inbox: '5' }
+    expect(toggleFilter(filters, 'status', '3').status).toBe('3')
+    expect(toggleFilter(filters, 'status', '2')).toEqual({ ...emptyFilters(), inbox: '5' })
+    expect(toggleFilter(filters, 'assignee', UNASSIGNED).assignee).toBe(UNASSIGNED)
+    expect(toggleFilter(emptyFilters(), 'team', '').team).toBe('')
   })
 })
