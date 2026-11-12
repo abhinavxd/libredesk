@@ -187,16 +187,6 @@ func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.Conver
 		u = strings.ReplaceAll(u, placeholder, value)
 	}
 
-	// Substitute custom contact and conversation attributes.
-	for _, attrs := range []json.RawMessage{contact.CustomAttributes, convCustomAttributes} {
-		var m map[string]any
-		if err := json.Unmarshal(attrs, &m); err == nil {
-			for k, v := range m {
-				u = strings.ReplaceAll(u, "{{"+k+"}}", url.QueryEscape(fmt.Sprintf("%v", v)))
-			}
-		}
-	}
-
 	// Generate encrypted token if {{token}} is in the URL and secret is set.
 	if strings.Contains(u, "{{token}}") && link.Secret != "" {
 		secret, err := crypto.Decrypt(link.Secret, m.encryptionKey)
@@ -235,6 +225,17 @@ func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.Conver
 		// Strip "enc:" prefix. External systems receive just the base64 ciphertext.
 		token = strings.TrimPrefix(token, crypto.EncryptedPrefix)
 		u = strings.ReplaceAll(u, "{{token}}", url.QueryEscape(token))
+	}
+
+	// Substitute custom contact and conversation attributes after built-in placeholders
+	// (including {{token}}) so they cannot override reserved variables.
+	for _, attrs := range []json.RawMessage{contact.CustomAttributes, convCustomAttributes} {
+		var m map[string]any
+		if err := json.Unmarshal(attrs, &m); err == nil {
+			for k, v := range m {
+				u = strings.ReplaceAll(u, "{{"+k+"}}", url.QueryEscape(fmt.Sprintf("%v", v)))
+			}
+		}
 	}
 
 	return u, nil
