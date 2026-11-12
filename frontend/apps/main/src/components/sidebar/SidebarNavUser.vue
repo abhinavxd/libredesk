@@ -45,13 +45,24 @@
         </div>
 
         <div class="space-y-2">
-          <!-- Dark-mode toggle -->
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">{{ i18n._('Dark Mode') }}</span>
-            <Switch
-              :checked="mode === 'dark'"
-              @update:checked="(val) => (mode = val ? 'dark' : 'light')"
-            />
+            <span class="text-muted-foreground">{{ i18n._('Theme') }}</span>
+            <Tabs v-model="themePreference">
+              <TabsList class="h-7 p-0.5">
+                <Tooltip v-for="option in THEME_OPTIONS" :key="option.value">
+                  <TooltipTrigger as-child>
+                    <TabsTrigger
+                      :value="option.value"
+                      class="px-2 py-1"
+                      :aria-label="i18n._(option.labelMessage)"
+                    >
+                      <component :is="option.icon" class="size-3.5" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ i18n._(option.labelMessage) }}</TooltipContent>
+                </Tooltip>
+              </TabsList>
+            </Tabs>
           </div>
 
           <div class="border-t border-border pt-3 space-y-3">
@@ -107,6 +118,7 @@
 </template>
 
 <script setup>
+import { defineMessage as msg } from '@lingui/core/macro'
 import { useI18n } from '@shared-ui/i18n'
 import {
   DropdownMenu,
@@ -121,7 +133,17 @@ import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import StatusDot from '@shared-ui/components/StatusDot.vue'
 import { Switch } from '@shared-ui/components/ui/switch'
-import { ChevronsUpDown, CircleUserRound, Keyboard, LogOut } from 'lucide-vue-next'
+import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
+import {
+  ChevronsUpDown,
+  CircleUserRound,
+  Keyboard,
+  LogOut,
+  Monitor,
+  Moon,
+  Sun
+} from 'lucide-vue-next'
 import { useUserStore } from '@main/stores/user'
 import { useIsMobile } from '@shared-ui/composables'
 import { useRouter } from 'vue-router'
@@ -130,8 +152,15 @@ import { useLogout } from '@main/composables/useLogout'
 
 import { useColorMode } from '@vueuse/core'
 
+// 'auto' follows the OS color scheme.
+const THEME_OPTIONS = [
+  { value: 'auto', labelMessage: msg({ message: 'System' }), icon: Monitor },
+  { value: 'light', labelMessage: msg({ message: 'Light' }), icon: Sun },
+  { value: 'dark', labelMessage: msg({ message: 'Dark' }), icon: Moon }
+]
+
 const isMobile = useIsMobile()
-const mode = useColorMode()
+const { store: themePreference } = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
 const i18n = useI18n()

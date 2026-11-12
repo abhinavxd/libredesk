@@ -29,54 +29,19 @@
           <FormMessage />
         </FormItem>
       </FormField>
-      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
-        <FormItem>
-          <FormLabel>{{ i18n._('Auto assignment type') }}</FormLabel>
-          <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="i18n._('Select an assignment type')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
-                    {{ at.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormControl>
-          <FormDescription>{{ i18n._('Round robin: Conversations are assigned to team members in a round-robin fashion. Manual: Conversations are to be picked by team members.') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
-        <FormItem>
-          <FormLabel>{{ i18n._('Maximum auto-assigned conversations') }}</FormLabel>
-          <FormControl>
-            <Input type="number" placeholder="0" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>{{ i18n._('Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the \u0022Open\u0022 category count toward this limit. Set to 0 for unlimited.') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-      <FormField v-slot="{ componentField }" name="timezone">
+      <FormField v-slot="{ value, handleChange, handleBlur, meta }" name="timezone">
         <FormItem>
           <FormLabel>{{ i18n.ngettext('Timezone', 'Timezones', 1) }}</FormLabel>
           <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="i18n._('Select timezone')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
-                    {{ label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <ComboBox
+              :model-value="value"
+              :items="timeZoneOptions"
+              virtual
+              :default-label="value"
+              :placeholder="i18n._('Select timezone')"
+              @update:model-value="(v) => handleChange(v, meta.validated)"
+              @blur="handleBlur"
+            />
           </FormControl>
           <FormDescription>{{ i18n._('Team\'\'s timezone will be used to calculate SLA.') }}</FormDescription>
           <FormMessage />
@@ -132,7 +97,51 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
+        <FormItem>
+          <FormLabel>{{ i18n._('Auto assignment type') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue :placeholder="i18n._('Select an assignment type')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
+                    {{ at.label }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormDescription>{{ i18n._('Round robin: Conversations are assigned to team members in a round-robin fashion. Manual: Conversations are to be picked by team members.') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
+        <FormItem>
+          <FormLabel>{{ i18n._('Maximum auto-assigned conversations') }}</FormLabel>
+          <FormControl>
+            <Input type="number" placeholder="0" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ i18n._('Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the "Open" category count toward this limit. Set to 0 for unlimited.') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </FormGrid>
+
+    <FormField v-slot="{ componentField, handleChange }" name="skip_offline_agents">
+      <FormItem>
+        <SwitchField
+          :title="i18n._('Skip offline agents')"
+          :description="i18n._('Offline agents are agents with no libredesk tab open. Round robin skips them until they come back online.')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
@@ -140,6 +149,7 @@
 
 <script setup>
 import FormGrid from '@shared-ui/components/FormGrid.vue'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button/index.js'
@@ -167,7 +177,8 @@ import { useEmitter } from '@main/composables/useEmitter.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useSlaStore } from '@main/stores/sla.js'
-import { timeZones } from '@main/constants/timezones.js'
+import { timeZoneOptions } from '@main/constants/timezones.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import api from '@main/api/index.js'
 import { useI18n } from '@shared-ui/i18n'
 

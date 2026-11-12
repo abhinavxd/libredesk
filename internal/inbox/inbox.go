@@ -449,10 +449,6 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 
-		if len(updateCfg.IMAP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("Empty IMAP config"), nil)
-		}
-
 		if len(updateCfg.SMTP) == 0 {
 			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.Get("Empty SMTP config"), nil)
 		}
@@ -652,6 +648,14 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	idx := slices.IndexFunc(inbox.Aliases, func(alias imodels.EmailAlias) bool { return strings.EqualFold(alias.Email, normalized) })
 	if idx < 0 {
 		return envelope.NewError(envelope.InputError, m.i18n.Get("Save the inbox first to verify this alias."), nil)
+	}
+	// Verification completes when IMAP reads back the message sent here.
+	var cfg imodels.Config
+	if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
+		return m.persistenceError("reading email config", err)
+	}
+	if len(cfg.IMAP) == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Empty IMAP config"), nil)
 	}
 	runtimeInbox, err := m.Get(id)
 	if err != nil {

@@ -42,7 +42,7 @@ func handleGetOIDC(r *fastglue.Request) error {
 func handleCreateOIDC(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = models.OIDC{}
+		req = models.OIDC{VerifyEmail: true}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), nil, envelope.GeneralError)
@@ -73,7 +73,7 @@ func handleCreateOIDC(r *fastglue.Request) error {
 func handleUpdateOIDC(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = models.OIDC{}
+		req = models.OIDC{VerifyEmail: true}
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {

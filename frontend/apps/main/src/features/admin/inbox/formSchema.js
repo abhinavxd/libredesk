@@ -5,6 +5,23 @@ import { extractEmailAddress } from '@main/utils/email-sender'
 
 export const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
+const createImapSchema = (i18n) => z.object({
+  host: z.string().min(1, i18n._('{name} Required')),
+  port: z.number().min(1).max(65535),
+  mailbox: z.string().min(1, i18n._('{name} Required')),
+  username: z.string().min(1, i18n._('{name} Required')),
+  password: z.string().min(1, i18n._('{name} Required')),
+  tls_type: z.enum(['none', 'starttls', 'tls']),
+  tls_skip_verify: z.boolean().optional(),
+  scan_inbox_since: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+    message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
+  }),
+  read_interval: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
+    message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
+  })
+})
+
+// imap is validated only while IMAP is on; a send-only inbox is saved with none.
 export const createFormSchema = (i18n) => z.object({
   name: z.string().min(1, i18n._('{name} Required')),
   from: z.string().min(1, i18n._('{name} Required')),
@@ -38,21 +55,8 @@ export const createFormSchema = (i18n) => z.object({
     provider: z.string().optional(),
     refresh_token: z.string().optional()
   }).optional(),
-  imap: z.object({
-    host: z.string().min(1, i18n._('{name} Required')),
-    port: z.number().min(1).max(65535),
-    mailbox: z.string().min(1, i18n._('{name} Required')),
-    username: z.string().min(1, i18n._('{name} Required')),
-    password: z.string().min(1, i18n._('{name} Required')),
-    tls_type: z.enum(['none', 'starttls', 'tls']),
-    tls_skip_verify: z.boolean().optional(),
-    scan_inbox_since: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
-      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
-    }),
-    read_interval: z.string().min(1, i18n._('{name} Required')).refine(isGoDuration, {
-      message: i18n._('Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h).')
-    })
-  }),
+  imap_enabled: z.boolean().optional().default(true),
+  imap: z.any().optional(),
   smtp: z.object({
     host: z.string().min(1, i18n._('{name} Required')),
     port: z.number().min(1).max(65535),
@@ -87,5 +91,13 @@ export const createFormSchema = (i18n) => z.object({
       ctx.addIssue({ code: 'custom', path: ['aliases', index, 'email'], message: i18n._('Already exists') })
     }
     seen.add(alias)
+  }
+  if (values.imap_enabled !== false) {
+    const result = createImapSchema(i18n).safeParse(values.imap)
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue({ ...issue, path: ['imap', ...issue.path] })
+      }
+    }
   }
 })

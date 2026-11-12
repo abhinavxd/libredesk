@@ -389,7 +389,7 @@ func handleGetConversation(r *fastglue.Request) error {
 	return r.SendEnvelope(conv)
 }
 
-// handleDownloadConversationTranscript sends the conversation transcript as a text file download.
+// handleDownloadConversationTranscript downloads the public transcript as plain text.
 func handleDownloadConversationTranscript(r *fastglue.Request) error {
 	var (
 		app   = r.Context.(*App)
@@ -402,7 +402,7 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	conversation, err := enforceConversationAccess(app, uuid, user)
+	conv, err := enforceConversationAccess(app, uuid, user)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -413,8 +413,8 @@ func handleDownloadConversationTranscript(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	transcript := app.conversation.BuildTranscript(*conversation, messages, time.Now())
-	safeRef := stringutil.SanitizeFilename(conversation.ReferenceNumber)
+	transcript := app.conversation.BuildTranscript(*conv, messages, time.Now() /* downloadedAt */)
+	safeRef := stringutil.SanitizeFilename(conv.ReferenceNumber)
 	filename := fmt.Sprintf("transcript-%s.txt", safeRef)
 	r.RequestCtx.Response.Header.Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))
 	r.RequestCtx.Response.Header.Set("X-Content-Type-Options", "nosniff")

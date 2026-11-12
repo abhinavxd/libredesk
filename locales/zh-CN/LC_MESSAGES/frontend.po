@@ -72,7 +72,7 @@ msgstr[0] "已选择 {count} 个"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BAccount%7D+other+%7BAccounts%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/components/sidebar/Sidebar.vue:291:38
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:90:13
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:101:13
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:132:12
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:133:17
 #: frontend/apps/main/src/features/command/sections.js:38:26
@@ -211,7 +211,7 @@ msgid_plural "Feedbacks"
 msgstr[0] "反馈"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BFile%7D+other+%7BFiles%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:133:48
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:130:48
 #: frontend/apps/main/src/stores/conversation.js:1302:11
 #: frontend/apps/widget/src/utils/messagePreview.js:7:13
 msgid "File"
@@ -263,8 +263,8 @@ msgid_plural "Home screen apps"
 msgstr[0] "主屏幕应用"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BHost%7D+other+%7BHosts%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:214:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:403:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:230:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:420:32
 msgid "Host"
 msgid_plural "Hosts"
 msgstr[0] "主机"
@@ -371,7 +371,7 @@ msgid_plural "Mentions"
 msgstr[0] "提及"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BMessage%7D+other+%7BMessages%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:61:32
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:68:32
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:399:30
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:103:23
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:368:23
@@ -468,7 +468,7 @@ msgstr[0] "通知"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BOnline%7D+other+%7BOnline%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:43:25
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:51:40
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:61:40
 #: frontend/apps/main/src/views/reports/OverviewView.vue:416:17
 #: frontend/apps/widget/src/components/ChatTitle.vue:31:58
 #: frontend/shared-ui/components/StatusDot.vue:60:12
@@ -491,8 +491,8 @@ msgid_plural "Pages"
 msgstr[0] "页"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BPassword%7D+other+%7BPasswords%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:292:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:481:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:308:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:498:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:74:24
 #: frontend/apps/main/src/views/auth/UserLoginView.vue:63:17
 msgid "Password"
@@ -515,8 +515,8 @@ msgid_plural "Placeholders"
 msgstr[0] "占位符"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BPort%7D+other+%7BPorts%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:229:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:418:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:245:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:435:32
 msgid "Port"
 msgid_plural "Ports"
 msgstr[0] "端口"
@@ -635,7 +635,7 @@ msgstr[0] "时间戳"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BTimezone%7D+other+%7BTimezones%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:55:17
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:66:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:34:24
 msgid "Timezone"
 msgid_plural "Timezones"
 msgstr[0] "时区"
@@ -656,8 +656,8 @@ msgid_plural "Titles"
 msgstr[0] "标题"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BTLS%7D+other+%7BTLSs%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:244:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:433:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:260:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:450:32
 msgid "TLS"
 msgid_plural "TLSs"
 msgstr[0] "TLS"
@@ -692,8 +692,8 @@ msgid_plural "URLs"
 msgstr[0] "URL"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BUsername%7D+other+%7BUsernames%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:277:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:466:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:293:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:483:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:64:24
 msgid "Username"
 msgid_plural "Usernames"
@@ -788,13 +788,11 @@ msgid "Performance"
 msgstr ""
 
 #: frontend/apps/main/src/views/admin/ai/CreateOrEditAssistant.vue:22:45
-#, fuzzy
 msgctxt "Assistant test tab"
 msgid "Test"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/ArticleEditSheet.vue:443:15
-#, fuzzy
 msgctxt "Associate an existing article"
 msgid "Link"
 msgstr ""
@@ -836,7 +834,7 @@ msgctxt "Context link encryption key"
 msgid "Secret"
 msgstr "密钥"
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:60:53
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:71:53
 #: frontend/apps/main/src/features/command/providers/useAccountCommands.js:1:24
 msgctxt "Conversation navigation"
 msgid "Away"
@@ -848,13 +846,11 @@ msgid "View conversation"
 msgstr "查看会话"
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:439:50
-#, fuzzy
 msgctxt "Date range"
 msgid "From"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:443:48
-#, fuzzy
 msgctxt "Date range"
 msgid "To"
 msgstr ""
@@ -876,7 +872,6 @@ msgstr[0] "模板"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BHeader%7D+other+%7BHeaders%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/features/admin/ai/ToolForm.vue:65:22
-#, fuzzy
 msgctxt "HTTP request headers"
 msgid "Header"
 msgid_plural "Headers"
@@ -959,13 +954,13 @@ msgctxt "No assigned team"
 msgid "None"
 msgstr "无"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:616:58
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:633:58
 #, fuzzy
 msgctxt "No authentication"
 msgid "None"
 msgstr "无"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:96:44
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:61:44
 #, fuzzy
 msgctxt "No business hours"
 msgid "None"
@@ -997,7 +992,7 @@ msgctxt "No parent collection"
 msgid "None"
 msgstr "无"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:119:44
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:84:44
 #, fuzzy
 msgctxt "No SLA policy"
 msgid "None"
@@ -1013,7 +1008,6 @@ msgid_plural "Names"
 msgstr[0] "名称"
 
 #: frontend/apps/main/src/views/admin/ai/CreateOrEditAssistant.vue:60:23
-#, fuzzy
 msgctxt "Run assistant test"
 msgid "Test"
 msgstr ""
@@ -1030,18 +1024,16 @@ msgid "Warning"
 msgstr "预警"
 
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:73:63
-#, fuzzy
 msgctxt "Time range"
 msgid "From"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:83:18
-#, fuzzy
 msgctxt "Time range"
 msgid "To"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:917:35
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:916:35
 msgid "'{{ .Agent.FirstName }} at {{ .Inbox.Name }}'"
 msgstr ""
 
@@ -1081,7 +1073,7 @@ msgstr[0] "管理员"
 #: frontend/apps/main/src/components/editor/MentionList.vue:61:31
 #: frontend/apps/main/src/composables/useConversationFilters.js:121:25
 #: frontend/apps/main/src/constants/navigation.js:183:26
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:211:14
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:234:14
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:96:46
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:125:24
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:8:45
@@ -1123,9 +1115,9 @@ msgstr[0] "离开"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BBusiness+hour%7D+other+%7BBusiness+hours%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/constants/navigation.js:23:26
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:78:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:75:17
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:712:43
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:88:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:53:24
 #: frontend/apps/main/src/router/index.js:296:38
 #: frontend/apps/main/src/views/admin/business-hours/CreateOrEditBusinessHours.vue:74:40
 msgid "Business hour"
@@ -1140,7 +1132,7 @@ msgstr[0] "工作时间"
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:58:22
 #: frontend/apps/main/src/features/admin/custom-attributes/CustomAttributesForm.vue:41:23
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:205:10
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:418:23
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:434:23
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:121:17
 #: frontend/apps/main/src/features/command/sections.js:33:26
 #: frontend/apps/main/src/features/command/sections.js:39:34
@@ -1242,8 +1234,8 @@ msgstr[1] ""
 #: frontend/apps/main/src/router/index.js:208:38
 #: frontend/apps/main/src/router/index.js:220:42
 #: frontend/apps/main/src/router/index.js:227:42
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:182:37
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:81:24
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:195:37
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:88:24
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterTree.vue:342:37
 msgid "Help center"
 msgid_plural "Help centers"
@@ -1397,7 +1389,7 @@ msgstr[1] ""
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BSLA+policy%7D+other+%7BSLA+policies%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/composables/useConversationFilters.js:125:19
 #: frontend/apps/main/src/constants/navigation.js:31:26
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:111:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:76:24
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationInfo.vue:76:37
 msgid "SLA policy"
 msgid_plural "SLA policies"
@@ -1441,7 +1433,7 @@ msgstr[0] "SSO"
 #: frontend/apps/main/src/features/admin/help-center/helpCenterColumns.js:41:33
 #: frontend/apps/main/src/features/admin/oidc/dataTableColumns.js:40:33
 #: frontend/apps/main/src/features/admin/webhooks/dataTableColumns.js:64:33
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:51:96
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:61:96
 #: frontend/apps/main/src/features/command/providers/useBulkCommands.js:30:19
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:136:17
 #: frontend/apps/main/src/features/command/providers/useListCommands.js:42:78
@@ -1455,7 +1447,7 @@ msgstr[0] "状态"
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BSubject%7D+other+%7BSubjects%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/composables/useConversationFilters.js:178:19
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:56:32
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:63:32
 #: frontend/apps/main/src/features/admin/templates/TemplateForm.vue:16:24
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:185:51
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationInfo.vue:19:37
@@ -1481,7 +1473,7 @@ msgstr[0] "标签"
 #: frontend/apps/main/src/components/editor/MentionList.vue:62:30
 #: frontend/apps/main/src/constants/navigation.js:191:26
 #: frontend/apps/main/src/features/admin/agents/AgentForm.vue:99:24
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:206:14
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:229:14
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:95:46
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:111:24
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:46:46
@@ -1621,17 +1613,17 @@ msgstr "{name} 必须至少为 {min}。"
 #: frontend/apps/main/src/features/admin/help-center/helpCenterFormSchema.js:174:42
 #: frontend/apps/main/src/features/admin/help-center/helpCenterFormSchema.js:177:24
 #: frontend/apps/main/src/features/admin/inbox/formSchema.js:9:26
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:10:26
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:42:28
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:44:31
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:45:32
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:46:32
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:49:40
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:52:37
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:57:28
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:63:36
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:66:41
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:77:63
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:11:29
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:12:30
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:13:30
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:16:38
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:19:35
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:26:26
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:27:26
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:61:28
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:67:36
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:70:41
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:81:63
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:57:25
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:63:25
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:69:23
@@ -1658,13 +1650,13 @@ msgstr "{name} 必须至少为 {min}。"
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:40:17
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:45:28
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:57:67
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:7:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:9:23
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:13:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:21:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:23:23
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:26:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:28:23
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:8:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:10:25
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:14:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:26:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:28:25
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:31:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:33:25
 #: frontend/apps/main/src/features/admin/roles/formSchema.js:6:22
 #: frontend/apps/main/src/features/admin/roles/formSchema.js:17:22
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:160:26
@@ -1678,7 +1670,7 @@ msgstr "{name} 必须至少为 {min}。"
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:11:36
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:12:30
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:13:59
-#: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:15:39
+#: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:16:39
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:6:22
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:9:22
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:19:17
@@ -1695,7 +1687,7 @@ msgstr "{name} 必须至少为 {min}。"
 #: frontend/apps/main/src/features/contact/formSchema.js:7:28
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:419:15
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:427:32
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:168:37
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:204:37
 #: frontend/apps/main/src/features/view/ViewForm.vue:127:24
 #: frontend/apps/main/src/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue:463:26
 #: frontend/apps/main/src/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue:475:26
@@ -1785,7 +1777,7 @@ msgstr "添加"
 msgid "Add a language before authoring articles in it."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:148:8
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:155:8
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:214:17
 msgid "Add action"
 msgstr "添加操作"
@@ -1952,8 +1944,8 @@ msgstr "额外反馈（可选）"
 msgid "Advance warning"
 msgstr "提前预警"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:310:18
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:499:18
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:326:20
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:516:18
 msgid "Advanced"
 msgstr ""
 
@@ -2088,11 +2080,11 @@ msgstr "允许用户在聊天中使用表情符号"
 msgid "Allow visitors to start new conversations"
 msgstr "允许访客发起新会话"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:156:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:153:17
 msgid "Allowed file upload extensions"
 msgstr "允许的文件上传扩展名"
 
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:87:81
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:91:81
 msgid "Already exists"
 msgstr "已存在"
 
@@ -2239,7 +2231,7 @@ msgid "Article linked as a translation."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:564:20
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:29:47
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:32:47
 msgid "Article page"
 msgstr ""
 
@@ -2310,7 +2302,7 @@ msgstr "分配团队"
 msgid "Assign to me"
 msgstr "分配给我"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:202:11
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:225:11
 msgid "Assigned team"
 msgstr ""
 
@@ -2318,7 +2310,7 @@ msgstr ""
 msgid "Assigned user"
 msgstr "分配的用户"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:201:11
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:224:11
 #: frontend/apps/main/src/features/conversation/list/ConversationListItem.vue:291:50
 #: frontend/apps/main/src/features/search/SearchFilters.vue:25:24
 msgid "Assignee"
@@ -2368,12 +2360,12 @@ msgstr "已认证用户会话时长"
 msgid "Authentication failed. This inbox can''t send or receive messages until you update its credentials."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:598:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:615:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:84:24
 msgid "Authentication Protocol"
 msgstr "认证协议"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:621:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:638:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:88:43
 msgid "Authentication protocol to use."
 msgstr "要使用的认证协议。"
@@ -2386,7 +2378,7 @@ msgstr ""
 msgid "Authorization denied"
 msgstr "授权被拒绝"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:34:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:103:24
 msgid "Auto assignment type"
 msgstr "自动分配类型"
 
@@ -2593,7 +2585,7 @@ msgstr ""
 msgid "Brand name"
 msgstr "品牌名称"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:110:48
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:107:48
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:300:16
 msgid "Branding"
 msgstr ""
@@ -2669,7 +2661,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:69:23
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterBasicsForm.vue:69:11
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterDropdown.vue:41:30
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:755:11
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:759:11
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:903:13
 #: frontend/apps/main/src/features/admin/inbox/InboxDataTableDropDown.vue:37:30
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:786:46
@@ -2690,7 +2682,7 @@ msgstr ""
 #: frontend/apps/main/src/features/conversation/WhatsAppComposer.vue:47:15
 #: frontend/apps/main/src/features/conversation/message/MessageBubble.vue:259:30
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationSideBar.vue:61:15
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:100:21
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:125:21
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterTree.vue:234:30
 #: frontend/apps/main/src/views/admin/whatsapp/CreateEditWhatsAppTemplate.vue:290:15
 #: frontend/apps/main/src/views/admin/whatsapp/WhatsAppTemplateList.vue:63:34
@@ -2763,7 +2755,7 @@ msgstr "在此更改您的头像。"
 #: frontend/apps/main/src/features/admin/automation/RuleTab.vue:149:19
 #: frontend/apps/main/src/features/admin/automation/RuleTab.vue:165:19
 #: frontend/apps/main/src/features/admin/context-links/dataTableDropdown.vue:112:19
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:280:19
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:278:19
 #: frontend/apps/main/src/features/admin/webhooks/dataTableDropdown.vue:118:19
 #: frontend/apps/main/src/features/contact/CreateContactDialog.vue:57:59
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationInfo.vue:169:19
@@ -2785,7 +2777,7 @@ msgstr "在此更改您的头像。"
 #: frontend/apps/main/src/views/admin/context-links/CreateEditContextLink.vue:70:19
 #: frontend/apps/main/src/views/admin/custom-attributes/CustomAttributes.vue:184:21
 #: frontend/apps/main/src/views/admin/custom-attributes/CustomAttributes.vue:189:21
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:228:19
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:253:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterList.vue:117:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterList.vue:135:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterTree.vue:476:19
@@ -2846,7 +2838,7 @@ msgstr "选择渠道"
 msgid "Choose setup method"
 msgstr "选择设置方法"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:261:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:277:40
 msgid "Choose the encryption method for IMAP."
 msgstr "选择 IMAP 的加密方法。"
 
@@ -2951,6 +2943,10 @@ msgstr ""
 msgid "Collection layout"
 msgstr ""
 
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:30:18
+msgid "Collection page"
+msgstr ""
+
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:388:24
 msgid "Color of the greeting and introduction text on the home screen"
 msgstr "主屏幕上问候语和介绍文本的颜色"
@@ -2977,7 +2973,7 @@ msgstr "合规率"
 msgid "Concise"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1226:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1229:21
 msgid "Configure IMAP and SMTP manually"
 msgstr "手动配置 IMAP 和 SMTP"
 
@@ -3014,11 +3010,11 @@ msgstr "连接 {provider} 帐户"
 msgid "Connect a WhatsApp number through the Meta Cloud API to receive and reply to contact messages on WhatsApp."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1214:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1217:21
 msgid "Connect with Google Workspace or Gmail"
 msgstr "使用 Google Workspace 或 Gmail 连接"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1220:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1223:21
 msgid "Connect with Microsoft 365 or Outlook"
 msgstr "使用 Microsoft 365 或 Outlook 连接"
 
@@ -3147,7 +3143,7 @@ msgstr ""
 msgid "Conversations updated"
 msgstr "会话已更新"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1291:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1294:19
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:366:59
 #: frontend/apps/main/src/features/conversation/sidebar/CopilotPanel.vue:453:59
 msgid "Copied to clipboard"
@@ -3172,7 +3168,7 @@ msgstr "复制以下代码片段"
 msgid "Could not copy to clipboard."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:233:19
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:244:19
 msgid "Could not fetch business hours"
 msgstr "无法获取工作时间"
 
@@ -3197,16 +3193,16 @@ msgstr "封面图片 URL"
 #: frontend/apps/main/src/features/admin/help-center/ArticleEditSheet.vue:620:37
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:265:40
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterBasicsForm.vue:72:11
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:853:40
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1168:23
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:40
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1171:23
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1863:23
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:286:23
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:195:47
-#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:168:23
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:185:23
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:122:23
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:139:47
 #: frontend/apps/main/src/features/admin/sla/SLAForm.vue:308:47
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:199:23
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:210:23
 #: frontend/apps/main/src/features/command/providers/useContactCommands.js:37:47
 #: frontend/apps/main/src/features/command/providers/useCreateCommands.js:26:19
 #: frontend/apps/main/src/features/command/providers/useCreateCommands.js:37:17
@@ -3360,8 +3356,12 @@ msgstr "自定义工作时间"
 msgid "Custom code"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:721:30
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:725:30
 msgid "Custom CSS"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:721:35
+msgid "Custom CSS and JS run only on a custom domain."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:41:30
@@ -3372,7 +3372,7 @@ msgstr ""
 msgid "Custom instructions"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:736:30
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:740:30
 msgid "Custom JS"
 msgstr ""
 
@@ -3401,6 +3401,7 @@ msgid "Danger"
 msgstr ""
 
 #: frontend/apps/main/src/components/PreviewThemeToggle.vue:16:21
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:159:37
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:224:53
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:243:25
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:615:25
@@ -3409,11 +3410,6 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:531:31
 msgid "Dark"
 msgstr ""
-
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:50:51
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:41:19
-msgid "Dark Mode"
-msgstr "深色模式"
 
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:114:54
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:137:56
@@ -3429,7 +3425,7 @@ msgstr "默认"
 msgid "Default (accent tint)"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:104:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:69:30
 msgid "Default business hours for the team, will be used to calculate SLA."
 msgstr "团队的默认工作时间，将用于计算 SLA。"
 
@@ -3563,7 +3559,7 @@ msgid "Descending"
 msgstr "降序"
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:98:11
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:38:47
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:41:47
 msgid "Desktop"
 msgstr ""
 
@@ -3589,7 +3585,7 @@ msgstr ""
 msgid "Disable"
 msgstr "禁用"
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:58:31
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:68:31
 msgid "Disable reassign replies"
 msgstr ""
 
@@ -3602,6 +3598,10 @@ msgstr ""
 #: frontend/apps/main/src/views/admin/inbox/InboxList.vue:171:40
 msgid "Disabled"
 msgstr "已禁用"
+
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:121:28
+msgid "Disabling this allows sign in without confirming email ownership."
+msgstr ""
 
 #: frontend/apps/widget/src/composables/useReplyPreviews.js:64:21
 msgid "Dismiss"
@@ -3623,7 +3623,7 @@ msgstr ""
 msgid "Display name for outgoing email replies. Leave blank to use the name from the From address."
 msgstr "显示发送电子邮件回复的名称。留空则使用来自地址的名称。"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:102:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:99:26
 msgid "Display the conversation subject line in the conversation list when available."
 msgstr ""
 
@@ -3665,7 +3665,7 @@ msgstr "下载"
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:991:34
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:397:13
-#: frontend/apps/main/src/features/conversation/Conversation.vue:77:17
+#: frontend/apps/main/src/features/conversation/Conversation.vue:78:19
 #: frontend/apps/widget/src/components/ChatHeader.vue:37:15
 msgid "Download transcript"
 msgstr "下载脚本"
@@ -3695,11 +3695,11 @@ msgstr "以小时或分钟为单位的时长。示例：1h, 30m, 1h30m"
 msgid "During business hours"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:294:32
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:317:32
 msgid "e.g. 30m, 3h, 2h30m"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:106:34
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:113:34
 msgid "e.g. priority.escalated"
 msgstr ""
 
@@ -3730,7 +3730,6 @@ msgstr "每个操作必须有一个类型和一个值"
 #: frontend/apps/main/src/features/admin/teams/TeamDataTableDropdown.vue:7:11
 #: frontend/apps/main/src/features/admin/templates/dataTableDropdown.vue:7:11
 #: frontend/apps/main/src/features/admin/webhooks/dataTableDropdown.vue:8:13
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:39:28
 #: frontend/apps/main/src/features/view/ViewForm.vue:6:25
 #: frontend/apps/main/src/router/index.js:390:42
 #: frontend/apps/main/src/views/admin/business-hours/CreateOrEditBusinessHours.vue:66:20
@@ -3858,6 +3857,14 @@ msgstr ""
 msgid "Edit webhook"
 msgstr "编辑 Webhook"
 
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:45:86
+msgid "Edit: {name}"
+msgstr ""
+
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:45:155
+msgid "Edit: {name}: {value}"
+msgstr ""
+
 #: frontend/apps/main/src/views/admin/ai/AIEditorPrompts.vue:39:12
 msgid "Editor prompts are the AI actions agents can run on their draft from the reply box, such as fixing grammar or changing tone."
 msgstr ""
@@ -3917,7 +3924,7 @@ msgstr "启用子地址会话识别"
 msgid "Enable pre-chat form"
 msgstr "启用聊天前表单"
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:58:68
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:68:68
 msgid "Enable reassign replies"
 msgstr ""
 
@@ -3931,6 +3938,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/ai/toolColumns.js:44:36
 #: frontend/apps/main/src/features/admin/automation/RuleList.vue:11:38
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:103:22
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:219:26
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:30:30
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:24:18
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:384:29
@@ -4009,7 +4017,7 @@ msgstr "连接收件箱出错"
 msgid "Evaluate rule on these events."
 msgstr "在这些事件上评估规则。"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:111:23
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:118:23
 msgid "Event name sent in the webhook payload."
 msgstr ""
 
@@ -4071,7 +4079,7 @@ msgstr ""
 msgid "External links"
 msgstr "外部链接"
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:861:12
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:866:12
 msgid "Facebook"
 msgstr ""
 
@@ -4079,7 +4087,7 @@ msgstr ""
 msgid "Fade background"
 msgstr "渐变背景"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1007:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1006:15
 msgid "Failed"
 msgstr ""
 
@@ -4100,7 +4108,7 @@ msgstr ""
 msgid "False"
 msgstr "否"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:123:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:120:26
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:197:30
 msgid "Favicon URL"
 msgstr "Favicon URL"
@@ -4216,7 +4224,7 @@ msgstr ""
 msgid "From"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:677:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:694:34
 msgid "From display name template (optional)"
 msgstr "来自显示名称模板（可选）"
 
@@ -4247,7 +4255,7 @@ msgstr "为此客服生成 API 密钥，以编程方式访问 Libredesk。"
 msgid "Generate reply"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:859:10
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:864:10
 msgid "GitHub"
 msgstr ""
 
@@ -4265,7 +4273,7 @@ msgstr ""
 msgid "Good"
 msgstr "好"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1213:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1216:15
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:203
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:447
 msgid "Google"
@@ -4346,12 +4354,12 @@ msgstr ""
 msgid "Heading {level}"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:632:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:649:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:122:24
 msgid "HELO Hostname"
 msgstr "HELO 主机名"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:685:39
+#: frontend/apps/main/src/components/HelpPopover.vue:9:21
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:339:54
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:439:53
 #: frontend/apps/widget/src/layouts/MainLayout.vue:52:47
@@ -4457,7 +4465,7 @@ msgstr "身份验证"
 msgid "Identity verified"
 msgstr "身份已验证"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:552:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:569:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:158:24
 msgid "Idle Timeout"
 msgstr "空闲超时"
@@ -4539,7 +4547,7 @@ msgstr ""
 msgid "Insert into reply"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:862:13
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:867:13
 msgid "Instagram"
 msgstr ""
 
@@ -4551,7 +4559,7 @@ msgstr "安装"
 msgid "Instructions"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:348:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:364:31
 msgid "Interval to scan the inbox for new emails. Format: 120s, 1m, 1h"
 msgstr "扫描收件箱新电子邮件的间隔。格式：120s、1m、1h"
 
@@ -4571,10 +4579,10 @@ msgid "Invalid color"
 msgstr "无效颜色"
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:151:45
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:50:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:53:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:64:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:67:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:17:13
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:20:13
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:68:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:71:15
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:248:41
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:311:41
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:371:21
@@ -4588,14 +4596,14 @@ msgid "Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."
 msgstr "无效的时长格式。请使用有效格式（例如 30m、1h、48h）。"
 
 #: frontend/apps/main/src/features/admin/agents/formSchema.js:32:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:12:55
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:26:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:29:55
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:43:15
 #: frontend/apps/main/src/features/contact/formSchema.js:30:21
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:410:65
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:424:34
 #: frontend/apps/main/src/views/auth/ResetPasswordView.vue:90:25
 #: frontend/apps/main/src/views/auth/ResetPasswordView.vue:129:42
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:220:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:221:25
 #: frontend/apps/widget/src/components/preChatFormSchema.js:31:30
 msgid "Invalid email address"
 msgstr "无效的电子邮件地址"
@@ -4629,7 +4637,7 @@ msgstr "无效端口值"
 msgid "Invalid reset link. Please request a new password reset link."
 msgstr "重置链接无效。请请求新的密码重置链接。"
 
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:20:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:37:15
 msgid "Invalid template. Use only the supported variables and balanced braces."
 msgstr "无效的模板。只能使用支持的变量和花括号。"
 
@@ -4639,19 +4647,19 @@ msgid "Invalid time format (HH:mm)"
 msgstr "无效的时间格式（HH:mm）"
 
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:10:20
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:16:15
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:18:38
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:17:17
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:21:22
 #: frontend/apps/main/src/features/admin/webhooks/formSchema.js:17:17
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:199:28
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:235:28
 #: frontend/apps/widget/src/components/preChatFormSchema.js:69:30
 #: frontend/apps/widget/src/components/preChatFormSchema.js:75:25
 msgid "Invalid URL"
 msgstr "无效 URL"
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:923:21
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:187:32
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:196:50
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:204:19
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:223:32
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:232:50
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:240:19
 msgid "Invalid value"
 msgstr "无效值"
 
@@ -4687,8 +4695,8 @@ msgstr ""
 
 #: frontend/apps/main/src/components/KeyboardShortcutsDialog.vue:60:15
 #: frontend/apps/main/src/components/KeyboardShortcutsDialog.vue:5:24
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:97:13
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:67:15
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:108:13
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:77:15
 msgid "Keyboard shortcuts"
 msgstr "键盘快捷键"
 
@@ -4825,6 +4833,7 @@ msgid "Letters, numbers, hyphen and underscore only, up to 64 characters."
 msgstr ""
 
 #: frontend/apps/main/src/components/PreviewThemeToggle.vue:8:21
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:158:38
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:220:54
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:239:25
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:611:25
@@ -4851,7 +4860,7 @@ msgstr ""
 msgid "Link URL"
 msgstr "链接 URL"
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:860:12
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:865:12
 msgid "LinkedIn"
 msgstr ""
 
@@ -4896,11 +4905,11 @@ msgstr "日志条目类型"
 msgid "Logging in..."
 msgstr "正在登录..."
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:610:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:627:32
 msgid "Login"
 msgstr "Login"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:114:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:111:26
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:256:30
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:327:36
 #: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:68:24
@@ -4911,8 +4920,8 @@ msgstr "Logo URL"
 msgid "Logo URL should be a valid URL"
 msgstr "Logo URL 应为有效 URL"
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:103:11
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:75:15
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:114:11
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:85:15
 msgid "Logout"
 msgstr "登出"
 
@@ -4920,11 +4929,11 @@ msgstr "登出"
 msgid "Looks up an order''s status and delivery date by order ID."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:316:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:332:40
 msgid "Mailbox"
 msgstr "邮箱"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:327:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:343:31
 msgid "Mailbox (folder) to scan for incoming emails. Default is INBOX (usually no need to change)."
 msgstr "扫描传入电子邮件的邮箱（文件夹）。默认为 INBOX（通常无需更改）。"
 
@@ -5036,7 +5045,7 @@ msgstr "管理用户"
 msgid "Manage webhooks"
 msgstr "管理 Webhooks"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:184:28
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:195:28
 msgid "Manual"
 msgstr "手动"
 
@@ -5079,11 +5088,11 @@ msgstr ""
 msgid "Match these rules"
 msgstr "匹配这些规则"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:142:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:139:17
 msgid "Max allowed file upload size"
 msgstr "最大允许文件上传大小"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:148:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:145:17
 msgid "Max allowed file upload size in MB."
 msgstr "最大允许文件上传大小（MB）。"
 
@@ -5092,7 +5101,7 @@ msgstr "最大允许文件上传大小（MB）。"
 msgid "Max allowed file upload size should be between 1 and 500 MB"
 msgstr "最大允许文件上传大小应在 1 到 500 MB 之间"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:508:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:525:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:136:24
 msgid "Max Connections"
 msgstr "最大连接数"
@@ -5101,7 +5110,7 @@ msgstr "最大连接数"
 msgid "Max messages per email"
 msgstr "每封电子邮件最大消息数"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:530:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:547:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:147:24
 msgid "Max Retries"
 msgstr "最大重试次数"
@@ -5114,16 +5123,16 @@ msgstr ""
 msgid "Max turns"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:56:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:125:24
 msgid "Maximum auto-assigned conversations"
 msgstr "最大自动分配会话数"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:519:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:536:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:141:30
 msgid "Maximum number of concurrent connections to the server."
 msgstr "与服务器的最大并发连接数。"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:60:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:129:30
 msgid "Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the \"Open\" category count toward this limit. Set to 0 for unlimited."
 msgstr "可自动分配给一个客服的最大会话数量。仅处于“打开”类别状态的会话计入此限制。设置为 0 表示无限制。"
 
@@ -5131,12 +5140,12 @@ msgstr "可自动分配给一个客服的最大会话数量。仅处于“打开
 msgid "Maximum number of messages to include in a single continuity email. Max 100."
 msgstr "单封连续性电子邮件中包含的最大消息数量。最大 100。"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:563:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:580:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:164:15
 msgid "Maximum time an inactive connection must be kept alive before closing it and removing it from the pool."
 msgstr "在关闭并从连接池中移除不活动连接之前，保持其存活的最长时间。"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:585:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:602:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:177:15
 msgid "Maximum time to wait to obtain a connection before timing out. Timeouts may occur when all open connections are busy sending e-mails and they''re not returning to the pool fast enough. This is also the timeout used when creating new SMTP connections."
 msgstr "等待获取连接的最长时间，超时后将失败。当所有打开的连接都忙于发送电子邮件且未能足够快地返回连接池时，可能会发生超时。这也是创建新 SMTP 连接时使用的超时。"
@@ -5207,7 +5216,7 @@ msgstr ""
 msgid "Method"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1219:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1222:15
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:244
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:488
 msgid "Microsoft"
@@ -5234,7 +5243,7 @@ msgid "Minimum time between proactive messages"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:99:10
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:40:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:43:46
 msgid "Mobile"
 msgstr ""
 
@@ -5709,11 +5718,12 @@ msgstr ""
 msgid "Not available"
 msgstr "不可用"
 
-#: frontend/shared-ui/components/ui/combobox/ComboBox.vue:25:43
+#: frontend/shared-ui/components/ui/combobox/ComboBox.vue:45:43
+#: frontend/shared-ui/components/ui/combobox/VirtualCommand.vue:36:9
 msgid "Not found"
 msgstr "未找到"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:990:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:989:15
 msgid "Not verified"
 msgstr ""
 
@@ -5739,7 +5749,7 @@ msgstr ""
 msgid "Number of back-and-forth replies before the assistant hands off. Between 1 and 20."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:541:30
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:558:30
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:152:31
 msgid "Number of times to retry when a message fails."
 msgstr "消息失败时的重试次数。"
@@ -5749,8 +5759,8 @@ msgstr "消息失败时的重试次数。"
 msgid "Numbered list"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:255:52
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:444:52
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:271:54
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:461:52
 msgid "OFF"
 msgstr "关闭"
 
@@ -5761,6 +5771,10 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1003:16
 msgid "Office hours"
 msgstr "办公时间"
+
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:139:24
+msgid "Offline agents are agents with no libredesk tab open. Round robin skips them until they come back online."
+msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:197:26
 msgid "Offline threshold"
@@ -5823,7 +5837,7 @@ msgstr ""
 msgid "Open command bar"
 msgstr "打开命令栏"
 
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:417:19
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:433:19
 msgid "Open contact"
 msgstr ""
 
@@ -5867,7 +5881,7 @@ msgstr "用于 Webhook 签名验证的可选密钥。"
 msgid "Optional. Add one placeholder - '{{1}}' or a named one like '{{order_id}}' - matching the style used in the body, if the header text changes per message."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:670:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:687:15
 msgid "Options"
 msgstr "选项"
 
@@ -5880,7 +5894,7 @@ msgstr "OR"
 msgid "Or continue with"
 msgstr "或使用以下方式继续"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1225:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1228:15
 msgid "Other provider"
 msgstr "其他提供商"
 
@@ -5938,7 +5952,7 @@ msgstr ""
 msgid "Parent collection"
 msgstr ""
 
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:225:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:226:25
 msgid "Password cannot be empty"
 msgstr "密码不能为空"
 
@@ -5978,7 +5992,12 @@ msgstr ""
 msgid "Paused"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:995:15
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:414:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:85:21
+msgid "PDF"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:994:15
 msgid "Pending"
 msgstr "待处理"
 
@@ -6013,9 +6032,14 @@ msgstr ""
 msgid "Pick date and time"
 msgstr "选择日期和时间"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:614:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:631:32
 msgid "Plain"
 msgstr "Plain"
+
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:405:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:82:21
+msgid "Plain text (.txt)"
+msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:698:53
 msgid "Platform"
@@ -6039,7 +6063,7 @@ msgstr "请更正电子邮件错误"
 msgid "Please enter at least {length} characters to search."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1261:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1264:19
 msgid "Please provide both client ID and client secret"
 msgstr "请提供客户端 ID 和客户端密钥"
 
@@ -6088,7 +6112,7 @@ msgstr "请为所有条件设置值。"
 msgid "Poor"
 msgstr "差"
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:903:10
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:908:10
 msgid "Popular articles"
 msgstr ""
 
@@ -6230,8 +6254,8 @@ msgstr ""
 msgid "Reasoning effort"
 msgstr ""
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:74:53
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:59:19
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:85:53
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:69:19
 msgid "Reassign replies"
 msgstr "重新分配回复"
 
@@ -6298,7 +6322,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/inbox/PreChatFormConfig.vue:102:39
 #: frontend/apps/main/src/features/admin/inbox/WidgetHelpConfig.vue:159:29
 #: frontend/apps/main/src/features/admin/sla/SLAForm.vue:122:27
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:96:19
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:121:19
 #: frontend/apps/main/src/features/search/SearchFilters.vue:85:24
 msgid "Remove"
 msgstr "移除"
@@ -6395,6 +6419,10 @@ msgstr ""
 msgid "Require verified contact"
 msgstr ""
 
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:119:24
+msgid "Require verified email"
+msgstr ""
+
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:124:35
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:126:38
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:193:37
@@ -6410,7 +6438,7 @@ msgstr "所需的 CSV 格式"
 msgid "Required for Microsoft inboxes to thread replies correctly."
 msgstr "Microsoft 收件箱需要此功能才能正确将回复分组为线程。"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:996:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:995:16
 msgid "Resend"
 msgstr ""
 
@@ -6530,11 +6558,11 @@ msgstr "Root URL"
 msgid "Root URL should be a valid URL"
 msgstr "Root URL 应为有效 URL"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:183:33
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:194:33
 msgid "Round robin"
 msgstr "轮询"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:49:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:118:30
 msgid "Round robin: Conversations are assigned to team members in a round-robin fashion. Manual: Conversations are to be picked by team members."
 msgstr "轮询：会话以轮询方式分配给团队成员。手动：会话由团队成员自行领取。"
 
@@ -6558,8 +6586,12 @@ msgstr "当联系人创建新会话时运行的规则。客服发起的会话不
 msgid "Rules the assistant must never break."
 msgstr ""
 
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:142:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:153:46
 msgid "Sample article"
+msgstr ""
+
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:154:49
+msgid "Sample collection"
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/EditorLinkDialog.vue:40:15
@@ -6571,20 +6603,20 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/ai/SnippetForm.vue:40:23
 #: frontend/apps/main/src/features/admin/ai/ToolForm.vue:166:23
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:239:42
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:250:41
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1168:42
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:248:41
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1171:42
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1863:42
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:286:42
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:195:30
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:249:9
-#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:168:42
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:185:42
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:122:42
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:139:30
 #: frontend/apps/main/src/features/admin/sla/SLAForm.vue:308:30
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:199:42
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:210:42
 #: frontend/apps/main/src/features/admin/templates/TemplateForm.vue:115:30
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationSideBar.vue:64:15
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:102:51
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:127:51
 #: frontend/apps/main/src/features/view/ViewForm.vue:45:52
 #: frontend/apps/main/src/views/admin/automations/CreateOrEditRule.vue:151:43
 #: frontend/apps/main/src/views/admin/context-links/CreateEditContextLink.vue:10:46
@@ -6612,11 +6644,11 @@ msgstr ""
 msgid "Saving..."
 msgstr "正在保存..."
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:359:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:375:40
 msgid "Scan Inbox Since"
 msgstr "扫描收件箱自"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:337:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:353:40
 msgid "Scan Interval"
 msgstr "扫描间隔"
 
@@ -6638,8 +6670,8 @@ msgid "Search agents..."
 msgstr ""
 
 #: frontend/apps/main/src/features/contact/ContactsList.vue:10:24
-msgid "Search by email"
-msgstr "按电子邮件搜索"
+msgid "Search by name, email or phone"
+msgstr ""
 
 #: frontend/apps/main/src/views/search/SearchView.vue:10:26
 msgid "Search by reference number, contact email address or messages in conversations."
@@ -6749,7 +6781,7 @@ msgstr "选择客服"
 msgid "Select all conversations"
 msgstr "选择所有会话"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:38:43
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:107:43
 msgid "Select an assignment type"
 msgstr "选择分配类型"
 
@@ -6771,8 +6803,8 @@ msgstr "至少选择一个筛选条件。"
 msgid "Select availability status"
 msgstr "选择可用性状态"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:83:45
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:92:43
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:80:45
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:57:43
 msgid "Select business hours"
 msgstr "选择工作时间"
 
@@ -6815,7 +6847,7 @@ msgstr "选择收件箱"
 msgid "Select operator"
 msgstr "选择运算符"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:115:43
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:80:43
 msgid "Select policy"
 msgstr "选择策略"
 
@@ -6827,7 +6859,7 @@ msgstr "选择位置"
 msgid "Select priority"
 msgstr "选择优先级"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:606:57
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:623:57
 msgid "Select protocol"
 msgstr "选择协议"
 
@@ -6835,7 +6867,7 @@ msgstr "选择协议"
 msgid "Select provider"
 msgstr "选择提供商"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:51:32
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:58:32
 msgid "Select recipients"
 msgstr ""
 
@@ -6866,13 +6898,13 @@ msgstr "选择团队"
 msgid "Select the events you want to subscribe to."
 msgstr "选择您要订阅的事件。"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:60:45
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:70:43
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:63:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:41:28
 msgid "Select timezone"
 msgstr "选择时区"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:252:51
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:441:51
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:268:53
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:458:51
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:46:43
 msgid "Select TLS type"
 msgstr "选择 TLS 类型"
@@ -6887,15 +6919,15 @@ msgstr "选择类型"
 #: frontend/apps/main/src/components/filter/FilterRow.vue:81:28
 #: frontend/apps/main/src/components/filter/FilterRow.vue:87:28
 #: frontend/apps/main/src/components/filter/FilterRow.vue:94:28
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:86:32
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:93:32
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:145:50
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:167:47
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:213:20
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:61:43
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:86:43
 msgid "Select value"
 msgstr "选择值"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:99:34
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:106:34
 msgid "Select webhook"
 msgstr ""
 
@@ -6998,7 +7030,8 @@ msgstr ""
 msgid "Serve this help center on its own domain instead of the app URL. Point the domain at Libredesk in your DNS and reverse proxy first."
 msgstr ""
 
-#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:42:51
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:45:255
+#: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:53:53
 msgid "Set"
 msgstr ""
 
@@ -7053,11 +7086,11 @@ msgstr "设置状态"
 msgid "Set status name. Click save when you''re done."
 msgstr "设置状态名称。完成后点击保存。"
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:50:57
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:60:57
 msgid "Set status to away"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:50:24
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:60:24
 msgid "Set status to online"
 msgstr ""
 
@@ -7084,7 +7117,7 @@ msgstr "设置"
 msgid "Set up alert triggers and recipients"
 msgstr "设置通知触发器和收件人"
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:295:9
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:318:9
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:94:32
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:103:32
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:154:32
@@ -7107,7 +7140,7 @@ msgstr "设置已成功更新，请重启应用程序以使更改生效。"
 msgid "Setup"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:140:28
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:147:28
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:22:28
 msgid "Shift + Enter to add a new line."
 msgstr "Shift + Enter 添加新行。"
@@ -7211,7 +7244,7 @@ msgstr "显示引用文本"
 msgid "Show related articles"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:101:20
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:98:20
 msgid "Show subject in conversation list"
 msgstr "在对话列表中显示主题"
 
@@ -7264,8 +7297,8 @@ msgstr "登录"
 msgid "Sign in to your account"
 msgstr "登录您的帐户"
 
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:172:25
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:189:77
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:173:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:190:77
 msgid "Sign-in failed. Try again, and contact your administrator if it keeps happening."
 msgstr ""
 
@@ -7281,11 +7314,15 @@ msgstr "站点名称"
 msgid "Site name should be at least 1 character"
 msgstr "站点名称至少需要 1 个字符"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:384:38
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:657:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:400:40
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:674:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:187:24
 msgid "Skip hostname check on the TLS certificate."
 msgstr "跳过 TLS 证书上的主机名检查。"
+
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:138:18
+msgid "Skip offline agents"
+msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1132:73
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1239:73
@@ -7296,8 +7333,8 @@ msgstr "跳过主屏幕，直接打开用户最近的会话，或如果不存在
 msgid "Skip this form when a chat starts. Show it when the AI needs to transfer the conversation to a human."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:383:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:656:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:399:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:673:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:186:18
 msgid "Skip TLS Verification"
 msgstr "跳过 TLS 验证"
@@ -7324,7 +7361,7 @@ msgstr "SLA 策略描述应在 1 到 255 个字符之间"
 msgid "SLA Policy name should be between 1 and 255 characters"
 msgstr "SLA 策略名称应在 1 到 255 个字符之间"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:131:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:96:30
 msgid "SLA policy to be auto applied to conversations, when conversations are assigned to this team."
 msgstr "当会话分配给此团队时，自动应用于会话的 SLA 策略。"
 
@@ -7336,7 +7373,7 @@ msgstr "SLA 有助于跟踪团队绩效，确保在预期时间范围内处理�
 msgid "Small"
 msgstr "小"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:397:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:414:15
 msgid "SMTP Configuration"
 msgstr "SMTP 配置"
 
@@ -7400,7 +7437,7 @@ msgstr "某人"
 #: frontend/apps/main/src/features/admin/agents/AgentForm.vue:456:19
 #: frontend/apps/main/src/features/admin/agents/AgentForm.vue:481:19
 #: frontend/apps/main/src/features/admin/help-center/IconPicker.vue:54:13
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1296:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1299:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:4:7
 #: frontend/apps/widget/src/components/CSATMessageBubble.vue:134:24
 msgid "Something went wrong"
@@ -7521,21 +7558,21 @@ msgstr ""
 msgid "Summarize this conversation"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:406:13
-#: frontend/apps/main/src/features/conversation/Conversation.vue:84:17
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:422:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:94:17
 msgid "Summarize with AI"
 msgstr ""
 
-#: frontend/apps/main/src/features/conversation/Conversation.vue:190:19
+#: frontend/apps/main/src/features/conversation/Conversation.vue:209:19
 msgid "Summarizing conversation with AI. This may take a few seconds."
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/ArticleEditor.vue:80:20
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:407:23
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:423:23
 msgid "Summary"
 msgstr ""
 
-#: frontend/apps/main/src/features/conversation/Conversation.vue:194:19
+#: frontend/apps/main/src/features/conversation/Conversation.vue:213:19
 msgid "Summary added to the conversation as a private note."
 msgstr ""
 
@@ -7551,11 +7588,11 @@ msgstr ""
 msgid "Switch between reply and private note"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:40:57
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:28:37
 msgid "Switch to dark mode"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:40:24
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:27:38
 msgid "Switch to light mode"
 msgstr ""
 
@@ -7569,12 +7606,20 @@ msgstr ""
 msgid "Switch to reply"
 msgstr ""
 
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:26:37
+msgid "Switch to system theme"
+msgstr ""
+
 #: frontend/apps/main/src/views/admin/whatsapp/WhatsAppTemplateList.vue:33:17
 msgid "Sync from Meta"
 msgstr ""
 
 #: frontend/apps/main/src/views/admin/whatsapp/WhatsAppTemplateList.vue:294:19
 msgid "Synced {count} template(s) from Meta."
+msgstr ""
+
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:157:37
+msgid "System"
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/EditorToolbar.vue:246:114
@@ -7584,7 +7629,7 @@ msgstr ""
 msgid "Table"
 msgstr ""
 
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:39:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:42:46
 msgid "Tablet"
 msgstr ""
 
@@ -7621,7 +7666,7 @@ msgstr "团队已分配"
 msgid "Team the conversation is handed off to when the assistant cannot help."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:81:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:46:30
 msgid "Team''s timezone will be used to calculate SLA."
 msgstr "团队的时区将用于计算 SLA。"
 
@@ -7714,7 +7759,7 @@ msgstr ""
 msgid "The external app should reject tokens older than this. Included as ''exp'' (expiry timestamp) inside the encrypted token."
 msgstr "外部应用应拒绝早于此时间的令牌。作为 ''exp''（过期时间戳）包含在加密令牌中。"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:643:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:660:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:127:15
 msgid "The hostname to use in the HELO/EHLO command. If not set, defaults to localhost."
 msgstr "用于 HELO/EHLO 命令的主机名。如果未设置，默认为 localhost。"
@@ -7743,9 +7788,11 @@ msgstr ""
 msgid "The tool pauses before it runs, and an agent approves or declines it. Keep this on for tools that change data."
 msgstr ""
 
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:49:51
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:211:30
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:260:53
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:264:34
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:48:17
 msgid "Theme"
 msgstr ""
 
@@ -7929,7 +7976,7 @@ msgstr "定时任务"
 msgid "Title shown in search engines and browser tabs. Leave blank to use the article title."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:450:39
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:467:39
 msgid "TLS/SSL encryption, STARTTLS is commonly used."
 msgstr "TLS/SSL 加密，通常使用 STARTTLS。"
 
@@ -7939,7 +7986,7 @@ msgstr "TLS/SSL 加密，通常使用 STARTTLS。"
 msgid "To"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:370:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:386:31
 msgid "To improve performance in large helpdesks with high email volume, this limits scans to emails received since the specified duration (e.g., `2h`, `48h`) by subtracting it from the current time."
 msgstr "为提高高电子邮件量大型帮助台的性能，此设置将扫描限制为自指定时长（例如 `2h`、`48h`）以来收到的电子邮件，通过从当前时间减去该时长计算。"
 
@@ -8027,7 +8074,7 @@ msgstr "尝试调整筛选条件"
 msgid "Try adjusting your search terms or filters."
 msgstr "尝试调整您的搜索词或筛选条件。"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1008:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1007:16
 #: frontend/apps/main/src/views/search/SearchView.vue:23:54
 #: frontend/apps/widget/src/views/HelpView.vue:199:10
 msgid "Try again"
@@ -8082,7 +8129,7 @@ msgstr ""
 msgid "Unassigned"
 msgstr "未分配"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:228:19
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:239:19
 msgid "Unauthorized"
 msgstr "未授权"
 
@@ -8122,7 +8169,7 @@ msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/ArticleEditSheet.vue:620:18
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:265:21
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:853:21
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:21
 msgid "Update"
 msgstr "更新"
 
@@ -8178,7 +8225,7 @@ msgstr "使用情况"
 msgid "Use '{{token}}' for a fully encrypted payload that the external app decrypts with a shared secret. Or use individual variables like '{{email}}', '{{phone}}', '{{external_user_id}}' for plain URL links to trusted internal tools."
 msgstr "使用 '{{token}}' 获取完全加密的有效负载，外部应用程序使用共享密钥解密。或者使用独立变量，如 '{{email}}'、'{{phone}}'、'{{external_user_id}}'，用于指向受信任内部工具的纯 URL 链接。"
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:168:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:165:17
 msgid "Use `*` to permit all file types. For example: `jpg, png, pdf`"
 msgstr "使用 `*` 允许所有文件类型。例如：`jpg, png, pdf`"
 
@@ -8204,16 +8251,17 @@ msgstr ""
 msgid "Users"
 msgstr "用户"
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:916:35
-msgid "Variables: '{{ .Agent.FirstName }}', '{{ .Agent.LastName }}', '{{ .Agent.FullName }}', '{{ .Inbox.Name }}'."
-msgstr "变量: '{{ .Agent.FirstName }}', '{{ .Agent.LastName }}', '{{ .Agent.FullName }}', '{{ .Inbox.Name }}'."
+#: frontend/apps/main/src/features/admin/automation/ActionBox.vue:218:8
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1061:8
+msgid "Variables: {variables}"
+msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1001:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1000:15
 msgid "Verified"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:991:16
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1002:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:990:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1001:16
 msgid "Verify"
 msgstr ""
 
@@ -8293,7 +8341,7 @@ msgstr "访客"
 msgid "Visitors land on this language unless they pick another."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:574:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:591:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:171:24
 msgid "Wait Timeout"
 msgstr "等待超时"
@@ -8345,7 +8393,7 @@ msgstr "Webhook 发送成功"
 msgid "Webhook verify token"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:857:11
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:862:11
 msgid "Website"
 msgstr ""
 
@@ -8437,7 +8485,7 @@ msgstr ""
 msgid "Written by"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:11
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:863:11
 msgid "X (Twitter)"
 msgstr ""
 
@@ -8460,7 +8508,7 @@ msgstr "您只能有一个默认的发送电子邮件模板。"
 msgid "You can now login with your new password."
 msgstr "您现在可以使用新密码登录。"
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:230:25
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:241:25
 msgid "You do not have permission to view business hours."
 msgstr "您无权查看工作时间。"
 
@@ -8480,7 +8528,11 @@ msgstr "您的服务器生成包含用户详细信息的已签名 JWT。使用�
 msgid "Your sign-in session expired. Try signing in again."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:863:11
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:172:31
+msgid "Your SSO provider has not confirmed email ownership, and sign in is blocked. Verify your email with the provider or contact your administrator."
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:868:11
 msgid "YouTube"
 msgstr ""
 

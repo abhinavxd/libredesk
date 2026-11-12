@@ -69,7 +69,7 @@ msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BAccount%7D+other+%7BAccounts%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/components/sidebar/Sidebar.vue:291:38
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:90:13
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:101:13
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:132:12
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:133:17
 #: frontend/apps/main/src/features/command/sections.js:38:26
@@ -216,7 +216,7 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BFile%7D+other+%7BFiles%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:133:48
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:130:48
 #: frontend/apps/main/src/stores/conversation.js:1302:11
 #: frontend/apps/widget/src/utils/messagePreview.js:7:13
 msgid "File"
@@ -273,8 +273,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BHost%7D+other+%7BHosts%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:214:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:403:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:230:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:420:32
 msgid "Host"
 msgid_plural "Hosts"
 msgstr[0] ""
@@ -492,7 +492,7 @@ msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BOnline%7D+other+%7BOnline%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/features/admin/inbox/LivechatWidgetPreview.vue:43:25
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:51:40
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:61:40
 #: frontend/apps/main/src/views/reports/OverviewView.vue:416:17
 #: frontend/apps/widget/src/components/ChatTitle.vue:31:58
 #: frontend/shared-ui/components/StatusDot.vue:60:12
@@ -518,8 +518,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BPassword%7D+other+%7BPasswords%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:292:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:481:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:308:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:498:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:74:24
 #: frontend/apps/main/src/views/auth/UserLoginView.vue:63:17
 msgid "Password"
@@ -545,8 +545,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BPort%7D+other+%7BPorts%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:229:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:418:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:245:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:435:32
 msgid "Port"
 msgid_plural "Ports"
 msgstr[0] ""
@@ -677,7 +677,7 @@ msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BTimezone%7D+other+%7BTimezones%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:55:17
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:66:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:34:24
 msgid "Timezone"
 msgid_plural "Timezones"
 msgstr[0] ""
@@ -700,8 +700,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BTLS%7D+other+%7BTLSs%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:244:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:433:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:260:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:450:32
 msgid "TLS"
 msgid_plural "TLSs"
 msgstr[0] ""
@@ -739,8 +739,8 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BUsername%7D+other+%7BUsernames%7D%7D&pluralize_on=count
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:277:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:466:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:293:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:483:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:64:24
 msgid "Username"
 msgid_plural "Usernames"
@@ -885,7 +885,7 @@ msgctxt "Context link encryption key"
 msgid "Secret"
 msgstr ""
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:60:53
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:71:53
 #: frontend/apps/main/src/features/command/providers/useAccountCommands.js:1:24
 msgctxt "Conversation navigation"
 msgid "Away"
@@ -993,12 +993,12 @@ msgctxt "No assigned team"
 msgid "None"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:616:58
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:633:58
 msgctxt "No authentication"
 msgid "None"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:96:44
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:61:44
 msgctxt "No business hours"
 msgid "None"
 msgstr ""
@@ -1025,7 +1025,7 @@ msgctxt "No parent collection"
 msgid "None"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:119:44
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:84:44
 msgctxt "No SLA policy"
 msgid "None"
 msgstr ""
@@ -1064,7 +1064,7 @@ msgctxt "Time range"
 msgid "To"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:899:35
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:916:35
 msgid "'{{ .Agent.FirstName }} at {{ .Inbox.Name }}'"
 msgstr ""
 
@@ -1153,9 +1153,9 @@ msgstr[1] ""
 
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BBusiness+hour%7D+other+%7BBusiness+hours%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/constants/navigation.js:23:26
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:78:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:75:17
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:712:43
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:88:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:53:24
 #: frontend/apps/main/src/router/index.js:296:38
 #: frontend/apps/main/src/views/admin/business-hours/CreateOrEditBusinessHours.vue:74:40
 msgid "Business hour"
@@ -1171,7 +1171,7 @@ msgstr[1] ""
 #: frontend/apps/main/src/features/admin/automation/RuleBox.vue:58:22
 #: frontend/apps/main/src/features/admin/custom-attributes/CustomAttributesForm.vue:41:23
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:205:10
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:418:23
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:434:23
 #: frontend/apps/main/src/features/command/providers/useNavigationCommands.js:121:17
 #: frontend/apps/main/src/features/command/sections.js:33:26
 #: frontend/apps/main/src/features/command/sections.js:39:34
@@ -1280,8 +1280,8 @@ msgstr[1] ""
 #: frontend/apps/main/src/router/index.js:208:38
 #: frontend/apps/main/src/router/index.js:220:42
 #: frontend/apps/main/src/router/index.js:227:42
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:182:37
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:81:24
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:195:37
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:88:24
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterTree.vue:342:37
 msgid "Help center"
 msgid_plural "Help centers"
@@ -1449,7 +1449,7 @@ msgstr[1] ""
 #. js-lingui:icu=%7Bcount%2C+plural%2C+one+%7BSLA+policy%7D+other+%7BSLA+policies%7D%7D&pluralize_on=count
 #: frontend/apps/main/src/composables/useConversationFilters.js:125:19
 #: frontend/apps/main/src/constants/navigation.js:31:26
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:111:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:76:24
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationInfo.vue:76:37
 msgid "SLA policy"
 msgid_plural "SLA policies"
@@ -1496,7 +1496,7 @@ msgstr[1] ""
 #: frontend/apps/main/src/features/admin/help-center/helpCenterColumns.js:41:33
 #: frontend/apps/main/src/features/admin/oidc/dataTableColumns.js:40:33
 #: frontend/apps/main/src/features/admin/webhooks/dataTableColumns.js:64:33
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:51:96
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:61:96
 #: frontend/apps/main/src/features/command/providers/useBulkCommands.js:30:19
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:136:17
 #: frontend/apps/main/src/features/command/providers/useListCommands.js:42:78
@@ -1685,17 +1685,17 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/help-center/helpCenterFormSchema.js:174:42
 #: frontend/apps/main/src/features/admin/help-center/helpCenterFormSchema.js:177:24
 #: frontend/apps/main/src/features/admin/inbox/formSchema.js:9:26
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:10:26
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:42:28
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:44:31
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:45:32
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:46:32
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:49:40
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:52:37
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:57:28
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:63:36
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:66:41
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:77:63
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:11:29
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:12:30
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:13:30
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:16:38
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:19:35
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:26:26
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:27:26
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:61:28
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:67:36
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:70:41
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:81:63
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:57:25
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:63:25
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:69:23
@@ -1722,13 +1722,13 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:40:17
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:45:28
 #: frontend/apps/main/src/features/admin/notification/formSchema.js:57:67
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:7:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:9:23
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:13:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:21:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:23:23
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:26:22
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:28:23
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:8:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:10:25
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:14:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:26:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:28:25
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:31:24
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:33:25
 #: frontend/apps/main/src/features/admin/roles/formSchema.js:6:22
 #: frontend/apps/main/src/features/admin/roles/formSchema.js:17:22
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:160:26
@@ -1742,7 +1742,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:11:36
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:12:30
 #: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:13:59
-#: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:15:39
+#: frontend/apps/main/src/features/admin/teams/teamFormSchema.js:16:39
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:6:22
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:9:22
 #: frontend/apps/main/src/features/admin/templates/formSchema.js:19:17
@@ -1775,12 +1775,12 @@ msgstr ""
 msgid "✅ Thank you for your feedback!"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:806:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:823:15
 msgid "1. Create OAuth app at"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:826:18
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:829:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:843:18
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:846:29
 msgid "2. Add this callback URL:"
 msgstr ""
 
@@ -1788,7 +1788,7 @@ msgstr ""
 msgid "24-hour reply window closed"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:845:17
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:862:17
 msgid "3. Enter your credentials below:"
 msgstr ""
 
@@ -2016,8 +2016,8 @@ msgstr ""
 msgid "Advance warning"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:310:18
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:499:18
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:326:20
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:516:18
 msgid "Advanced"
 msgstr ""
 
@@ -2152,11 +2152,11 @@ msgstr ""
 msgid "Allow visitors to start new conversations"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:156:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:153:17
 msgid "Allowed file upload extensions"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:87:81
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:91:81
 msgid "Already exists"
 msgstr ""
 
@@ -2303,7 +2303,7 @@ msgid "Article linked as a translation."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:564:20
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:29:47
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:32:47
 msgid "Article page"
 msgstr ""
 
@@ -2432,12 +2432,12 @@ msgstr ""
 msgid "Authentication failed. This inbox can''t send or receive messages until you update its credentials."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:598:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:615:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:84:24
 msgid "Authentication Protocol"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:621:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:638:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:88:43
 msgid "Authentication protocol to use."
 msgstr ""
@@ -2450,7 +2450,7 @@ msgstr ""
 msgid "Authorization denied"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:34:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:103:24
 msgid "Auto assignment type"
 msgstr ""
 
@@ -2657,7 +2657,7 @@ msgstr ""
 msgid "Brand name"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:110:48
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:107:48
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:300:16
 msgid "Branding"
 msgstr ""
@@ -2733,8 +2733,8 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:69:23
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterBasicsForm.vue:69:11
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterDropdown.vue:41:30
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:755:11
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:886:13
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:759:11
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:903:13
 #: frontend/apps/main/src/features/admin/inbox/InboxDataTableDropDown.vue:37:30
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:786:46
 #: frontend/apps/main/src/features/admin/macros/dataTableDropdown.vue:29:30
@@ -2827,7 +2827,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/automation/RuleTab.vue:149:19
 #: frontend/apps/main/src/features/admin/automation/RuleTab.vue:165:19
 #: frontend/apps/main/src/features/admin/context-links/dataTableDropdown.vue:112:19
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:280:19
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:278:19
 #: frontend/apps/main/src/features/admin/webhooks/dataTableDropdown.vue:118:19
 #: frontend/apps/main/src/features/contact/CreateContactDialog.vue:57:59
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationInfo.vue:169:19
@@ -2849,7 +2849,7 @@ msgstr ""
 #: frontend/apps/main/src/views/admin/context-links/CreateEditContextLink.vue:70:19
 #: frontend/apps/main/src/views/admin/custom-attributes/CustomAttributes.vue:184:21
 #: frontend/apps/main/src/views/admin/custom-attributes/CustomAttributes.vue:189:21
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:228:19
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:253:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterList.vue:117:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterList.vue:135:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterTree.vue:476:19
@@ -2910,7 +2910,7 @@ msgstr ""
 msgid "Choose setup method"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:261:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:277:40
 msgid "Choose the encryption method for IMAP."
 msgstr ""
 
@@ -2950,12 +2950,12 @@ msgid "Click to switch between and / or"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:46:15
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:849:42
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:866:42
 #: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:80:24
 msgid "Client ID"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:859:46
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:876:46
 #: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:90:24
 msgid "Client secret"
 msgstr ""
@@ -3015,6 +3015,10 @@ msgstr ""
 msgid "Collection layout"
 msgstr ""
 
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:30:18
+msgid "Collection page"
+msgstr ""
+
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:388:24
 msgid "Color of the greeting and introduction text on the home screen"
 msgstr ""
@@ -3041,7 +3045,7 @@ msgstr ""
 msgid "Concise"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1211:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1229:21
 msgid "Configure IMAP and SMTP manually"
 msgstr ""
 
@@ -3069,7 +3073,7 @@ msgstr ""
 msgid "Confirm password"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:299
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:299
 msgid "Connect {provider} account"
 msgstr ""
 
@@ -3078,11 +3082,11 @@ msgstr ""
 msgid "Connect a WhatsApp number through the Meta Cloud API to receive and reply to contact messages on WhatsApp."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1199:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1217:21
 msgid "Connect with Google Workspace or Gmail"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1205:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1223:21
 msgid "Connect with Microsoft 365 or Outlook"
 msgstr ""
 
@@ -3099,7 +3103,7 @@ msgid "Connected via OAuth - {provider}"
 msgstr ""
 
 #: frontend/apps/main/src/components/banner/ConnectionBanner.vue:52:12
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:889:33
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:906:33
 #: frontend/apps/widget/src/components/ConnectionBanner.vue:31:12
 msgid "Connecting..."
 msgstr ""
@@ -3157,7 +3161,7 @@ msgstr ""
 msgid "Context links appear in the conversation sidebar, letting agents open external tools like CRMs, billing systems, or internal dashboards with the contact''s details passed automatically."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:889:59
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:906:59
 msgid "Continue"
 msgstr ""
 
@@ -3211,13 +3215,13 @@ msgstr ""
 msgid "Conversations updated"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1276:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1294:19
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:366:59
 #: frontend/apps/main/src/features/conversation/sidebar/CopilotPanel.vue:453:59
 msgid "Copied to clipboard"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:840:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:857:19
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:228:33
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:390:17
 #: frontend/apps/main/src/features/conversation/sidebar/CopilotPanel.vue:147:33
@@ -3236,7 +3240,7 @@ msgstr ""
 msgid "Could not copy to clipboard."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:233:19
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:244:19
 msgid "Could not fetch business hours"
 msgstr ""
 
@@ -3261,16 +3265,16 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/help-center/ArticleEditSheet.vue:620:37
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:265:40
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterBasicsForm.vue:72:11
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:853:40
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1153:23
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:40
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1171:23
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1863:23
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:286:23
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:195:47
-#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:168:23
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:185:23
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:122:23
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:139:47
 #: frontend/apps/main/src/features/admin/sla/SLAForm.vue:308:47
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:199:23
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:210:23
 #: frontend/apps/main/src/features/command/providers/useContactCommands.js:37:47
 #: frontend/apps/main/src/features/command/providers/useCreateCommands.js:26:19
 #: frontend/apps/main/src/features/command/providers/useCreateCommands.js:37:17
@@ -3390,13 +3394,13 @@ msgstr ""
 msgid "CSAT survey template"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:738:26
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:755:26
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:39:30
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:45:18
 msgid "CSAT Surveys"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:748:21
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:765:21
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:47:29
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:53:17
 msgid "CSAT surveys are only sent once per conversation."
@@ -3424,8 +3428,12 @@ msgstr ""
 msgid "Custom code"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:721:30
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:725:30
 msgid "Custom CSS"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:721:35
+msgid "Custom CSS and JS run only on a custom domain."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:41:30
@@ -3436,7 +3444,7 @@ msgstr ""
 msgid "Custom instructions"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:736:30
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:740:30
 msgid "Custom JS"
 msgstr ""
 
@@ -3465,6 +3473,7 @@ msgid "Danger"
 msgstr ""
 
 #: frontend/apps/main/src/components/PreviewThemeToggle.vue:16:21
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:159:37
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:224:53
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:243:25
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:615:25
@@ -3472,11 +3481,6 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:314:31
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:531:31
 msgid "Dark"
-msgstr ""
-
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:50:51
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:41:19
-msgid "Dark Mode"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:114:54
@@ -3493,7 +3497,7 @@ msgstr ""
 msgid "Default (accent tint)"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:104:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:69:30
 msgid "Default business hours for the team, will be used to calculate SLA."
 msgstr ""
 
@@ -3627,7 +3631,7 @@ msgid "Descending"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:98:11
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:38:47
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:41:47
 msgid "Desktop"
 msgstr ""
 
@@ -3653,7 +3657,7 @@ msgstr ""
 msgid "Disable"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:58:31
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:68:31
 msgid "Disable reassign replies"
 msgstr ""
 
@@ -3665,6 +3669,10 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/oidc/dataTableColumns.js:47:40
 #: frontend/apps/main/src/views/admin/inbox/InboxList.vue:171:40
 msgid "Disabled"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:121:28
+msgid "Disabling this allows sign in without confirming email ownership."
 msgstr ""
 
 #: frontend/apps/widget/src/composables/useReplyPreviews.js:64:21
@@ -3683,11 +3691,11 @@ msgstr ""
 msgid "Display as button"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:690:23
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:707:23
 msgid "Display name for outgoing email replies. Leave blank to use the name from the From address."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:102:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:99:26
 msgid "Display the conversation subject line in the conversation list when available."
 msgstr ""
 
@@ -3729,7 +3737,7 @@ msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:991:34
 #: frontend/apps/main/src/features/command/providers/useConversationCommands.js:397:13
-#: frontend/apps/main/src/features/conversation/Conversation.vue:77:17
+#: frontend/apps/main/src/features/conversation/Conversation.vue:78:19
 #: frontend/apps/widget/src/components/ChatHeader.vue:37:15
 msgid "Download transcript"
 msgstr ""
@@ -3980,7 +3988,7 @@ msgstr ""
 msgid "Enable only if the completion model can read images. When on, image attachments from customers are sent to the model. When off, images are never sent."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:720:26
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:737:26
 msgid "Enable plus addressing"
 msgstr ""
 
@@ -3988,7 +3996,7 @@ msgstr ""
 msgid "Enable pre-chat form"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:58:68
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:68:68
 msgid "Enable reassign replies"
 msgstr ""
 
@@ -4002,6 +4010,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/ai/toolColumns.js:44:36
 #: frontend/apps/main/src/features/admin/automation/RuleList.vue:11:38
 #: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:103:22
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:219:26
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:30:30
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:24:18
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:384:29
@@ -4064,11 +4073,11 @@ msgstr ""
 msgid "Enter your new password twice to confirm."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:853:26
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:870:26
 msgid "Enter your OAuth client ID"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:864:26
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:881:26
 msgid "Enter your OAuth client secret"
 msgstr ""
 
@@ -4142,7 +4151,7 @@ msgstr ""
 msgid "External links"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:861:12
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:866:12
 msgid "Facebook"
 msgstr ""
 
@@ -4150,7 +4159,7 @@ msgstr ""
 msgid "Fade background"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:989:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1006:15
 msgid "Failed"
 msgstr ""
 
@@ -4171,7 +4180,7 @@ msgstr ""
 msgid "False"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:123:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:120:26
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:197:30
 msgid "Favicon URL"
 msgstr ""
@@ -4235,7 +4244,7 @@ msgstr ""
 msgid "Focus reply box"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:137
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:813:137
 msgid "Follow the steps below to connect your email account"
 msgstr ""
 
@@ -4248,7 +4257,7 @@ msgstr ""
 msgid "Footer"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:747:22
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:764:22
 msgid "For better control on when to send surveys, disable this option and create an automation rule to send surveys."
 msgstr ""
 
@@ -4287,7 +4296,7 @@ msgstr ""
 msgid "From"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:677:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:694:34
 msgid "From display name template (optional)"
 msgstr ""
 
@@ -4318,7 +4327,7 @@ msgstr ""
 msgid "Generate reply"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:859:10
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:864:10
 msgid "GitHub"
 msgstr ""
 
@@ -4336,13 +4345,13 @@ msgstr ""
 msgid "Good"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1198:15
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:203
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:447
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1216:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:203
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:447
 msgid "Google"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:818:73
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:835:73
 msgid "Google Cloud Console"
 msgstr ""
 
@@ -4417,7 +4426,7 @@ msgstr ""
 msgid "Heading {level}"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:632:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:649:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:122:24
 msgid "HELO Hostname"
 msgstr ""
@@ -4528,7 +4537,7 @@ msgstr ""
 msgid "Identity verified"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:552:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:569:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:158:24
 msgid "Idle Timeout"
 msgstr ""
@@ -4558,7 +4567,7 @@ msgstr ""
 msgid "Imported"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:721:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:738:32
 msgid "Improves conversation threading but requires provider support (e.g., Gmail, Microsoft 365)."
 msgstr ""
 
@@ -4610,7 +4619,7 @@ msgstr ""
 msgid "Insert into reply"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:862:13
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:867:13
 msgid "Instagram"
 msgstr ""
 
@@ -4622,7 +4631,7 @@ msgstr ""
 msgid "Instructions"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:348:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:364:31
 msgid "Interval to scan the inbox for new emails. Format: 120s, 1m, 1h"
 msgstr ""
 
@@ -4642,10 +4651,10 @@ msgid "Invalid color"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:151:45
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:50:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:53:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:64:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:67:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:17:13
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:20:13
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:68:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:71:15
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:248:41
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:311:41
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:371:21
@@ -4659,14 +4668,14 @@ msgid "Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/agents/formSchema.js:32:15
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:12:55
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:26:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:29:55
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:43:15
 #: frontend/apps/main/src/features/contact/formSchema.js:30:21
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:410:65
 #: frontend/apps/main/src/features/conversation/EmailConversationForm.vue:424:34
 #: frontend/apps/main/src/views/auth/ResetPasswordView.vue:90:25
 #: frontend/apps/main/src/views/auth/ResetPasswordView.vue:129:42
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:220:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:221:25
 #: frontend/apps/widget/src/components/preChatFormSchema.js:31:30
 msgid "Invalid email address"
 msgstr ""
@@ -4700,7 +4709,7 @@ msgstr ""
 msgid "Invalid reset link. Please request a new password reset link."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/formSchema.js:20:15
+#: frontend/apps/main/src/features/admin/inbox/formSchema.js:37:15
 msgid "Invalid template. Use only the supported variables and balanced braces."
 msgstr ""
 
@@ -4710,8 +4719,8 @@ msgid "Invalid time format (HH:mm)"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:10:20
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:16:15
-#: frontend/apps/main/src/features/admin/oidc/formSchema.js:18:38
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:17:17
+#: frontend/apps/main/src/features/admin/oidc/formSchema.js:21:22
 #: frontend/apps/main/src/features/admin/webhooks/formSchema.js:17:17
 #: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:235:28
 #: frontend/apps/widget/src/components/preChatFormSchema.js:69:30
@@ -4758,8 +4767,8 @@ msgstr ""
 
 #: frontend/apps/main/src/components/KeyboardShortcutsDialog.vue:60:15
 #: frontend/apps/main/src/components/KeyboardShortcutsDialog.vue:5:24
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:97:13
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:67:15
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:108:13
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:77:15
 msgid "Keyboard shortcuts"
 msgstr ""
 
@@ -4896,6 +4905,7 @@ msgid "Letters, numbers, hyphen and underscore only, up to 64 characters."
 msgstr ""
 
 #: frontend/apps/main/src/components/PreviewThemeToggle.vue:8:21
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:158:38
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:220:54
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:239:25
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:611:25
@@ -4922,7 +4932,7 @@ msgstr ""
 msgid "Link URL"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:860:12
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:865:12
 msgid "LinkedIn"
 msgstr ""
 
@@ -4967,11 +4977,11 @@ msgstr ""
 msgid "Logging in..."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:610:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:627:32
 msgid "Login"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:114:26
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:111:26
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:256:30
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:327:36
 #: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:68:24
@@ -4982,8 +4992,8 @@ msgstr ""
 msgid "Logo URL should be a valid URL"
 msgstr ""
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:103:11
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:75:15
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:114:11
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:85:15
 msgid "Logout"
 msgstr ""
 
@@ -4991,11 +5001,11 @@ msgstr ""
 msgid "Looks up an order''s status and delivery date by order ID."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:316:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:332:40
 msgid "Mailbox"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:327:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:343:31
 msgid "Mailbox (folder) to scan for incoming emails. Default is INBOX (usually no need to change)."
 msgstr ""
 
@@ -5107,7 +5117,7 @@ msgstr ""
 msgid "Manage webhooks"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:184:28
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:195:28
 msgid "Manual"
 msgstr ""
 
@@ -5150,11 +5160,11 @@ msgstr ""
 msgid "Match these rules"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:142:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:139:17
 msgid "Max allowed file upload size"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:148:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:145:17
 msgid "Max allowed file upload size in MB."
 msgstr ""
 
@@ -5163,7 +5173,7 @@ msgstr ""
 msgid "Max allowed file upload size should be between 1 and 500 MB"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:508:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:525:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:136:24
 msgid "Max Connections"
 msgstr ""
@@ -5172,7 +5182,7 @@ msgstr ""
 msgid "Max messages per email"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:530:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:547:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:147:24
 msgid "Max Retries"
 msgstr ""
@@ -5185,16 +5195,16 @@ msgstr ""
 msgid "Max turns"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:56:24
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:125:24
 msgid "Maximum auto-assigned conversations"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:519:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:536:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:141:30
 msgid "Maximum number of concurrent connections to the server."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:60:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:129:30
 msgid "Maximum number of conversations that can be auto-assigned to an agent. Only conversations in statuses with the \"Open\" category count toward this limit. Set to 0 for unlimited."
 msgstr ""
 
@@ -5202,12 +5212,12 @@ msgstr ""
 msgid "Maximum number of messages to include in a single continuity email. Max 100."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:563:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:580:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:164:15
 msgid "Maximum time an inactive connection must be kept alive before closing it and removing it from the pool."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:585:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:602:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:177:15
 msgid "Maximum time to wait to obtain a connection before timing out. Timeouts may occur when all open connections are busy sending e-mails and they''re not returning to the pool fast enough. This is also the timeout used when creating new SMTP connections."
 msgstr ""
@@ -5278,13 +5288,13 @@ msgstr ""
 msgid "Method"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1204:15
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:244
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:488
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1222:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:244
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:488
 msgid "Microsoft"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:818:124
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:835:124
 msgid "Microsoft Azure Portal"
 msgstr ""
 
@@ -5305,7 +5315,7 @@ msgid "Minimum time between proactive messages"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/WidgetCampaigns.vue:99:10
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:40:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:43:46
 msgid "Mobile"
 msgstr ""
 
@@ -5780,11 +5790,12 @@ msgstr ""
 msgid "Not available"
 msgstr ""
 
-#: frontend/shared-ui/components/ui/combobox/ComboBox.vue:25:43
+#: frontend/shared-ui/components/ui/combobox/ComboBox.vue:45:43
+#: frontend/shared-ui/components/ui/combobox/VirtualCommand.vue:36:9
 msgid "Not found"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:972:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:989:15
 msgid "Not verified"
 msgstr ""
 
@@ -5810,7 +5821,7 @@ msgstr ""
 msgid "Number of back-and-forth replies before the assistant hands off. Between 1 and 20."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:541:30
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:558:30
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:152:31
 msgid "Number of times to retry when a message fails."
 msgstr ""
@@ -5820,8 +5831,8 @@ msgstr ""
 msgid "Numbered list"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:255:52
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:444:52
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:271:54
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:461:52
 msgid "OFF"
 msgstr ""
 
@@ -5831,6 +5842,10 @@ msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1003:16
 msgid "Office hours"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:139:24
+msgid "Offline agents are agents with no libredesk tab open. Round robin skips them until they come back online."
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:197:26
@@ -5894,7 +5909,7 @@ msgstr ""
 msgid "Open command bar"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:417:19
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:433:19
 msgid "Open contact"
 msgstr ""
 
@@ -5938,7 +5953,7 @@ msgstr ""
 msgid "Optional. Add one placeholder - '{{1}}' or a named one like '{{order_id}}' - matching the style used in the body, if the header text changes per message."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:670:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:687:15
 msgid "Options"
 msgstr ""
 
@@ -5951,7 +5966,7 @@ msgstr ""
 msgid "Or continue with"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1210:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1228:15
 msgid "Other provider"
 msgstr ""
 
@@ -6009,7 +6024,7 @@ msgstr ""
 msgid "Parent collection"
 msgstr ""
 
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:225:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:226:25
 msgid "Password cannot be empty"
 msgstr ""
 
@@ -6049,7 +6064,12 @@ msgstr ""
 msgid "Paused"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:977:15
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:414:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:85:21
+msgid "PDF"
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:994:15
 msgid "Pending"
 msgstr ""
 
@@ -6084,8 +6104,13 @@ msgstr ""
 msgid "Pick date and time"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:614:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:631:32
 msgid "Plain"
+msgstr ""
+
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:405:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:82:21
+msgid "Plain text (.txt)"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:698:53
@@ -6110,7 +6135,7 @@ msgstr ""
 msgid "Please enter at least {length} characters to search."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1246:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1264:19
 msgid "Please provide both client ID and client secret"
 msgstr ""
 
@@ -6159,7 +6184,7 @@ msgstr ""
 msgid "Poor"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:903:10
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:908:10
 msgid "Popular articles"
 msgstr ""
 
@@ -6255,7 +6280,7 @@ msgstr ""
 msgid "Professional"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:755:26
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:772:26
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:54:30
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:34:18
 msgid "Prompt to tag before replying"
@@ -6289,7 +6314,7 @@ msgstr ""
 msgid "Quote"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:53
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:813:53
 msgid "Re-enter your credentials to refresh the OAuth connection"
 msgstr ""
 
@@ -6301,8 +6326,8 @@ msgstr ""
 msgid "Reasoning effort"
 msgstr ""
 
-#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:74:53
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:59:19
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:85:53
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:69:19
 msgid "Reassign replies"
 msgstr ""
 
@@ -6318,7 +6343,7 @@ msgstr ""
 msgid "Reconnect"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:779:53
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:796:53
 msgid "Reconnect {provider} account"
 msgstr ""
 
@@ -6450,7 +6475,7 @@ msgstr ""
 msgid "Reply window closes in {time}. After that, only template messages can be sent."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:697:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:714:32
 msgid "Reply-To address (optional)"
 msgstr ""
 
@@ -6466,6 +6491,10 @@ msgstr ""
 msgid "Require verified contact"
 msgstr ""
 
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:119:24
+msgid "Require verified email"
+msgstr ""
+
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:124:35
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:126:38
 #: frontend/apps/main/src/features/admin/inbox/livechatFormSchema.js:193:37
@@ -6477,11 +6506,11 @@ msgstr ""
 msgid "Required CSV format"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:731:27
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:748:27
 msgid "Required for Microsoft inboxes to thread replies correctly."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:978:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:995:16
 msgid "Resend"
 msgstr ""
 
@@ -6601,11 +6630,11 @@ msgstr ""
 msgid "Root URL should be a valid URL"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:183:33
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:194:33
 msgid "Round robin"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:49:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:118:30
 msgid "Round robin: Conversations are assigned to team members in a round-robin fashion. Manual: Conversations are to be picked by team members."
 msgstr ""
 
@@ -6629,8 +6658,12 @@ msgstr ""
 msgid "Rules the assistant must never break."
 msgstr ""
 
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:142:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:153:46
 msgid "Sample article"
+msgstr ""
+
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:154:49
+msgid "Sample collection"
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/EditorLinkDialog.vue:40:15
@@ -6642,17 +6675,17 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/ai/SnippetForm.vue:40:23
 #: frontend/apps/main/src/features/admin/ai/ToolForm.vue:166:23
 #: frontend/apps/main/src/features/admin/business-hours/BusinessHoursForm.vue:239:42
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:250:41
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1153:42
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:248:41
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1171:42
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1863:42
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:286:42
 #: frontend/apps/main/src/features/admin/macros/MacroForm.vue:195:30
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:249:9
-#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:168:42
+#: frontend/apps/main/src/features/admin/oidc/OIDCForm.vue:185:42
 #: frontend/apps/main/src/features/admin/roles/RoleForm.vue:122:42
 #: frontend/apps/main/src/features/admin/shared-views/SharedViewForm.vue:139:30
 #: frontend/apps/main/src/features/admin/sla/SLAForm.vue:308:30
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:199:42
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:210:42
 #: frontend/apps/main/src/features/admin/templates/TemplateForm.vue:115:30
 #: frontend/apps/main/src/features/conversation/sidebar/ConversationSideBar.vue:64:15
 #: frontend/apps/main/src/features/conversation/sidebar/CustomAttributes.vue:127:51
@@ -6683,11 +6716,11 @@ msgstr ""
 msgid "Saving..."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:359:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:375:40
 msgid "Scan Inbox Since"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:337:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:353:40
 msgid "Scan Interval"
 msgstr ""
 
@@ -6709,7 +6742,7 @@ msgid "Search agents..."
 msgstr ""
 
 #: frontend/apps/main/src/features/contact/ContactsList.vue:10:24
-msgid "Search by email"
+msgid "Search by name, email or phone"
 msgstr ""
 
 #: frontend/apps/main/src/views/search/SearchView.vue:10:26
@@ -6820,7 +6853,7 @@ msgstr ""
 msgid "Select all conversations"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:38:43
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:107:43
 msgid "Select an assignment type"
 msgstr ""
 
@@ -6842,8 +6875,8 @@ msgstr ""
 msgid "Select availability status"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:83:45
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:92:43
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:80:45
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:57:43
 msgid "Select business hours"
 msgstr ""
 
@@ -6886,7 +6919,7 @@ msgstr ""
 msgid "Select operator"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:115:43
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:80:43
 msgid "Select policy"
 msgstr ""
 
@@ -6898,7 +6931,7 @@ msgstr ""
 msgid "Select priority"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:606:57
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:623:57
 msgid "Select protocol"
 msgstr ""
 
@@ -6937,13 +6970,13 @@ msgstr ""
 msgid "Select the events you want to subscribe to."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:60:45
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:70:43
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:63:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:41:28
 msgid "Select timezone"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:252:51
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:441:51
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:268:53
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:458:51
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:46:43
 msgid "Select TLS type"
 msgstr ""
@@ -6994,7 +7027,7 @@ msgstr ""
 msgid "Send CSAT"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:739:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:756:32
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:40:36
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:46:24
 msgid "Send customer satisfaction surveys when a conversation is marked as resolved."
@@ -7125,11 +7158,11 @@ msgstr ""
 msgid "Set status name. Click save when you''re done."
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:50:57
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:60:57
 msgid "Set status to away"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:50:24
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:60:24
 msgid "Set status to online"
 msgstr ""
 
@@ -7283,7 +7316,7 @@ msgstr ""
 msgid "Show related articles"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:101:20
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:98:20
 msgid "Show subject in conversation list"
 msgstr ""
 
@@ -7336,8 +7369,8 @@ msgstr ""
 msgid "Sign in to your account"
 msgstr ""
 
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:172:25
-#: frontend/apps/main/src/views/auth/UserLoginView.vue:189:77
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:173:25
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:190:77
 msgid "Sign-in failed. Try again, and contact your administrator if it keeps happening."
 msgstr ""
 
@@ -7353,10 +7386,14 @@ msgstr ""
 msgid "Site name should be at least 1 character"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:384:38
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:657:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:400:40
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:674:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:187:24
 msgid "Skip hostname check on the TLS certificate."
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:138:18
+msgid "Skip offline agents"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:1132:73
@@ -7368,8 +7405,8 @@ msgstr ""
 msgid "Skip this form when a chat starts. Show it when the AI needs to transfer the conversation to a human."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:383:32
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:656:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:399:34
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:673:32
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:186:18
 msgid "Skip TLS Verification"
 msgstr ""
@@ -7396,7 +7433,7 @@ msgstr ""
 msgid "SLA Policy name should be between 1 and 255 characters"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:131:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:96:30
 msgid "SLA policy to be auto applied to conversations, when conversations are assigned to this team."
 msgstr ""
 
@@ -7408,7 +7445,7 @@ msgstr ""
 msgid "Small"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:397:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:414:15
 msgid "SMTP Configuration"
 msgstr ""
 
@@ -7472,7 +7509,7 @@ msgstr ""
 #: frontend/apps/main/src/features/admin/agents/AgentForm.vue:456:19
 #: frontend/apps/main/src/features/admin/agents/AgentForm.vue:481:19
 #: frontend/apps/main/src/features/admin/help-center/IconPicker.vue:54:13
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1281:19
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1299:19
 #: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:4:7
 #: frontend/apps/widget/src/components/CSATMessageBubble.vue:134:24
 msgid "Something went wrong"
@@ -7593,25 +7630,25 @@ msgstr ""
 msgid "Summarize this conversation"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:406:13
-#: frontend/apps/main/src/features/conversation/Conversation.vue:84:17
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:422:13
+#: frontend/apps/main/src/features/conversation/Conversation.vue:94:17
 msgid "Summarize with AI"
 msgstr ""
 
-#: frontend/apps/main/src/features/conversation/Conversation.vue:190:19
+#: frontend/apps/main/src/features/conversation/Conversation.vue:209:19
 msgid "Summarizing conversation with AI. This may take a few seconds."
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/ArticleEditor.vue:80:20
-#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:407:23
+#: frontend/apps/main/src/features/command/providers/useConversationCommands.js:423:23
 msgid "Summary"
 msgstr ""
 
-#: frontend/apps/main/src/features/conversation/Conversation.vue:194:19
+#: frontend/apps/main/src/features/conversation/Conversation.vue:213:19
 msgid "Summary added to the conversation as a private note."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:701:36
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:718:36
 msgid "support@example.com"
 msgstr ""
 
@@ -7623,11 +7660,11 @@ msgstr ""
 msgid "Switch between reply and private note"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:40:57
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:28:37
 msgid "Switch to dark mode"
 msgstr ""
 
-#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:40:24
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:27:38
 msgid "Switch to light mode"
 msgstr ""
 
@@ -7641,12 +7678,20 @@ msgstr ""
 msgid "Switch to reply"
 msgstr ""
 
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:26:37
+msgid "Switch to system theme"
+msgstr ""
+
 #: frontend/apps/main/src/views/admin/whatsapp/WhatsAppTemplateList.vue:33:17
 msgid "Sync from Meta"
 msgstr ""
 
 #: frontend/apps/main/src/views/admin/whatsapp/WhatsAppTemplateList.vue:294:19
 msgid "Synced {count} template(s) from Meta."
+msgstr ""
+
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:157:37
+msgid "System"
 msgstr ""
 
 #: frontend/apps/main/src/components/editor/EditorToolbar.vue:246:114
@@ -7656,7 +7701,7 @@ msgstr ""
 msgid "Table"
 msgstr ""
 
-#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:39:46
+#: frontend/apps/main/src/views/admin/help-center/HelpCenterCustomize.vue:42:46
 msgid "Tablet"
 msgstr ""
 
@@ -7693,7 +7738,7 @@ msgstr ""
 msgid "Team the conversation is handed off to when the assistant cannot help."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:81:30
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:46:30
 msgid "Team''s timezone will be used to calculate SLA."
 msgstr ""
 
@@ -7721,7 +7766,7 @@ msgstr ""
 msgid "Template submitted to Meta. Approval usually takes a few minutes."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:870:42
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:887:42
 msgid "Tenant ID"
 msgstr ""
 
@@ -7786,7 +7831,7 @@ msgstr ""
 msgid "The external app should reject tokens older than this. Included as ''exp'' (expiry timestamp) inside the encrypted token."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:643:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:660:29
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:127:15
 msgid "The hostname to use in the HELO/EHLO command. If not set, defaults to localhost."
 msgstr ""
@@ -7815,9 +7860,11 @@ msgstr ""
 msgid "The tool pauses before it runs, and an agent approves or declines it. Keep this on for tools that change data."
 msgstr ""
 
+#: frontend/apps/main/src/components/sidebar/SidebarNavUser.vue:49:51
 #: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:211:30
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:260:53
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:264:34
+#: frontend/apps/main/src/features/command/providers/useAccountCommands.js:48:17
 msgid "Theme"
 msgstr ""
 
@@ -8001,7 +8048,7 @@ msgstr ""
 msgid "Title shown in search engines and browser tabs. Leave blank to use the article title."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:450:39
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:467:39
 msgid "TLS/SSL encryption, STARTTLS is commonly used."
 msgstr ""
 
@@ -8011,7 +8058,7 @@ msgstr ""
 msgid "To"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:370:29
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:386:31
 msgid "To improve performance in large helpdesks with high email volume, this limits scans to emails received since the specified duration (e.g., `2h`, `48h`) by subtracting it from the current time."
 msgstr ""
 
@@ -8099,7 +8146,7 @@ msgstr ""
 msgid "Try adjusting your search terms or filters."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:990:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1007:16
 #: frontend/apps/main/src/views/search/SearchView.vue:23:54
 #: frontend/apps/widget/src/views/HelpView.vue:199:10
 msgid "Try again"
@@ -8154,7 +8201,7 @@ msgstr ""
 msgid "Unassigned"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:228:19
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:239:19
 msgid "Unauthorized"
 msgstr ""
 
@@ -8194,7 +8241,7 @@ msgstr ""
 
 #: frontend/apps/main/src/features/admin/help-center/ArticleEditSheet.vue:620:18
 #: frontend/apps/main/src/features/admin/help-center/CollectionEditSheet.vue:265:21
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:853:21
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:21
 msgid "Update"
 msgstr ""
 
@@ -8250,7 +8297,7 @@ msgstr ""
 msgid "Use '{{token}}' for a fully encrypted payload that the external app decrypts with a shared secret. Or use individual variables like '{{email}}', '{{phone}}', '{{external_user_id}}' for plain URL links to trusted internal tools."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:168:17
+#: frontend/apps/main/src/features/admin/general/GeneralSettingForm.vue:165:17
 msgid "Use `*` to permit all file types. For example: `jpg, png, pdf`"
 msgstr ""
 
@@ -8277,16 +8324,16 @@ msgid "Users"
 msgstr ""
 
 #: frontend/apps/main/src/features/admin/automation/ActionBox.vue:218:8
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1044:8
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1061:8
 msgid "Variables: {variables}"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:983:15
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1000:15
 msgid "Verified"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:973:16
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:984:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:990:16
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:1001:16
 msgid "Verify"
 msgstr ""
 
@@ -8366,7 +8413,7 @@ msgstr ""
 msgid "Visitors land on this language unless they pick another."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:574:38
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:591:38
 #: frontend/apps/main/src/features/admin/notification/NotificationSettingForm.vue:171:24
 msgid "Wait Timeout"
 msgstr ""
@@ -8387,7 +8434,7 @@ msgstr ""
 msgid "Waiting since"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:756:32
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:773:32
 #: frontend/apps/main/src/features/admin/inbox/LivechatInboxForm.vue:55:36
 #: frontend/apps/main/src/features/admin/inbox/WhatsAppInboxForm.vue:35:24
 msgid "Warn agents before they send a reply on a conversation that has no tags. Agents can still send without tagging by confirming the prompt."
@@ -8418,7 +8465,7 @@ msgstr ""
 msgid "Webhook verify token"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:857:11
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:862:11
 msgid "Website"
 msgstr ""
 
@@ -8469,7 +8516,7 @@ msgstr ""
 msgid "Where and when"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:708:23
+#: frontend/apps/main/src/features/admin/inbox/EmailInboxForm.vue:725:23
 msgid "Where customer replies go. Only needed when SMTP From and IMAP mailbox are on different domains."
 msgstr ""
 
@@ -8510,7 +8557,7 @@ msgstr ""
 msgid "Written by"
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:858:11
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:863:11
 msgid "X (Twitter)"
 msgstr ""
 
@@ -8533,7 +8580,7 @@ msgstr ""
 msgid "You can now login with your new password."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:230:25
+#: frontend/apps/main/src/features/admin/teams/TeamForm.vue:241:25
 msgid "You do not have permission to view business hours."
 msgstr ""
 
@@ -8553,7 +8600,11 @@ msgstr ""
 msgid "Your sign-in session expired. Try signing in again."
 msgstr ""
 
-#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:863:11
+#: frontend/apps/main/src/views/auth/UserLoginView.vue:172:31
+msgid "Your SSO provider has not confirmed email ownership, and sign in is blocked. Verify your email with the provider or contact your administrator."
+msgstr ""
+
+#: frontend/apps/main/src/features/admin/help-center/HelpCenterForm.vue:868:11
 msgid "YouTube"
 msgstr ""
 

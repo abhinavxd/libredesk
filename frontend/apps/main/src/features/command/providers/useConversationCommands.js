@@ -37,8 +37,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents'
 import { permissions as perms } from '@main/constants/permissions'
 import { CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@main/constants/conversation'
-import { MACROS_COMMAND } from '../useCommandPalette'
-import { SECTIONS } from '../sections'
+import { MACROS_COMMAND } from '@main/features/command/useCommandPalette'
+import { SECTIONS } from '@main/features/command/sections'
 
 export const SNOOZE_COMMAND = 'conv.snooze'
 export const SNOOZE_CUSTOM_COMMAND = 'conv.snooze.custom'
@@ -398,8 +398,24 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       keywords: ['export'],
       section,
       icon: Download,
+      group: true
+    },
+    {
+      id: 'conv.transcript.txt',
+      label: i18n._('Plain text (.txt)'),
+      keywords: ['txt', 'text'],
+      parent: 'conv.transcript',
+      icon: Download,
       run: () =>
         emitter.emit(EMITTER_EVENTS.CONVERSATION_ACTION, CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT)
+    },
+    {
+      id: 'conv.transcript.pdf',
+      label: i18n._('PDF'),
+      parent: 'conv.transcript',
+      icon: Download,
+      run: () =>
+        emitter.emit(EMITTER_EVENTS.CONVERSATION_ACTION, CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT_PDF)
     },
     {
       id: 'conv.summarize',

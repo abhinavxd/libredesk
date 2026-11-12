@@ -169,6 +169,7 @@ const oidcErrorMessages = {
   oidc_session_expired: msg({ message: 'Your sign-in session expired. Try signing in again.' }),
   oidc_no_account: msg({ message: 'There is no agent account for the email your SSO provider returned. Contact your administrator for access.' }),
   oidc_account_disabled: msg({ message: 'Your account is disabled, Please contact administrator' }),
+  oidc_email_not_verified: msg({ message: 'Your SSO provider has not confirmed email ownership, and sign in is blocked. Verify your email with the provider or contact your administrator.' }),
   oidc_login_failed: msg({ message: 'Sign-in failed. Try again, and contact your administrator if it keeps happening.' })
 }
 

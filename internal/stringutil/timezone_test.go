@@ -1,12 +1,14 @@
 package stringutil
 
 import (
+	"encoding/json/v2"
+	"os"
+	"slices"
 	"testing"
 	"time"
 )
 
-// frontendPickerTimezones mirrors frontend/apps/main/src/constants/timezones.js (the values the FE can send on save).
-var frontendPickerTimezones = []string{
+var legacyPickerTimezones = []string{
 	"UTC",
 	"America/New_York",
 	"America/Chicago",
@@ -45,12 +47,26 @@ var frontendPickerTimezones = []string{
 }
 
 func TestFrontendPickerTimezonesAreValid(t *testing.T) {
-	for _, tz := range frontendPickerTimezones {
-		// Save-time validation must accept it.
+	data, err := os.ReadFile("../../frontend/shared-ui/constants/timezones.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var timezones []string
+	if err := json.Unmarshal(data, &timezones); err != nil {
+		t.Fatal(err)
+	}
+	if len(timezones) < 400 {
+		t.Fatalf("expected the complete timezone list, got %d entries", len(timezones))
+	}
+	for _, tz := range legacyPickerTimezones {
+		if !slices.Contains(timezones, tz) {
+			t.Errorf("previously offered timezone %q is missing", tz)
+		}
+	}
+	for _, tz := range timezones {
 		if !IsValidTimezone(tz) {
 			t.Errorf("frontend picker offers %q but IsValidTimezone rejects it", tz)
 		}
-		// It must actually load in Go, since the date filter relies on it at query time.
 		if _, err := time.LoadLocation(tz); err != nil {
 			t.Errorf("frontend picker offers %q but time.LoadLocation fails: %v", tz, err)
 		}

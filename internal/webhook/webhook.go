@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +25,16 @@ import (
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/version"
 	"github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
+)
+
+const (
+	defaultRetryBackoff = 5 * time.Second
+	maxRetryBackoff     = 10 * time.Minute
 )
 
 var (
@@ -48,6 +55,8 @@ type Manager struct {
 	closedMu      sync.RWMutex
 	wg            sync.WaitGroup
 	encryptionKey string
+	maxRetries    int
+	retryBackoff  time.Duration
 }
 
 // Opts contains options for initializing the Manager.
@@ -60,6 +69,8 @@ type Opts struct {
 	Timeout       time.Duration
 	EncryptionKey string
 	DialControl   ssrf.Control
+	MaxRetries    int
+	RetryBackoff  time.Duration
 }
 
 // DeliveryTask represents a webhook delivery task
@@ -68,6 +79,11 @@ type DeliveryTask struct {
 	Payload any
 	// Zero means fan out to all subscribers of Event.
 	WebhookID int
+
+	attempt          int
+	deliveryID       string
+	body             []byte
+	webhookUpdatedAt time.Time
 }
 
 // queries contains prepared SQL queries.
@@ -92,6 +108,11 @@ func New(opts Opts) (*Manager, error) {
 		return nil, err
 	}
 
+	retryBackoff := opts.RetryBackoff
+	if retryBackoff <= 0 {
+		retryBackoff = defaultRetryBackoff
+	}
+
 	transport := ssrf.NewTransport(opts.DialControl, 3*time.Second)
 	transport.TLSHandshakeTimeout = 3 * time.Second
 	transport.ResponseHeaderTimeout = 3 * time.Second
@@ -108,6 +129,8 @@ func New(opts Opts) (*Manager, error) {
 		},
 		workers:       opts.Workers,
 		encryptionKey: opts.EncryptionKey,
+		maxRetries:    max(opts.MaxRetries, 0),
+		retryBackoff:  retryBackoff,
 	}, nil
 }
 
@@ -341,6 +364,13 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 			m.lo.Debug("skipping delivery, webhook is inactive", "webhook_id", webhook.ID, "event", task.Event)
 			return
 		}
+		if task.staleFor(webhook) {
+			m.lo.Info("dropping webhook retry, the webhook was edited after the first attempt",
+				"webhook_id", webhook.ID,
+				"event", task.Event,
+				"delivery_id", task.deliveryID)
+			return
+		}
 		m.deliverSingleWebhook(webhook, task)
 		return
 	}
@@ -358,17 +388,23 @@ func (m *Manager) deliverWebhook(task DeliveryTask) {
 
 // deliverSingleWebhook delivers a webhook to a single endpoint.
 func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask) {
-	basePayload := map[string]any{
-		"event":     task.Event,
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"payload":   task.Payload,
-	}
+	if task.body == nil {
+		basePayload := map[string]any{
+			"event":     task.Event,
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+			"payload":   task.Payload,
+		}
 
-	payloadBytes, err := json.Marshal(basePayload)
-	if err != nil {
-		m.lo.Error("error marshaling webhook payload", "webhook_id", webhook.ID, "event", task.Event, "error", err)
-		return
+		body, err := json.Marshal(basePayload)
+		if err != nil {
+			m.lo.Error("error marshaling webhook payload", "webhook_id", webhook.ID, "event", task.Event, "error", err)
+			return
+		}
+		task.body = body
+		task.deliveryID = uuid.NewString()
+		task.attempt = 1
 	}
+	payloadBytes := task.body
 
 	// Create HTTP request
 	req, err := http.NewRequest("POST", webhook.URL, bytes.NewReader(payloadBytes))
@@ -380,6 +416,9 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Libredesk-Webhook/"+version.Version)
+	req.Header.Set("X-Libredesk-Event", string(task.Event))
+	req.Header.Set("X-Libredesk-Delivery-Id", task.deliveryID)
+	req.Header.Set("X-Libredesk-Delivery-Attempt", strconv.Itoa(task.attempt))
 
 	// Add signature if secret is provided
 	if webhook.Secret != "" {
@@ -402,7 +441,10 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 			"webhook_id", webhook.ID,
 			"url", webhook.URL,
 			"event", task.Event,
+			"delivery_id", task.deliveryID,
+			"attempt", task.attempt,
 			"error", err)
+		m.retryLater(webhook, task)
 		return
 	}
 	defer resp.Body.Close()
@@ -428,8 +470,72 @@ func (m *Manager) deliverSingleWebhook(webhook models.Webhook, task DeliveryTask
 			"webhook_id", webhook.ID,
 			"event", task.Event,
 			"url", webhook.URL,
+			"delivery_id", task.deliveryID,
+			"attempt", task.attempt,
 			"status_code", resp.StatusCode,
 			"response_bytes", len(responseBody))
+		if retryableStatus(resp.StatusCode) {
+			m.retryLater(webhook, task)
+		}
+	}
+}
+
+func (m *Manager) retryDelay(attempt int) time.Duration {
+	delay := m.retryBackoff
+	for i := 1; i < attempt && delay < maxRetryBackoff; i++ {
+		delay *= 2
+	}
+	return min(delay, maxRetryBackoff)
+}
+
+func (m *Manager) retryLater(webhook models.Webhook, task DeliveryTask) {
+	if task.Event == models.EventWebhookTest {
+		return
+	}
+	if task.attempt > m.maxRetries {
+		if m.maxRetries > 0 {
+			m.lo.Error("webhook delivery failed after all attempts, giving up",
+				"webhook_id", webhook.ID,
+				"event", task.Event,
+				"delivery_id", task.deliveryID,
+				"attempts", task.attempt)
+		}
+		return
+	}
+
+	next := DeliveryTask{
+		Event:            task.Event,
+		WebhookID:        webhook.ID,
+		attempt:          task.attempt + 1,
+		deliveryID:       task.deliveryID,
+		body:             task.body,
+		webhookUpdatedAt: webhook.UpdatedAt,
+	}
+	delay := m.retryDelay(task.attempt)
+	m.lo.Warn("scheduling webhook delivery retry",
+		"webhook_id", webhook.ID,
+		"event", task.Event,
+		"delivery_id", task.deliveryID,
+		"next_attempt", next.attempt,
+		"delay", delay)
+	time.AfterFunc(delay, func() { m.enqueueRetry(next) })
+}
+
+func (m *Manager) enqueueRetry(task DeliveryTask) {
+	m.closedMu.RLock()
+	defer m.closedMu.RUnlock()
+	if m.closed {
+		return
+	}
+
+	select {
+	case m.deliveryQueue <- task:
+	default:
+		m.lo.Error("webhook delivery queue is full, dropping webhook retry",
+			"event", task.Event,
+			"webhook_id", task.WebhookID,
+			"delivery_id", task.deliveryID,
+			"attempt", task.attempt)
 	}
 }
 
@@ -451,4 +557,13 @@ func (m *Manager) getWebhooksByEvent(event string) ([]models.Webhook, error) {
 	m.decryptWebhooks(webhooks)
 
 	return webhooks, nil
+}
+
+func (t DeliveryTask) staleFor(webhook models.Webhook) bool {
+	return !t.webhookUpdatedAt.IsZero() && !t.webhookUpdatedAt.Equal(webhook.UpdatedAt)
+}
+
+func retryableStatus(code int) bool {
+	return code == http.StatusRequestTimeout || code == http.StatusTooEarly || code == http.StatusTooManyRequests ||
+		code >= http.StatusInternalServerError
 }

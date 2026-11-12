@@ -58,7 +58,7 @@ func New(opts Opts) (*Manager, error) {
 // GetAll retrieves tags matching query, all of them when pageSize is 0.
 func (t *Manager) GetAll(query string, page, pageSize int) ([]models.Tag, error) {
 	var tags = make([]models.Tag, 0)
-	if err := t.q.GetAllTags.Select(&tags, query, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
+	if err := t.q.GetAllTags.Select(&tags, query, pageSize, dbutil.PageOffset(page, pageSize), dbutil.ContainsPattern(query)); err != nil {
 		t.lo.Error("error fetching tags", "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, t.i18n.Get("Something went wrong"), nil)
 	}

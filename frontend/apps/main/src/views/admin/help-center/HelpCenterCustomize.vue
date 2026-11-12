@@ -26,6 +26,9 @@
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="landing">{{ i18n._('Landing page') }}</SelectItem>
+                <SelectItem value="collection">{{
+                  i18n._('Collection page')
+                }}</SelectItem>
                 <SelectItem value="article">{{ i18n._('Article page') }}</SelectItem>
               </SelectContent>
             </Select>
@@ -73,14 +76,19 @@
                 <ExternalLink class="size-3 shrink-0" />
               </a>
             </div>
-            <div ref="previewBox" class="h-[calc(100dvh-13rem)] overflow-hidden bg-muted">
+            <div ref="previewBox" class="relative h-[calc(100dvh-13rem)] overflow-hidden bg-muted">
               <iframe
-                ref="previewFrame"
-                class="border-0 bg-background block origin-top-left"
+                v-for="preview in previews"
+                :key="preview.id"
+                :ref="(el) => setPreviewFrame(preview.id, el)"
+                class="absolute left-0 top-0 border-0 bg-background block origin-top-left"
+                :class="{ invisible: preview.id !== activePreview?.id }"
                 :style="frameStyle"
+                :srcdoc="preview.html"
                 :title="i18n.ngettext('Help center', 'Help centers', 1)"
+                :aria-hidden="preview.id !== activePreview?.id"
                 sandbox="allow-same-origin"
-                @load="lockPreview"
+                @load="showPreview(preview)"
               />
             </div>
           </div>
@@ -128,7 +136,10 @@ const loading = ref(true)
 const loadFailed = ref(false)
 const isSubmitting = ref(false)
 const helpCenter = ref(null)
-const previewFrame = ref(null)
+const activePreview = ref(null)
+const pendingPreview = ref(null)
+const previewFrames = new Map()
+const previews = computed(() => [activePreview.value, pendingPreview.value].filter(Boolean))
 const origin = computed(() =>
   (appSettingsStore.settings?.['app.root_url'] || window.location.origin).replace(/\/$/, '')
 )
@@ -140,6 +151,7 @@ const previewBox = ref(null)
 const previewTitle = computed(() => {
   const values = lastFormValues.value || helpCenter.value || {}
   if (previewPage.value === 'article') return i18n._('Sample article')
+  if (previewPage.value === 'collection') return i18n._('Sample collection')
   return values.page_title || values.name || ''
 })
 
@@ -151,9 +163,10 @@ const helpCenterPath = (values) => `/hc/${values.slug || ''}/${values.default_lo
 
 const previewURL = computed(() => {
   const path = helpCenterPath(lastFormValues.value || helpCenter.value || {})
-  return previewPage.value === 'article'
-    ? `${origin.value}${path}/articles/sample-article`
-    : `${origin.value}${path}`
+  if (previewPage.value === 'article') return `${origin.value}${path}/articles/sample-article`
+  if (previewPage.value === 'collection')
+    return `${origin.value}${path}/collections/sample-collection`
+  return `${origin.value}${path}`
 })
 // Uses the saved slug, not the form: an unsaved slug has no live page yet.
 const previewLiveURL = computed(() => `${origin.value}${helpCenterPath(helpCenter.value || {})}`)
@@ -185,25 +198,37 @@ const breadcrumbLinks = computed(() => [
 
 const goBack = () => router.push({ name: 'help-center-list' })
 
-// Links resolve against the admin origin; following one would replace the preview.
-const lockPreview = () => {
-  const body = previewFrame.value?.contentDocument?.body
-  if (body) body.inert = true
+const setPreviewFrame = (id, el) => {
+  if (el) previewFrames.set(id, el)
+  else previewFrames.delete(id)
 }
 
 // A slower earlier render can land after a newer one, so only the latest request may paint.
 let previewRequest = 0
 
+const showPreview = async (preview) => {
+  const frame = previewFrames.get(preview.id)
+  const doc = frame?.contentDocument
+  if (!doc) return
+  doc.body.inert = true
+  await doc.fonts.ready
+  if (preview.id !== previewRequest || preview.id !== pendingPreview.value?.id) return
+
+  const current = previewFrames.get(activePreview.value?.id)
+  if (current && activePreview.value.page === preview.page) {
+    frame.contentWindow.scrollTo(current.contentWindow.scrollX, current.contentWindow.scrollY)
+  }
+  activePreview.value = preview
+  pendingPreview.value = null
+}
+
 const renderPreview = async (values) => {
   const request = ++previewRequest
+  const page = previewPage.value
+  pendingPreview.value = null
   try {
-    const { data } = await api.previewHelpCenter(
-      props.id,
-      values,
-      previewPage.value,
-      previewTheme.value
-    )
-    if (request === previewRequest && previewFrame.value) previewFrame.value.srcdoc = data
+    const { data } = await api.previewHelpCenter(props.id, values, page, previewTheme.value)
+    if (request === previewRequest) pendingPreview.value = { id: request, page, html: data }
   } catch {
     // A half-filled form can fail validation while typing; the last good preview stays up.
   }
@@ -265,6 +290,7 @@ watch(previewBox, (box) => {
 })
 
 onBeforeUnmount(() => {
+  previewRequest++
   clearTimeout(previewTimer)
   boxObserver?.disconnect()
 })

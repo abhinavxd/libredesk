@@ -6,7 +6,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: cmd/init.go:490:17
+#: cmd/init.go:497:17
 #, go-format
 msgid "%d result"
 msgid_plural "%d results"

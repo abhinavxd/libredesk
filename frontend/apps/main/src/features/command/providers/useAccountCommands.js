@@ -10,6 +10,7 @@ import {
   Clock,
   Keyboard,
   LogOut,
+  Monitor,
   Moon,
   Sun,
   UserRoundCog
@@ -21,9 +22,15 @@ import { SECTIONS } from '@main/features/command/sections'
 
 const AWAY_STATUSES = ['away_manual', 'away_and_reassigning']
 
+const THEME_COMMANDS = [
+  { value: 'auto', labelMessage: msg({ message: 'Switch to system theme' }), icon: Monitor },
+  { value: 'light', labelMessage: msg({ message: 'Switch to light mode' }), icon: Sun },
+  { value: 'dark', labelMessage: msg({ message: 'Switch to dark mode' }), icon: Moon }
+]
+
 export function useAccountCommands() {
   const i18n = useI18n()
-  const mode = useColorMode()
+  const { store: themePreference } = useColorMode()
   const userStore = useUserStore()
   const shortcutsDialog = useKeyboardShortcutsDialog()
   const logout = useLogout()
@@ -32,19 +39,22 @@ export function useAccountCommands() {
     const status = userStore.user.availability_status
     const isAway = AWAY_STATUSES.includes(status)
     const isReassigning = status === 'away_and_reassigning'
-    const isDark = mode.value === 'dark'
+
+    const themeCommands = THEME_COMMANDS.filter(
+      (option) => option.value !== themePreference.value
+    ).map((option) => ({
+      id: `account.theme.${option.value}`,
+      label: i18n._(option.labelMessage),
+      keywords: [i18n._('Theme'), 'theme'],
+      section: SECTIONS.ACCOUNT,
+      icon: option.icon,
+      run: () => {
+        themePreference.value = option.value
+      }
+    }))
 
     return [
-      {
-        id: 'account.theme',
-        label: isDark ? i18n._('Switch to light mode') : i18n._('Switch to dark mode'),
-        keywords: [i18n._('Dark Mode'), 'theme'],
-        section: SECTIONS.ACCOUNT,
-        icon: isDark ? Sun : Moon,
-        run: () => {
-          mode.value = isDark ? 'light' : 'dark'
-        }
-      },
+      ...themeCommands,
       {
         id: 'account.availability',
         label: isAway ? i18n._('Set status to online') : i18n._('Set status to away'),

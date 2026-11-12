@@ -106,6 +106,23 @@
       </FormItem>
     </FormField>
 
+    <FormField name="verify_email" v-slot="{ value, handleChange, meta }">
+      <FormItem>
+        <div class="flex items-center space-x-2">
+          <FormControl>
+            <Checkbox
+              type="button"
+              :checked="value"
+              @update:checked="(checked) => handleChange(checked, meta.validated)"
+            />
+          </FormControl>
+          <FormLabel>{{ i18n._('Require verified email') }}</FormLabel>
+        </div>
+        <FormDescription>{{ i18n._('Disabling this allows sign in without confirming email ownership.') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
+
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
 </template>
@@ -177,14 +194,17 @@ const onSubmit = form.handleSubmit((values) => {
   props.submitForm(values)
 })
 
-// Watch for changes in initialValues and update the form.
 watch(
   () => props.initialValues,
   (newValues) => {
-    if (newValues && newValues.provider !== 'Custom') {
-      newValues.logo_url = ''
-    }
-    form.setValues(newValues, false)
+    form.setValues(
+      {
+        ...newValues,
+        logo_url: newValues?.provider !== 'Custom' ? '' : newValues.logo_url,
+        verify_email: newValues?.verify_email ?? true
+      },
+      false
+    )
   },
   { deep: true, immediate: true }
 )

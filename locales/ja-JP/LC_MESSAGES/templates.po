@@ -11,7 +11,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: cmd/init.go:490:17
+#: cmd/init.go:497:17
 msgid "%d result"
 msgid_plural "%d results"
 msgstr[0] ""
@@ -242,4 +242,3 @@ msgstr[0] ""
 msgid "author"
 msgid_plural "authors"
 msgstr[0] ""
-

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "update:timezones": "node scripts/update-timezones.mjs",
     "dev": "pnpm exec vite",
     "dev:main": "pnpm exec vite --mode main",
     "dev:widget": "pnpm exec vite --mode widget",

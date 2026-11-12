@@ -10,13 +10,13 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/image"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -112,7 +112,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 	var (
 		app      = r.Context.(*App)
 		auser    = r.RequestCtx.UserValue("user").(amodels.User)
-		ip       = realip.FromRequest(r.RequestCtx)
+		ip       = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		availReq availabilityRequest
 	)
 
@@ -270,7 +270,7 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		req   = agentReq{}
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
-		ip    = realip.FromRequest(r.RequestCtx)
+		ip    = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id == 0 {

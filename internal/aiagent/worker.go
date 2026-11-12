@@ -222,8 +222,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 
-	private := false
-	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, m.maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, _, err := m.convo.GetAIConversationMessages(conv.UUID, 1 /** page **/, m.maxHistoryMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -268,13 +267,17 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 
 	contactLines := contactFieldLines(conv.Contact)
 	systemPrompt := buildSystemPrompt(assistant)
+	if msgs[0].Total > len(msgs) {
+		systemPrompt += "\n\nOnly the latest public messages are included. Earlier messages are omitted."
+	}
 	if len(contactLines) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
-	history := m.buildHistory(msgs, conv.ContactID)
+	loc := m.ai.WorkspaceLocation()
+	history := m.buildHistory(msgs, conv.ContactID, loc)
 	// Keep customer-controlled data (contact fields, subject, attributes) out of the system prompt; it
 	// stays in a user-role block so it ranks below the assistant's instructions, not beside them.
-	if block := customerContextBlock(conv, contactLines); block != "" {
+	if block := customerContextBlock(conv, contactLines, loc); block != "" {
 		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
@@ -643,7 +646,7 @@ func latestInboundContact(msgs []cmodels.Message) *cmodels.Message {
 	return nil
 }
 
-func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels.ChatMessage {
+func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int, loc *time.Location) []aimodels.ChatMessage {
 	// Tools act as the primary contact, so a CC'd participant's message must never enter the prompt
 	// as a trusted user turn - it could inject instructions that drive those tools under the
 	// contact's identity. Keep the contact's own messages and the agent's replies; drop other contacts.
@@ -727,6 +730,9 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 				text += "\n"
 			}
 			text += strings.Join(markers, "\n")
+		}
+		if !msg.CreatedAt.IsZero() {
+			text = "[" + msg.CreatedAt.In(loc).Format(time.RFC3339) + "]\n" + text
 		}
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}

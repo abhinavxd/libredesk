@@ -11,7 +11,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: internal/activity_log/activity_log.go:235:17
+#: internal/activity_log/activity_log.go:233:17
 msgid "%[1]s (%[2]s) added permission(s) %[3]s to role %[4]s (%[5]s)"
 msgstr "%[1]s (%[2]s) a ajouté les permissions %[3]s au rôle %[4]s (%[5]s)"
 
@@ -27,11 +27,11 @@ msgstr "%[1]s (%[2]s) a changé le statut de %[3]s (%[4]s) vers \"Absent et réa
 msgid "%[1]s (%[2]s) changed %[3]s (%[4]s) status to online"
 msgstr "%[1]s (%[2]s) a changé le statut de %[3]s (%[4]s) vers \"En ligne\""
 
-#: internal/activity_log/activity_log.go:256:17
+#: internal/activity_log/activity_log.go:254:17
 msgid "%[1]s (%[2]s) deleted contact %[3]s (%[4]s)"
 msgstr "%[1]s (%[2]s) a supprimé le contact %[3]s (%[4]s)"
 
-#: internal/activity_log/activity_log.go:273:17
+#: internal/activity_log/activity_log.go:271:17
 msgid "%[1]s (%[2]s) exported data of contact %[3]s (%[4]s)"
 msgstr "%[1]s (%[2]s) a exporté les données du contact %[3]s (%[4]s)"
 
@@ -55,29 +55,29 @@ msgstr "%[1]s (%[2]s) s'est connecté"
 msgid "%[1]s (%[2]s) logged out"
 msgstr "%[1]s (%[2]s) s'est déconnecté"
 
-#: internal/activity_log/activity_log.go:220:17
+#: internal/activity_log/activity_log.go:218:17
 msgid "%[1]s (%[2]s) removed permission(s) %[3]s and added permission(s) %[4]s to role %[5]s (%[6]s)"
 msgstr "%[1]s (%[2]s) a supprimé les permissions %[3]s et ajouté les permissions %[4]s au rôle %[5]s (%[6]s)"
 
-#: internal/activity_log/activity_log.go:228:17
+#: internal/activity_log/activity_log.go:226:17
 msgid "%[1]s (%[2]s) removed permission(s) %[3]s from role %[4]s (%[5]s)"
 msgstr "%[1]s (%[2]s) a supprimé les permissions %[3]s du rôle %[4]s (%[5]s)"
 
-#: internal/activity_log/activity_log.go:201:17
+#: internal/activity_log/activity_log.go:199:17
 msgid "%[1]s (%[2]s) set password for %[3]s (%[4]s)"
 msgstr "%[1]s (%[2]s) a défini le mot de passe de %[3]s (%[4]s)"
 
-#: cmd/agent_import.go:20:57 cmd/chat.go:1279:67 cmd/chat.go:1291:67
-#: cmd/chat.go:1307:67 cmd/chat.go:1336:50 cmd/chat.go:204:57
-#: cmd/chat.go:344:57 cmd/chat.go:380:57 cmd/chat.go:392:57 cmd/chat.go:396:57
-#: cmd/chat.go:400:57 cmd/chat.go:568:57 cmd/chat.go:682:57
-#: cmd/conversation.go:1075:53 cmd/conversation.go:1089:54
-#: cmd/conversation.go:1094:55 cmd/conversation.go:1097:55
-#: cmd/conversation.go:1101:55 cmd/conversation.go:1106:54
-#: cmd/conversation.go:1109:54 cmd/conversation.go:1112:54
-#: cmd/inboxes.go:498:50 cmd/inboxes.go:502:50 cmd/inboxes.go:507:51
-#: cmd/inboxes.go:510:51 cmd/tag_import.go:21:57 cmd/views.go:284:49
-#: cmd/widget_middleware.go:41:58
+#: cmd/agent_import.go:20:57 cmd/chat.go:1293:67 cmd/chat.go:1305:67
+#: cmd/chat.go:1321:67 cmd/chat.go:1350:50 cmd/chat.go:206:57
+#: cmd/chat.go:347:57 cmd/chat.go:383:57 cmd/chat.go:395:57 cmd/chat.go:399:57
+#: cmd/chat.go:403:57 cmd/chat.go:573:57 cmd/chat.go:687:57
+#: cmd/conversation.go:1078:53 cmd/conversation.go:1092:54
+#: cmd/conversation.go:1097:55 cmd/conversation.go:1100:55
+#: cmd/conversation.go:1104:55 cmd/conversation.go:1109:54
+#: cmd/conversation.go:1112:54 cmd/conversation.go:1115:54
+#: cmd/inboxes.go:499:50 cmd/inboxes.go:503:50 cmd/inboxes.go:508:51
+#: cmd/inboxes.go:511:51 cmd/tag_import.go:21:57 cmd/views.go:284:49
+#: cmd/widget_middleware.go:40:58
 msgid "%[1]s Required"
 msgstr "%[1]s requis"
 
@@ -87,26 +87,26 @@ msgstr "%[1]s action non autorisée"
 
 #: cmd/business_hours.go:55:57 cmd/contacts.go:234:57 cmd/contacts.go:357:69
 #: cmd/context_links.go:168:49 cmd/context_links.go:171:49
-#: cmd/conversation.go:634:57 cmd/conversation.go:672:57
-#: cmd/conversation.go:676:57 cmd/custom_attributes.go:131:49
+#: cmd/conversation.go:635:57 cmd/conversation.go:673:57
+#: cmd/conversation.go:677:57 cmd/custom_attributes.go:131:49
 #: cmd/custom_attributes.go:134:49 cmd/custom_attributes.go:137:49
 #: cmd/custom_attributes.go:140:49 cmd/custom_attributes.go:143:49
-#: cmd/helpcenter.go:1144:57 cmd/helpcenter.go:1162:57 cmd/helpcenter.go:187:57
-#: cmd/helpcenter.go:2046:49 cmd/helpcenter.go:2049:49
-#: cmd/helpcenter.go:2052:49 cmd/helpcenter.go:2070:49
-#: cmd/helpcenter.go:2078:49 cmd/helpcenter.go:2081:49 cmd/helpcenter.go:224:57
-#: cmd/helpcenter.go:248:57 cmd/helpcenter.go:293:57 cmd/helpcenter.go:310:57
-#: cmd/helpcenter.go:327:57 cmd/helpcenter.go:344:57 cmd/helpcenter.go:362:57
-#: cmd/helpcenter.go:387:57 cmd/helpcenter.go:416:57 cmd/helpcenter.go:435:57
-#: cmd/helpcenter.go:452:57 cmd/helpcenter.go:468:57 cmd/helpcenter.go:490:57
-#: cmd/helpcenter.go:528:57 cmd/helpcenter.go:547:57 cmd/helpcenter.go:554:57
-#: cmd/helpcenter.go:572:57 cmd/helpcenter.go:594:57 cmd/helpcenter.go:601:57
-#: cmd/helpcenter.go:619:57 cmd/helpcenter.go:623:57 cmd/helpcenter.go:643:57
-#: cmd/helpcenter.go:650:57 cmd/helpcenter.go:667:57 cmd/inboxes.go:482:49
-#: cmd/inboxes.go:485:49 cmd/inboxes.go:488:49 cmd/inboxes.go:534:51
-#: cmd/inboxes.go:537:51 cmd/inboxes.go:540:51 cmd/inboxes.go:582:51
-#: cmd/inboxes.go:691:50 cmd/inboxes.go:731:50 cmd/inboxes.go:737:50
-#: cmd/inboxes.go:744:50 cmd/inboxes.go:761:50 cmd/inboxes.go:767:50
+#: cmd/helpcenter.go:1158:57 cmd/helpcenter.go:1176:57 cmd/helpcenter.go:198:57
+#: cmd/helpcenter.go:2102:49 cmd/helpcenter.go:2105:49
+#: cmd/helpcenter.go:2108:49 cmd/helpcenter.go:2126:49
+#: cmd/helpcenter.go:2134:49 cmd/helpcenter.go:2137:49 cmd/helpcenter.go:235:57
+#: cmd/helpcenter.go:259:57 cmd/helpcenter.go:307:57 cmd/helpcenter.go:324:57
+#: cmd/helpcenter.go:341:57 cmd/helpcenter.go:358:57 cmd/helpcenter.go:376:57
+#: cmd/helpcenter.go:401:57 cmd/helpcenter.go:430:57 cmd/helpcenter.go:449:57
+#: cmd/helpcenter.go:466:57 cmd/helpcenter.go:482:57 cmd/helpcenter.go:504:57
+#: cmd/helpcenter.go:542:57 cmd/helpcenter.go:561:57 cmd/helpcenter.go:568:57
+#: cmd/helpcenter.go:586:57 cmd/helpcenter.go:608:57 cmd/helpcenter.go:615:57
+#: cmd/helpcenter.go:633:57 cmd/helpcenter.go:637:57 cmd/helpcenter.go:657:57
+#: cmd/helpcenter.go:664:57 cmd/helpcenter.go:681:57 cmd/inboxes.go:483:49
+#: cmd/inboxes.go:486:49 cmd/inboxes.go:489:49 cmd/inboxes.go:535:51
+#: cmd/inboxes.go:538:51 cmd/inboxes.go:541:51 cmd/inboxes.go:583:51
+#: cmd/inboxes.go:692:50 cmd/inboxes.go:732:50 cmd/inboxes.go:738:50
+#: cmd/inboxes.go:745:50 cmd/inboxes.go:762:50 cmd/inboxes.go:768:50
 #: cmd/macro.go:325:49 cmd/macro.go:329:49 cmd/macro.go:339:50
 #: cmd/oauth.go:57:57 cmd/sla.go:113:49 cmd/sla.go:116:49 cmd/sla.go:123:50
 #: cmd/sla.go:126:50 cmd/sla.go:129:50 cmd/sla.go:133:51 cmd/sla.go:145:50
@@ -118,43 +118,47 @@ msgstr "%[1]s action non autorisée"
 #: cmd/users.go:669:49 cmd/views.go:109:57 cmd/views.go:113:57
 #: cmd/views.go:272:49 cmd/views.go:275:49 cmd/views.go:45:57
 #: cmd/views.go:49:57 cmd/webhooks.go:185:49 cmd/webhooks.go:188:49
-#: cmd/webhooks.go:191:49 internal/ai/ai.go:418:49 internal/ai/ai.go:421:49
+#: cmd/webhooks.go:191:49 internal/ai/ai.go:437:49 internal/ai/ai.go:440:49
 #: internal/ai/knowledgebase.go:105:77 internal/ai/knowledgebase.go:109:77
 #: internal/ai/knowledgebase.go:84:77 internal/ai/knowledgebase.go:88:77
-#: internal/aiagent/aiagent.go:410:49 internal/conversation/message.go:642:61
-#: internal/conversation/status/status.go:148:49 internal/inbox/inbox.go:446:67
-#: internal/inbox/inbox.go:589:54 internal/oidc/oidc.go:193:49
+#: internal/aiagent/aiagent.go:411:49 internal/conversation/message.go:677:61
+#: internal/conversation/status/status.go:152:49 internal/inbox/inbox.go:445:67
+#: internal/inbox/inbox.go:584:54 internal/oidc/oidc.go:193:49
 #: internal/oidc/oidc.go:196:49 internal/role/role.go:110:64
 #: internal/role/role.go:131:64
 msgid "%[1]s empty"
 msgstr "%[1]s vide"
 
-#: internal/conversation/conversation.go:1538:21
+#: internal/conversation/conversation.go:1544:21
 msgid "%[1]s mentioned you in #%[2]s"
 msgstr "%[1]s vous a mentionné dans #%[2]s"
 
-#: cmd/inboxes.go:550:51 cmd/inboxes.go:561:51 cmd/inboxes.go:709:49
+#: cmd/inboxes.go:551:51 cmd/inboxes.go:562:51 cmd/inboxes.go:710:49
 msgid "%[1]s must be at least %[2]s."
 msgstr "%[1]s doit être au moins %[2]s."
 
-#: cmd/helpcenter.go:1186:58 internal/helpcenter/helpcenter.go:1345:50
+#: cmd/helpcenter.go:1200:58 internal/helpcenter/helpcenter.go:1345:50
 #: internal/helpcenter/helpcenter.go:1352:50
 msgid "A collection cannot be its own parent."
 msgstr "Une catégorie ne peut pas être son propre parent."
 
-#: cmd/helpcenter.go:2179:16
+#: cmd/helpcenter.go:2221:16 cmd/helpcenter.go:2269:16
 msgid "A sample article showing how your article pages will look."
 msgstr "Un exemple d'article montrant à quoi ressembleront les pages de vos articles."
+
+#: cmd/helpcenter.go:2226:18
+msgid "A sample collection showing how your collection pages will look."
+msgstr ""
 
 #: internal/ai/agent_approval.go:204:53
 msgid "A tool request is waiting for approval. Approve or decline it before running the AI again."
 msgstr ""
 
-#: cmd/ai.go:425:17
+#: cmd/ai.go:429:17
 msgid "AI summary"
 msgstr "Résumé IA"
 
-#: cmd/widget_middleware.go:68:58
+#: cmd/widget_middleware.go:67:58
 msgid "Access denied"
 msgstr "Accès refusé"
 
@@ -162,16 +166,16 @@ msgstr "Accès refusé"
 msgid "Add an email or a phone number. A contact needs at least one to be reached."
 msgstr ""
 
-#: cmd/inboxes.go:687:49
+#: cmd/inboxes.go:688:49
 msgid "Add up to 6 quick replies."
 msgstr ""
 
-#: cmd/users.go:349:4 internal/conversation/continuity.go:298:17
+#: cmd/users.go:349:4 internal/conversation/continuity.go:304:17
 #: internal/conversation/transcript.go:62:10
 msgid "Agent"
 msgstr "Agent"
 
-#: internal/ai/ai.go:276:56 internal/context_link/context_link.go:111:75
+#: internal/ai/ai.go:283:56 internal/context_link/context_link.go:111:75
 #: internal/helpcenter/helpcenter.go:315:57
 #: internal/helpcenter/helpcenter.go:371:57
 #: internal/helpcenter/helpcenter.go:476:65
@@ -179,8 +183,8 @@ msgstr "Agent"
 #: internal/helpcenter/helpcenter.go:712:62
 #: internal/helpcenter/helpcenter.go:773:61
 #: internal/helpcenter/helpcenter.go:777:62
-#: internal/helpcenter/helpcenter.go:833:61 internal/inbox/inbox.go:635:58
-#: internal/webhook/webhook.go:169:71
+#: internal/helpcenter/helpcenter.go:833:61 internal/inbox/inbox.go:630:58
+#: internal/webhook/webhook.go:192:71
 #: internal/whatsapp/template/template.go:148:72
 msgid "Already exists"
 msgstr "existe déjà"
@@ -214,27 +218,28 @@ msgstr[1] ""
 msgid "Article status must be draft or published."
 msgstr "Le statut de l'article doit être « Brouillon » ou « Publié »."
 
+#: internal/conversation/conversation.go:1440:17
 #: internal/conversation/transcript.go:51:32
 msgid "Attachment"
 msgid_plural "Attachments"
 msgstr[0] "Pièce jointe"
 msgstr[1] "Pièces jointes"
 
-#: internal/conversation/message.go:1682:10
+#: internal/conversation/message.go:1735:10
 msgid "Audio"
 msgstr "Son"
 
-#: cmd/conversation.go:682:58 cmd/inboxes.go:351:57 cmd/login.go:41:57
-#: cmd/messages.go:177:57 cmd/messages.go:230:57 cmd/settings.go:137:57
-#: cmd/settings.go:49:57 internal/inbox/inbox.go:409:66
+#: cmd/conversation.go:683:58 cmd/inboxes.go:352:57 cmd/login.go:41:57
+#: cmd/messages.go:177:57 cmd/messages.go:230:57 cmd/settings.go:138:57
+#: cmd/settings.go:49:57 internal/inbox/inbox.go:408:66
 msgid "Bad request"
 msgstr "Requête invalide"
 
-#: cmd/helpcenter.go:2170:28
+#: cmd/helpcenter.go:2230:31 cmd/helpcenter.go:2260:28
 msgid "Before you begin"
 msgstr "Avant de commencer"
 
-#: cmd/helpcenter.go:2166:36
+#: cmd/helpcenter.go:2256:36
 msgid "Body text, links and images appear here, styled with the settings you pick on the left."
 msgstr "Le texte du corps, les liens et les images apparaissent ici, stylisés avec les paramètres que vous choisissez sur la gauche."
 
@@ -246,11 +251,11 @@ msgstr "Questionnaire de satisfaction utilisateur (CSAT) introuvable"
 msgid "CSAT already submitted"
 msgstr "Questionnaire de satisfaction utilisateur (CSAT) déjà soumis"
 
-#: internal/conversation/message.go:936:13
+#: internal/conversation/message.go:974:13
 msgid "CSAT survey was not sent. The WhatsApp reply window is closed."
 msgstr ""
 
-#: cmd/middlewares.go:53:61
+#: cmd/middlewares.go:60:61
 msgid "CSRF token mismatch"
 msgstr "Inadéquation du jeton CSRF"
 
@@ -258,11 +263,11 @@ msgstr "Inadéquation du jeton CSRF"
 msgid "CSV must contain headers and at least one data row"
 msgstr "Le CSV doit contenir des en-têtes et au moins une ligne de données"
 
-#: internal/template/template.go:122:54
+#: internal/template/template.go:136:54
 msgid "Cannot delete built-in template"
 msgstr "Impossible de supprimer le modèle intégré"
 
-#: internal/conversation/status/status.go:102:50
+#: internal/conversation/status/status.go:104:50
 msgid "Cannot delete status as it is in use, Please remove this status from all conversations before deleting"
 msgstr "Impossible de supprimer le statut car il est en cours d'utilisation. Veuillez supprimer ce statut de toutes les conversations avant de le supprimer"
 
@@ -274,8 +279,8 @@ msgstr "Impossible de supprimer l'utilisateur du système"
 msgid "Cannot modify admin role, Please create a new role."
 msgstr "Impossible de modifier le rôle d'administrateur. Veuillez créer un nouveau rôle."
 
-#: internal/conversation/status/status.go:125:64
-#: internal/conversation/status/status.go:97:49
+#: internal/conversation/status/status.go:127:64
+#: internal/conversation/status/status.go:99:49
 msgid "Cannot update default conversation status"
 msgstr "Impossible de mettre à jour l'état de la conversation par défaut"
 
@@ -289,26 +294,26 @@ msgstr "Les catégories peuvent être imbriquées jusqu'à 3 niveaux. Choisissez
 msgid "Contact"
 msgstr "Contact"
 
-#: internal/ai/ai.go:421:75 internal/ai/knowledgebase.go:110:4
+#: internal/ai/ai.go:440:75 internal/ai/knowledgebase.go:110:4
 #: internal/ai/knowledgebase.go:89:4
 msgid "Content"
 msgstr "Contenu"
 
-#: cmd/chat.go:345:4 cmd/chat.go:683:4
+#: cmd/chat.go:348:4 cmd/chat.go:688:4
 #: internal/conversation/transcript.go:19:30
 msgid "Conversation"
 msgstr "Conversation"
 
-#: internal/conversation/conversation.go:1341:21
+#: internal/conversation/conversation.go:1344:21
 msgid "Conversation assigned to you #%[1]s"
 msgstr "Conversation assignée à vous #%[1]s"
 
-#: internal/conversation/conversation.go:489:5
-#: internal/conversation/message.go:1231:67
+#: internal/conversation/conversation.go:494:5
+#: internal/conversation/message.go:1270:67
 msgid "Conversation not found"
 msgstr "Conversation introuvable"
 
-#: internal/conversation/conversation.go:1356:128
+#: internal/conversation/conversation.go:1359:128
 msgid "Conversation reopened #%[1]s"
 msgstr ""
 
@@ -316,7 +321,7 @@ msgstr ""
 msgid "Could not apply macro"
 msgstr "Impossible d'appliquer la macro"
 
-#: cmd/chat.go:1317:6
+#: cmd/chat.go:1331:6
 msgid "Country code"
 msgstr "Indicatif du pays"
 
@@ -332,11 +337,11 @@ msgstr "L'attribut personnalisé existe déjà"
 msgid "Custom attribute not found"
 msgstr "Attribut personnalisé introuvable"
 
-#: internal/template/template.go:83:71
+#: internal/template/template.go:78:72 internal/template/template.go:97:72
 msgid "Default template already exists"
 msgstr "Le modèle par défaut existe déjà"
 
-#: cmd/conversation.go:1083:53
+#: cmd/conversation.go:1086:53
 msgid "Disabled"
 msgstr ""
 
@@ -344,7 +349,7 @@ msgstr ""
 msgid "Downloaded at"
 msgstr "Téléchargé le"
 
-#: internal/sla/sla.go:759:23
+#: internal/sla/sla.go:762:23
 msgid "Due in %[1]s"
 msgstr "Échéance dans %[1]s"
 
@@ -356,15 +361,15 @@ msgstr "Les actions en double ne sont pas autorisées"
 msgid "Duration must be at least 1 minute."
 msgstr "La durée doit être d'au moins 1 minute."
 
-#: cmd/chat.go:1292:6 cmd/chat.go:1296:6
+#: cmd/chat.go:1306:6 cmd/chat.go:1310:6
 msgid "Email"
 msgstr "E-mail"
 
-#: internal/inbox/inbox.go:454:67
+#: internal/inbox/inbox.go:658:49
 msgid "Empty IMAP config"
 msgstr "Configuration IMAP vide"
 
-#: internal/inbox/inbox.go:458:67
+#: internal/inbox/inbox.go:453:67
 msgid "Empty SMTP config"
 msgstr "Configuration SMTP vide"
 
@@ -376,33 +381,33 @@ msgstr "Saisissez une URL HTTP ou HTTPS valide."
 msgid "Enter the domain's root URL starting with https://, with no path or trailing slash, e.g. https://help.example.com."
 msgstr "Entrez l'URL racine du domaine commençant par https://, sans chemin d'accès ou barre oblique de fin, par exemple « https://help.example.com »."
 
-#: cmd/ai.go:113:70 cmd/ai.go:132:70 cmd/ai.go:172:70 cmd/ai.go:188:70
-#: cmd/ai.go:225:70 cmd/ai.go:246:70 cmd/ai.go:293:70 cmd/ai.go:312:70
-#: cmd/ai.go:328:70 cmd/ai.go:356:70 cmd/ai.go:405:70 cmd/ai.go:408:70
-#: cmd/ai.go:439:70 cmd/ai.go:442:70 cmd/ai.go:467:70 cmd/ai.go:471:70
-#: cmd/ai.go:549:70 cmd/ai.go:581:70 cmd/ai.go:75:70 cmd/aiagent.go:142:70
+#: cmd/ai.go:116:70 cmd/ai.go:135:70 cmd/ai.go:175:70 cmd/ai.go:191:70
+#: cmd/ai.go:228:70 cmd/ai.go:249:70 cmd/ai.go:296:70 cmd/ai.go:315:70
+#: cmd/ai.go:331:70 cmd/ai.go:359:70 cmd/ai.go:408:70 cmd/ai.go:411:70
+#: cmd/ai.go:443:70 cmd/ai.go:446:70 cmd/ai.go:472:70 cmd/ai.go:476:70
+#: cmd/ai.go:559:70 cmd/ai.go:591:70 cmd/ai.go:78:70 cmd/aiagent.go:142:70
 #: cmd/aiagent.go:171:59 cmd/aiagent.go:175:59 cmd/aiagent.go:178:59
 #: cmd/aiagent.go:240:70 cmd/aiagent.go:282:70 cmd/automation.go:116:57
 #: cmd/automation.go:133:70 cmd/automation.go:67:57 cmd/automation.go:84:57
-#: cmd/business_hours.go:51:57 cmd/business_hours.go:93:57 cmd/chat.go:200:57
-#: cmd/chat.go:564:57 cmd/chat.go:613:57 cmd/chat.go:676:66
+#: cmd/business_hours.go:51:57 cmd/business_hours.go:93:57 cmd/chat.go:202:57
+#: cmd/chat.go:569:57 cmd/chat.go:618:57 cmd/chat.go:681:66
 #: cmd/contacts.go:231:70 cmd/contacts.go:301:70 cmd/contacts.go:329:71
 #: cmd/context_links.go:54:57 cmd/context_links.go:78:57
-#: cmd/conversation.go:457:58 cmd/conversation.go:551:57
-#: cmd/conversation.go:587:57 cmd/conversation.go:629:57
-#: cmd/conversation.go:664:57 cmd/conversation.go:715:57
-#: cmd/conversation.go:727:57 cmd/conversation.go:755:66
-#: cmd/conversation.go:785:66 cmd/conversation.go:883:57
+#: cmd/conversation.go:458:58 cmd/conversation.go:552:57
+#: cmd/conversation.go:588:57 cmd/conversation.go:630:57
+#: cmd/conversation.go:665:57 cmd/conversation.go:716:57
+#: cmd/conversation.go:728:57 cmd/conversation.go:756:66
+#: cmd/conversation.go:786:66 cmd/conversation.go:874:57
 #: cmd/custom_attributes.go:75:57 cmd/custom_attributes.go:98:57
 #: cmd/draft.go:100:57 cmd/draft.go:43:57 cmd/draft.go:50:57
-#: cmd/helpcenter.go:1115:70 cmd/helpcenter.go:1166:70 cmd/helpcenter.go:204:70
-#: cmd/helpcenter.go:228:70 cmd/helpcenter.go:252:70 cmd/helpcenter.go:366:70
-#: cmd/helpcenter.go:391:70 cmd/helpcenter.go:420:70 cmd/helpcenter.go:494:70
-#: cmd/helpcenter.go:551:70 cmd/helpcenter.go:576:70 cmd/helpcenter.go:598:70
-#: cmd/helpcenter.go:647:70 cmd/inboxes.go:189:57 cmd/inboxes.go:194:57
-#: cmd/inboxes.go:242:57 cmd/inboxes.go:247:57 cmd/inboxes.go:357:57
+#: cmd/helpcenter.go:1129:70 cmd/helpcenter.go:1180:70 cmd/helpcenter.go:215:70
+#: cmd/helpcenter.go:239:70 cmd/helpcenter.go:263:70 cmd/helpcenter.go:380:70
+#: cmd/helpcenter.go:405:70 cmd/helpcenter.go:434:70 cmd/helpcenter.go:508:70
+#: cmd/helpcenter.go:565:70 cmd/helpcenter.go:590:70 cmd/helpcenter.go:612:70
+#: cmd/helpcenter.go:661:70 cmd/inboxes.go:190:57 cmd/inboxes.go:195:57
+#: cmd/inboxes.go:243:57 cmd/inboxes.go:248:57 cmd/inboxes.go:358:57
 #: cmd/login.go:37:57 cmd/macro.go:113:57 cmd/media.go:48:66
-#: cmd/messages.go:208:66 cmd/oidc.go:48:57 cmd/oidc.go:85:57
+#: cmd/messages.go:208:66 cmd/oidc.go:48:57 cmd/oidc.go:84:57
 #: cmd/roles.go:67:57 cmd/roles.go:86:57 cmd/sla.go:50:57 cmd/sla.go:78:57
 #: cmd/statuses.go:29:57 cmd/statuses.go:71:57 cmd/tags.go:40:57
 #: cmd/tags.go:85:57 cmd/teams.go:69:70 cmd/teams.go:92:70
@@ -412,14 +417,14 @@ msgstr "Entrez l'URL racine du domaine commençant par https://, sans chemin d'a
 #: cmd/users.go:215:57 cmd/users.go:282:57 cmd/users.go:434:57
 #: cmd/users.go:488:70 cmd/views.go:102:57 cmd/views.go:188:57
 #: cmd/views.go:214:57 cmd/views.go:38:57 cmd/webhooks.go:106:57
-#: cmd/webhooks.go:74:57 internal/conversation/conversation.go:636:57
+#: cmd/webhooks.go:74:57 internal/conversation/conversation.go:641:57
 msgid "Error parsing request"
 msgstr "Erreur lors de l'analyse de la requête"
 
-#: cmd/chat.go:275:66 cmd/chat.go:292:67 cmd/chat.go:295:66 cmd/chat.go:599:66
-#: cmd/chat.go:777:66 cmd/conversation.go:1026:72
+#: cmd/chat.go:278:66 cmd/chat.go:295:67 cmd/chat.go:298:66 cmd/chat.go:604:66
+#: cmd/chat.go:782:66 cmd/conversation.go:1029:72
 #: cmd/widget_campaign_reply.go:64:73 cmd/widget_campaign_reply.go:85:73
-#: internal/conversation/message.go:513:51
+#: internal/conversation/message.go:549:51
 #: internal/conversation/proactive.go:86:50
 msgid "Error sending message"
 msgstr "Erreur lors de l'envoi du message"
@@ -428,8 +433,8 @@ msgstr "Erreur lors de l'envoi du message"
 msgid "Error sending password reset email"
 msgstr "Erreur lors de l'envoi de l'email de réinitialisation du mot de passe"
 
-#: internal/conversation/conversation.go:1557:51
-#: internal/conversation/conversation.go:1856:51
+#: internal/conversation/conversation.go:1563:51
+#: internal/conversation/conversation.go:1862:51
 msgid "Error updating conversation"
 msgstr "Erreur lors de la mise à jour de la conversation"
 
@@ -438,21 +443,21 @@ msgid "Error uploading file"
 msgstr "Erreur lors du téléversement du fichier"
 
 #: cmd/agent_import.go:21:4 cmd/tag_import.go:22:4
-#: internal/conversation/message.go:1684:10
+#: internal/conversation/message.go:1737:10
 msgid "File"
 msgstr "Fichier"
 
-#: cmd/chat.go:703:57
+#: cmd/chat.go:708:57
 msgid "File Upload is disabled"
 msgstr "Le téléchargement de fichiers est désactivé"
 
-#: cmd/chat.go:708:57 cmd/handlers.go:475:51 cmd/handlers.go:506:51
-#: cmd/handlers.go:522:51 cmd/handlers.go:548:51 cmd/handlers.go:575:51
-#: cmd/handlers.go:592:51 cmd/handlers.go:617:51 cmd/media.go:53:57
+#: cmd/chat.go:713:57 cmd/handlers.go:477:51 cmd/handlers.go:508:51
+#: cmd/handlers.go:524:51 cmd/handlers.go:550:51 cmd/handlers.go:577:51
+#: cmd/handlers.go:594:51 cmd/handlers.go:619:51 cmd/media.go:53:57
 msgid "File not found"
 msgstr "Fichier introuvable"
 
-#: cmd/chat.go:735:4 cmd/media.go:112:4 cmd/users.go:524:4
+#: cmd/chat.go:740:4 cmd/media.go:112:4 cmd/users.go:524:4
 msgid "File size too large, please upload a file less than %[1]s"
 msgstr "Taille du fichier trop importante, veuillez télécharger un fichier inférieur à %[1]s"
 
@@ -460,19 +465,19 @@ msgstr "Taille du fichier trop importante, veuillez télécharger un fichier inf
 msgid "File type is not an image"
 msgstr "Le type de fichier n'est pas une image"
 
-#: cmd/chat.go:744:57 cmd/media.go:120:57
+#: cmd/chat.go:749:57 cmd/media.go:120:57
 msgid "File type not allowed"
 msgstr "Type de fichier non autorisé"
 
-#: internal/conversation/whatsapp.go:354:50
+#: internal/conversation/whatsapp.go:357:50
 msgid "Fill in the %[1]s value before sending this template."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:361:51
+#: internal/conversation/whatsapp.go:364:51
 msgid "Fill in the header's %[1]s value before sending this template."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:374:52
+#: internal/conversation/whatsapp.go:377:52
 msgid "Fill in the link value for the %[1]s button before sending this template."
 msgstr ""
 
@@ -480,17 +485,17 @@ msgstr ""
 msgid "First response time cannot be after resolution time"
 msgstr "Le délai de première réponse ne peut être postérieur au délai de résolution"
 
-#: cmd/helpcenter.go:2169:28
+#: cmd/helpcenter.go:2229:31 cmd/helpcenter.go:2259:28
 msgid "Getting started"
 msgstr "Premiers pas"
 
-#: internal/conversation/message.go:1678:10
-#: internal/conversation/message.go:779:19
+#: internal/conversation/message.go:1731:10
+#: internal/conversation/message.go:817:19
 msgid "Image"
 msgstr "Image"
 
 #: cmd/agent_import.go:48:55 cmd/tag_import.go:49:55
-#: internal/importer/importer.go:64:4
+#: internal/importer/importer.go:65:4
 msgid "Import already in progress"
 msgstr "Importation déjà en cours"
 
@@ -498,26 +503,26 @@ msgstr "Importation déjà en cours"
 msgid "Import completed: %[1]s of %[2]s successful, %[3]s failed"
 msgstr "Importation terminée : %[1]s sur %[2]s réussies, %[3]s échouées"
 
-#: internal/importer/importer.go:115:4
+#: internal/importer/importer.go:116:4
 msgid "Import not found"
 msgstr "Importation introuvable"
 
-#: cmd/widget_middleware.go:42:5
+#: cmd/widget_middleware.go:41:5
 msgid "Inbox"
 msgstr "Boîte de réception"
 
-#: cmd/messages.go:221:57 internal/conversation/message.go:607:67
-#: internal/inbox/inbox.go:659:49
+#: cmd/messages.go:221:57 internal/conversation/message.go:647:67
+#: internal/inbox/inbox.go:662:49
 msgid "Inbox is disabled"
 msgstr "La boîte de réception est désactivée"
 
-#: cmd/widget_middleware.go:47:58 cmd/widget_middleware.go:53:58
-#: cmd/widget_middleware.go:56:58 internal/inbox/inbox.go:208:58
+#: cmd/widget_middleware.go:46:58 cmd/widget_middleware.go:52:58
+#: cmd/widget_middleware.go:55:58 internal/inbox/inbox.go:208:58
 #: internal/inbox/inbox.go:216:57 internal/inbox/inbox.go:220:58
 msgid "Inbox not found"
 msgstr "Boîte de réception introuvable"
 
-#: internal/conversation/status/status.go:159:49
+#: internal/conversation/status/status.go:163:49
 msgid "Invalid %[1]s"
 msgstr ""
 
@@ -525,7 +530,7 @@ msgstr ""
 msgid "Invalid CSV file"
 msgstr "Fichier CSV non valide"
 
-#: cmd/inboxes.go:653:51
+#: cmd/inboxes.go:654:51
 msgid "Invalid IP address or CIDR range: %[1]s"
 msgstr "Adresse IP ou plage CIDR invalide : %[1]s"
 
@@ -533,8 +538,8 @@ msgstr "Adresse IP ou plage CIDR invalide : %[1]s"
 msgid "Invalid JSON. Check for a missing comma, quote, or bracket."
 msgstr "JSON invalide. Vérifiez qu'aucune virgule, guillemet ou parenthèse ne soit manquante."
 
-#: cmd/inboxes.go:591:51 cmd/inboxes.go:595:52 cmd/inboxes.go:621:51
-#: cmd/inboxes.go:624:51 cmd/inboxes.go:629:50
+#: cmd/inboxes.go:592:51 cmd/inboxes.go:596:52 cmd/inboxes.go:622:51
+#: cmd/inboxes.go:625:51 cmd/inboxes.go:630:50
 msgid "Invalid URL"
 msgstr "URL non valide"
 
@@ -542,42 +547,42 @@ msgstr "URL non valide"
 msgid "Invalid availability status"
 msgstr "État de disponibilité invalide"
 
-#: cmd/inboxes.go:585:51 cmd/inboxes.go:588:51
+#: cmd/inboxes.go:586:51 cmd/inboxes.go:589:51
 msgid "Invalid color"
 msgstr "Couleur invalide"
 
-#: internal/user/user.go:466:63 internal/user/user.go:475:63
-#: internal/user/user.go:482:62
+#: internal/user/user.go:471:63 internal/user/user.go:481:63
+#: internal/user/user.go:488:62
 msgid "Invalid credential"
 msgstr "Identifiant non valide"
 
-#: cmd/inboxes.go:640:51 cmd/inboxes.go:645:51
+#: cmd/inboxes.go:641:51 cmd/inboxes.go:646:51
 msgid "Invalid domain: %[1]s. Enter domain names only (e.g. example.com), without protocol or paths."
 msgstr "Domaine non valide : %[1]s. Saisissez uniquement des noms de domaine (ex : example.com), sans protocole ni chemin."
 
-#: cmd/inboxes.go:547:51 cmd/inboxes.go:558:51 cmd/inboxes.go:706:49
+#: cmd/inboxes.go:548:51 cmd/inboxes.go:559:51 cmd/inboxes.go:707:49
 #: cmd/sla.go:138:51 cmd/sla.go:153:50 cmd/sla.go:164:50 cmd/sla.go:182:50
 msgid "Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."
 msgstr "Format de durée invalide. Veuillez utiliser un format valide (ex : 30m, 1h, 48h)."
 
-#: cmd/chat.go:1300:67 cmd/contacts.go:353:69 cmd/conversation.go:1115:54
-#: cmd/conversation.go:1119:55 cmd/inboxes.go:476:52 cmd/users.go:661:49
-#: internal/conversation/message.go:1777:54 internal/inbox/inbox.go:637:58
-#: internal/inbox/inbox.go:647:49
+#: cmd/chat.go:1314:67 cmd/contacts.go:353:69 cmd/conversation.go:1118:54
+#: cmd/conversation.go:1122:55 cmd/inboxes.go:477:52 cmd/users.go:661:49
+#: internal/conversation/message.go:1830:54 internal/inbox/inbox.go:632:58
+#: internal/inbox/inbox.go:642:49
 msgid "Invalid email address"
 msgstr "Adresse email invalide"
 
-#: internal/user/user.go:162:56 internal/user/user.go:168:55
+#: internal/user/user.go:164:56 internal/user/user.go:173:55
 msgid "Invalid email or password."
 msgstr "E-mail ou mot de passe incorrect."
 
-#: internal/conversation/conversation.go:2091:48
+#: internal/conversation/conversation.go:2114:48
 #: internal/search/search.go:130:65 internal/search/search.go:162:65
 #: internal/search/search.go:199:58 internal/search/search.go:205:59
 msgid "Invalid filters."
 msgstr "Filtres invalides."
 
-#: cmd/settings.go:159:57 internal/inbox/inbox.go:639:58
+#: cmd/settings.go:161:57 internal/inbox/inbox.go:634:58
 msgid "Invalid from email address format, make sure it's a valid email address in the format `Name <mail@example.com>`"
 msgstr "Format d'adresse email invalide. Assurez-vous qu'il s'agit d'une adresse email valide au format `Nom <mail@example.com>`"
 
@@ -585,27 +590,28 @@ msgstr "Format d'adresse email invalide. Assurez-vous qu'il s'agit d'une adresse
 msgid "Invalid language code. Use a code like en or en-US."
 msgstr "Code de langue invalide. Utilisez un code comme « fr » ou « fr-FR »."
 
-#: cmd/middlewares.go:291:53
+#: cmd/middlewares.go:310:53
 msgid "Invalid or expired media URL"
 msgstr "URL de média invalide ou expirée"
 
-#: cmd/media.go:189:56 cmd/media.go:207:55 cmd/middlewares.go:63:57
+#: cmd/media.go:189:56 cmd/media.go:207:55 cmd/middlewares.go:48:57
+#: cmd/middlewares.go:70:57
 msgid "Invalid or expired session"
 msgstr "Session invalide ou expirée"
 
-#: cmd/middlewares.go:217:56
+#: cmd/middlewares.go:236:56
 msgid "Invalid or expired session. Please clear your cookies and try again."
 msgstr "Session invalide ou expirée. Veuillez effacer vos cookies et réessayer."
 
-#: cmd/middlewares.go:161:63
+#: cmd/middlewares.go:168:63
 msgid "Invalid permission"
 msgstr "Autorisation non valide"
 
-#: cmd/conversation.go:1189:53 cmd/conversation.go:1193:53
+#: cmd/conversation.go:1192:53 cmd/conversation.go:1196:53
 msgid "Invalid phone number"
 msgstr "Numéro de téléphone incorrect"
 
-#: cmd/inboxes.go:747:50
+#: cmd/inboxes.go:748:50
 msgid "Invalid port value"
 msgstr "Valeur de port non valide"
 
@@ -617,18 +623,18 @@ msgstr "Rôle invalide"
 msgid "Invalid rule execution mode"
 msgstr ""
 
-#: internal/conversation/conversation.go:1078:49
-#: internal/conversation/conversation.go:1087:50
+#: internal/conversation/conversation.go:1081:49
+#: internal/conversation/conversation.go:1090:50
 msgid "Invalid snooze duration"
 msgstr "Durée de mise en sommeil invalide"
 
-#: internal/user/user.go:204:64
+#: internal/user/user.go:209:64
 msgid "Invalid user"
 msgstr "Utilisateur non valide"
 
-#: cmd/inboxes.go:519:50 cmd/inboxes.go:601:50 cmd/inboxes.go:606:50
-#: cmd/inboxes.go:610:50 cmd/inboxes.go:616:50 cmd/widget_campaign.go:180:56
-#: cmd/widget_campaign.go:243:48
+#: cmd/inboxes.go:520:50 cmd/inboxes.go:602:50 cmd/inboxes.go:607:50
+#: cmd/inboxes.go:611:50 cmd/inboxes.go:617:50 cmd/widget_campaign.go:180:56
+#: cmd/widget_campaign.go:245:48
 msgid "Invalid value"
 msgstr "Valeur invalide"
 
@@ -640,7 +646,7 @@ msgstr "La langue %[1]s contient encore des catégories ou des articles. La reti
 msgid "Letters, numbers, hyphen and underscore only, up to 64 characters."
 msgstr "Lettres, chiffres, tirets et trait de soulignement uniquement, limité à 64 caractères."
 
-#: cmd/helpcenter.go:2167:36
+#: cmd/helpcenter.go:2257:36
 msgid "List items and other formatting are styled the same way."
 msgstr "Les éléments de liste et les autres mises en forme sont stylisés de la même manière."
 
@@ -660,37 +666,37 @@ msgstr "Macro partiellement appliquée"
 msgid "Media not found"
 msgstr "Média introuvable"
 
-#: cmd/chat.go:205:4 cmd/chat.go:569:4
+#: cmd/chat.go:207:4 cmd/chat.go:574:4
 msgid "Message"
 msgstr "Message"
 
-#: internal/conversation/whatsapp.go:287:59
+#: internal/conversation/whatsapp.go:290:59
 msgid "Meta has not approved this template yet (status: %[1]s). Wait for approval or pick another template."
 msgstr ""
 
-#: cmd/inboxes.go:166:49
+#: cmd/inboxes.go:167:49
 msgid "Meta rejected these credentials: %[1]s"
 msgstr ""
 
-#: cmd/chat.go:208:57 cmd/chat.go:572:57 cmd/inboxes.go:694:50
+#: cmd/chat.go:210:57 cmd/chat.go:577:57 cmd/inboxes.go:695:50
 msgid "Must be at most %[1]s characters"
 msgstr "Doit contenir au maximum %[1]s caractères"
 
-#: cmd/inboxes.go:568:51
+#: cmd/inboxes.go:569:51
 msgid "Must be between %[1]s and %[2]s"
 msgstr "Doit être compris entre %[1]s et %[2]s"
 
-#: cmd/chat.go:1280:6 cmd/chat.go:1284:6 cmd/chat.go:405:4
-#: internal/aiagent/aiagent.go:410:75
+#: cmd/chat.go:1294:6 cmd/chat.go:1298:6 cmd/chat.go:408:4
+#: internal/aiagent/aiagent.go:411:75
 msgid "Name"
 msgstr "Nom"
 
-#: internal/conversation/conversation.go:1353:104
-#: internal/conversation/conversation.go:1370:16
+#: internal/conversation/conversation.go:1356:104
+#: internal/conversation/conversation.go:1373:16
 msgid "New reply on #%[1]s"
 msgstr ""
 
-#: cmd/helpcenter.go:2171:28
+#: cmd/helpcenter.go:2231:31 cmd/helpcenter.go:2261:28
 msgid "Next steps"
 msgstr "Prochaines étapes"
 
@@ -702,20 +708,20 @@ msgstr "Aucun contenu lisible n'a été trouvé à cette URL."
 msgid "No tags exist yet. Tag suggestions need an existing tag list to choose from. Ask an admin to create tags first."
 msgstr "Aucune étiquette n'existe encore. Les suggestions d'étiquettes nécessitent des étiquettes existantes. Demandez à un administrateur de les créer."
 
-#: internal/aiagent/worker.go:374:53
+#: internal/aiagent/worker.go:378:53
 msgid "No, I need more help"
 msgstr ""
 
-#: cmd/helpcenter.go:950:55 cmd/helpcenter.go:957:55 cmd/media.go:325:69
+#: cmd/helpcenter.go:964:55 cmd/helpcenter.go:971:55 cmd/media.go:325:69
 #: cmd/users.go:295:55 cmd/users.go:602:55 cmd/users.go:640:55
 #: cmd/widget_campaign_reply.go:29:73 cmd/widget_help.go:92:73
-#: internal/ai/ai.go:259:56 internal/ai/ai.go:291:56
+#: internal/ai/ai.go:266:56 internal/ai/ai.go:298:56
 #: internal/ai/knowledgebase.go:115:59 internal/ai/knowledgebase.go:74:59
 #: internal/ai/toolstore.go:112:62 internal/ai/toolstore.go:37:59
-#: internal/ai/toolstore.go:99:56 internal/aiagent/aiagent.go:390:56
+#: internal/ai/toolstore.go:99:56 internal/aiagent/aiagent.go:391:56
 #: internal/aiagent/faq.go:303:56 internal/context_link/context_link.go:81:59
-#: internal/conversation/conversation.go:641:57
-#: internal/conversation/conversation.go:654:57
+#: internal/conversation/conversation.go:646:57
+#: internal/conversation/conversation.go:659:57
 #: internal/conversation/message_delete.go:19:57
 #: internal/helpcenter/helpcenter.go:1026:62
 #: internal/helpcenter/helpcenter.go:1327:66
@@ -728,8 +734,8 @@ msgstr ""
 #: internal/helpcenter/helpcenter.go:807:62
 #: internal/helpcenter/helpcenter.go:951:62
 #: internal/inbox/channel/livechat/proactive/proactive.go:88:58
-#: internal/user/agent.go:180:52 internal/webhook/webhook.go:143:62
-#: internal/webhook/webhook.go:241:52
+#: internal/user/agent.go:180:52 internal/webhook/webhook.go:166:62
+#: internal/webhook/webhook.go:260:52
 #: internal/whatsapp/template/template.go:96:56
 msgid "Not found"
 msgstr "introuvable"
@@ -738,12 +744,12 @@ msgstr "introuvable"
 msgid "OIDC Provider not found"
 msgstr "Fournisseur OIDC introuvable"
 
-#: internal/sla/sla.go:757:23
+#: internal/sla/sla.go:760:23
 msgid "Overdue by %[1]s"
 msgstr "En retard de %[1]s"
 
 #: cmd/csat.go:123:21 cmd/csat.go:37:21 cmd/csat.go:55:21
-#: cmd/helpcenter.go:2002:19
+#: cmd/helpcenter.go:2058:19
 msgid "Page not found"
 msgstr "Page introuvable"
 
@@ -761,11 +767,12 @@ msgid_plural "Permissions"
 msgstr[0] ""
 msgstr[1] ""
 
-#: cmd/chat.go:837:81 cmd/conversation.go:234:56 cmd/conversation.go:911:77
-#: cmd/macro.go:190:75 cmd/media.go:217:52 cmd/media.go:240:55
-#: cmd/media.go:306:60 cmd/media.go:90:57 cmd/messages.go:212:56
-#: cmd/messages.go:246:57 cmd/middlewares.go:170:53 cmd/views.go:264:54
-#: cmd/widget_transcript.go:23:75 internal/authz/authz.go:72:63
+#: cmd/chat.go:842:81 cmd/conversation.go:234:56 cmd/conversation.go:896:76
+#: cmd/conversation.go:913:77 cmd/macro.go:190:75 cmd/media.go:217:52
+#: cmd/media.go:240:55 cmd/media.go:306:60 cmd/media.go:90:57
+#: cmd/messages.go:212:56 cmd/messages.go:246:57 cmd/middlewares.go:177:53
+#: cmd/views.go:264:54 cmd/widget_transcript.go:23:75
+#: internal/authz/authz.go:72:63
 msgid "Permission denied"
 msgstr "Autorisation refusée"
 
@@ -773,11 +780,11 @@ msgstr "Autorisation refusée"
 msgid "Permission denied for some macro actions"
 msgstr "Permission refusée pour certaines actions macro"
 
-#: cmd/chat.go:1308:6 cmd/chat.go:1312:6 cmd/chat.go:410:4
+#: cmd/chat.go:1322:6 cmd/chat.go:1326:6 cmd/chat.go:413:4
 msgid "Phone number"
 msgstr "Numéro de téléphone"
 
-#: cmd/conversation.go:1159:52
+#: cmd/conversation.go:1162:52
 msgid "Pick a valid country for the phone number."
 msgstr ""
 
@@ -785,23 +792,23 @@ msgstr ""
 msgid "Please enter at least %[1]s characters to search."
 msgstr "Veuillez saisir au moins %[1]s caractères pour effectuer la recherche."
 
-#: cmd/csat.go:192:22
+#: cmd/csat.go:191:22
 msgid "Please provide a rating or feedback."
 msgstr "Veuillez fournir une note ou un commentaire."
 
-#: internal/conversation/conversation.go:1951:13
+#: internal/conversation/conversation.go:1957:13
 msgid "Please rate this conversation:"
 msgstr "Veuillez évaluer cette conversation :"
 
-#: internal/aiagent/worker.go:497:41
+#: internal/aiagent/worker.go:501:41
 msgid "Please share these details before I connect you with a human."
 msgstr ""
 
-#: cmd/widget_campaign.go:265:50
+#: cmd/widget_campaign.go:267:50
 msgid "Proactive message `%[1]s` is invalid: %[2]s"
 msgstr ""
 
-#: internal/auth/auth.go:209:53
+#: internal/auth/auth.go:226:53
 msgid "Provider not found"
 msgstr "Fournisseur introuvable"
 
@@ -809,11 +816,11 @@ msgstr "Fournisseur introuvable"
 msgid "Rate your interaction with us"
 msgstr "Noter votre interaction"
 
-#: internal/conversation/continuity.go:337:16
+#: internal/conversation/continuity.go:343:16
 msgid "Reply directly to this email to continue the conversation."
 msgstr "Répondez directement à cet email pour continuer la conversation."
 
-#: internal/conversation/continuity.go:339:16
+#: internal/conversation/continuity.go:345:16
 msgid "Reply to this email or %[1]sgo to chat%[2]s to continue the conversation."
 msgstr "Répondez à cet email ou %[1]sallez au chat%[2]s pour continuer la conversation."
 
@@ -881,7 +888,7 @@ msgstr "Ligne %[1]s : Erreur - le tag existe déjà : \"%[2]s\""
 msgid "Rule not found"
 msgstr "Règle introuvable"
 
-#: internal/sla/sla.go:750:24
+#: internal/sla/sla.go:753:24
 msgid "SLA %[1]s: %[2]s for #%[3]s"
 msgstr "SLA %[1]s : %[2]s pour #%[3]s"
 
@@ -889,23 +896,23 @@ msgstr "SLA %[1]s : %[2]s pour #%[3]s"
 msgid "SLA not found"
 msgstr "SLA introuvable"
 
-#: cmd/helpcenter.go:2178:16
+#: cmd/helpcenter.go:2268:16
 msgid "Sample article"
 msgstr "Exemple d'article"
 
-#: cmd/helpcenter.go:2173:13
+#: cmd/helpcenter.go:2263:13
 msgid "Sample author"
 msgstr "Exemple d’auteur"
 
-#: cmd/helpcenter.go:2189:10
+#: cmd/helpcenter.go:2225:18 cmd/helpcenter.go:2279:10
 msgid "Sample collection"
 msgstr "Exemple de catégorie"
 
-#: internal/inbox/inbox.go:655:49
+#: internal/inbox/inbox.go:650:49
 msgid "Save the inbox first to verify this alias."
 msgstr ""
 
-#: cmd/helpcenter.go:931:42
+#: cmd/helpcenter.go:945:42
 msgid "Search"
 msgstr "Rechercher"
 
@@ -913,7 +920,7 @@ msgstr "Rechercher"
 msgid "Secret must be exactly 32 characters."
 msgstr "Le secret doit comporter exactement 32 caractères."
 
-#: cmd/helpcenter.go:2061:50
+#: cmd/helpcenter.go:2117:50
 msgid "Select a live chat inbox."
 msgstr ""
 
@@ -921,73 +928,74 @@ msgstr ""
 msgid "Someone other than the contact replied on this conversation, so the AI assistant handed it off to a human."
 msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'assistant IA l'a donc transmise à un humain."
 
-#: cmd/agent_import.go:27:66 cmd/ai.go:129:57 cmd/ai.go:145:57 cmd/ai.go:210:57
-#: cmd/ai.go:243:57 cmd/ai.go:269:57 cmd/ai.go:309:57 cmd/ai.go:341:57
-#: cmd/ai.go:98:57 cmd/aiagent.go:119:57 cmd/aiagent.go:139:57
+#: cmd/agent_import.go:27:66 cmd/ai.go:101:57 cmd/ai.go:132:57 cmd/ai.go:148:57
+#: cmd/ai.go:213:57 cmd/ai.go:246:57 cmd/ai.go:272:57 cmd/ai.go:312:57
+#: cmd/ai.go:344:57 cmd/aiagent.go:119:57 cmd/aiagent.go:139:57
 #: cmd/aiagent.go:155:57 cmd/aiagent.go:237:57 cmd/aiagent.go:254:57
 #: cmd/aiagent.go:52:57 cmd/aiagent.go:91:57 cmd/automation.go:101:57
 #: cmd/automation.go:63:57 cmd/business_hours.go:32:57
 #: cmd/business_hours.go:39:66 cmd/business_hours.go:74:57
-#: cmd/business_hours.go:90:57 cmd/business_hours.go:96:57 cmd/chat.go:1472:51
-#: cmd/chat.go:215:66 cmd/chat.go:220:66 cmd/chat.go:306:66 cmd/chat.go:368:66
-#: cmd/chat.go:373:66 cmd/chat.go:422:66 cmd/chat.go:460:66 cmd/chat.go:476:66
-#: cmd/chat.go:520:66 cmd/chat.go:526:66 cmd/chat.go:533:66 cmd/chat.go:621:72
-#: cmd/chat.go:699:66 cmd/chat.go:715:66 cmd/chat.go:750:66 cmd/chat.go:789:66
-#: cmd/chat.go:820:78 cmd/chat.go:826:78 cmd/chat.go:931:76 cmd/chat.go:937:76
+#: cmd/business_hours.go:90:57 cmd/business_hours.go:96:57 cmd/chat.go:1486:51
+#: cmd/chat.go:218:66 cmd/chat.go:223:66 cmd/chat.go:309:66 cmd/chat.go:371:66
+#: cmd/chat.go:376:66 cmd/chat.go:425:66 cmd/chat.go:465:66 cmd/chat.go:481:66
+#: cmd/chat.go:525:66 cmd/chat.go:531:66 cmd/chat.go:538:66 cmd/chat.go:626:72
+#: cmd/chat.go:704:66 cmd/chat.go:720:66 cmd/chat.go:755:66 cmd/chat.go:794:66
+#: cmd/chat.go:825:78 cmd/chat.go:831:78 cmd/chat.go:936:76 cmd/chat.go:942:76
 #: cmd/config.go:27:72 cmd/contacts.go:145:57 cmd/contacts.go:181:57
 #: cmd/contacts.go:213:57 cmd/contacts.go:257:57 cmd/contacts.go:260:57
 #: cmd/contacts.go:297:57 cmd/contacts.go:78:57 cmd/contacts.go:97:57
 #: cmd/context_links.go:112:57 cmd/context_links.go:141:57
 #: cmd/context_links.go:35:57 cmd/context_links.go:75:57
-#: cmd/context_links.go:98:57 cmd/conversation.go:1015:57
-#: cmd/conversation.go:1050:57 cmd/conversation.go:1123:54
-#: cmd/conversation.go:1126:53 cmd/conversation.go:213:57
+#: cmd/context_links.go:98:57 cmd/conversation.go:1018:57
+#: cmd/conversation.go:1053:57 cmd/conversation.go:1126:54
+#: cmd/conversation.go:1129:53 cmd/conversation.go:213:57
 #: cmd/conversation.go:296:57 cmd/conversation.go:335:57
-#: cmd/conversation.go:908:74 cmd/conversation.go:929:73
-#: cmd/conversation.go:936:73 cmd/conversation.go:988:72 cmd/csat.go:185:23
-#: cmd/csat.go:93:10 cmd/custom_attributes.go:117:57
-#: cmd/custom_attributes.go:181:51 cmd/custom_attributes.go:45:57
-#: cmd/custom_attributes.go:95:57 cmd/draft.go:54:57 cmd/draft.go:59:57
-#: cmd/handlers.go:483:72 cmd/handlers.go:683:4 cmd/helpcenter.go:2004:19
-#: cmd/inboxes.go:212:66 cmd/inboxes.go:222:72 cmd/inboxes.go:238:4
-#: cmd/inboxes.go:277:66 cmd/inboxes.go:287:72 cmd/inboxes.go:302:4
-#: cmd/inboxes.go:312:66 cmd/inboxes.go:318:72 cmd/inboxes.go:338:66
-#: cmd/inboxes.go:48:73 cmd/inboxes.go:662:51 cmd/inboxes.go:666:51
-#: cmd/inboxes.go:670:51 cmd/inboxes.go:69:73 cmd/inboxes.go:720:49
-#: cmd/inboxes.go:725:49 cmd/inboxes.go:734:50 cmd/inboxes.go:74:73
-#: cmd/inboxes.go:753:51 cmd/inboxes.go:764:50 cmd/inboxes.go:772:50
-#: cmd/inboxes.go:79:72 cmd/login.go:100:72 cmd/login.go:62:72
-#: cmd/login.go:67:72 cmd/macro.go:162:57 cmd/macro.go:201:57
-#: cmd/macro.go:26:67 cmd/macro.go:335:49 cmd/macro.go:46:67 cmd/macro.go:63:57
-#: cmd/macro.go:76:67 cmd/macro.go:89:57 cmd/macro.go:99:66 cmd/media.go:60:66
-#: cmd/messages.go:225:57 cmd/messages.go:238:71 cmd/messages.go:243:71
-#: cmd/middlewares.go:167:63 cmd/middlewares.go:192:56
-#: cmd/middlewares.go:280:54 cmd/oauth.go:136:57 cmd/oauth.go:145:4
-#: cmd/oauth.go:163:57 cmd/oauth.go:196:66 cmd/oauth.go:46:4 cmd/oauth.go:52:4
-#: cmd/oauth.go:72:66 cmd/oauth.go:93:66 cmd/oauth.go:99:66 cmd/oidc.go:104:66
-#: cmd/oidc.go:118:57 cmd/oidc.go:126:66 cmd/oidc.go:31:57 cmd/oidc.go:64:66
-#: cmd/oidc.go:81:57 cmd/settings.go:120:72 cmd/settings.go:154:72
-#: cmd/settings.go:30:72 cmd/settings.go:77:72 cmd/settings.go:88:73
-#: cmd/settings.go:96:72 cmd/sla.go:100:57 cmd/sla.go:32:57 cmd/sla.go:74:57
-#: cmd/statuses.go:51:57 cmd/statuses.go:67:57 cmd/tag_import.go:28:66
-#: cmd/tags.go:63:57 cmd/tags.go:81:57 cmd/teams.go:117:57 cmd/teams.go:52:57
-#: cmd/teams.go:88:57 cmd/templates.go:36:57 cmd/user_notifications.go:54:4
+#: cmd/conversation.go:893:73 cmd/conversation.go:910:74
+#: cmd/conversation.go:931:73 cmd/conversation.go:938:73
+#: cmd/conversation.go:990:72 cmd/csat.go:184:23 cmd/csat.go:93:10
+#: cmd/custom_attributes.go:117:57 cmd/custom_attributes.go:181:51
+#: cmd/custom_attributes.go:45:57 cmd/custom_attributes.go:95:57
+#: cmd/draft.go:54:57 cmd/draft.go:59:57 cmd/handlers.go:485:72
+#: cmd/handlers.go:685:4 cmd/helpcenter.go:2060:19 cmd/inboxes.go:213:66
+#: cmd/inboxes.go:223:72 cmd/inboxes.go:239:4 cmd/inboxes.go:278:66
+#: cmd/inboxes.go:288:72 cmd/inboxes.go:303:4 cmd/inboxes.go:313:66
+#: cmd/inboxes.go:319:72 cmd/inboxes.go:339:66 cmd/inboxes.go:49:73
+#: cmd/inboxes.go:663:51 cmd/inboxes.go:667:51 cmd/inboxes.go:671:51
+#: cmd/inboxes.go:70:73 cmd/inboxes.go:721:49 cmd/inboxes.go:726:49
+#: cmd/inboxes.go:735:50 cmd/inboxes.go:754:51 cmd/inboxes.go:75:73
+#: cmd/inboxes.go:765:50 cmd/inboxes.go:773:50 cmd/inboxes.go:80:72
+#: cmd/login.go:61:72 cmd/login.go:66:72 cmd/login.go:99:72 cmd/macro.go:162:57
+#: cmd/macro.go:201:57 cmd/macro.go:26:67 cmd/macro.go:335:49
+#: cmd/macro.go:46:67 cmd/macro.go:63:57 cmd/macro.go:76:67 cmd/macro.go:89:57
+#: cmd/macro.go:99:66 cmd/media.go:60:66 cmd/messages.go:225:57
+#: cmd/messages.go:238:71 cmd/messages.go:243:71 cmd/middlewares.go:174:63
+#: cmd/middlewares.go:205:56 cmd/middlewares.go:299:54 cmd/oauth.go:136:57
+#: cmd/oauth.go:145:4 cmd/oauth.go:150:4 cmd/oauth.go:168:57
+#: cmd/oauth.go:201:66 cmd/oauth.go:46:4 cmd/oauth.go:52:4 cmd/oauth.go:72:66
+#: cmd/oauth.go:93:66 cmd/oauth.go:99:66 cmd/oidc.go:102:66 cmd/oidc.go:116:57
+#: cmd/oidc.go:123:66 cmd/oidc.go:31:57 cmd/oidc.go:63:66 cmd/oidc.go:80:57
+#: cmd/settings.go:121:72 cmd/settings.go:156:72 cmd/settings.go:30:72
+#: cmd/settings.go:77:72 cmd/settings.go:88:73 cmd/settings.go:96:72
+#: cmd/sla.go:100:57 cmd/sla.go:32:57 cmd/sla.go:74:57 cmd/statuses.go:51:57
+#: cmd/statuses.go:67:57 cmd/tag_import.go:28:66 cmd/tags.go:63:57
+#: cmd/tags.go:81:57 cmd/teams.go:117:57 cmd/teams.go:52:57 cmd/teams.go:88:57
+#: cmd/templates.go:36:57 cmd/user_notifications.go:54:4
 #: cmd/user_notifications.go:82:4 cmd/users.go:101:57 cmd/users.go:593:57
 #: cmd/users.go:631:57 cmd/users.go:79:57 cmd/views.go:168:57
 #: cmd/views.go:211:57 cmd/views.go:243:57 cmd/views.go:281:49
 #: cmd/views.go:70:57 cmd/views.go:99:57 cmd/webhooks.go:102:57
 #: cmd/webhooks.go:132:57 cmd/webhooks.go:150:57 cmd/webhooks.go:172:57
 #: cmd/webhooks.go:51:57 cmd/whatsapp_template.go:204:57
-#: cmd/widget_middleware.go:62:67 cmd/widget_middleware.go:86:67
-#: cmd/widget_middleware.go:90:67 internal/activity_log/activity_log.go:292:51
+#: cmd/widget_middleware.go:61:67 cmd/widget_middleware.go:85:67
+#: cmd/widget_middleware.go:89:67 internal/activity_log/activity_log.go:290:51
 #: internal/activity_log/activity_log.go:64:56
 #: internal/activity_log/activity_log.go:73:56
-#: internal/activity_log/activity_log.go:81:56 internal/ai/ai.go:249:56
-#: internal/ai/ai.go:262:54 internal/ai/ai.go:279:54 internal/ai/ai.go:294:54
-#: internal/ai/ai.go:302:51 internal/ai/ai.go:333:49 internal/ai/ai.go:353:52
-#: internal/ai/ai.go:364:51 internal/ai/ai.go:368:51 internal/ai/ai.go:383:49
-#: internal/ai/ai.go:433:55 internal/ai/ai.go:443:76 internal/ai/ai.go:449:77
-#: internal/ai/ai.go:464:77 internal/ai/copilot.go:107:56
+#: internal/activity_log/activity_log.go:81:56 internal/ai/ai.go:256:56
+#: internal/ai/ai.go:269:54 internal/ai/ai.go:286:54 internal/ai/ai.go:301:54
+#: internal/ai/ai.go:309:51 internal/ai/ai.go:340:49 internal/ai/ai.go:360:52
+#: internal/ai/ai.go:371:51 internal/ai/ai.go:375:51 internal/ai/ai.go:390:49
+#: internal/ai/ai.go:452:55 internal/ai/ai.go:462:76 internal/ai/ai.go:468:77
+#: internal/ai/ai.go:483:77 internal/ai/copilot.go:107:56
 #: internal/ai/copilot.go:182:56 internal/ai/copilot.go:191:51
 #: internal/ai/copilot.go:200:51 internal/ai/knowledgebase.go:118:57
 #: internal/ai/knowledgebase.go:136:51 internal/ai/knowledgebase.go:144:51
@@ -1000,19 +1008,19 @@ msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'ass
 #: internal/ai/toolstore.go:40:57 internal/ai/toolstore.go:60:56
 #: internal/ai/toolstore.go:69:56 internal/ai/toolstore.go:86:60
 #: internal/aiagent/aiagent.go:152:56 internal/aiagent/aiagent.go:176:56
-#: internal/aiagent/aiagent.go:228:54 internal/aiagent/aiagent.go:272:71
-#: internal/aiagent/aiagent.go:279:71 internal/aiagent/aiagent.go:285:71
-#: internal/aiagent/aiagent.go:290:71 internal/aiagent/aiagent.go:295:71
-#: internal/aiagent/aiagent.go:316:71 internal/aiagent/aiagent.go:322:71
-#: internal/aiagent/aiagent.go:326:71 internal/aiagent/aiagent.go:330:71
-#: internal/aiagent/aiagent.go:334:71 internal/aiagent/aiagent.go:339:71
-#: internal/aiagent/aiagent.go:357:54 internal/aiagent/aiagent.go:363:54
-#: internal/aiagent/aiagent.go:367:54 internal/aiagent/aiagent.go:373:54
-#: internal/aiagent/aiagent.go:378:54 internal/aiagent/aiagent.go:393:54
-#: internal/aiagent/aiagent.go:402:56 internal/aiagent/aiagent.go:419:49
-#: internal/aiagent/faq.go:109:51 internal/aiagent/faq.go:306:54
-#: internal/aiagent/faq.go:61:56 internal/aiagent/faq.go:89:51
-#: internal/auth/auth.go:214:55 internal/auth/auth.go:449:51
+#: internal/aiagent/aiagent.go:228:54 internal/aiagent/aiagent.go:273:71
+#: internal/aiagent/aiagent.go:280:71 internal/aiagent/aiagent.go:286:71
+#: internal/aiagent/aiagent.go:291:71 internal/aiagent/aiagent.go:296:71
+#: internal/aiagent/aiagent.go:317:71 internal/aiagent/aiagent.go:323:71
+#: internal/aiagent/aiagent.go:327:71 internal/aiagent/aiagent.go:331:71
+#: internal/aiagent/aiagent.go:335:71 internal/aiagent/aiagent.go:340:71
+#: internal/aiagent/aiagent.go:358:54 internal/aiagent/aiagent.go:364:54
+#: internal/aiagent/aiagent.go:368:54 internal/aiagent/aiagent.go:374:54
+#: internal/aiagent/aiagent.go:379:54 internal/aiagent/aiagent.go:394:54
+#: internal/aiagent/aiagent.go:403:56 internal/aiagent/aiagent.go:420:49
+#: internal/aiagent/faq.go:110:51 internal/aiagent/faq.go:306:54
+#: internal/aiagent/faq.go:62:56 internal/aiagent/faq.go:90:51
+#: internal/auth/auth.go:231:55 internal/auth/auth.go:494:51
 #: internal/automation/automation.go:196:58
 #: internal/automation/automation.go:209:57
 #: internal/automation/automation.go:219:72
@@ -1021,11 +1029,11 @@ msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'ass
 #: internal/automation/automation.go:260:51
 #: internal/automation/automation.go:272:52
 #: internal/automation/automation.go:284:51
-#: internal/business_hours/business_hours.go:109:75
-#: internal/business_hours/business_hours.go:77:56
-#: internal/business_hours/business_hours.go:87:75
-#: internal/business_hours/business_hours.go:96:52
-#: internal/business_hours/business_hours.go:99:51
+#: internal/business_hours/business_hours.go:100:51
+#: internal/business_hours/business_hours.go:110:75
+#: internal/business_hours/business_hours.go:78:56
+#: internal/business_hours/business_hours.go:88:75
+#: internal/business_hours/business_hours.go:97:52
 #: internal/context_link/context_link.go:106:73
 #: internal/context_link/context_link.go:114:73
 #: internal/context_link/context_link.go:131:74
@@ -1040,89 +1048,88 @@ msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'ass
 #: internal/context_link/context_link.go:84:57
 #: internal/context_link/context_link.go:87:57
 #: internal/context_link/context_link.go:96:56
-#: internal/conversation/conversation.go:1050:51
-#: internal/conversation/conversation.go:1060:51
-#: internal/conversation/conversation.go:1095:51
-#: internal/conversation/conversation.go:1108:51
-#: internal/conversation/conversation.go:1138:51
-#: internal/conversation/conversation.go:1193:51
-#: internal/conversation/conversation.go:1203:52
-#: internal/conversation/conversation.go:1211:52
-#: internal/conversation/conversation.go:1219:52
-#: internal/conversation/conversation.go:1226:51
-#: internal/conversation/conversation.go:1254:52
-#: internal/conversation/conversation.go:1265:52
-#: internal/conversation/conversation.go:1567:51
-#: internal/conversation/conversation.go:1898:51
-#: internal/conversation/conversation.go:1910:51
-#: internal/conversation/conversation.go:1916:52
-#: internal/conversation/conversation.go:1934:52
-#: internal/conversation/conversation.go:1939:52
-#: internal/conversation/conversation.go:1946:52
-#: internal/conversation/conversation.go:1956:51
-#: internal/conversation/conversation.go:1966:51
-#: internal/conversation/conversation.go:1978:51
-#: internal/conversation/conversation.go:1982:51
-#: internal/conversation/conversation.go:1994:51
-#: internal/conversation/conversation.go:2028:57
-#: internal/conversation/conversation.go:492:65
-#: internal/conversation/conversation.go:513:66
-#: internal/conversation/conversation.go:523:66
-#: internal/conversation/conversation.go:533:66
-#: internal/conversation/conversation.go:543:66
-#: internal/conversation/conversation.go:562:56
-#: internal/conversation/conversation.go:598:65
-#: internal/conversation/conversation.go:644:58
-#: internal/conversation/conversation.go:657:58
-#: internal/conversation/conversation.go:670:51
-#: internal/conversation/conversation.go:683:57
-#: internal/conversation/conversation.go:772:66
-#: internal/conversation/conversation.go:781:66
+#: internal/conversation/conversation.go:1053:51
+#: internal/conversation/conversation.go:1063:51
+#: internal/conversation/conversation.go:1098:51
+#: internal/conversation/conversation.go:1111:51
+#: internal/conversation/conversation.go:1141:51
+#: internal/conversation/conversation.go:1196:51
+#: internal/conversation/conversation.go:1206:52
+#: internal/conversation/conversation.go:1214:52
+#: internal/conversation/conversation.go:1222:52
+#: internal/conversation/conversation.go:1229:51
+#: internal/conversation/conversation.go:1257:52
+#: internal/conversation/conversation.go:1268:52
+#: internal/conversation/conversation.go:1573:51
+#: internal/conversation/conversation.go:1904:51
+#: internal/conversation/conversation.go:1916:51
+#: internal/conversation/conversation.go:1922:52
+#: internal/conversation/conversation.go:1940:52
+#: internal/conversation/conversation.go:1945:52
+#: internal/conversation/conversation.go:1952:52
+#: internal/conversation/conversation.go:1962:51
+#: internal/conversation/conversation.go:1989:51
+#: internal/conversation/conversation.go:2001:51
+#: internal/conversation/conversation.go:2005:51
+#: internal/conversation/conversation.go:2017:51
+#: internal/conversation/conversation.go:2051:57
+#: internal/conversation/conversation.go:497:65
+#: internal/conversation/conversation.go:518:66
+#: internal/conversation/conversation.go:528:66
+#: internal/conversation/conversation.go:538:66
+#: internal/conversation/conversation.go:548:66
+#: internal/conversation/conversation.go:567:56
+#: internal/conversation/conversation.go:603:65
+#: internal/conversation/conversation.go:649:58
+#: internal/conversation/conversation.go:662:58
+#: internal/conversation/conversation.go:675:51
+#: internal/conversation/conversation.go:688:57
+#: internal/conversation/conversation.go:777:66
 #: internal/conversation/conversation.go:786:66
-#: internal/conversation/conversation.go:799:58
-#: internal/conversation/conversation.go:824:58
-#: internal/conversation/conversation.go:867:51
-#: internal/conversation/conversation.go:883:51
+#: internal/conversation/conversation.go:791:66
+#: internal/conversation/conversation.go:804:58
+#: internal/conversation/conversation.go:829:58
+#: internal/conversation/conversation.go:872:51
 #: internal/conversation/conversation.go:888:51
-#: internal/conversation/conversation.go:921:51
-#: internal/conversation/conversation.go:961:51
+#: internal/conversation/conversation.go:924:51
+#: internal/conversation/conversation.go:964:51
 #: internal/conversation/drafts.go:19:58 internal/conversation/drafts.go:30:56
 #: internal/conversation/drafts.go:47:51
-#: internal/conversation/message.go:1234:65
-#: internal/conversation/message.go:1771:55
-#: internal/conversation/message.go:1785:55
-#: internal/conversation/message.go:341:71
-#: internal/conversation/message.go:350:71
-#: internal/conversation/message.go:355:71
-#: internal/conversation/message.go:390:60
-#: internal/conversation/message.go:489:58
-#: internal/conversation/message.go:505:58
-#: internal/conversation/message.go:647:70
-#: internal/conversation/message.go:675:69
-#: internal/conversation/message.go:705:51
-#: internal/conversation/message.go:716:51
-#: internal/conversation/message.go:752:56
-#: internal/conversation/message.go:756:56
-#: internal/conversation/message.go:874:51
-#: internal/conversation/message.go:894:51
+#: internal/conversation/message.go:1273:65
+#: internal/conversation/message.go:1824:55
+#: internal/conversation/message.go:1838:55
+#: internal/conversation/message.go:1865:71
+#: internal/conversation/message.go:1874:71
+#: internal/conversation/message.go:1879:71
+#: internal/conversation/message.go:426:60
+#: internal/conversation/message.go:525:58
+#: internal/conversation/message.go:541:58
+#: internal/conversation/message.go:682:70
+#: internal/conversation/message.go:710:69
+#: internal/conversation/message.go:740:51
+#: internal/conversation/message.go:751:51
+#: internal/conversation/message.go:787:56
+#: internal/conversation/message.go:791:56
+#: internal/conversation/message.go:912:51
+#: internal/conversation/message.go:932:51
 #: internal/conversation/message_delete.go:22:55
-#: internal/conversation/priority/priority.go:58:56
-#: internal/conversation/priority/priority.go:68:61
+#: internal/conversation/priority/priority.go:60:56
+#: internal/conversation/priority/priority.go:72:61
 #: internal/conversation/proactive.go:16:69
 #: internal/conversation/sidebar_counts.go:110:56
 #: internal/conversation/sidebar_counts.go:119:56
 #: internal/conversation/sidebar_counts.go:82:51
-#: internal/conversation/status/status.go:105:51
-#: internal/conversation/status/status.go:121:66
-#: internal/conversation/status/status.go:130:66
-#: internal/conversation/status/status.go:140:59
-#: internal/conversation/status/status.go:67:56
-#: internal/conversation/status/status.go:83:59
-#: internal/conversation/status/status.go:93:51
-#: internal/conversation/whatsapp.go:166:53
-#: internal/conversation/whatsapp.go:182:52
-#: internal/conversation/whatsapp.go:225:60
-#: internal/conversation/whatsapp.go:228:58 internal/csat/csat.go:112:51
+#: internal/conversation/status/status.go:107:51
+#: internal/conversation/status/status.go:123:66
+#: internal/conversation/status/status.go:132:66
+#: internal/conversation/status/status.go:144:59
+#: internal/conversation/status/status.go:69:56
+#: internal/conversation/status/status.go:85:59
+#: internal/conversation/status/status.go:95:51
+#: internal/conversation/whatsapp.go:169:53
+#: internal/conversation/whatsapp.go:185:52
+#: internal/conversation/whatsapp.go:228:60
+#: internal/conversation/whatsapp.go:231:58 internal/csat/csat.go:112:51
 #: internal/csat/csat.go:75:56
 #: internal/custom_attribute/custom_attribute.go:107:51
 #: internal/custom_attribute/custom_attribute.go:65:68
@@ -1201,43 +1208,43 @@ msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'ass
 #: internal/inbox/inbox.go:211:59 internal/inbox/inbox.go:223:59
 #: internal/inbox/inbox.go:230:68 internal/inbox/inbox.go:244:56
 #: internal/inbox/inbox.go:252:57 internal/inbox/inbox.go:296:68
-#: internal/inbox/inbox.go:443:69 internal/inbox/inbox.go:450:69
-#: internal/inbox/inbox.go:517:68 internal/inbox/inbox.go:586:56
-#: internal/inbox/inbox.go:593:56 internal/inbox/inbox.go:615:68
-#: internal/inbox/inbox.go:624:51 internal/inbox/inbox.go:664:51
-#: internal/inbox/inbox.go:669:51 internal/inbox/inbox.go:723:50
+#: internal/inbox/inbox.go:442:69 internal/inbox/inbox.go:449:69
+#: internal/inbox/inbox.go:512:68 internal/inbox/inbox.go:581:56
+#: internal/inbox/inbox.go:588:56 internal/inbox/inbox.go:610:68
+#: internal/inbox/inbox.go:619:51 internal/inbox/inbox.go:667:51
+#: internal/inbox/inbox.go:672:51 internal/inbox/inbox.go:726:50
 #: internal/macro/macro.go:100:56 internal/macro/macro.go:111:56
 #: internal/macro/macro.go:122:56 internal/macro/macro.go:132:51
 #: internal/macro/macro.go:144:51 internal/macro/macro.go:67:58
 #: internal/macro/macro.go:78:67 internal/macro/macro.go:89:67
 #: internal/media/media.go:155:67 internal/media/media.go:181:58
-#: internal/media/media.go:250:58 internal/media/media.go:334:52
-#: internal/media/media.go:346:51 internal/notification/preferences.go:122:51
+#: internal/media/media.go:250:58 internal/media/media.go:333:52
+#: internal/media/media.go:345:51 internal/notification/preferences.go:122:51
 #: internal/notification/preferences.go:128:52
 #: internal/notification/preferences.go:133:51
 #: internal/notification/preferences.go:85:56
-#: internal/notification/push.go:105:56 internal/notification/push.go:120:51
-#: internal/notification/push.go:131:51
+#: internal/notification/push.go:106:56 internal/notification/push.go:121:51
+#: internal/notification/push.go:132:51
 #: internal/notification/user_notification.go:109:51
 #: internal/notification/user_notification.go:118:51
 #: internal/notification/user_notification.go:127:51
 #: internal/notification/user_notification.go:136:51
 #: internal/notification/user_notification.go:145:51
-#: internal/notification/user_notification.go:155:51
+#: internal/notification/user_notification.go:157:51
 #: internal/notification/user_notification.go:72:66
 #: internal/notification/user_notification.go:82:58
 #: internal/notification/user_notification.go:96:65
 #: internal/oidc/oidc.go:107:57 internal/oidc/oidc.go:135:66
 #: internal/oidc/oidc.go:141:66 internal/oidc/oidc.go:167:66
 #: internal/oidc/oidc.go:173:66 internal/oidc/oidc.go:185:51
-#: internal/oidc/oidc.go:79:57 internal/report/report.go:100:56
-#: internal/report/report.go:109:56 internal/report/report.go:114:56
-#: internal/report/report.go:120:56 internal/report/report.go:135:56
-#: internal/report/report.go:142:56 internal/report/report.go:156:56
-#: internal/report/report.go:163:56 internal/report/report.go:177:56
-#: internal/report/report.go:184:56 internal/report/report.go:198:56
-#: internal/report/report.go:205:56 internal/report/report.go:75:56
-#: internal/report/report.go:81:56 internal/report/report.go:86:56
+#: internal/oidc/oidc.go:79:57 internal/report/report.go:101:56
+#: internal/report/report.go:110:56 internal/report/report.go:115:56
+#: internal/report/report.go:121:56 internal/report/report.go:136:56
+#: internal/report/report.go:143:56 internal/report/report.go:157:56
+#: internal/report/report.go:164:56 internal/report/report.go:178:56
+#: internal/report/report.go:185:56 internal/report/report.go:199:56
+#: internal/report/report.go:206:56 internal/report/report.go:76:56
+#: internal/report/report.go:82:56 internal/report/report.go:87:56
 #: internal/role/role.go:119:66 internal/role/role.go:146:66
 #: internal/role/role.go:66:58 internal/role/role.go:79:57
 #: internal/role/role.go:98:51 internal/search/search.go:117:56
@@ -1249,44 +1256,44 @@ msgstr "Quelqu'un d'autre que le contact a répondu à cette conversation, l'ass
 #: internal/tag/tag.go:105:56 internal/tag/tag.go:63:56
 #: internal/tag/tag.go:73:56 internal/tag/tag.go:86:56
 #: internal/tag/tag.go:95:51 internal/team/team.go:101:58
-#: internal/team/team.go:115:57 internal/team/team.go:128:57
-#: internal/team/team.go:138:57 internal/team/team.go:151:56
-#: internal/team/team.go:168:58 internal/team/team.go:177:51
-#: internal/team/team.go:187:58 internal/team/team.go:75:58
-#: internal/team/team.go:88:58 internal/template/template.go:109:62
-#: internal/template/template.go:119:51 internal/template/template.go:126:51
-#: internal/template/template.go:70:70 internal/template/template.go:86:70
-#: internal/template/template.go:96:62 internal/user/agent.go:107:66
+#: internal/team/team.go:114:57 internal/team/team.go:127:57
+#: internal/team/team.go:137:57 internal/team/team.go:150:56
+#: internal/team/team.go:167:58 internal/team/team.go:176:51
+#: internal/team/team.go:186:58 internal/team/team.go:75:58
+#: internal/team/team.go:88:58 internal/template/template.go:100:70
+#: internal/template/template.go:110:62 internal/template/template.go:123:62
+#: internal/template/template.go:133:51 internal/template/template.go:140:51
+#: internal/template/template.go:81:70 internal/user/agent.go:107:66
 #: internal/user/agent.go:122:66 internal/user/agent.go:142:52
 #: internal/user/agent.go:159:51 internal/user/agent.go:177:51
 #: internal/user/agent.go:87:58 internal/user/agent.go:97:58
 #: internal/user/contact.go:243:54 internal/user/contact.go:32:51
 #: internal/user/contact.go:47:51 internal/user/contact.go:68:51
 #: internal/user/contact.go:78:51 internal/user/contact.go:91:56
-#: internal/user/notes.go:13:58 internal/user/notes.go:23:57
-#: internal/user/notes.go:33:64 internal/user/notes.go:42:51
-#: internal/user/user.go:165:57 internal/user/user.go:178:56
-#: internal/user/user.go:187:56 internal/user/user.go:195:56
-#: internal/user/user.go:213:57 internal/user/user.go:235:57
-#: internal/user/user.go:248:57 internal/user/user.go:261:57
-#: internal/user/user.go:284:57 internal/user/user.go:316:51
-#: internal/user/user.go:325:51 internal/user/user.go:335:55
-#: internal/user/user.go:339:55 internal/user/user.go:352:54
-#: internal/user/user.go:360:54 internal/user/user.go:369:51
-#: internal/user/user.go:410:51 internal/user/user.go:420:51
-#: internal/user/user.go:429:51 internal/user/user.go:440:59
-#: internal/user/user.go:447:59 internal/user/user.go:453:59
-#: internal/user/user.go:468:57 internal/user/user.go:497:51
+#: internal/user/notes.go:16:58 internal/user/notes.go:28:57
+#: internal/user/notes.go:38:64 internal/user/notes.go:47:51
+#: internal/user/user.go:167:57 internal/user/user.go:183:56
+#: internal/user/user.go:192:56 internal/user/user.go:200:56
+#: internal/user/user.go:218:57 internal/user/user.go:240:57
+#: internal/user/user.go:253:57 internal/user/user.go:266:57
+#: internal/user/user.go:289:57 internal/user/user.go:321:51
+#: internal/user/user.go:330:51 internal/user/user.go:340:55
+#: internal/user/user.go:344:55 internal/user/user.go:357:54
+#: internal/user/user.go:365:54 internal/user/user.go:374:51
+#: internal/user/user.go:415:51 internal/user/user.go:425:51
+#: internal/user/user.go:434:51 internal/user/user.go:445:59
+#: internal/user/user.go:452:59 internal/user/user.go:458:59
+#: internal/user/user.go:474:57 internal/user/user.go:503:51
 #: internal/view/view.go:107:66 internal/view/view.go:117:66
 #: internal/view/view.go:127:66 internal/view/view.go:137:66
 #: internal/view/view.go:146:51 internal/view/view.go:67:57
 #: internal/view/view.go:77:56 internal/view/view.go:87:56
-#: internal/view/view.go:97:56 internal/webhook/webhook.go:119:56
-#: internal/webhook/webhook.go:129:56 internal/webhook/webhook.go:146:60
-#: internal/webhook/webhook.go:151:60 internal/webhook/webhook.go:164:69
-#: internal/webhook/webhook.go:172:69 internal/webhook/webhook.go:193:70
-#: internal/webhook/webhook.go:201:70 internal/webhook/webhook.go:207:69
-#: internal/webhook/webhook.go:222:51 internal/webhook/webhook.go:232:69
+#: internal/view/view.go:97:56 internal/webhook/webhook.go:142:56
+#: internal/webhook/webhook.go:152:56 internal/webhook/webhook.go:169:60
+#: internal/webhook/webhook.go:174:60 internal/webhook/webhook.go:187:69
+#: internal/webhook/webhook.go:195:69 internal/webhook/webhook.go:214:70
+#: internal/webhook/webhook.go:222:70 internal/webhook/webhook.go:228:69
+#: internal/webhook/webhook.go:241:51 internal/webhook/webhook.go:251:69
 #: internal/whatsapp/template/template.go:150:70
 #: internal/whatsapp/template/template.go:238:70
 #: internal/whatsapp/template/template.go:243:70
@@ -1303,7 +1310,7 @@ msgstr "Une erreur s'est produite"
 msgid "Starting import of %[1]s %[2]s"
 msgstr "Démarrage de l'importation de %[1]s %[2]s"
 
-#: internal/conversation/status/status.go:151:49
+#: internal/conversation/status/status.go:155:49
 msgid "Status is too long, should be at most %[1]s characters"
 msgstr "Le statut est trop long, il doit contenir au maximum %[1]s caractères"
 
@@ -1315,19 +1322,19 @@ msgstr "Sujet"
 msgid "Tag already exists"
 msgstr "L'étiquette existe déjà"
 
-#: internal/team/team.go:125:58
+#: internal/team/team.go:124:58
 msgid "Team already exists"
 msgstr "L'équipe existe déjà"
 
-#: internal/team/team.go:112:56
+#: internal/team/team.go:111:56
 msgid "Team not found"
 msgstr "Équipe introuvable"
 
-#: internal/ai/ai.go:430:54 internal/template/template.go:106:64
+#: internal/ai/ai.go:449:54 internal/template/template.go:120:64
 msgid "Template not found"
 msgstr "Modèle introuvable"
 
-#: internal/conversation/whatsapp.go:291:59
+#: internal/conversation/whatsapp.go:294:59
 msgid "Templates with a %[1]s header can't be sent from libredesk yet. Pick a template with a text header or none."
 msgstr ""
 
@@ -1350,25 +1357,25 @@ msgstr ""
 msgid "That collection belongs to another help center. Pick a collection in this help center."
 msgstr "Cette catégorie appartient à un autre centre d'aide. Choisissez une catégorie appartenant à ce centre d'aide."
 
-#: internal/conversation/whatsapp.go:284:59
+#: internal/conversation/whatsapp.go:287:59
 msgid "That template belongs to another inbox. Pick one from this inbox's templates."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:319:59
+#: internal/conversation/whatsapp.go:322:59
 msgid "The 24-hour reply window has closed. Send an approved template instead."
 msgstr ""
 
-#: internal/aiagent/worker.go:157:30 internal/aiagent/worker.go:260:30
-#: internal/aiagent/worker.go:348:13 internal/aiagent/worker.go:368:31
-#: internal/aiagent/worker.go:379:31 internal/aiagent/worker.go:97:30
+#: internal/aiagent/worker.go:156:30 internal/aiagent/worker.go:260:30
+#: internal/aiagent/worker.go:352:13 internal/aiagent/worker.go:372:31
+#: internal/aiagent/worker.go:383:31 internal/aiagent/worker.go:96:30
 msgid "The AI assistant could not respond and handed this conversation off to a human."
 msgstr "L'assistant d'IA n'a pas été en mesure de répondre à cette conversation et l'a transmise à un humain."
 
-#: internal/aiagent/worker.go:397:30
+#: internal/aiagent/worker.go:401:30
 msgid "The AI assistant did not have an answer and handed this conversation off to a human."
 msgstr "L'assistant d'IA n'a pas trouvé de réponse pour cette conversation et l'a transmise à un humain."
 
-#: internal/aiagent/worker.go:508:10
+#: internal/aiagent/worker.go:512:10
 msgid "The AI assistant handed this conversation off to a human."
 msgstr "L'assistant d'IA a transmis cette conversation à un humain."
 
@@ -1380,27 +1387,27 @@ msgstr "L'assistant d'IA a atteint sa limite de nombre de réponses pour cette c
 msgid "The AI hit its step limit before answering. Try a simpler request, or ask an admin to raise the limit."
 msgstr "L'IA a atteint sa limite de nombre d'étapes avant de répondre. Essayez une requête plus simple, ou demandez à un administrateur d'augmenter la limite."
 
-#: internal/ai/ai.go:485:49 internal/ai/ai.go:506:49
+#: internal/ai/ai.go:507:49 internal/ai/ai.go:528:49
 msgid "The AI provider API key is not set. Ask your administrator to add it in AI settings."
 msgstr "La clé API du fournisseur d'IA n'est pas définie. Demandez à votre administrateur de l'ajouter dans les paramètres."
 
-#: internal/ai/ai.go:497:51
+#: internal/ai/ai.go:500:51 internal/ai/ai.go:519:51
 msgid "The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."
 msgstr "Le fournisseur d'IA n'a pas pu être joint. Réessayez dans quelques minutes ou demandez à votre administrateur de vérifier les paramètres."
 
-#: internal/ai/ai.go:489:53
+#: internal/ai/ai.go:511:53
 msgid "The AI provider is rate limiting requests. Wait a minute and try again."
 msgstr "Le fournisseur d'AI limite les requêtes. Attendez une minute et réessayez."
 
-#: internal/ai/ai.go:482:49
+#: internal/ai/ai.go:504:49
 msgid "The AI provider rejected the API key. AI features won't work until your administrator updates it in AI settings."
 msgstr "Le fournisseur d'IA a rejeté la clé API. Les fonctionnalités IA ne fonctionneront pas tant que votre administrateur ne la mettra pas à jour dans les paramètres."
 
-#: internal/ai/ai.go:493:51
+#: internal/ai/ai.go:515:51
 msgid "The AI provider took too long to respond. Try again, or with a shorter request."
 msgstr "Le fournisseur d'IA a mis trop de temps à répondre. Réessayez, ou essayez une requête plus courte."
 
-#: cmd/ai.go:390:72 cmd/ai.go:422:72 cmd/ai.go:514:72 cmd/ai.go:639:78
+#: cmd/ai.go:393:72 cmd/ai.go:426:72 cmd/ai.go:524:72 cmd/ai.go:667:78
 msgid "The AI returned an empty response. Nothing was generated. Try again, or rephrase your request."
 msgstr "L'AI a renvoyé une réponse vide. Rien n'a été généré. Réessayez ou reformulez votre demande."
 
@@ -1417,7 +1424,7 @@ msgstr ""
 msgid "The page could not be fetched. Check the URL is reachable and try again."
 msgstr "La page n'a pas pu être récupérée. Vérifiez que l'URL est accessible et réessayez."
 
-#: cmd/helpcenter.go:2004:52
+#: cmd/helpcenter.go:2060:52
 msgid "The page couldn't be loaded due to a temporary problem. Try again in a moment, or go back to the help center home."
 msgstr "La page n'a pas pu être chargée en raison d'un problème temporaire. Réessayez dans un instant, ou retournez au centre d'aide."
 
@@ -1429,11 +1436,11 @@ msgstr "La catégorie parente utilise une langue différente. Choisissez une cat
 msgid "The provided key is not allowed as it conflicts with default attributes. Please use a different key."
 msgstr "La clé fournie n'est pas autorisée car elle est en conflit avec les attributs par défaut. Veuillez utiliser une clé différente."
 
-#: internal/ai/ai.go:409:49
+#: internal/ai/ai.go:416:49
 msgid "The provider returned %[1]s-dimension vectors but Dimensions is set to %[2]s. Set Dimensions to %[1]s, or search will not work."
 msgstr "Le fournisseur a retourné des vecteurs de dimension %[1]s alors que les dimensions du modèle sont définies à %[2]s. Réglez les dimensions à %[1]s ou la recherche ne fonctionnera pas."
 
-#: cmd/ai.go:487:71
+#: cmd/ai.go:492:71
 msgid "The selected assistant is unavailable. It may have been removed or disabled. Pick another assistant or use the default Copilot."
 msgstr "L'assistant sélectionné n'est pas disponible. Il a peut-être été supprimé ou désactivé. Choisissez un autre assistant ou utilisez le copilote par défaut."
 
@@ -1449,15 +1456,15 @@ msgstr ""
 msgid "The tool was declined, but the AI could not complete its response. Run the AI action again if you still need a reply."
 msgstr ""
 
-#: internal/ai/ai.go:348:49 internal/ai/toolstore.go:158:55
+#: internal/ai/ai.go:355:49 internal/ai/toolstore.go:158:55
 msgid "The value can't start with \"enc:\". That prefix is reserved for encrypted secrets."
 msgstr "La valeur ne peut pas débuter par \"enc:\". Ce préfixe est réservé aux secrets chiffrés."
 
-#: cmd/ai.go:450:70
+#: cmd/ai.go:455:70
 msgid "There are no messages to suggest tags from yet."
 msgstr "Il n'y a pas encore de messages pour lesquels suggérer des étiquettes."
 
-#: cmd/ai.go:415:70
+#: cmd/ai.go:419:70
 msgid "There are no messages to summarize yet."
 msgstr "Il n'y a pas encore de message à résumer."
 
@@ -1470,7 +1477,7 @@ msgstr "Les paramètres d'apparence n'ont pas pu être lus. Actualisez la page e
 msgid "This article already has a translation in that language."
 msgstr ""
 
-#: internal/notification/push.go:116:49 internal/notification/push.go:127:49
+#: internal/notification/push.go:117:49 internal/notification/push.go:128:49
 msgid "This browser subscription is invalid. Disable and enable browser notifications, then try again."
 msgstr ""
 
@@ -1478,33 +1485,37 @@ msgstr ""
 msgid "This collection contains articles or sub-collections in its current language. Changing the language would hide them from the help center. Move them out first."
 msgstr "Cette catégorie contient des articles ou des sous-catégories dans sa langue actuelle. Changer sa langue les masquerait. Déplacez-les avant de modifier la langue."
 
-#: cmd/conversation.go:957:18
+#: cmd/conversation.go:959:18
 msgid "This contact already has an open conversation in this inbox that you cannot access. Ask an agent with access to send the template."
 msgstr ""
 
-#: cmd/conversation.go:960:18
+#: cmd/conversation.go:962:18
 msgid "This contact already has an open conversation in this inbox. Open it to send a template."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:242:59
-#: internal/conversation/whatsapp.go:254:59
+#: internal/conversation/whatsapp.go:245:59
+#: internal/conversation/whatsapp.go:257:59
 msgid "This contact has no phone number. Add one to message them on WhatsApp."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:246:59
-#: internal/conversation/whatsapp.go:251:59
+#: internal/conversation/whatsapp.go:249:59
+#: internal/conversation/whatsapp.go:254:59
 msgid "This contact's phone number has no valid country code. Fix it on the contact to message them on WhatsApp."
 msgstr ""
 
-#: cmd/chat.go:1479:54
+#: cmd/chat.go:1493:54
 msgid "This conversation has been closed"
 msgstr "Cette conversation a été fermée"
 
-#: cmd/chat.go:726:57 cmd/media.go:103:57
+#: internal/template/template.go:216:49
+msgid "This email template cannot deliver replies. Check the syntax and include %[1]s."
+msgstr ""
+
+#: cmd/chat.go:731:57 cmd/media.go:103:57
 msgid "This file is 0 bytes, so it will not be attached."
 msgstr "Ce fichier fait 0 octets, il ne sera donc pas joint."
 
-#: cmd/chat.go:625:55 cmd/chat.go:664:55
+#: cmd/chat.go:630:55 cmd/chat.go:669:55
 msgid "This handoff is no longer pending. Send a new message if you still need a human."
 msgstr ""
 
@@ -1512,7 +1523,7 @@ msgstr ""
 msgid "This header has no saved value. Renaming a header does not carry over its stored secret. Enter the value again."
 msgstr "Cette en-tête n'a pas de valeur enregistrée. Le renommage d'une en-tête ne conserve pas son secret stocké. Entrez la valeur à nouveau."
 
-#: cmd/inboxes.go:163:49 cmd/inboxes.go:495:50
+#: cmd/inboxes.go:164:49 cmd/inboxes.go:496:50
 msgid "This inbox's WhatsApp settings could not be read. Re-enter the credentials and save again."
 msgstr ""
 
@@ -1524,7 +1535,7 @@ msgstr ""
 msgid "This language is not one of the help center's supported languages. Content saved in it will not appear on the public site. Add the language to the help center first."
 msgstr "Cette langue n'est pas une des langues prises en charge par le centre d'aide. Le contenu enregistré dans celui-ci n'apparaîtra pas sur le site public. Ajoutez d'abord la langue au centre d'aide."
 
-#: internal/conversation/whatsapp.go:344:49
+#: internal/conversation/whatsapp.go:347:49
 msgid "This message is longer than WhatsApp's limit of %[1]s characters. Shorten it and send again."
 msgstr ""
 
@@ -1536,15 +1547,15 @@ msgstr "Ce nom est déjà utilisé par un outil intégré. Choisissez un nom dif
 msgid "This note was deleted"
 msgstr "La note a été supprimée"
 
-#: cmd/conversation.go:1186:53
+#: cmd/conversation.go:1189:53
 msgid "This number does not match the country you picked. Fix one of them."
 msgstr ""
 
-#: cmd/helpcenter.go:2002:46
+#: cmd/helpcenter.go:2058:46
 msgid "This page doesn't exist or may have moved. Search above, or go back to the help center home."
 msgstr "Cette page n'existe pas a été déplacée. Effectuez une recherche à l'aide du champ ci-dessus ou retournez au centre d'aide."
 
-#: internal/conversation/whatsapp.go:262:62
+#: internal/conversation/whatsapp.go:265:62
 msgid "This phone number already belongs to another contact on WhatsApp. Merge or correct the contacts first."
 msgstr ""
 
@@ -1553,8 +1564,8 @@ msgstr ""
 msgid "This slug is not allowed. Use a different slug."
 msgstr "Cet identifiant n'est pas autorisé. Indiquez un identifiant différent."
 
-#: internal/aiagent/faq.go:112:52 internal/aiagent/faq.go:74:52
-#: internal/aiagent/faq.go:92:52
+#: internal/aiagent/faq.go:113:52 internal/aiagent/faq.go:75:52
+#: internal/aiagent/faq.go:93:52
 msgid "This suggestion has already been reviewed."
 msgstr "Cette suggestion a déjà été évaluée."
 
@@ -1567,7 +1578,7 @@ msgstr ""
 msgid "This template is reserved for CSAT surveys and can't be deleted. Edit it in the inbox's CSAT settings."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:295:59
+#: internal/conversation/whatsapp.go:298:59
 msgid "This template needs content libredesk cannot send. Choose a text template or sync templates from Meta."
 msgstr ""
 
@@ -1576,7 +1587,7 @@ msgstr ""
 msgid "This tool changed after approval was requested and was not run. Run the AI action again to review the current tool."
 msgstr ""
 
-#: cmd/ai.go:631:82 internal/ai/agent_approval.go:221:59
+#: cmd/ai.go:659:82 internal/ai/agent_approval.go:221:59
 #: internal/ai/agent_approval.go:88:71
 msgid "This tool request cannot be approved for this conversation. Run the AI action again to create a new request."
 msgstr ""
@@ -1585,31 +1596,31 @@ msgstr ""
 msgid "This tool request is no longer available. Run the AI action again to create a new request."
 msgstr ""
 
-#: internal/ai/ai.go:418:75 internal/ai/knowledgebase.go:106:4
+#: internal/ai/ai.go:437:75 internal/ai/knowledgebase.go:106:4
 #: internal/ai/knowledgebase.go:85:4
 msgid "Title"
 msgstr "Titre"
 
-#: internal/user/user.go:357:53
+#: internal/user/user.go:362:53
 msgid "Token is invalid or expired, Please try again by requesting a new password reset link"
 msgstr "Le jeton n'est pas valide ou a expiré, veuillez réessayer en demandant un nouveau lien de réinitialisation du mot de passe"
 
-#: internal/conversation/conversation.go:2088:49
+#: internal/conversation/conversation.go:2111:49
 msgid "Too many filter groups. A view can have at most %[1]s. Remove the extra groups and save again."
 msgstr "Limite de groupes de filtres dépassée. Une vue ne peut avoir plus de %[1]s groupes. Supprimez des groupes et réessayez."
 
-#: internal/conversation/conversation.go:465:61
+#: internal/conversation/conversation.go:470:61
 #: internal/conversation/proactive.go:46:72
 msgid "Too many requests."
 msgstr "Trop de requêtes."
 
-#: internal/conversation/whatsapp.go:337:49
+#: internal/conversation/whatsapp.go:340:49
 msgid "Type a message or attach a file before sending."
 msgstr ""
 
-#: cmd/chat.go:388:59 cmd/chat.go:471:59 cmd/widget_middleware.go:101:60
-#: cmd/widget_middleware.go:107:60 cmd/widget_middleware.go:112:60
-#: cmd/widget_middleware.go:118:60
+#: cmd/chat.go:391:59 cmd/chat.go:476:59 cmd/widget_middleware.go:100:60
+#: cmd/widget_middleware.go:106:60 cmd/widget_middleware.go:111:60
+#: cmd/widget_middleware.go:117:60
 msgid "Unauthorized"
 msgstr "Non autorisé"
 
@@ -1622,9 +1633,9 @@ msgid "User already logged in"
 msgstr "L'utilisateur est déjà connecté"
 
 #: internal/user/contact.go:240:56 internal/user/contact.go:81:52
-#: internal/user/user.go:210:59 internal/user/user.go:232:59
-#: internal/user/user.go:245:59 internal/user/user.go:258:59
-#: internal/user/user.go:281:59
+#: internal/user/user.go:215:59 internal/user/user.go:237:59
+#: internal/user/user.go:250:59 internal/user/user.go:263:59
+#: internal/user/user.go:286:59
 msgid "User not found"
 msgstr "Utilisateur introuvable"
 
@@ -1632,7 +1643,7 @@ msgstr "Utilisateur introuvable"
 msgid "User with same email already exists"
 msgstr "L'utilisateur avec le même email existe déjà"
 
-#: internal/conversation/message.go:1680:10
+#: internal/conversation/message.go:1733:10
 msgid "Video"
 msgstr "Vidéo"
 
@@ -1649,15 +1660,15 @@ msgstr "Nous vous remercions de prendre le temps de nous faire part de vos comme
 msgid "Welcome to Libredesk"
 msgstr "Bienvenue sur Libredesk"
 
-#: internal/conversation/message.go:652:68
+#: internal/conversation/message.go:687:68
 msgid "WhatsApp takes one file per message. Send the files one at a time."
 msgstr ""
 
-#: internal/conversation/whatsapp.go:277:61
+#: internal/conversation/whatsapp.go:280:61
 msgid "WhatsApp templates are unavailable right now. Try again in a moment."
 msgstr ""
 
-#: internal/aiagent/worker.go:374:34
+#: internal/aiagent/worker.go:378:34
 msgid "Yes"
 msgstr "Oui"
 
@@ -1681,25 +1692,24 @@ msgstr "Vous n'avez pas accès à cette vue"
 msgid "You're not a member of this team, Please refresh the page and try again"
 msgstr "Vous n'êtes pas membre de cette équipe, veuillez actualiser la page et réessayer"
 
-#: cmd/login.go:52:72 cmd/middlewares.go:77:60
+#: cmd/login.go:52:72 cmd/middlewares.go:84:60
 msgid "Your account is disabled, Please contact administrator"
 msgstr "Votre compte est désactivé, veuillez contacter l'administrateur"
 
-#: internal/conversation/whatsapp.go:173:14
+#: internal/conversation/whatsapp.go:176:14
 msgid "Your conversation has been resolved. How did we do? Rate your experience: %[1]s"
 msgstr ""
 
-#: internal/aiagent/tools.go:268:14 internal/aiagent/tools.go:274:21
+#: internal/aiagent/tools.go:266:14 internal/aiagent/tools.go:272:21
 msgid "Your verification code"
 msgstr "Votre code de vérification"
 
-#: internal/aiagent/tools.go:259:10
+#: internal/aiagent/tools.go:257:10
 msgid "Your verification code is %[1]s. It expires in 10 minutes. If you did not request this, you can ignore this email."
 msgstr "Votre code de vérification est %[1]s. Il expire dans 10 minutes. Si vous ne l'avez pas demandé, vous pouvez ignorer cet email."
 
-#: cmd/chat.go:1283:67 cmd/chat.go:1295:67 cmd/chat.go:1311:67
-#: cmd/chat.go:1316:67 cmd/chat.go:404:57 cmd/chat.go:409:57
+#: cmd/chat.go:1297:67 cmd/chat.go:1309:67 cmd/chat.go:1325:67
+#: cmd/chat.go:1330:67 cmd/chat.go:407:57 cmd/chat.go:412:57
 #: internal/helpcenter/helpcenter.go:1502:50
 msgid "`%[1]s` must be at most %[2]s characters."
 msgstr "La valeur du champ « %[1]s » ne peut excéder %[2]s caractères."
-

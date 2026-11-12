@@ -7,7 +7,7 @@
         <SearchInput
           class="min-w-0 flex-1 max-w-sm"
           v-model="searchTerm"
-          :placeholder="i18n._('Search by email')"
+          :placeholder="i18n._('Search by name, email or phone')"
           :clear-label="i18n._('Clear search')"
           @update:model-value="fetchContactsDebounced"
         />
@@ -187,14 +187,15 @@ const fetchContacts = async () => {
   loading.value = true
   let filterJSON = ''
   if (searchTerm.value && searchTerm.value.length >= 3) {
-    filterJSON = JSON.stringify([
-      {
+    filterJSON = JSON.stringify({
+      logic: 'OR',
+      rules: ['email', 'phone_number', 'full_name'].map((field) => ({
         model: 'users',
-        field: 'email',
+        field,
         operator: 'ilike',
         value: searchTerm.value
-      }
-    ])
+      }))
+    })
   }
   try {
     const response = await api.getContacts({

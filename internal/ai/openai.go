@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +48,10 @@ const (
 	// The API rejects an empty/whitespace-only string in the input array with a 400 that fails the
 	// whole batch; a lone space is a harmless stand-in that keeps input/output indices aligned.
 	emptyEmbeddingPlaceholder = " "
+
+	timeContextPrompt = `Workspace time zone: %s.
+Current date and time: %s (%s).
+Read today, tomorrow and other relative dates in the workspace time zone unless another time zone is explicitly provided.`
 )
 
 // Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
@@ -57,6 +62,7 @@ type OpenAIClient struct {
 	cfg    models.ProviderConfig
 	lo     *logf.Logger
 	client *http.Client
+	loc    *time.Location
 }
 
 type embeddingBatch struct{ start, end int }
@@ -85,12 +91,12 @@ type apiErrorResponse struct {
 	} `json:"error"`
 }
 
-func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, client *http.Client) *OpenAIClient {
+func NewOpenAIClient(cfg models.ProviderConfig, lo *logf.Logger, client *http.Client, loc *time.Location) *OpenAIClient {
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = defaultOpenAIBaseURL
 	}
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
-	return &OpenAIClient{cfg: cfg, lo: lo, client: client}
+	return &OpenAIClient{cfg: cfg, lo: lo, client: client, loc: loc}
 }
 
 // SendPrompt runs a single system+user prompt and returns the assistant text.
@@ -122,7 +128,7 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 		maxTokens = 1024
 	}
 
-	messages := payload.Messages
+	messages := withTimeContext(payload.Messages, time.Now() /** now **/, o.loc)
 	sentImages := 0
 	for _, msg := range messages {
 		sentImages += len(msg.Images)
@@ -454,4 +460,15 @@ func embeddingBatches(inputs []string) []embeddingBatch {
 		batches = append(batches, embeddingBatch{start, len(inputs)})
 	}
 	return batches
+}
+
+func withTimeContext(msgs []models.ChatMessage, now time.Time, loc *time.Location) []models.ChatMessage {
+	local := now.In(loc)
+	timeContext := fmt.Sprintf(timeContextPrompt, loc, local.Format(time.RFC3339), local.Weekday())
+	if len(msgs) > 0 && msgs[0].Role == models.RoleSystem {
+		out := slices.Clone(msgs)
+		out[0].Content += "\n\n" + timeContext
+		return out
+	}
+	return append([]models.ChatMessage{{Role: models.RoleSystem, Content: timeContext}}, msgs...)
 }

@@ -162,6 +162,12 @@ func (m *Manager) MessageSenderWorker(ctx context.Context) {
 	}
 }
 
+// GetAIConversationMessages excludes private messages, surveys and continuity emails before counting and pagination.
+func (m *Manager) GetAIConversationMessages(conversationUUID string, page, pageSize int) ([]models.Message, int, error) {
+	private := false
+	return m.getConversationMessages(conversationUUID, page, pageSize, &private, []string{models.MessageIncoming, models.MessageOutgoing}, true /** excludeCSAT **/)
+}
+
 // sendOutgoingMessage sends an outgoing message.
 func (m *Manager) sendOutgoingMessage(message models.Message) {
 	defer m.outgoingProcessingMessages.Delete(message.ID)
@@ -383,39 +389,7 @@ func (m *Manager) previousMessagesData(conversationID, messageID int) []previous
 
 // GetConversationMessages retrieves messages for a specific conversation.
 func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSize int, private *bool, msgTypes []string) ([]models.Message, int, error) {
-	var (
-		messages = make([]models.Message, 0)
-		qArgs    []any
-	)
-
-	// Convert msgTypes slice to pq.StringArray for PostgreSQL
-	var typesArg any
-	if len(msgTypes) > 0 {
-		typesArg = pq.StringArray(msgTypes)
-	}
-
-	qArgs = append(qArgs, conversationUUID, private, typesArg)
-	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
-	if err != nil {
-		m.lo.Error("error generating messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
-	}
-
-	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
-		ReadOnly: true,
-	})
-	defer tx.Rollback()
-	if err != nil {
-		m.lo.Error("error preparing get messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
-	}
-
-	if err := tx.Select(&messages, query, qArgs...); err != nil {
-		m.lo.Error("error fetching conversations", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
-	}
-
-	return messages, pageSize, nil
+	return m.getConversationMessages(conversationUUID, page, pageSize, private, msgTypes, false /** excludeCSAT **/)
 }
 
 // GetAllConversationMessages returns the newest messages in a conversation in chronological order, capped at limit; a non-positive limit returns them all.
@@ -1871,4 +1845,39 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 		return normalized, nil
 	}
 	return sendable[0], nil
+}
+
+func (m *Manager) getConversationMessages(conversationUUID string, page, pageSize int, private *bool, msgTypes []string, excludeCSAT bool) ([]models.Message, int, error) {
+	var (
+		messages = make([]models.Message, 0)
+		qArgs    []any
+	)
+
+	var typesArg any
+	if len(msgTypes) > 0 {
+		typesArg = pq.StringArray(msgTypes)
+	}
+
+	qArgs = append(qArgs, conversationUUID, private, typesArg, excludeCSAT)
+	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
+	if err != nil {
+		m.lo.Error("error generating messages query", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
+	}
+
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
+		ReadOnly: true,
+	})
+	defer tx.Rollback()
+	if err != nil {
+		m.lo.Error("error preparing get messages query", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
+	}
+
+	if err := tx.Select(&messages, query, qArgs...); err != nil {
+		m.lo.Error("error fetching conversations", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
+	}
+
+	return messages, pageSize, nil
 }

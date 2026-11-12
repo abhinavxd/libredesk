@@ -41,6 +41,13 @@ func authenticateUser(r *fastglue.Request, app *App) (models.User, error) {
 		return user, nil
 	}
 
+	// Help center custom code runs on its custom domain, so agent sessions are never honored there.
+	if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+		return user, err
+	} else if isHelpCenter {
+		return user, envelope.NewError(envelope.GeneralError, app.i18n.Get("Invalid or expired session"), nil)
+	}
+
 	// Session-based authentication - Check CSRF first.
 	method := string(r.RequestCtx.Method())
 	if method == http.MethodPost || method == http.MethodPut || method == http.MethodDelete {
@@ -186,6 +193,12 @@ func perm(handler fastglue.FastRequestHandler, perm string) fastglue.FastRequest
 func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
+		if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+			return sendErrorEnvelope(r, err)
+		} else if isHelpCenter {
+			fastglue.NotFoundHandler(r.RequestCtx)
+			return nil
+		}
 
 		user, err := validatePageSession(r, app)
 		if err != nil {
@@ -211,6 +224,12 @@ func authPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 func notAuthPage(handler fastglue.FastRequestHandler) fastglue.FastRequestHandler {
 	return func(r *fastglue.Request) error {
 		app := r.Context.(*App)
+		if isHelpCenter, err := isHelpCenterHost(app, r); err != nil {
+			return sendErrorEnvelope(r, err)
+		} else if isHelpCenter {
+			fastglue.NotFoundHandler(r.RequestCtx)
+			return nil
+		}
 
 		user, err := validatePageSession(r, app)
 		if err != nil {

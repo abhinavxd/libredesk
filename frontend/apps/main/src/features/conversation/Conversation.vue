@@ -73,9 +73,19 @@
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="downloadTranscript">
-              {{ i18n._('Download transcript') }}
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {{ i18n._('Download transcript') }}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem @click="downloadTranscript('txt')">
+                  {{ i18n._('Plain text (.txt)') }}
+                </DropdownMenuItem>
+                <DropdownMenuItem @click="downloadTranscript('pdf')">
+                  {{ i18n._('PDF') }}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuItem
               v-if="userStore.can(perms.MESSAGES_WRITE_PRIVATE)"
               :disabled="isSummarizing"
@@ -110,6 +120,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@shared-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
@@ -127,6 +140,7 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { downloadBlobResponse, parseBlobError } from '@shared-ui/utils/file'
+import { printTranscript } from '@main/features/conversation/print-transcript'
 import api from '@main/api'
 import { permissions as perms } from '@main/constants/permissions.js'
 defineProps({ detailsOpen: { type: Boolean, default: false } })
@@ -160,12 +174,17 @@ const snoozedUntilLabel = computed(() =>
     : ''
 )
 
-const downloadTranscript = async () => {
+const downloadTranscript = async (format = 'txt') => {
   const conversation = conversationStore.current
   if (!conversation) return
   try {
     const response = await api.getConversationTranscript(conversation.uuid)
-    downloadBlobResponse(response, `transcript-${conversation.reference_number}.txt`)
+    const filename = `transcript-${conversation.reference_number}`
+    if (format === 'pdf') {
+      await printTranscript(await response.data.text(), filename)
+    } else {
+      downloadBlobResponse(response, `${filename}.txt`)
+    }
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
@@ -213,6 +232,7 @@ const handleUpdateStatus = (status) => {
 
 const paletteActions = {
   [CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT]: downloadTranscript,
+  [CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT_PDF]: () => downloadTranscript('pdf'),
   [CONVERSATION_ACTIONS.SUMMARIZE]: summarize
 }
 const onPaletteAction = (action) => paletteActions[action]?.()

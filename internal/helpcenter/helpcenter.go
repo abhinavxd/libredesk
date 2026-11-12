@@ -1077,7 +1077,7 @@ func (m *Manager) SearchPublishedArticles(helpCenterSlug, query, locale string, 
 	if utf8.RuneCountInString(query) < minSearchQueryLen {
 		return articles, nil
 	}
-	query = truncateRunes(query, maxSearchQueryLen)
+	query = stringutil.TruncateRunes(query, maxSearchQueryLen)
 	tsQuery := prefixTSQuery(query)
 	if err := m.q.SearchPublishedArticles.Select(&articles, helpCenterSlug, dbutil.ContainsPattern(query), limit, locale, tsQuery); err != nil {
 		m.lo.Error("error searching published articles", "error", err, "help_center_slug", helpCenterSlug)
@@ -1111,7 +1111,7 @@ func (m *Manager) RecordArticleFeedback(articleID int, isHelpful bool) error {
 // LogSearch records a public search term and how many results it returned. Terms under
 // the search floor never ran, so logging them would pollute the zero-result insights.
 func (m *Manager) LogSearch(helpCenterID int, query string, resultsCount int) {
-	query = truncateRunes(strings.TrimSpace(query), maxSearchQueryLen)
+	query = stringutil.TruncateRunes(strings.TrimSpace(query), maxSearchQueryLen)
 	if utf8.RuneCountInString(query) < minSearchQueryLen {
 		return
 	}
@@ -1604,7 +1604,7 @@ func GenerateSlug(title string) string {
 
 // withSuffix truncates a slug so the suffix still fits inside maxSlugLen.
 func withSuffix(slug, suffix string) string {
-	return strings.Trim(truncateRunes(slug, maxSlugLen-len(suffix)), "-") + suffix
+	return strings.Trim(stringutil.TruncateRunes(slug, maxSlugLen-len(suffix)), "-") + suffix
 }
 
 func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterRequest, error) {
@@ -1771,14 +1771,6 @@ func normalizeLocales(locales []string, defaultLocale string) []string {
 
 func isValidArticleStatus(status string) bool {
 	return status == models.ArticleStatusDraft || status == models.ArticleStatusPublished
-}
-
-func truncateRunes(s string, limit int) string {
-	runes := []rune(s)
-	if len(runes) <= limit {
-		return s
-	}
-	return string(runes[:limit])
 }
 
 // buildArticleSanitizer returns the HTML sanitization policy for article content.
