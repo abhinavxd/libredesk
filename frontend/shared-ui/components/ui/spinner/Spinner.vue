@@ -3,7 +3,7 @@
     <div class="flex items-center justify-center gap-2">
       <div :class="spinnerClass"></div>
       <span v-if="text" :class="textClass">{{ text }}</span>
-      <span v-if="!text" class="sr-only">{{ $t('globals.terms.loading') }}</span>
+      <span v-if="!text" class="sr-only">{{ i18n._('Loading') }}</span>
     </div>
   </div>
 </template>

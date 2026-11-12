@@ -46,7 +46,7 @@ func handleGetInboxes(r *fastglue.Request) error {
 	for i := range inboxes {
 		if err := inboxes[i].ClearPasswords(); err != nil {
 			app.lo.Error("error clearing inbox passwords from response", "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 		}
 		setComputedInboxFieldsWithRoot(app, &inboxes[i], rootURL)
 	}
@@ -67,17 +67,17 @@ func handleGetInbox(r *fastglue.Request) error {
 		var config livechat.Config
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
 			app.lo.Error("error parsing live chat config", "id", id, "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 		}
 		inbox.Config, err = json.Marshal(config)
 		if err != nil {
 			app.lo.Error("error encoding live chat config", "id", id, "error", err)
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 		}
 	}
 	if err := inbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	setComputedInboxFields(app, &inbox)
 	return r.SendEnvelope(inbox)
@@ -161,10 +161,11 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 	}
 	var cfg whatsappChannel.Config
 	if err := json.Unmarshal(inb.Config, &cfg); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.whatsapp.error.invalidConfig"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("This inbox's WhatsApp settings could not be read. Re-enter the credentials and save again."), nil)
 	}
 	if err := app.whatsappClient.ValidateCredentials(r.RequestCtx, cfg.Account()); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.whatsapp.error.credentialCheckFailed", "error", err.Error()), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Meta rejected these credentials: %[1]s",
+			err.Error()), nil)
 	}
 	return nil
 }
@@ -186,12 +187,12 @@ func handleCreateInbox(r *fastglue.Request) error {
 		inbox = imodels.Inbox{}
 	)
 	if err := r.Decode(&inbox, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	// Trim whitespace from inbox fields and config.
 	if err := trimInboxFields(&inbox); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateInbox(app, inbox, false); err != nil {
@@ -209,7 +210,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 
 	if err := reloadInbox(app, createdInbox.ID); err != nil {
 		app.lo.Error("error reloading inbox", "id", createdInbox.ID, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	if createdInbox.Channel == whatsappChannel.ChannelWhatsApp {
@@ -219,7 +220,7 @@ func handleCreateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := createdInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	setComputedInboxFields(app, &createdInbox)
 
@@ -235,16 +236,16 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&inbox, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	// Trim whitespace from inbox fields and config.
 	if err := trimInboxFields(&inbox); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 
 	if err := validateInbox(app, inbox, true); err != nil {
@@ -274,7 +275,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 
 	if err := reloadInbox(app, id); err != nil {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	if updatedInbox.Channel == whatsappChannel.ChannelWhatsApp {
@@ -284,7 +285,7 @@ func handleUpdateInbox(r *fastglue.Request) error {
 	// Clear passwords before returning.
 	if err := updatedInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	setComputedInboxFields(app, &updatedInbox)
 
@@ -299,7 +300,7 @@ func handleToggleInbox(r *fastglue.Request) error {
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
-			app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+			app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	toggledInbox, err := app.inbox.Toggle(r.RequestCtx, id)
@@ -309,13 +310,13 @@ func handleToggleInbox(r *fastglue.Request) error {
 
 	if err := reloadInbox(app, id); err != nil {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 
 	// Clear passwords before returning
 	if err := toggledInbox.ClearPasswords(); err != nil {
 		app.lo.Error("error clearing inbox passwords from response", "error", err)
-		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.somethingWentWrong"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Something went wrong"), nil))
 	}
 	setComputedInboxFields(app, &toggledInbox)
 
@@ -335,7 +336,7 @@ func handleDeleteInbox(r *fastglue.Request) error {
 	}
 	if err := reloadInbox(app, id); err != nil {
 		app.lo.Error("error reloading inbox", "id", id, "error", err)
-		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.Get("Something went wrong"), nil, envelope.GeneralError)
 	}
 	if recErr == nil && deleted.Channel == whatsappChannel.ChannelWhatsApp {
 		go repointWhatsAppWebhookAfterDelete(app, deleted)
@@ -348,13 +349,13 @@ func handleVerifySendForInboxAlias(r *fastglue.Request) error {
 	app := r.Context.(*App)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.badRequest"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Bad request"), nil, envelope.InputError)
 	}
 	var request struct {
 		Email string `json:"email"`
 	}
 	if err := r.Decode(&request, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 	if err := app.inbox.StartAliasVerification(r.RequestCtx, id, request.Email); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -473,40 +474,41 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 		if len(inbox.Config) > 0 {
 			if err := json.Unmarshal(inbox.Config, &cfg); err == nil && cfg.ReplyTo != "" {
 				if _, err := mail.ParseAddress(cfg.ReplyTo); err != nil {
-					return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+					return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid email address"), nil)
 				}
 			}
 		}
 	}
 	if len(inbox.Config) == 0 {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "config"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "config"), nil)
 	}
 	if inbox.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "name"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "name"), nil)
 	}
 	if inbox.Channel == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "channel"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "channel"), nil)
 	}
 
 	// Live credential check against Meta runs in the handler where request context is available.
 	if inbox.Channel == whatsappChannel.ChannelWhatsApp {
 		var cfg whatsappChannel.Config
 		if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.whatsapp.error.invalidConfig"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("This inbox's WhatsApp settings could not be read. Re-enter the credentials and save again."), nil)
 		}
 		if cfg.PhoneNumberID == "" || cfg.WABAID == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`phone_number_id`, `waba_id`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required",
+				"`phone_number_id`, `waba_id`"), nil)
 		}
 		if cfg.WebhookVerifyToken == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`webhook_verify_token`"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required", "`webhook_verify_token`"), nil)
 		}
 		// On edit secrets arrive masked/empty and the config merge restores them.
 		if !isUpdate {
 			if cfg.AccessToken == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`access_token`"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required", "`access_token`"), nil)
 			}
 			if cfg.AppSecret == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.required", "name", "`app_secret`"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s Required", "`app_secret`"), nil)
 			}
 		}
 	}
@@ -515,7 +517,7 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 	if inbox.Channel == livechat.ChannelLiveChat {
 		var config livechat.Config
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 		}
 		if err := validateLiveChatSessionDuration(app, config.SessionDuration); err != nil {
 			return err
@@ -530,36 +532,43 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 		// Validate continuity settings - required when linked email inbox is set.
 		if inbox.LinkedEmailInboxID.Valid && inbox.LinkedEmailInboxID.Int > 0 {
 			if config.Continuity.OfflineThreshold == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "offline_threshold"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "offline_threshold"), nil)
 			}
 			if config.Continuity.MinEmailInterval == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "min_email_interval"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "min_email_interval"), nil)
 			}
 			if config.Continuity.MaxMessagesPerEmail == 0 {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "max_messages_per_email"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty",
+					"max_messages_per_email"), nil)
 			}
 		}
 		if config.Continuity.OfflineThreshold != "" {
 			d, err := time.ParseDuration(config.Continuity.OfflineThreshold)
 			if err != nil {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidDuration", "name", "offline_threshold"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 			}
 			if d < time.Minute {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.minDuration", "name", "offline_threshold", "min", "1m"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s must be at least %[2]s.",
+					"offline_threshold",
+					"1m"), nil)
 			}
 		}
 		if config.Continuity.MinEmailInterval != "" {
 			d, err := time.ParseDuration(config.Continuity.MinEmailInterval)
 			if err != nil {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidDuration", "name", "min_email_interval"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 			}
 			if d < time.Minute {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.minDuration", "name", "min_email_interval", "min", "1m"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s must be at least %[2]s.",
+					"min_email_interval",
+					"1m"), nil)
 			}
 		}
 		if config.Continuity.MaxMessagesPerEmail != 0 {
 			if config.Continuity.MaxMessagesPerEmail < 1 || config.Continuity.MaxMessagesPerEmail > 100 {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.minmaxNumber", "min", "1", "max", "100"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Must be between %[1]s and %[2]s",
+					"1",
+					"100"), nil)
 			}
 		}
 
@@ -571,54 +580,54 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 
 		for _, branding := range []livechat.Branding{config.Branding.Light, config.Branding.Dark} {
 			if branding.Colors.Primary == "" {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "primary color"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "primary color"), nil)
 			}
 			if !hexColorRegex.MatchString(branding.Colors.Primary) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidColor"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid color"), nil)
 			}
 			if branding.Launcher.Color != "" && !hexColorRegex.MatchString(branding.Launcher.Color) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidColor"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid color"), nil)
 			}
 			if branding.HomeScreen.Background.ImageURL != "" && !httputil.IsValidHTTPURL(branding.HomeScreen.Background.ImageURL) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid URL"), nil)
 			}
 			for _, u := range []string{branding.LogoURL, branding.Launcher.LogoURL} {
 				if u != "" && !httputil.IsValidHTTPURL(u) {
-					return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+					return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid URL"), nil)
 				}
 			}
 		}
 
 		if config.Theme != livechat.ThemeSystem && config.Theme != livechat.ThemeLight && config.Theme != livechat.ThemeDark {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 		}
 
 		// Validate launcher position.
 		if config.Launcher.Position != "left" && config.Launcher.Position != "right" {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 		}
 
 		if config.Launcher.IconScale < minLauncherIconScale || config.Launcher.IconScale > maxLauncherIconScale {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 		}
 
 		// Validate launcher spacing: clamp to a sane range so a fat-fingered value doesn't push the launcher off-screen.
 		if config.Launcher.Spacing.Side < 0 || config.Launcher.Spacing.Side > 200 ||
 			config.Launcher.Spacing.Bottom < 0 || config.Launcher.Spacing.Bottom > 200 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid value"), nil)
 		}
 
 		for _, ha := range config.HomeApps {
 			if ha.URL != "" && !httputil.IsValidHTTPURL(ha.URL) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid URL"), nil)
 			}
 			if ha.ImageURL != "" && !httputil.IsValidHTTPURL(ha.ImageURL) {
-				return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid URL"), nil)
 			}
 		}
 
 		if config.WebsiteURL != "" && !httputil.IsValidHTTPURL(config.WebsiteURL) {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidUrl"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid URL"), nil)
 		}
 
 		// Validate trusted domains.
@@ -629,18 +638,21 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 				continue
 			}
 			if strings.Contains(d, "://") || strings.Contains(d, "/") || strings.Contains(d, " ") {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidDomain", "domain", d), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid domain: %[1]s. Enter domain names only (e.g. example.com), without protocol or paths.",
+					d), nil)
 			}
 			// Wildcard must be at the start followed by a dot.
 			if strings.Contains(d, "*") && !strings.HasPrefix(d, "*.") {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidDomain", "domain", d), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid domain: %[1]s. Enter domain names only (e.g. example.com), without protocol or paths.",
+					d), nil)
 			}
 		}
 
 		// Validate blocked IPs entries.
 		for _, entry := range config.BlockedIPs {
 			if !httputil.ValidateIPOrCIDR(entry) {
-				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidIPOrCIDR", "entry", entry), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid IP address or CIDR range: %[1]s",
+					entry), nil)
 			}
 		}
 
@@ -648,15 +660,15 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 		if inbox.LinkedEmailInboxID.Valid {
 			linkedInbox, err := app.inbox.GetDBRecord(int(inbox.LinkedEmailInboxID.Int))
 			if err != nil {
-				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 			}
 			// Ensure linked inbox is an email channel
 			if linkedInbox.Channel != "email" {
-				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 			}
 			// Ensure linked inbox is enabled
 			if !linkedInbox.Enabled {
-				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 
 			}
 		}
@@ -673,14 +685,14 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 
 func validateQuickReplies(app *App, replies []string) error {
 	if len(replies) > 6 {
-		return envelope.NewError(envelope.InputError, app.i18n.T("admin.inbox.livechat.quickReplies.limit"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Add up to 6 quick replies."), nil)
 	}
 	for _, reply := range replies {
 		if strings.TrimSpace(reply) == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "quick reply"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "quick reply"), nil)
 		}
 		if utf8.RuneCountInString(reply) > 120 {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.maxLength", "max", "120"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Must be at most %[1]s characters", "120"), nil)
 		}
 	}
 	return nil
@@ -692,10 +704,12 @@ func validateLiveChatSessionDuration(app *App, value string) error {
 	}
 	duration, err := time.ParseDuration(value)
 	if err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidDuration"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h)."), nil)
 	}
 	if duration < time.Hour {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.minDuration", "name", "session_duration", "min", "1h"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s must be at least %[2]s.",
+			"session_duration",
+			"1h"), nil)
 	}
 	return nil
 }
@@ -704,40 +718,40 @@ func validateLiveChatSessionDuration(app *App, value string) error {
 func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 	var cfg imodels.Config
 	if err := json.Unmarshal(configJSON, &cfg); err != nil {
-		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Validate auth_type.
 	if cfg.AuthType != "" && cfg.AuthType != imodels.AuthTypePassword && cfg.AuthType != imodels.AuthTypeOAuth2 {
-		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Validate OAuth config if auth_type is oauth2.
 	if cfg.AuthType == imodels.AuthTypeOAuth2 {
 		if cfg.OAuth == nil {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "oauth"), nil)
 		}
 		if cfg.OAuth.Provider != string(oauth.ProviderGoogle) && cfg.OAuth.Provider != string(oauth.ProviderMicrosoft) {
-			return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 		}
 		if cfg.OAuth.ClientID == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "oauth.client_id"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "oauth.client_id"), nil)
 		}
 	}
 
 	// Validate SMTP configs.
 	for i, smtp := range cfg.SMTP {
 		if smtp.Host == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "smtp.host"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "smtp.host"), nil)
 		}
 		if smtp.Port <= 0 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidPortValue"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Invalid port value"), nil)
 		}
 		// Validate auth_protocol for password auth.
 		if cfg.AuthType != imodels.AuthTypeOAuth2 {
 			validAuthProtocols := map[string]bool{"": true, "none": true, "plain": true, "login": true, "cram": true}
 			if !validAuthProtocols[cfg.SMTP[i].AuthProtocol] {
-				return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+				return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 			}
 		}
 	}
@@ -745,18 +759,18 @@ func validateEmailConfig(app *App, configJSON json.RawMessage) error {
 	// Validate IMAP configs.
 	for _, imap := range cfg.IMAP {
 		if imap.Host == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "imap.host"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "imap.host"), nil)
 		}
 		if imap.Port <= 0 {
-			return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 		}
 		if imap.Mailbox == "" {
-			return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "imap.mailbox"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "imap.mailbox"), nil)
 		}
 		// Validate tls_type.
 		validTLSTypes := map[string]bool{"none": true, "starttls": true, "tls": true}
 		if !validTLSTypes[imap.TLSType] {
-			return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.InputError, app.i18n.Get("Something went wrong"), nil)
 		}
 	}
 

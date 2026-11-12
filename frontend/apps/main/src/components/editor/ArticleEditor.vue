@@ -48,9 +48,9 @@ import EditorLinkDialog from './EditorLinkDialog.vue'
 import EditorYoutubeDialog from './EditorYoutubeDialog.vue'
 import { buildArticleExtensions } from './editorExtensions'
 import { useTextEditor } from './useTextEditor'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const textContent = defineModel('textContent', { default: '' })
 const htmlContent = defineModel('htmlContent', { default: '' })
@@ -76,8 +76,8 @@ const imageInput = ref(null)
 const { editor, insertImages, focus } = useTextEditor({
   extensions: buildArticleExtensions({
     getPlaceholder: () => props.placeholder,
-    embedTitle: t('editor.tooltip.youtube'),
-    defaultSummary: t('globals.terms.summary')
+    embedTitle: i18n._('YouTube video'),
+    defaultSummary: i18n._('Summary')
   }),
   htmlContent,
   textContent,

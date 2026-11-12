@@ -2,7 +2,7 @@
   <div class="flex flex-col relative flex-1 min-h-0">
     <!-- Loading conversation overlay -->
     <div v-if="isLoadingConversation" class="absolute inset-0 bg-background z-10" role="status">
-      <Spinner size="md" :text="$t('globals.terms.loading')" absolute />
+      <Spinner size="md" :text="i18n._('Loading')" absolute />
     </div>
     <div
       class="flex-1 min-h-0 overflow-y-auto [overflow-anchor:none] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/30 hover:scrollbar-thumb-muted-foreground/50"
@@ -100,8 +100,8 @@
               >
                 {{
                   isQuotedTextVisible(message.uuid)
-                    ? t('conversation.hideQuotedText')
-                    : t('conversation.showQuotedText')
+                    ? i18n._('Hide quoted text')
+                    : i18n._('Show quoted text')
                 }}
               </div>
               <MessageAttachment class="mt-1" :attachments="message.attachments" />
@@ -144,10 +144,10 @@
                     class="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin"
                   ></div>
                   <span v-if="message.status === 'sending'">
-                    {{ $t('globals.messages.sending') }}
+                    {{ i18n._('Sending...') }}
                   </span>
                   <span v-if="message.status === 'uploading'">
-                    {{ $t('globals.messages.uploading') }}
+                    {{ i18n._('Uploading') }}
                   </span>
                 </span>
                 <span v-else>
@@ -180,7 +180,7 @@ import { useDocumentVisibility, useDebounceFn } from '@vueuse/core'
 import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useRelativeTime } from '@widget/composables/useRelativeTime.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Letter } from 'vue-letter'
 import { allowedCssProperties } from 'lettersanitizer'
 import ScrollToBottomButton from '@shared-ui/components/ScrollToBottomButton'
@@ -220,7 +220,7 @@ const contentEl = ref(null)
 const unreadMessages = ref(0)
 const currentConversationUUID = ref('')
 const quotedTextState = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 
 const { hasUserScrolled, scrollToBottom, scrollToOffset, handleScroll } = useStickyScroll(
   messagesContainer,

@@ -32,7 +32,7 @@ func handleGetContextLink(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	contextLink, err := app.contextLink.Get(id)
@@ -51,7 +51,7 @@ func handleCreateContextLink(r *fastglue.Request) error {
 		contextLink = models.ContextLink{}
 	)
 	if err := r.Decode(&contextLink, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 	if err := validateContextLink(app, &contextLink); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -72,10 +72,10 @@ func handleUpdateContextLink(r *fastglue.Request) error {
 		id, _       = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := r.Decode(&contextLink, "json"); err != nil {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Error parsing request"), err.Error(), envelope.InputError)
 	}
 	if err := validateContextLink(app, &contextLink); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -95,7 +95,7 @@ func handleDeleteContextLink(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if err := app.contextLink.Delete(id); err != nil {
 		return sendErrorEnvelope(r, err)
@@ -109,7 +109,7 @@ func handleToggleContextLink(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	result, err := app.contextLink.Toggle(id)
 	if err != nil {
@@ -138,7 +138,7 @@ func handleGetContextLinkURL(r *fastglue.Request) error {
 		conversationUUID = string(r.RequestCtx.QueryArgs().Peek("conversation_uuid"))
 	)
 	if id <= 0 || conversationUUID == "" {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
@@ -165,13 +165,13 @@ func handleGetContextLinkURL(r *fastglue.Request) error {
 
 func validateContextLink(app *App, contextLink *models.ContextLink) error {
 	if contextLink.Name == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`name`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`name`"), nil)
 	}
 	if contextLink.URLTemplate == "" {
-		return envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "`url_template`"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty", "`url_template`"), nil)
 	}
 	if contextLink.Secret != "" && !strings.Contains(contextLink.Secret, stringutil.PasswordDummy) && len(contextLink.Secret) != 32 {
-		return envelope.NewError(envelope.InputError, app.i18n.T("contextLink.secretLengthError"), nil)
+		return envelope.NewError(envelope.InputError, app.i18n.Get("Secret must be exactly 32 characters."), nil)
 	}
 	if contextLink.TokenExpirySeconds <= 0 {
 		contextLink.TokenExpirySeconds = 1200

@@ -4,7 +4,7 @@
       <template #actions>
         <router-link :to="{ name: 'new-role' }">
           <Button>
-            {{ $t('role.new') }}
+            {{ i18n._('New role') }}
           </Button>
         </router-link>
       </template>
@@ -13,7 +13,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="roles"
         :loading="isLoading"
       />
@@ -32,12 +32,12 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const emitter = useEmitter()
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const roles = ref([])
 const isLoading = ref(false)
 

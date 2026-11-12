@@ -1,6 +1,8 @@
+
+
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Eye, MessageSquarePlus } from 'lucide-vue-next'
 import { navIconMap } from '@main/constants/navIcons'
 import { adminNavItems } from '@main/constants/navigation'
@@ -11,7 +13,7 @@ import { SECTIONS } from '../sections'
 
 export function useCreateCommands() {
   const router = useRouter()
-  const { t } = useI18n()
+  const i18n = useI18n()
   const emitter = useEmitter()
 
   const adminCreates = () =>
@@ -20,8 +22,8 @@ export function useCreateCommands() {
       .filter((item) => item.createRouteName)
       .map((item) => ({
         id: `create.${item.createRouteName}`,
-        label: t(router.resolve({ name: item.createRouteName }).meta.titleKey),
-        keywords: [t('globals.messages.create'), t('globals.terms.admin')],
+        label: i18n._(router.resolve({ name: item.createRouteName }).meta.titleMessage),
+        keywords: [i18n._('Create'), i18n._('{count, plural, one {Admin} other {Admins}}')],
         section: SECTIONS.CREATE,
         icon: navIconMap[item.icon],
         permission: item.permission,
@@ -31,8 +33,8 @@ export function useCreateCommands() {
   return computed(() => [
     {
       id: 'create.conversation',
-      label: t('conversation.newConversation'),
-      keywords: [t('globals.messages.create')],
+      label: i18n._('New conversation'),
+      keywords: [i18n._('Create')],
       section: SECTIONS.ACTIONS,
       icon: MessageSquarePlus,
       permission: permissions.CONVERSATIONS_WRITE,
@@ -41,8 +43,8 @@ export function useCreateCommands() {
     },
     {
       id: 'create.view',
-      label: t('command.newView'),
-      keywords: [t('globals.messages.create'), t('globals.terms.view')],
+      label: i18n._('New view'),
+      keywords: [i18n._('Create'), i18n._('{count, plural, one {View} other {Views}}')],
       section: SECTIONS.ACTIONS,
       icon: Eye,
       permission: permissions.VIEW_MANAGE,

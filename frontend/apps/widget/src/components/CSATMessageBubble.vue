@@ -6,7 +6,7 @@
       enter-from-class="opacity-0 motion-safe:scale-[0.96]"
     >
       <div v-if="!isSubmitted">
-        <p class="mb-3">{{ t('globals.messages.pleaseRateConversation') }}</p>
+        <p class="mb-3">{{ i18n._('Please rate this conversation:') }}</p>
 
         <div class="grid grid-cols-5 gap-1 mb-4">
           <Button
@@ -30,12 +30,12 @@
 
         <div class="mb-4">
           <Label :for="feedbackId" class="text-xs text-muted-foreground mb-2 block">
-            {{ t('globals.messages.additionalFeedback') }}
+            {{ i18n._('Additional feedback (optional)') }}
           </Label>
           <Textarea
             :id="feedbackId"
             v-model="feedback"
-            :placeholder="$t('globals.terms.tellUsMore')"
+            :placeholder="i18n._('Tell us more...')"
             class="min-h-[60px]"
             maxlength="500"
           />
@@ -51,13 +51,13 @@
         >
           <Spinner v-if="isSubmitting" size="sm" :absolute="false" :center="false" />
           {{
-            isSubmitting ? t('globals.messages.submitting') : t('globals.messages.submitFeedback')
+            isSubmitting ? i18n._('Submitting...') : i18n._('Submit feedback')
           }}
         </Button>
       </div>
 
       <div v-else class="text-center py-2" role="status">
-        <p class="mb-3">{{ t('globals.messages.thankYouFeedback') }}</p>
+        <p class="mb-3">{{ i18n._('✅ Thank you for your feedback!') }}</p>
 
         <div v-if="csatMeta.submitted_rating" class="mb-2">
           <span
@@ -80,7 +80,7 @@
 
 <script setup>
 import { ref, computed, useId } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@widget/api/index.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { Textarea } from '@shared-ui/components/ui/textarea'
@@ -108,14 +108,14 @@ const csatMeta = computed(() => {
 const isSubmitted = computed(() => csatMeta.value.csat_submitted === true)
 const csatUuid = computed(() => csatMeta.value.csat_uuid || '')
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const ratings = [
-  { value: 1, emoji: '😢', text: t('globals.terms.poor') },
-  { value: 2, emoji: '😕', text: t('globals.terms.fair') },
-  { value: 3, emoji: '😊', text: t('globals.terms.good') },
-  { value: 4, emoji: '😃', text: t('globals.terms.great') },
-  { value: 5, emoji: '🤩', text: t('globals.terms.excellent') }
+  { value: 1, emoji: '😢', text: i18n._('Poor') },
+  { value: 2, emoji: '😕', text: i18n._('Fair') },
+  { value: 3, emoji: '😊', text: i18n._('Good') },
+  { value: 4, emoji: '😃', text: i18n._('Great') },
+  { value: 5, emoji: '🤩', text: i18n._('Excellent') }
 ]
 
 const submitRating = async () => {
@@ -131,7 +131,7 @@ const submitRating = async () => {
       message_uuid: props.message.uuid
     })
   } catch {
-    submitError.value = t('globals.messages.somethingWentWrong')
+    submitError.value = i18n._('Something went wrong')
   } finally {
     isSubmitting.value = false
   }

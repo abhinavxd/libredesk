@@ -5,7 +5,7 @@
     target="_blank"
     rel="noopener noreferrer"
   >
-    {{ $t('helpCenter.poweredBy') }}
+    {{ i18n._('Powered by') }}
     <span
       class="transition-colors duration-150 can-hover:group-hover:text-foreground group-focus-visible:text-foreground motion-reduce:transition-none"
       >libredesk</span

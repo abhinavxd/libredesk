@@ -198,7 +198,7 @@
                     @update:model-value="(value) => handleChange(value, meta.validated)"
                   >
                     <SelectTrigger>
-                      <SelectValue :placeholder="field.placeholder || $t('globals.terms.select')" />
+                      <SelectValue :placeholder="field.placeholder || i18n._('Select')" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem
@@ -218,12 +218,12 @@
 
           <div v-if="!props.handoffMode" class="space-y-2">
             <label class="text-sm font-medium">
-              {{ $t('globals.terms.message') }}
+              {{ i18n.ngettext('Message', 'Messages', 1) }}
               <span class="text-destructive">*</span>
             </label>
             <Textarea
               v-model="messageText"
-              :placeholder="$t('globals.terms.typeMessage')"
+              :placeholder="i18n._('Type your message...')"
               class="w-full min-h-32 max-h-48 resize-none"
             />
           </div>
@@ -247,8 +247,8 @@
           ></div>
           {{
             props.handoffMode
-              ? $t('widget.prechatForm.continueToHuman')
-              : $t('widget.prechatForm.startChat')
+              ? i18n._('Continue to a human')
+              : i18n._('Start chat')
           }}
         </Button>
       </div>
@@ -284,7 +284,7 @@ import { useWidgetStore } from '@widget/store/widget.js'
 import { useChatStore } from '@widget/store/chat.js'
 import { useUserStore } from '@widget/store/user.js'
 import { resolvePreChatForm } from '@widget/utils/preChatForm.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { createPreChatFormSchema } from './preChatFormSchema.js'
 import api from '@widget/api/index.js'
 
@@ -304,7 +304,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['submit'])
-const { t } = useI18n()
+const i18n = useI18n()
 const widgetStore = useWidgetStore()
 const chat = useChatStore()
 const userStore = useUserStore()
@@ -338,7 +338,7 @@ const sortedFields = computed(() => {
 const showForm = computed(() => preChatFormEnabled.value && sortedFields.value.length > 0)
 
 // Create form with dynamic schema based on fields
-const formSchema = computed(() => toTypedSchema(createPreChatFormSchema(t, sortedFields.value)))
+const formSchema = computed(() => toTypedSchema(createPreChatFormSchema(i18n, sortedFields.value)))
 
 // Generate initial values dynamically
 const draft = props.handoffMode ? chat.handoffDraft : chat.preChatDraft

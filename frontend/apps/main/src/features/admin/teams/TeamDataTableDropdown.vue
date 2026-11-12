@@ -4,7 +4,7 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="editTeam(props.team.id)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.edit') }}
+        {{ i18n._('Edit') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -12,7 +12,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ t('globals.messages.delete') }}
+        {{ i18n._('Delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -21,16 +21,16 @@
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle
-          >{{ t('globals.messages.delete') }} {{ t('globals.terms.team', 1) }}</AlertDialogTitle
+          >{{ i18n._('Delete') }} {{ i18n.ngettext('Team', 'Teams', 1) }}</AlertDialogTitle
         >
         <AlertDialogDescription>
-          {{ t('confirm.deleteTeam') }}
+          {{ i18n._('This action cannot be undone. This will permanently delete this team.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          t('globals.messages.delete')
+          i18n._('Delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -62,9 +62,9 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@/api'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const alertOpen = ref(false)
 const router = useRouter()

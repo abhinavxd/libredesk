@@ -4,7 +4,7 @@
       <template #actions>
         <router-link :to="{ name: 'new-shared-view' }">
           <Button>
-            {{ $t('sharedView.new') }}
+            {{ i18n._('New shared view') }}
           </Button>
         </router-link>
       </template>
@@ -13,7 +13,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="sharedViews"
         :loading="formLoading"
       />
@@ -32,11 +32,11 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 const sharedViews = ref([])
 const emit = useEmitter()

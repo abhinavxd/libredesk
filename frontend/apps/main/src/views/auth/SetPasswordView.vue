@@ -4,16 +4,16 @@
       <CardContent class="p-6 space-y-5">
         <div class="space-y-1 text-center">
           <CardTitle class="ui-display-heading">{{
-            t('auth.setNewPassword')
+            i18n._('Set new password')
           }}</CardTitle>
-          <p class="text-sm text-muted-foreground">{{ t('auth.enterNewPasswordTwice') }}</p>
+          <p class="text-sm text-muted-foreground">{{ i18n._('Enter your new password twice to confirm.') }}</p>
         </div>
 
         <form @submit.prevent="setPasswordAction" class="space-y-3">
           <div class="space-y-2">
             <Label for="password" class="text-muted-foreground">
               {{
-                t('auth.newPassword')
+                i18n._('New password')
               }}
             </Label>
             <div class="relative">
@@ -27,7 +27,7 @@
               />
               <button
                 type="button"
-                :aria-label="showPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                :aria-label="showPassword ? i18n._('Hide password') : i18n._('Show password')"
                 :class="PASSWORD_TOGGLE_CLASS"
                 @click="showPassword = !showPassword"
               >
@@ -39,7 +39,7 @@
 
           <div class="space-y-2">
             <Label for="confirmPassword" class="text-muted-foreground">
-              {{ t('auth.confirmPassword') }}
+              {{ i18n._('Confirm password') }}
             </Label>
             <div class="relative">
               <Input
@@ -52,7 +52,7 @@
               />
               <button
                 type="button"
-                :aria-label="showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')"
+                :aria-label="showConfirmPassword ? i18n._('Hide password') : i18n._('Show password')"
                 :class="PASSWORD_TOGGLE_CLASS"
                 @click="showConfirmPassword = !showConfirmPassword"
               >
@@ -71,9 +71,9 @@
               <div
                 class="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-3"
               ></div>
-              {{ t('auth.settingPassword') }}
+              {{ i18n._('Setting password...') }}
             </span>
-            <span v-else>{{ t('auth.setNewPassword') }}</span>
+            <span v-else>{{ i18n._('Set new password') }}</span>
           </Button>
         </form>
 
@@ -104,13 +104,13 @@ import { Card, CardContent, CardTitle } from '@shared-ui/components/ui/card'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
 import { Eye, EyeOff } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import AuthLayout from '@/layouts/auth/AuthLayout.vue'
 
 const PASSWORD_MIN_LENGTH = 8
 const PASSWORD_MAX_LENGTH = 72
 
-const { t } = useI18n()
+const i18n = useI18n()
 const errorMessage = ref('')
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
@@ -131,19 +131,19 @@ onMounted(() => {
     router.push({ name: 'login' })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('auth.invalidResetLink')
+      description: i18n._('Invalid reset link. Please request a new password reset link.')
     })
   }
 })
 
 const validateForm = () => {
   if (!passwordForm.value.password) {
-    errorMessage.value = t('auth.passwordRequired')
+    errorMessage.value = i18n._('Password is required.')
     applyTemporaryClass('set-password-container', 'animate-shake')
     return false
   }
   if (!isPasswordLengthValid(passwordForm.value.password)) {
-    errorMessage.value = t('validation.minmax', {
+    errorMessage.value = i18n._('Must be between {min} and {max} characters', {
       min: PASSWORD_MIN_LENGTH,
       max: PASSWORD_MAX_LENGTH
     })
@@ -151,7 +151,7 @@ const validateForm = () => {
     return false
   }
   if (passwordForm.value.password !== passwordForm.value.confirmPassword) {
-    errorMessage.value = t('auth.passwordsDoNotMatch')
+    errorMessage.value = i18n._('Passwords do not match.')
     applyTemporaryClass('set-password-container', 'animate-shake')
     return false
   }
@@ -171,7 +171,7 @@ const setPasswordAction = async () => {
       password: passwordForm.value.password
     })
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('auth.passwordSetSuccess')
+      description: i18n._('You can now login with your new password.')
     })
     router.push({ name: 'login' })
   } catch (err) {

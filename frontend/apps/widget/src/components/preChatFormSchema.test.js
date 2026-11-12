@@ -1,10 +1,10 @@
 import { describe, test, expect } from 'vitest'
 import { createPreChatFormSchema } from './preChatFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
 
 const field = (overrides) => ({ enabled: true, required: false, ...overrides })
-const build = (...fields) => createPreChatFormSchema(mockT, fields)
+const build = (...fields) => createPreChatFormSchema(mockI18n, fields)
 
 describe('Pre Chat Form Schema', () => {
     test('no fields yields an empty schema', () => {

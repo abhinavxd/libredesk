@@ -75,7 +75,7 @@ func handleGetContact(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	c, err := app.user.GetContactOrVisitor(id, "")
 	if err != nil {
@@ -94,7 +94,7 @@ func handleUpdateContact(r *fastglue.Request) error {
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	contact, err := app.user.GetContactOrVisitor(id, "")
@@ -142,7 +142,7 @@ func handleDeleteContact(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	contact, err := app.user.GetContactOrVisitor(id, "")
@@ -178,7 +178,7 @@ func handleExportContact(r *fastglue.Request) error {
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 	if id <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	contact, err := app.user.GetContactOrVisitor(id, "")
@@ -210,7 +210,7 @@ func handleGetContactNotes(r *fastglue.Request) error {
 		contactID, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if contactID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	notes, err := app.user.GetNotes(contactID)
 	if err != nil {
@@ -228,10 +228,11 @@ func handleCreateContactNote(r *fastglue.Request) error {
 		req          = createContactNoteReq{}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 	if len(req.Note) == 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.empty", "name", "note"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("%[1]s empty",
+			"note"), nil, envelope.InputError)
 	}
 	n, err := app.user.CreateNote(contactID, auser.ID, req.Note)
 	if err != nil {
@@ -253,10 +254,10 @@ func handleDeleteContactNote(r *fastglue.Request) error {
 		auser        = r.RequestCtx.UserValue("user").(amodels.User)
 	)
 	if contactID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 	if noteID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	agent, err := app.user.GetAgentCachedOrLoad(auser.ID)
@@ -271,7 +272,7 @@ func handleDeleteContactNote(r *fastglue.Request) error {
 			return sendErrorEnvelope(r, err)
 		}
 		if note.UserID != auser.ID {
-			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("errors.canOnlyDeleteOwnNote"), nil, envelope.InputError)
+			return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.Get("You can only delete your own note"), nil, envelope.InputError)
 		}
 	}
 
@@ -293,11 +294,11 @@ func handleBlockContact(r *fastglue.Request) error {
 	)
 
 	if contactID <= 0 {
-		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.InputError)
+		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Get("Something went wrong"), nil, envelope.InputError)
 	}
 
 	if err := r.Decode(&req, "json"); err != nil {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.T("errors.parsingRequest"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.InputError, app.i18n.Get("Error parsing request"), nil))
 	}
 
 	app.lo.Info("setting contact block status", "contact_id", contactID, "enabled", req.Enabled, "actor_id", auser.ID)
@@ -325,7 +326,7 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
 		app.lo.Debug("error parsing form data", "error", err)
-		return models.User{}, nil, envelope.NewError(envelope.GeneralError, app.i18n.T("errors.parsingRequest"), nil)
+		return models.User{}, nil, envelope.NewError(envelope.GeneralError, app.i18n.Get("Error parsing request"), nil)
 	}
 
 	value := func(key string) string {
@@ -346,14 +347,15 @@ func contactFromForm(r *fastglue.Request) (models.User, *multipart.Form, error) 
 
 	email := value("email")
 	if email == "" && value("phone_number") == "" {
-		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.T("contact.emailOrPhoneRequired"), nil)
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Get("Add an email or a phone number. A contact needs at least one to be reached."), nil)
 	}
 	if email != "" && !stringutil.ValidEmail(email) {
-		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidEmail"), nil)
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Get("Invalid email address"), nil)
 	}
 	firstName := value("first_name")
 	if firstName == "" {
-		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Ts("globals.messages.empty", "name", "first_name"), nil)
+		return models.User{}, nil, envelope.NewError(envelope.InputError, app.i18n.Get("%[1]s empty",
+			"first_name"), nil)
 	}
 
 	return models.User{

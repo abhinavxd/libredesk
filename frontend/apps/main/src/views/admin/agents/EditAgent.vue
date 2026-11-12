@@ -21,19 +21,19 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import AgentForm from '@/features/admin/agents/AgentForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const user = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const formLoading = ref(false)
 const emitter = useEmitter()
 
 const breadcrumbLinks = [
-  { path: 'agent-list', label: t('globals.terms.agent', 2) },
+  { path: 'agent-list', label: i18n._('{count, plural, one {Agent} other {Agents}}', 2) },
   {
     path: '',
-    label: t('agent.edit')
+    label: i18n._('Edit agent')
   }
 ]
 
@@ -46,7 +46,7 @@ const updateUser = async (payload) => {
     formLoading.value = true
     await api.updateUser(user.value.id, payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

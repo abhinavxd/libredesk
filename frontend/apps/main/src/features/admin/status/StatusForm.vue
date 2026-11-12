@@ -2,7 +2,7 @@
   <form>
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+        <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
         <FormControl>
           <Input type="text" placeholder="Spam" v-bind="componentField" />
         </FormControl>
@@ -12,7 +12,7 @@
 
     <FormField v-slot="{ componentField }" name="category">
       <FormItem class="mt-4">
-        <FormLabel>{{ $t('globals.terms.category') }}</FormLabel>
+        <FormLabel>{{ i18n._('Category') }}</FormLabel>
         <FormControl>
           <Select v-bind="componentField">
             <SelectTrigger class="w-full">
@@ -20,9 +20,9 @@
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="open">{{ $t('globals.terms.open') }}</SelectItem>
-                <SelectItem value="waiting">{{ $t('globals.terms.waiting') }}</SelectItem>
-                <SelectItem value="resolved">{{ $t('globals.terms.resolved') }}</SelectItem>
+                <SelectItem value="open">{{ i18n._('Open') }}</SelectItem>
+                <SelectItem value="waiting">{{ i18n._('Waiting') }}</SelectItem>
+                <SelectItem value="resolved">{{ i18n._('Resolved') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

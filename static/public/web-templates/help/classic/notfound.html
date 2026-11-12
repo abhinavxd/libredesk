@@ -5,7 +5,7 @@
     <p class="hc-code">{{ .Data.ErrorCode }}</p>
     <h1>{{ .Data.ErrorTitle }}</h1>
     <p>{{ .Data.ErrorText }}</p>
-    <a class="hc-back" href="{{ .Data.HelpCenter.BasePath }}">{{ $.L.T "helpCenter.backToHelpCenter" }}</a>
+    <a class="hc-back" href="{{ .Data.HelpCenter.BasePath }}">{{ $.L.GetD "templates" "Back to help center" }}</a>
 </section>
 
 {{ template "classic-footer" . }}

@@ -3,7 +3,7 @@
     <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
       <template #actions>
         <RouterLink :to="{ name: 'new-context-link' }">
-          <Button>{{ $t('contextLink.new') }}</Button>
+          <Button>{{ i18n._('New context link') }}</Button>
         </RouterLink>
       </template>
     </AdminToolbar>
@@ -11,7 +11,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="links"
         :loading="isLoading"
       />
@@ -27,14 +27,14 @@ import DataTable from '@main/components/datatable/DataTable.vue'
 import { createColumns } from '@/features/admin/context-links/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import { useEmitter } from '@/composables/useEmitter'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import LoadingOverlay from '@/components/layout/LoadingOverlay.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import api from '@/api'
 
 const links = ref([])
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const emit = useEmitter()
 

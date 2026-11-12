@@ -24,7 +24,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ssrf"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -59,7 +59,7 @@ type Manager struct {
 	q             queries
 	db            *sqlx.DB
 	lo            *logf.Logger
-	i18n          *i18n.I18n
+	i18n          *gotext.Locale
 	settings      settingsStore
 	encryptionKey string
 	chunkCfg      stringutil.ChunkConfig
@@ -88,7 +88,7 @@ type Manager struct {
 type Opts struct {
 	Ctx           context.Context
 	DB            *sqlx.DB
-	I18n          *i18n.I18n
+	I18n          *gotext.Locale
 	Lo            *logf.Logger
 	EncryptionKey string
 	DialControl   ssrf.Control
@@ -253,7 +253,7 @@ func (m *Manager) GetPrompts() ([]models.Prompt, error) {
 	prompts := make([]models.Prompt, 0)
 	if err := m.q.GetPrompts.Select(&prompts); err != nil {
 		m.lo.Error("error fetching prompts", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return prompts, nil
 }
@@ -263,10 +263,10 @@ func (m *Manager) GetPromptByID(id int) (models.Prompt, error) {
 	var p models.Prompt
 	if err := m.q.GetPromptByID.Get(&p, id); err != nil {
 		if err == sql.ErrNoRows {
-			return p, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return p, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching prompt", "error", err)
-		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return p, nil
 }
@@ -280,10 +280,10 @@ func (m *Manager) CreatePrompt(title, content string) (models.Prompt, error) {
 	key := strings.ReplaceAll(stringutil.GenerateSlug(title), "-", "_")
 	if err := m.q.InsertPrompt.Get(&p, key, strings.TrimSpace(title), strings.TrimSpace(content)); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return p, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return p, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error creating prompt", "error", err)
-		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return p, nil
 }
@@ -295,10 +295,10 @@ func (m *Manager) UpdatePrompt(id int, title, content string) (models.Prompt, er
 	}
 	if err := m.q.UpdatePrompt.Get(&p, id, strings.TrimSpace(title), strings.TrimSpace(content)); err != nil {
 		if err == sql.ErrNoRows {
-			return p, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return p, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error updating prompt", "error", err)
-		return p, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return p, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return p, nil
 }
@@ -306,7 +306,7 @@ func (m *Manager) UpdatePrompt(id int, title, content string) (models.Prompt, er
 func (m *Manager) DeletePrompt(id int) error {
 	if _, err := m.q.DeletePrompt.Exec(id); err != nil {
 		m.lo.Error("error deleting prompt", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -337,7 +337,7 @@ func (m *Manager) VisionEnabled() bool {
 func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderConfig) error {
 	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
 		m.lo.Warn("invalid provider type", "providerType", providerType)
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	existing, err := m.getRawProviderConfig(providerType)
@@ -352,12 +352,12 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	case in.APIKey == "":
 	case crypto.IsEncrypted(in.APIKey):
 		// crypto.Encrypt would store this user-supplied value as-is and Decrypt would then fail on every call.
-		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.reservedSecretPrefix"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The value can't start with \"enc:\". That prefix is reserved for encrypted secrets."), nil)
 	default:
 		enc, eerr := crypto.Encrypt(in.APIKey, m.encryptionKey)
 		if eerr != nil {
 			m.lo.Error("error encrypting API key", "error", eerr)
-			return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		apiKey = enc
 	}
@@ -368,11 +368,11 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		m.lo.Error("error marshaling provider config", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if _, err := m.q.UpdateProviderConfig.Exec(providerType, b); err != nil {
 		m.lo.Error("error updating provider config", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// A changed embedding model, dimension count, or backend URL produces vectors incomparable to the stored ones.
@@ -387,7 +387,7 @@ func (m *Manager) UpdateProviderConfig(providerType string, in models.ProviderCo
 // TestProviderConfig makes one live provider request with the given config; a masked api_key uses the stored key, matching what an update of the same form would store.
 func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConfig) error {
 	if providerType != models.ProviderTypeCompletion && providerType != models.ProviderTypeEmbedding {
-		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	cfg := in
@@ -413,8 +413,9 @@ func (m *Manager) TestProviderConfig(providerType string, in models.ProviderConf
 		return m.testProviderError(err)
 	}
 	if cfg.Dimensions > 0 && len(vec) != cfg.Dimensions {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("ai.testDimensionsMismatch",
-			"configured", strconv.Itoa(cfg.Dimensions), "returned", strconv.Itoa(len(vec))), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The provider returned %[1]s-dimension vectors but Dimensions is set to %[2]s. Set Dimensions to %[1]s, or search will not work.",
+			strconv.Itoa(len(vec)),
+			strconv.Itoa(cfg.Dimensions)), nil)
 	}
 	return nil
 }
@@ -433,10 +434,10 @@ func (m *Manager) WorkspaceLocation() *time.Location {
 
 func (m *Manager) validatePrompt(title, content string) error {
 	if strings.TrimSpace(title) == "" {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.title")), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", m.i18n.Get("Title")), nil)
 	}
 	if strings.TrimSpace(content) == "" {
-		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", m.i18n.T("globals.terms.content")), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("%[1]s empty", m.i18n.Get("Content")), nil)
 	}
 	return nil
 }
@@ -445,10 +446,10 @@ func (m *Manager) getPrompt(k string) (string, error) {
 	var p models.Prompt
 	if err := m.q.GetPrompt.Get(&p, k); err != nil {
 		if err == sql.ErrNoRows {
-			return "", envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundTemplate"), nil)
+			return "", envelope.NewError(envelope.InputError, m.i18n.Get("Template not found"), nil)
 		}
 		m.lo.Error("error fetching prompt", "error", err)
-		return "", envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return "", envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return p.Content, nil
 }
@@ -458,13 +459,13 @@ func (m *Manager) getRawProviderConfig(providerType string) (models.ProviderConf
 	var p models.Provider
 	if err := m.q.GetProviderByType.Get(&p, providerType); err != nil {
 		m.lo.Error("error fetching provider", "error", err, "type", providerType)
-		return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	var cfg models.ProviderConfig
 	if len(p.Config) > 0 {
 		if err := json.Unmarshal(p.Config, &cfg); err != nil {
 			m.lo.Error("error parsing provider config", "error", err)
-			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 	return cfg, nil
@@ -479,7 +480,7 @@ func (m *Manager) getProviderConfig(providerType string) (models.ProviderConfig,
 		decrypted, err := crypto.Decrypt(cfg.APIKey, m.encryptionKey)
 		if err != nil {
 			m.lo.Error("error decrypting API key", "error", err)
-			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.ProviderConfig{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		cfg.APIKey = decrypted
 	}
@@ -496,26 +497,26 @@ func (m *Manager) getProviderClient(providerType string) (ProviderClient, error)
 
 func (m *Manager) providerError(err error) error {
 	if errors.Is(err, context.Canceled) {
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("ai.providerUnavailable"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."), nil)
 	}
 	if errors.Is(err, ErrInvalidAPIKey) {
 		m.lo.Error("invalid provider API key")
-		return envelope.NewError(envelope.InputError, m.i18n.T("ai.invalidAPIKey"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The AI provider rejected the API key. AI features won't work until your administrator updates it in AI settings."), nil)
 	}
 	if errors.Is(err, ErrApiKeyNotSet) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The AI provider API key is not set. Ask your administrator to add it in AI settings."), nil)
 	}
 	if errors.Is(err, ErrRateLimited) {
 		m.lo.Error("rate limited by AI provider", "error", err)
-		return envelope.NewError(envelope.RateLimitError, m.i18n.T("ai.rateLimited"), nil)
+		return envelope.NewError(envelope.RateLimitError, m.i18n.Get("The AI provider is rate limiting requests. Wait a minute and try again."), nil)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		m.lo.Error("AI provider request timed out", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("ai.providerTimeout"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("The AI provider took too long to respond. Try again, or with a shorter request."), nil)
 	}
 	if errors.Is(err, ErrProviderUnavailable) {
 		m.lo.Error("AI provider unavailable", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("ai.providerUnavailable"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("The AI provider could not be reached. Try again in a few minutes, or ask your administrator to check the AI settings."), nil)
 	}
 	m.lo.Error("error from AI provider", "error", err)
 	return envelope.NewError(envelope.GeneralError, capProviderErrorMessage(err), nil)
@@ -524,7 +525,7 @@ func (m *Manager) providerError(err error) error {
 // testProviderError surfaces the provider's own error message so the admin can act on it.
 func (m *Manager) testProviderError(err error) error {
 	if errors.Is(err, ErrApiKeyNotSet) {
-		return envelope.NewError(envelope.InputError, m.i18n.T("ai.apiKeyNotSet"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("The AI provider API key is not set. Ask your administrator to add it in AI settings."), nil)
 	}
 	return envelope.NewError(envelope.InputError, capProviderErrorMessage(err), nil)
 }

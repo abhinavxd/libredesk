@@ -1,12 +1,12 @@
 import * as z from 'zod';
 
-export const createFormSchema = (t) => z
+export const createFormSchema = (i18n) => z
   .object({
     name: z.string({
-      required_error: t('globals.messages.required'),
+      required_error: i18n._('{name} Required'),
     }),
     body: z.string({
-      required_error: t('globals.messages.required'),
+      required_error: i18n._('{name} Required'),
     }),
     type: z.string().optional(),
     subject: z.string().optional(),
@@ -16,7 +16,7 @@ export const createFormSchema = (t) => z
     if (data.type !== 'email_outgoing' && data.name !== 'CSAT request' && !data.subject) {
       ctx.addIssue({
         path: ['subject'],
-        message: t('globals.messages.required'),
+        message: i18n._('{name} Required'),
         code: z.ZodIssueCode.custom,
       });
     }

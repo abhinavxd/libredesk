@@ -5,14 +5,14 @@
         <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
           <template #actions>
             <Button @click="router.push({ name: 'new-ai-tool' })">{{
-              t('admin.ai.tool.new')
+              i18n._('New tool')
             }}</Button>
           </template>
         </AdminToolbar>
         <DataTable
           v-model:search="searchTerm"
           :searchable="false"
-          :columns="createToolColumns(t, { onEdit: editTool })"
+          :columns="createToolColumns(i18n, { onEdit: editTool })"
           :data="tools"
           :loading="isLoading"
         />
@@ -20,14 +20,14 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.toolsHelp') }}</p>
+      <p>{{ i18n._('Tools let the assistant call your own APIs to fetch or update data while replying. A tool is shared across every assistant granted access to it, and the model decides when to call it from the name and description, so keep those precise.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#tools"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -45,12 +45,12 @@ import { createToolColumns } from '@/features/admin/ai/toolColumns.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const router = useRouter()
 const isLoading = ref(false)

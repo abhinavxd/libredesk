@@ -11,7 +11,7 @@
       >
         <Select :model-value="modelValue.field" @update:model-value="onFieldChange">
           <SelectTrigger>
-            <SelectValue :placeholder="t('placeholders.selectField')" />
+            <SelectValue :placeholder="i18n._('Select field')" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -37,7 +37,7 @@
           @update:model-value="onOperatorChange"
         >
           <SelectTrigger>
-            <SelectValue :placeholder="t('placeholders.selectOperator')" />
+            <SelectValue :placeholder="i18n._('Select operator')" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -72,26 +72,26 @@
               v-else-if="fieldType === FIELD_TYPE.MULTI_SELECT"
               v-model="leafValue"
               :items="fieldOptions"
-              :placeholder="t('placeholders.selectTags')"
+              :placeholder="i18n._('Select tags')"
             />
 
             <SelectAgentCombobox
               v-else-if="fieldEntity === 'agent'"
               v-model="leafValue"
-              :placeholder="t('placeholders.selectValue')"
+              :placeholder="i18n._('Select value')"
             />
 
             <SelectTeamCombobox
               v-else-if="fieldEntity === 'team'"
               v-model="leafValue"
-              :placeholder="t('placeholders.selectValue')"
+              :placeholder="i18n._('Select value')"
             />
 
             <SelectComboBox
               v-else-if="fieldOptions.length > 0"
               v-model="leafValue"
               :items="fieldOptions"
-              :placeholder="t('placeholders.selectValue')"
+              :placeholder="i18n._('Select value')"
             />
 
             <DateFilterValue
@@ -100,7 +100,7 @@
               :range="modelValue.operator === OPERATOR.BETWEEN"
             />
 
-            <Input v-else v-model="leafValue" :placeholder="t('globals.terms.value')" type="text" />
+            <Input v-else v-model="leafValue" :placeholder="i18n.ngettext('Value', 'Values', 1)" type="text" />
           </template>
         </div>
       </div>
@@ -120,7 +120,7 @@ import {
   SelectValue
 } from '@shared-ui/components/ui/select'
 import { Input } from '@shared-ui/components/ui/input'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { FIELD_TYPE, OPERATOR, operatorLabel } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
@@ -138,7 +138,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['remove'])
 const modelValue = defineModel('modelValue', { required: true })
-const { t } = useI18n()
+const i18n = useI18n()
 
 const fieldConfig = computed(() => props.fields.find((f) => f.field === modelValue.value.field))
 const fieldOptions = computed(() => fieldConfig.value?.options || [])
@@ -147,7 +147,7 @@ const fieldEntity = computed(() => fieldConfig.value?.entity || '')
 const fieldType = computed(() => fieldConfig.value?.type || '')
 
 // "contains any of" only applies to multi-value fields; single-value text stays "contains"
-const opLabel = (op) => (fieldType.value === FIELD_TYPE.MULTI_SELECT ? operatorLabel(op, t) : op)
+const opLabel = (op) => (fieldType.value === FIELD_TYPE.MULTI_SELECT ? operatorLabel(op, i18n) : op)
 
 const isEmptyValue = (v) =>
   v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)

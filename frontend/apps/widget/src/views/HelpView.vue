@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ArrowLeft, Maximize2, Minimize2, FileQuestionMark } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import SearchInput from '@shared-ui/components/SearchInput.vue'
@@ -16,7 +16,7 @@ import api from '@widget/api/index.js'
 
 const help = useHelpStore()
 const widget = useWidgetStore()
-const { t } = useI18n()
+const i18n = useI18n()
 let mounted = true
 onUnmounted(() => {
   mounted = false
@@ -79,7 +79,7 @@ const search = async () => {
     help.results = response.data.data || []
   } catch {
     if (valid(identity) && help.query.trim() === query)
-      error.value = t('globals.messages.helpLoadError')
+      error.value = i18n._('Help could not be loaded. Try again or send us a message.')
   } finally {
     if (valid(identity)) searching.value = false
   }
@@ -102,7 +102,7 @@ const openArticle = async ({ id, slug, locale: articleLocale }) => {
     await nextTick()
     backButton.value?.$el?.focus()
   } catch {
-    if (valid(identity)) error.value = t('globals.messages.helpLoadError')
+    if (valid(identity)) error.value = i18n._('Help could not be loaded. Try again or send us a message.')
   } finally {
     if (valid(identity)) busy.value = false
   }
@@ -164,12 +164,12 @@ onMounted(async () => {
         variant="ghost"
         size="icon"
         class="absolute left-2"
-        :aria-label="t('globals.messages.goBack')"
+        :aria-label="i18n._('Go back')"
         @click="back"
         ><ArrowLeft class="size-4" aria-hidden="true"
       /></Button>
       <h3 v-if="!help.article" class="text-base font-semibold text-foreground">
-        {{ t('globals.terms.help') }}
+        {{ i18n._('Help') }}
       </h3>
       <Button
         v-if="canExpand"
@@ -177,7 +177,7 @@ onMounted(async () => {
         variant="ghost"
         size="icon"
         class="absolute right-2"
-        :aria-label="widget.isExpanded ? t('globals.terms.collapse') : t('globals.terms.expand')"
+        :aria-label="widget.isExpanded ? i18n._('Collapse') : i18n._('Expand')"
         @click="toggleExpand"
       >
         <Minimize2 v-if="widget.isExpanded" class="size-4" aria-hidden="true" />
@@ -194,9 +194,9 @@ onMounted(async () => {
         <Spinner size="md" absolute />
       </div>
       <div v-if="error || help.failed" role="alert" class="p-4 text-sm">
-        <p>{{ error || t('globals.messages.helpLoadError') }}</p>
+        <p>{{ error || i18n._('Help could not be loaded. Try again or send us a message.') }}</p>
         <Button type="button" variant="outline" class="mt-2" @click="retry">{{
-          t('globals.terms.tryAgain')
+          i18n._('Try again')
         }}</Button>
       </div>
       <template v-if="help.article">
@@ -209,8 +209,8 @@ onMounted(async () => {
           <SearchInput
             ref="searchInput"
             v-model="help.query"
-            :placeholder="t('widget.searchArticles')"
-            :clear-label="t('globals.messages.clearSearch')"
+            :placeholder="i18n._('Search for help')"
+            :clear-label="i18n._('Clear search')"
             :loading="searching"
           />
         </form>
@@ -234,7 +234,7 @@ onMounted(async () => {
           >
             <FileQuestionMark class="w-10 h-10 text-muted-foreground mb-4" aria-hidden="true" />
             <p class="text-sm text-muted-foreground">
-              {{ t('globals.messages.noResultsFor', { query: help.query.trim() }) }}
+              {{ i18n._('No results for “{query}”', { query: help.query.trim() }) }}
             </p>
             <StartConversationButton class="mt-4" />
           </div>

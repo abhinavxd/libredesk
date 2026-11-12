@@ -10,7 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/macro/models"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -24,7 +24,7 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Predefined queries.
@@ -43,7 +43,7 @@ type queries struct {
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // New initializes a macro manager.
@@ -61,10 +61,10 @@ func (m *Manager) Get(id int) (models.Macro, error) {
 	macro := models.Macro{}
 	if err := m.q.Get.Get(&macro, id); err != nil {
 		if err == sql.ErrNoRows {
-			return macro, envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMacro"), nil)
+			return macro, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Macro not found"), nil)
 		}
 		m.lo.Error("error getting macro", "error", err)
-		return macro, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return macro, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return macro, nil
 }
@@ -75,7 +75,7 @@ func (m *Manager) Create(name, messageContent string, userID, teamID *int, visib
 	err := m.q.Create.Get(&createdMacro, name, messageContent, userID, teamID, visibility, pq.StringArray(visibleWhen), actions)
 	if err != nil {
 		m.lo.Error("error creating macro", "error", err)
-		return models.Macro{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Macro{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return createdMacro, nil
 }
@@ -86,7 +86,7 @@ func (m *Manager) Update(id int, name, messageContent string, userID, teamID *in
 	err := m.q.Update.Get(&updatedMacro, id, name, messageContent, userID, teamID, visibility, pq.StringArray(visibleWhen), actions)
 	if err != nil {
 		m.lo.Error("error updating macro", "error", err)
-		return models.Macro{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Macro{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return updatedMacro, nil
 }
@@ -97,7 +97,7 @@ func (m *Manager) GetAll() ([]models.Macro, error) {
 	err := m.q.GetAll.Select(&macros)
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return macros, nil
 }
@@ -108,7 +108,7 @@ func (m *Manager) GetAllCompact(query string, page, pageSize int) ([]models.Macr
 	err := m.q.GetAllCompact.Select(&macros, query, pageSize, dbutil.PageOffset(page, pageSize), dbutil.ContainsPattern(query))
 	if err != nil {
 		m.lo.Error("error fetching macros", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return macros, nil
 }
@@ -119,7 +119,7 @@ func (m *Manager) SearchCompact(query, view string, userID int, teamIDs []int) (
 	err := m.q.SearchCompact.Select(&macros, query, view, userID, pq.Array(teamIDs), dbutil.ContainsPattern(query))
 	if err != nil {
 		m.lo.Error("error searching macros", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return macros, nil
 }
@@ -129,10 +129,10 @@ func (m *Manager) Delete(id int) error {
 	result, err := m.q.Delete.Exec(id)
 	if err != nil {
 		m.lo.Error("error deleting macro", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		return envelope.NewError(envelope.NotFoundError, m.i18n.T("validation.notFoundMacro"), nil)
+		return envelope.NewError(envelope.NotFoundError, m.i18n.Get("Macro not found"), nil)
 	}
 	return nil
 }
@@ -141,7 +141,7 @@ func (m *Manager) Delete(id int) error {
 func (m *Manager) IncrementUsageCount(id int) error {
 	if _, err := m.q.IncrUsageCount.Exec(id); err != nil {
 		m.lo.Error("error incrementing usage count", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }

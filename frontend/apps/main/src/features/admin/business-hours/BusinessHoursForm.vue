@@ -4,7 +4,7 @@
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
           <FormLabel>
-            {{ t('globals.terms.name') }}
+            {{ i18n.ngettext('Name', 'Names', 1) }}
           </FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
@@ -16,7 +16,7 @@
       <FormField v-slot="{ componentField }" name="description">
         <FormItem>
           <FormLabel>
-            {{ t('globals.terms.description') }}
+            {{ i18n.ngettext('Description', 'Descriptions', 1) }}
           </FormLabel>
           <FormControl>
             <Input type="text" placeholder="" v-bind="componentField" />
@@ -29,18 +29,18 @@
     <FormField v-slot="{ componentField }" name="is_always_open">
       <FormItem>
         <FormLabel>
-          {{ t('admin.businessHours.setBusinessHours') }}
+          {{ i18n._('Set business hours') }}
         </FormLabel>
         <FormControl>
           <RadioGroup v-bind="componentField">
             <div class="flex flex-col space-y-2">
               <div class="flex items-center space-x-3">
                 <RadioGroupItem id="r1" :value="true" />
-                <Label for="r1">{{ t('admin.businessHours.alwaysOpen24x7') }}</Label>
+                <Label for="r1">{{ i18n._('Always open (24/7)') }}</Label>
               </div>
               <div class="flex items-center space-x-3">
                 <RadioGroupItem id="r2" :value="false" />
-                <Label for="r2">{{ t('admin.businessHours.customBusinessHours') }}</Label>
+                <Label for="r2">{{ i18n._('Custom business hours') }}</Label>
               </div>
             </div>
           </RadioGroup>
@@ -70,7 +70,7 @@
                 class="grid min-w-0 max-w-56 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
               >
                 <div class="min-w-0">
-                  <span :id="`${day}-from`" class="sr-only">{{ t('globals.terms.from') }}</span>
+                  <span :id="`${day}-from`" class="sr-only">{{ i18n.pgettext('Time range', 'From') }}</span>
                   <TimeField
                     class="min-w-0"
                     :aria-labelledby="`${day}-label ${day}-from`"
@@ -80,7 +80,7 @@
                   />
                 </div>
                 <span :id="`${day}-to`" class="text-muted-foreground">{{
-                  t('globals.terms.to')
+                  i18n.pgettext('Time range', 'To')
                 }}</span>
                 <div class="min-w-0">
                   <TimeField
@@ -105,13 +105,13 @@
           <div></div>
           <DialogTrigger as-child>
             <Button type="button" @click="openHolidayForm = true">
-              {{ t('businessHour.newHoliday') }}
+              {{ i18n._('New holiday') }}
             </Button>
           </DialogTrigger>
         </div>
       </div>
       <SimpleTable
-        :headers="[t('globals.terms.name'), t('globals.terms.date')]"
+        :headers="[i18n.ngettext('Name', 'Names', 1), i18n._('Date')]"
         :keys="['name', 'date']"
         :data="holidays"
         @deleteItem="deleteHoliday"
@@ -119,13 +119,13 @@
       <DialogContent class="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {{ t('businessHour.newHoliday') }}
+            {{ i18n._('New holiday') }}
           </DialogTitle>
           <DialogDescription />
         </DialogHeader>
         <div class="grid gap-4 py-4">
           <div class="grid items-center gap-2 sm:grid-cols-4 sm:gap-4">
-            <Label for="holiday_name" class="sm:text-right"> {{ t('globals.terms.name') }} </Label>
+            <Label for="holiday_name" class="sm:text-right"> {{ i18n.ngettext('Name', 'Names', 1) }} </Label>
             <Input
               id="holiday_name"
               ref="holidayNameRef"
@@ -134,7 +134,7 @@
             />
           </div>
           <div class="grid items-center gap-2 sm:grid-cols-4 sm:gap-4">
-            <Label for="date" class="sm:text-right"> {{ t('globals.terms.date') }} </Label>
+            <Label for="date" class="sm:text-right"> {{ i18n._('Date') }} </Label>
             <Popover :open="datePickerOpen" @update:open="datePickerOpen = $event">
               <PopoverTrigger as-child>
                 <Button
@@ -152,7 +152,7 @@
                   {{
                     holidayDate && !isNaN(new Date(holidayDate).getTime())
                       ? format(new Date(holidayDate), 'MMMM dd, yyyy')
-                      : t('globals.terms.pickDate')
+                      : i18n._('Pick a date')
                   }}
                 </Button>
               </PopoverTrigger>
@@ -164,7 +164,7 @@
         </div>
         <DialogFooter>
           <Button type="button" :disabled="!holidayName || !holidayDate" @click="saveHoliday">
-            {{ t('globals.messages.add') }}
+            {{ i18n._('Add') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -198,7 +198,7 @@ import { cn } from '@shared-ui/lib/utils.js'
 import { format } from 'date-fns'
 import { WEEKDAYS } from '@main/constants/date.js'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import SimpleTable from '@main/components/table/SimpleTable.vue'
 import {
   Dialog,
@@ -236,7 +236,7 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? i18n._('Create') : i18n._('Save'))
   )
 })
 
@@ -248,7 +248,7 @@ const hours = ref({})
 const openHolidayForm = ref(false)
 const datePickerOpen = ref(false)
 const holidayNameRef = ref(null)
-const { t } = useI18n()
+const i18n = useI18n()
 
 watch(openHolidayForm, (isOpen) => {
   if (isOpen) {
@@ -259,7 +259,7 @@ watch(openHolidayForm, (isOpen) => {
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     description: '',
     is_always_open: true

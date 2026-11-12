@@ -2,7 +2,7 @@
   <Dialog v-model:open="isOpen">
     <DialogContent class="sm:max-w-[425px]">
       <DialogHeader>
-        <DialogTitle>{{ $t('editor.addYoutubeUrl') }}</DialogTitle>
+        <DialogTitle>{{ i18n._('Add YouTube video URL') }}</DialogTitle>
         <DialogDescription></DialogDescription>
       </DialogHeader>
       <form @submit.stop.prevent="setYoutubeVideo">
@@ -10,17 +10,17 @@
           <Input
             v-model="youtubeUrl"
             type="text"
-            :placeholder="$t('placeholders.enterUrl')"
-            :aria-label="$t('placeholders.enterUrl')"
+            :placeholder="i18n._('Enter URL')"
+            :aria-label="i18n._('Enter URL')"
             @keydown.enter.prevent="setYoutubeVideo"
           />
           <p v-if="showError" class="text-sm text-destructive">
-            {{ $t('editor.invalidYoutubeUrl') }}
+            {{ i18n._('Enter a valid YouTube video URL.') }}
           </p>
         </div>
         <DialogFooter>
           <Button type="submit">
-            {{ $t('globals.messages.save') }}
+            {{ i18n._('Save') }}
           </Button>
         </DialogFooter>
       </form>

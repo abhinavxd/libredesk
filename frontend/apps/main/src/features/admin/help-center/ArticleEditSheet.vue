@@ -7,18 +7,18 @@
             <SheetTitle>
               {{
                 translationSource
-                  ? t('helpCenter.addTranslation')
+                  ? i18n._('Add translation')
                   : article
-                    ? t('helpCenter.editArticle')
-                    : t('helpCenter.newArticle')
+                    ? i18n._('Edit article')
+                    : i18n._('New article')
               }}
             </SheetTitle>
             <SheetDescription v-if="translationSource" class="mt-1">
-              {{ t('helpCenter.translationOf', { title: translationSource.title }) }}
+              {{ i18n._('Translation of “{title}”', { title: translationSource.title }) }}
             </SheetDescription>
             <div v-if="loadedArticle" class="mt-1 flex items-center gap-3">
               <SheetDescription>
-                {{ t('globals.terms.lastUpdated') }}:
+                {{ i18n._('Last updated') }}:
                 {{ formatDate(loadedArticle.updated_at) }}
               </SheetDescription>
               <Button
@@ -30,7 +30,7 @@
                 rel="noopener"
                 class="h-auto gap-1 p-0 font-normal"
               >
-                {{ t('globals.messages.viewArticle') }}
+                {{ i18n._('View article') }}
                 <ExternalLink class="size-3.5" aria-hidden="true" />
               </Button>
             </div>
@@ -49,9 +49,9 @@
                   <FormControl>
                     <Input
                       ref="titleInput"
-                      :aria-label="t('globals.terms.title')"
+                      :aria-label="i18n.ngettext('Title', 'Titles', 1)"
                       type="text"
-                      :placeholder="t('globals.terms.title')"
+                      :placeholder="i18n.ngettext('Title', 'Titles', 1)"
                       v-bind="componentField"
                       class="text-xl font-semibold border-0 px-0 py-3 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/60"
                     />
@@ -70,7 +70,7 @@
                         v-model:textContent="editorText"
                         :htmlContent="componentField.modelValue"
                         @update:htmlContent="(value) => componentField.onChange(value)"
-                        :placeholder="t('helpCenter.articlePlaceholder')"
+                        :placeholder="i18n._('Write your article...')"
                         enableInlineImages
                         linkedModel="help_articles"
                         :toolbarTarget="toolbarSlot"
@@ -92,7 +92,7 @@
             <div class="space-y-6">
               <div class="space-y-4">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.action', 2) }}
+                  {{ i18n.ngettext('Action', 'Actions', 2) }}
                 </h3>
 
                 <div class="flex gap-2">
@@ -103,7 +103,7 @@
                     @click="$emit('cancel')"
                     class="flex-1"
                   >
-                    {{ t('globals.messages.cancel') }}
+                    {{ i18n._('Cancel') }}
                   </Button>
                   <Button
                     type="button"
@@ -119,10 +119,10 @@
 
               <div v-if="loadedArticle && helpCenterLocales.length > 1" class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.translation', 2) }}
+                  {{ i18n.ngettext('Translation', 'Translations', 2) }}
                 </h3>
                 <p class="ui-description">
-                  {{ t('helpCenter.translationsHint') }}
+                  {{ i18n._('Write or link this article in other languages here. Readers who switch language land on the linked version, instead of the help center home page.') }}
                 </p>
 
                 <div class="space-y-2">
@@ -156,14 +156,14 @@
                           variant="outline"
                           size="icon"
                           class="h-auto shrink-0 text-muted-foreground hover:text-destructive"
-                          :aria-label="t('helpCenter.unlinkTranslation')"
+                          :aria-label="i18n._('Unlink translation')"
                           @click="askUnlink(locale)"
                         >
                           <Unlink aria-hidden="true" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {{ t('helpCenter.unlinkTranslation') }}
+                        {{ i18n._('Unlink translation') }}
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -177,7 +177,7 @@
                   <SelectTrigger class="w-full">
                     <div class="flex items-center gap-2">
                       <Plus class="size-4" aria-hidden="true" />
-                      <SelectValue :placeholder="t('helpCenter.addTranslation')" />
+                      <SelectValue :placeholder="i18n._('Add translation')" />
                     </div>
                   </SelectTrigger>
                   <SelectContent>
@@ -196,13 +196,13 @@
                   @click="openLinkDialog"
                 >
                   <Link2 class="mr-2 size-4" aria-hidden="true" />
-                  {{ t('helpCenter.linkExistingArticle') }}
+                  {{ i18n._('Link an existing article') }}
                 </Button>
               </div>
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.status') }}
+                  {{ i18n.ngettext('Status', 'Statuses', 1) }}
                 </h3>
 
                 <FormField v-slot="{ componentField }" name="status">
@@ -213,9 +213,9 @@
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="draft">{{ t('globals.terms.draft') }}</SelectItem>
+                          <SelectItem value="draft">{{ i18n._('Draft') }}</SelectItem>
                           <SelectItem value="published">{{
-                            t('globals.terms.published')
+                            i18n._('Published')
                           }}</SelectItem>
                         </SelectContent>
                       </Select>
@@ -227,11 +227,11 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.collection') }}
+                  {{ i18n.ngettext('Collection', 'Collections', 1) }}
                 </h3>
 
                 <p v-if="localeCollections.length === 0" class="ui-description">
-                  {{ t('helpCenter.noCollectionsInLanguage') }}
+                  {{ i18n._('No collections in this language. Create one before saving the article in it.') }}
                 </p>
                 <Button
                   v-if="localeCollections.length === 0 && translationSource"
@@ -241,7 +241,7 @@
                   @click="emit('create-translation-collection', { locale: form.values.locale })"
                 >
                   <Plus class="mr-2 size-4" aria-hidden="true" />
-                  {{ t('helpCenter.newCollection') }}
+                  {{ i18n._('New collection') }}
                 </Button>
 
                 <FormField v-slot="{ componentField }" name="collection_id">
@@ -269,7 +269,7 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('helpCenter.writtenBy') }}
+                  {{ i18n._('Written by') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="author_id">
                   <FormItem>
@@ -284,8 +284,8 @@
               <FormField v-slot="{ componentField, handleChange }" name="ai_enabled">
                 <FormItem>
                   <SwitchField
-                    :title="t('helpCenter.aiEnabled')"
-                    :description="t('helpCenter.aiEnabledHint')"
+                    :title="i18n._('Allow AI assistants to use this article')"
+                    :description="i18n._('Takes effect only when the article is published. Enable it in one language only, not in every translation.')"
                     :checked="componentField.modelValue"
                     @update:checked="handleChange"
                   />
@@ -294,7 +294,7 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('globals.terms.language') }}
+                  {{ i18n.ngettext('Language', 'Languages', 1) }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="locale">
                   <FormItem>
@@ -317,18 +317,18 @@
 
               <div class="space-y-3">
                 <h3 class="ui-heading">
-                  {{ t('helpCenter.excerpt') }}
+                  {{ i18n._('Excerpt') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="excerpt">
                   <FormItem>
                     <FormControl>
                       <Textarea
                         :rows="3"
-                        :placeholder="t('helpCenter.excerpt')"
+                        :placeholder="i18n._('Excerpt')"
                         v-bind="componentField"
                       />
                     </FormControl>
-                    <FormDescription>{{ t('helpCenter.excerptHint') }}</FormDescription>
+                    <FormDescription>{{ i18n._('A one-line summary shown under the article title and in search results.') }}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 </FormField>
@@ -336,11 +336,11 @@
 
               <div class="space-y-3 border-t pt-4">
                 <h3 class="ui-heading">
-                  {{ t('helpCenter.seo') }}
+                  {{ i18n._('SEO \u0026 metadata') }}
                 </h3>
                 <FormField v-slot="{ componentField }" name="meta_title">
                   <FormItem>
-                    <FormLabel>{{ t('helpCenter.metaTitle') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Meta title') }}</FormLabel>
                     <FormControl>
                       <Input
                         type="text"
@@ -348,13 +348,13 @@
                         v-bind="componentField"
                       />
                     </FormControl>
-                    <FormDescription>{{ t('helpCenter.metaTitleHint') }}</FormDescription>
+                    <FormDescription>{{ i18n._('Title shown in search engines and browser tabs. Leave blank to use the article title.') }}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 </FormField>
                 <FormField v-slot="{ componentField }" name="meta_description">
                   <FormItem>
-                    <FormLabel>{{ t('helpCenter.metaDescription') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Meta description') }}</FormLabel>
                     <FormControl>
                       <Textarea
                         :rows="2"
@@ -362,13 +362,13 @@
                         v-bind="componentField"
                       />
                     </FormControl>
-                    <FormDescription>{{ t('helpCenter.metaDescriptionHint') }}</FormDescription>
+                    <FormDescription>{{ i18n._('Shown in search-engine results and social previews. Leave blank to use the excerpt.') }}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 </FormField>
                 <FormField v-slot="{ componentField }" name="meta_image_url">
                   <FormItem>
-                    <FormLabel>{{ t('helpCenter.metaImageURL') }}</FormLabel>
+                    <FormLabel>{{ i18n._('Social image URL') }}</FormLabel>
                     <FormControl>
                       <Input type="text" placeholder="https://" v-bind="componentField" />
                     </FormControl>
@@ -379,32 +379,32 @@
 
               <div v-if="loadedArticle" class="space-y-3 text-sm border-t pt-4">
                 <div v-if="loadedArticle?.created_by_name" class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('helpCenter.createdBy') }}</span>
+                  <span class="text-muted-foreground">{{ i18n._('Created by') }}</span>
                   <span>{{ loadedArticle.created_by_name }}</span>
                 </div>
                 <div
                   v-if="loadedArticle?.helpful_count !== undefined"
                   class="flex justify-between py-1"
                 >
-                  <span class="text-muted-foreground">{{ t('globals.terms.feedback') }}</span>
+                  <span class="text-muted-foreground">{{ i18n.ngettext('Feedback', 'Feedbacks', 1) }}</span>
                   <span
                     >👍 {{ loadedArticle.helpful_count }} · 👎
                     {{ loadedArticle.not_helpful_count }}</span
                   >
                 </div>
                 <div class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('globals.terms.createdAt') }}</span>
+                  <span class="text-muted-foreground">{{ i18n._('Created at') }}</span>
                   <span>{{ formatDate(loadedArticle.created_at) }}</span>
                 </div>
                 <div class="flex justify-between py-1">
-                  <span class="text-muted-foreground">{{ t('globals.terms.updatedAt') }}</span>
+                  <span class="text-muted-foreground">{{ i18n._('Updated at') }}</span>
                   <span>{{ formatDate(loadedArticle.updated_at) }}</span>
                 </div>
                 <div
                   v-if="loadedArticle.view_count !== undefined"
                   class="flex justify-between py-1"
                 >
-                  <span class="text-muted-foreground">{{ t('globals.terms.view', 2) }}</span>
+                  <span class="text-muted-foreground">{{ i18n.ngettext('View', 'Views', 2, {}, 'Article page views') }}</span>
                   <span>{{ loadedArticle.view_count.toLocaleString() }}</span>
                 </div>
               </div>
@@ -418,29 +418,29 @@
   <Dialog :open="showLinkDialog" @update:open="showLinkDialog = $event">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>{{ t('helpCenter.linkExistingArticle') }}</DialogTitle>
-        <DialogDescription>{{ t('helpCenter.linkExistingArticleHint') }}</DialogDescription>
+        <DialogTitle>{{ i18n._('Link an existing article') }}</DialogTitle>
+        <DialogDescription>{{ i18n._('Pick an article written in another language to join it with this one as a translation.') }}</DialogDescription>
       </DialogHeader>
 
       <div class="space-y-4">
         <Spinner v-if="isLoadingLinkable" :absolute="false" class="py-8" />
         <p v-else-if="!linkableArticleItems.length" class="ui-description">
-          {{ t('helpCenter.noLinkableArticles') }}
+          {{ i18n._('No articles in the other languages are free to link. Write the translation instead.') }}
         </p>
         <SelectComboBox
           v-else
           v-model="linkArticleID"
           :items="linkableArticleItems"
-          :placeholder="t('placeholders.selectArticle')"
+          :placeholder="i18n._('Select article')"
         />
       </div>
 
       <DialogFooter>
         <Button type="button" variant="outline" @click="showLinkDialog = false">
-          {{ t('globals.messages.cancel') }}
+          {{ i18n._('Cancel') }}
         </Button>
         <Button type="button" :disabled="!linkArticleID || isLinking" @click="confirmLink">
-          {{ t('globals.terms.link') }}
+            {{ i18n.pgettext('Associate an existing article', 'Link') }}
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -449,19 +449,19 @@
   <AlertDialog :open="showUnlinkDialog" @update:open="showUnlinkDialog = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
           {{
-            t('helpCenter.unlinkTranslationConfirmation', {
+            i18n._('{language} will no longer be a translation of the others and will stand on its own. Its content stays as it is.', {
               language: languageName(unlinkLocale)
             })
           }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="confirmUnlink">{{
-          t('globals.messages.unlink')
+          i18n._('Unlink')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
@@ -512,7 +512,7 @@ import {
   FormMessage
 } from '@shared-ui/components/ui/form/index.js'
 import { createArticleFormSchema } from './articleFormSchema.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import Editor from '@main/components/editor/ArticleEditor.vue'
 import { highlightCodeBlocks } from '@main/components/editor/highlightCodeBlocks'
 import { Spinner } from '@shared-ui/components/ui/spinner'
@@ -527,7 +527,8 @@ import { format, isValid } from 'date-fns'
 import { Check, ChevronRight, ExternalLink, Link2, Plus, Unlink } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared-ui/components/ui/tooltip'
 
-const { t, locale: uiLocale } = useI18n()
+const i18n = useI18n()
+const { locale: uiLocale } = i18n
 
 const props = defineProps({
   isOpen: {
@@ -616,7 +617,7 @@ const editorRef = ref(null)
 const loadedArticle = ref(null)
 
 const submitLabel = computed(() =>
-  props.article ? t('globals.messages.update') : t('globals.messages.create')
+  props.article ? i18n._('Update') : i18n._('Create')
 )
 
 const linkedLocales = computed(
@@ -696,7 +697,7 @@ const toFormValues = () => {
 }
 
 const form = useForm({
-  validationSchema: toTypedSchema(createArticleFormSchema(t)),
+  validationSchema: toTypedSchema(createArticleFormSchema(i18n)),
   initialValues: toFormValues()
 })
 
@@ -826,7 +827,7 @@ const confirmLink = async () => {
     loadedArticle.value = await fetchArticle()
     showLinkDialog.value = false
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('helpCenter.translationLinked')
+      description: i18n._('Article linked as a translation.')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -849,7 +850,7 @@ const confirmUnlink = async () => {
     await api.unlinkArticleTranslation(translationByLocale.value.get(unlinkLocale.value).id)
     loadedArticle.value = await fetchArticle()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('helpCenter.translationUnlinked')
+      description: i18n._('Article unlinked from its translations.')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -862,7 +863,7 @@ const confirmUnlink = async () => {
 const selectTranslationLocale = (locale) => {
   if (form.meta.value.dirty) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('helpCenter.saveBeforeSwitchingTranslation')
+      description: i18n._('Unsaved changes would be lost. Save the article before switching languages.')
     })
     return
   }

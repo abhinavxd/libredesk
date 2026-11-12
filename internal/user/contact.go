@@ -29,22 +29,22 @@ func (u *Manager) ResolveContact(user *models.User, policy models.ContactPolicy)
 func (u *Manager) CreateContact(user *models.User) error {
 	password, err := u.newContactPassword()
 	if err != nil {
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
 	if user.Email.Valid {
 		if _, err := u.GetContactByEmail(user.Email.String); err == nil {
-			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+			return envelope.NewError(envelope.InputError, u.i18n.Get("Another contact with same email already exists"), nil)
 		} else if envErr, ok := err.(envelope.Error); !ok || envErr.ErrorType != envelope.NotFoundError {
 			return err
 		}
 	}
 	if err := u.q.InsertContact.QueryRow(user.Email, user.FirstName, user.LastName, password, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country).Scan(&user.ID); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+			return envelope.NewError(envelope.InputError, u.i18n.Get("Another contact with same email already exists"), nil)
 		}
 		u.lo.Error("error creating contact", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -62,10 +62,10 @@ func (u *Manager) UpdateContact(id int, user models.User) error {
 	user.Email = null.NewString(strings.ToLower(strings.TrimSpace(user.Email.String)), user.Email.Valid)
 	if _, err := u.q.UpdateContact.Exec(id, user.FirstName, user.LastName, user.Email, user.AvatarURL, user.PhoneNumber, user.PhoneNumberCountryCode, user.Country); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.InputError, u.i18n.T("contact.alreadyExistsWithEmail"), nil)
+			return envelope.NewError(envelope.InputError, u.i18n.Get("Another contact with same email already exists"), nil)
 		}
 		u.lo.Error("error updating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -75,10 +75,10 @@ func (u *Manager) DeleteContact(id int) error {
 	res, err := u.q.DeleteContact.Exec(id)
 	if err != nil {
 		u.lo.Error("error deleting contact", "contact_id", id, "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	if rows, _ := res.RowsAffected(); rows == 0 {
-		return envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
+		return envelope.NewError(envelope.NotFoundError, u.i18n.Get("User not found"), nil)
 	}
 	return nil
 }
@@ -88,7 +88,7 @@ func (u *Manager) ExportContactData(id int) ([]byte, error) {
 	var data []byte
 	if err := u.q.ExportContactData.Get(&data, id); err != nil {
 		u.lo.Error("error exporting contact data", "contact_id", id, "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return data, nil
 }
@@ -237,10 +237,10 @@ func (u *Manager) GetContactIDByChannelIdentity(channel, identifier string) (int
 	var id int
 	if err := u.q.GetContactIDByChannelIdentity.Get(&id, channel, identifier); err != nil {
 		if err == sql.ErrNoRows {
-			return 0, envelope.NewError(envelope.NotFoundError, u.i18n.T("validation.notFoundUser"), nil)
+			return 0, envelope.NewError(envelope.NotFoundError, u.i18n.Get("User not found"), nil)
 		}
 		u.lo.Error("error fetching contact by channel identity", "channel", channel, "error", err)
-		return 0, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return 0, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return id, nil
 }

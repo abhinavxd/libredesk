@@ -7,7 +7,7 @@
       <template #footer>
         <div class="flex space-x-3">
           <Button type="submit" :isLoading="formLoading">
-            {{ isNewForm ? t('globals.messages.create') : t('globals.messages.save') }}
+            {{ isNewForm ? i18n._('Create') : i18n._('Save') }}
           </Button>
           <Button
             v-if="!isNewForm"
@@ -17,7 +17,7 @@
             @click="handleTestWebhook"
           >
             {{
-              $t('webhook.sendTest')
+              i18n._('Send test')
             }}
           </Button>
         </div>
@@ -36,14 +36,14 @@ import { Button } from '@shared-ui/components/ui/button'
 import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
 import { useEmitter } from '../../../composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useRouter } from 'vue-router'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from '../../../features/admin/webhooks/formSchema.js'
 
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)
 const formLoading = ref(false)
@@ -57,7 +57,7 @@ const props = defineProps({
 })
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     name: '',
     url: '',
@@ -75,11 +75,11 @@ const onSubmit = form.handleSubmit(async (values) => {
     let toastDescription = ''
     if (props.id) {
       await api.updateWebhook(props.id, values)
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
     } else {
       await api.createWebhook(values)
       router.push({ name: 'webhook-list' })
-      toastDescription = t('globals.messages.savedSuccessfully')
+      toastDescription = i18n._('Changes saved')
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
@@ -103,7 +103,7 @@ const handleTestWebhook = async () => {
     await api.testWebhook(props.id)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'success',
-      description: t('webhook.sentSuccessfully')
+      description: i18n._('Webhook sent successfully')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -116,7 +116,7 @@ const handleTestWebhook = async () => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? i18n._('Edit') : i18n.pgettext('New webhook', 'New')
 }
 
 const isNewForm = computed(() => {
@@ -124,7 +124,7 @@ const isNewForm = computed(() => {
 })
 
 const breadcrumbLinks = [
-  { path: 'webhook-list', label: t('globals.terms.webhook') },
+  { path: 'webhook-list', label: i18n._('{count, plural, one {Webhook} other {Webhooks}}') },
   { path: '', label: breadCrumLabel() }
 ]
 

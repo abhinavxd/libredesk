@@ -6,10 +6,10 @@
           <template #left>
             <TabsList class="w-max justify-start">
               <TabsTrigger value="email_outgoing">
-                {{ $t('admin.template.outgoingEmailTemplates') }}
+                {{ i18n._('Outgoing email templates') }}
               </TabsTrigger>
               <TabsTrigger value="email_notification">
-                {{ $t('admin.template.emailNotificationTemplates') }}
+                {{ i18n._('Email notification templates') }}
               </TabsTrigger>
             </TabsList>
           </template>
@@ -19,7 +19,7 @@
               @click="navigateToNewTemplate"
               :disabled="templateType !== 'email_outgoing'"
             >
-              {{ $t('globals.messages.newTemplate') }}
+              {{ i18n._('New template') }}
             </Button>
           </template>
         </AdminToolbar>
@@ -27,7 +27,7 @@
           <DataTable
             v-model:search="searchTerm"
             :searchable="false"
-            :columns="createOutgoingEmailTableColumns(t)"
+            :columns="createOutgoingEmailTableColumns(i18n)"
             :data="templates"
             :loading="isLoading"
           />
@@ -36,7 +36,7 @@
           <DataTable
             v-model:search="searchTerm"
             :searchable="false"
-            :columns="createEmailNotificationTableColumns(t)"
+            :columns="createEmailNotificationTableColumns(i18n)"
             :data="templates"
             :loading="isLoading"
           />
@@ -61,13 +61,13 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useStorage } from '@vueuse/core'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 
 const templateType = useStorage('templateType', 'email_outgoing')
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const templates = ref([])
 const isLoading = ref(false)
 const router = useRouter()

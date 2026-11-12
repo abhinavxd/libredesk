@@ -3,18 +3,18 @@
     <DialogContent class="w-[min(92vw,960px)] max-w-4xl">
       <DialogHeader class="space-y-1">
         <DialogTitle
-          >{{ view?.id ? $t('globals.messages.edit') : $t('globals.messages.create') }}
-          {{ $t('globals.terms.view') }}
+          >{{ view?.id ? i18n._('Edit') : i18n._('Create') }}
+          {{ i18n.ngettext('View', 'Views', 1) }}
         </DialogTitle>
         <DialogDescription>
-          {{ $t('view.form.description') }}
+          {{ i18n._('Create and save custom filter views for quick access to your conversations.') }}
         </DialogDescription>
       </DialogHeader>
       <form @submit.prevent="onSubmit">
         <div class="grid gap-5 py-4">
           <FormField v-slot="{ componentField }" name="name" :validate-on-blur="false">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+              <FormLabel>{{ i18n.ngettext('Name', 'Names', 1) }}</FormLabel>
               <FormControl>
                 <Input
                   ref="nameInputRef"
@@ -25,24 +25,24 @@
                   @keydown.enter.prevent="onSubmit"
                 />
               </FormControl>
-              <FormDescription>{{ $t('view.form.name.description') }}</FormDescription>
+              <FormDescription>{{ i18n._('Enter an unique name for your view.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
           <FormField v-slot="{ componentField }" name="filters">
             <FormItem>
-              <FormLabel>{{ $t('globals.terms.filter', 2) }}</FormLabel>
+              <FormLabel>{{ i18n.ngettext('Filter', 'Filters', 2) }}</FormLabel>
               <FormControl>
                 <FilterGroupBuilder :fields="filterFields" v-bind="componentField" />
               </FormControl>
-              <FormDescription>{{ $t('view.form.filters.description') }}</FormDescription>
+              <FormDescription>{{ i18n._('Set one or more filters to customize view.') }}</FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
         </div>
         <DialogFooter>
           <Button type="submit" :disabled="isSubmitting" :isLoading="isSubmitting">
-            {{ isSubmitting ? t('globals.messages.saving') : t('globals.messages.save') }}
+            {{ isSubmitting ? i18n._('Saving...') : i18n._('Save') }}
           </Button>
         </DialogFooter>
       </form>
@@ -85,12 +85,12 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { z } from 'zod'
 import api from '@/api'
 
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const nameInputRef = ref(null)
 const openDialog = defineModel('openDialog', { required: false, default: false })
 watch(openDialog, (isOpen) => {
@@ -124,10 +124,10 @@ const formSchema = toTypedSchema(
     id: z.number().optional(),
     name: z
       .string({
-        required_error: t('globals.messages.required')
+        required_error: i18n._('{name} Required')
       })
-      .min(2, { message: t('view.form.name.length') })
-      .max(140, { message: t('view.form.name.length') }),
+      .min(2, { message: i18n._('View name should be between 2 and 140 characters.') })
+      .max(140, { message: i18n._('View name should be between 2 and 140 characters.') }),
     filters: z
       .object({
         logic: z.string().optional(),
@@ -150,7 +150,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 
   const leaves = collectLeaves(values.filters)
   if (leaves.length === 0) {
-    form.setFieldError('filters', t('view.form.filter.selectAtLeastOne'))
+    form.setFieldError('filters', i18n._('Select at least one filter.'))
     return
   }
   if (leaves.some(isPartialLeaf)) {
@@ -171,7 +171,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       viewID = resp?.data?.data?.id
     }
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     emitter.emit(EMITTER_EVENTS.REFRESH_LIST, { model: 'view', id: viewID })
     openDialog.value = false

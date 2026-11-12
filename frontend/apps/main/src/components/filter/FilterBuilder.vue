@@ -14,7 +14,7 @@
             <SelectTrigger>
               <SelectValue
                 :placeholder="
-                  t('placeholders.selectField')
+                  i18n._('Select field')
                 "
               />
             </SelectTrigger>
@@ -38,7 +38,7 @@
             <SelectTrigger>
               <SelectValue
                 :placeholder="
-                  t('placeholders.selectOperator')
+                  i18n._('Select operator')
                 "
               />
             </SelectTrigger>
@@ -67,26 +67,26 @@
                 v-else-if="getFieldType(modelFilter) === FIELD_TYPE.MULTI_SELECT"
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('placeholders.selectTags')"
+                :placeholder="i18n._('Select tags')"
               />
 
               <SelectAgentCombobox
                 v-else-if="getFieldEntity(modelFilter) === 'agent'"
                 v-model="modelFilter.value"
-                :placeholder="t('placeholders.selectValue')"
+                :placeholder="i18n._('Select value')"
               />
 
               <SelectTeamCombobox
                 v-else-if="getFieldEntity(modelFilter) === 'team'"
                 v-model="modelFilter.value"
-                :placeholder="t('placeholders.selectValue')"
+                :placeholder="i18n._('Select value')"
               />
 
               <SelectComboBox
                 v-else-if="getFieldOptions(modelFilter).length > 0"
                 v-model="modelFilter.value"
                 :items="getFieldOptions(modelFilter)"
-                :placeholder="t('placeholders.selectValue')"
+                :placeholder="i18n._('Select value')"
               />
 
               <DateFilterValue
@@ -98,7 +98,7 @@
               <Input
                 v-else
                 v-model="modelFilter.value"
-                :placeholder="t('globals.terms.value')"
+                :placeholder="i18n.ngettext('Value', 'Values', 1)"
                 type="text"
               />
             </template>
@@ -113,14 +113,14 @@
       <Button variant="ghost" size="sm" @click.stop="addFilter">
         <Plus class="w-3 h-3" />
         {{
-          $t('filter.add')
+          i18n._('Add filter')
         }}
       </Button>
       <div class="flex gap-2" v-if="showButtons">
         <Button variant="ghost" @click.stop="clearFilters">
-          {{ $t('globals.messages.reset') }}
+          {{ i18n._('Reset') }}
         </Button>
-        <Button @click.stop="applyFilters">{{ $t('globals.messages.apply') }}</Button>
+        <Button @click.stop="applyFilters">{{ i18n._('Apply') }}</Button>
       </div>
     </div>
   </div>
@@ -139,7 +139,7 @@ import {
 import { Plus } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { FIELD_TYPE, OPERATOR } from '@/constants/filterConfig'
 import CloseButton from '@/components/button/CloseButton.vue'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
@@ -159,7 +159,7 @@ const props = defineProps({
     default: true
   }
 })
-const { t } = useI18n()
+const i18n = useI18n()
 const emit = defineEmits(['apply', 'clear'])
 const modelValue = defineModel('modelValue', { required: false, default: () => [] })
 

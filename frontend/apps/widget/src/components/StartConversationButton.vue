@@ -7,17 +7,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ArrowRight } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import { useStartConversation } from '@widget/composables/useStartConversation.js'
 
 const props = defineProps({
-  fallbackLabel: { type: String, default: 'globals.messages.startNewConversation' },
+  fallbackLabel: { type: String, default: '' },
   arrow: { type: Boolean, default: false }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const { configuredLabel, canStartNewConversation, startNewConversation } = useStartConversation()
-const label = computed(() => configuredLabel.value || t(props.fallbackLabel))
+const label = computed(() => configuredLabel.value || props.fallbackLabel || i18n._('Start new conversation'))
 </script>

@@ -24,17 +24,13 @@ defineEmits(['collection', 'article'])
         </p>
         <p class="text-xs text-muted-foreground">
           {{
-            $t(
-              'globals.messages.articleCount',
-              { count: collection.article_count },
-              collection.article_count
-            )
+            i18n.ngettext('{count} article', '{count} articles', collection.article_count, { count: collection.article_count })
           }}
         </p>
       </template>
       <h3 v-else class="text-sm font-medium">
         {{
-          $t('globals.messages.collectionCount', { count: collections.length }, collections.length)
+          i18n.ngettext('{count} collection', '{count} collections', collections.length, { count: collections.length })
         }}
       </h3>
     </div>
@@ -68,11 +64,7 @@ defineEmits(['collection', 'article'])
               >{{ child.description }}</span
             >
             <span class="block text-xs font-normal text-muted-foreground">{{
-              $t(
-                'globals.messages.articleCount',
-                { count: child.article_count },
-                child.article_count
-              )
+              i18n.ngettext('{count} article', '{count} articles', child.article_count, { count: child.article_count })
             }}</span>
           </span>
           <ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

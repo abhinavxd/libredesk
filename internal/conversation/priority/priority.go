@@ -10,7 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -23,14 +23,14 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -57,7 +57,7 @@ func (m *Manager) GetAll() ([]models.Priority, error) {
 	var priorities = make([]models.Priority, 0)
 	if err := m.q.GetAll.Select(&priorities); err != nil {
 		m.lo.Error("error fetching priorities", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return priorities, nil
 }
@@ -69,7 +69,7 @@ func (m *Manager) Get(id int) (models.Priority, error) {
 		if !errors.Is(err, sql.ErrNoRows) {
 			m.lo.Error("error fetching priority", "error", err)
 		}
-		return priority, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return priority, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return priority, nil
 }

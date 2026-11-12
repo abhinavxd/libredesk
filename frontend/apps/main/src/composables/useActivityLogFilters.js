@@ -1,46 +1,48 @@
+
+
 import { computed } from 'vue'
 import { FIELD_TYPE, FIELD_OPERATORS } from '../constants/filterConfig'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 export function useActivityLogFilters () {
-    const { t } = useI18n()
+    const i18n = useI18n()
     const activityLogListFilters = computed(() => ({
         actor_id: {
-            label: t('globals.terms.actor'),
+            label: i18n._('{count, plural, one {Actor} other {Actors}}'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             entity: 'agent'
         },
         activity_type: {
-            label: t('activityLog.entryType'),
+            label: i18n._('Log entry type'),
             type: FIELD_TYPE.SELECT,
             operators: FIELD_OPERATORS.SELECT,
             options: [{
-                label: t('activityLog.entryType.agentLogin'),
+                label: i18n._('Agent login'),
                 value: 'agent_login'
             }, {
-                label: t('activityLog.entryType.agentLogout'),
+                label: i18n._('Agent logout'),
                 value: 'agent_logout'
             }, {
-                label: t('activityLog.entryType.agentAway'),
+                label: i18n._('Agent away'),
                 value: 'agent_away'
             }, {
-                label: t('activityLog.entryType.agentAwayReassigned'),
+                label: i18n._('Agent away reassigned'),
                 value: 'agent_away_reassigned'
             }, {
-                label: t('activityLog.entryType.agentOnline'),
+                label: i18n._('Agent online'),
                 value: 'agent_online'
             }, {
-                label: t('activityLog.entryType.agentPasswordSet'),
+                label: i18n._('Agent password set'),
                 value: 'agent_password_set'
             }, {
-                label: t('activityLog.entryType.agentRolePermissionsChanged'),
+                label: i18n._('Agent role permissions changed'),
                 value: 'agent_role_permissions_changed'
             }, {
-                label: t('activityLog.entryType.contactDeleted'),
+                label: i18n._('Contact deleted'),
                 value: 'contact_deleted'
             }, {
-                label: t('activityLog.entryType.contactDataExported'),
+                label: i18n._('Contact data exported'),
                 value: 'contact_data_exported'
             }]
         },

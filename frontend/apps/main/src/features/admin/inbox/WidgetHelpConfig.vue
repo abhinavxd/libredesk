@@ -1,7 +1,7 @@
 <script setup>
 import { usePreferredReducedMotion } from '@vueuse/core'
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Label } from '@shared-ui/components/ui/label'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -28,7 +28,7 @@ const props = defineProps({
   failed: { type: Boolean, default: false }
 })
 const emit = defineEmits(['update:modelValue'])
-const { t } = useI18n()
+const i18n = useI18n()
 
 const update = (key, value) => emit('update:modelValue', { ...props.modelValue, [key]: value })
 const updateAudience = (audience, key, value) =>
@@ -69,14 +69,14 @@ const unusedArticles = computed(() =>
 <template>
   <div class="space-y-8">
     <div class="space-y-2">
-      <Label for="widget-help-center">{{ t('globals.terms.helpCenter') }}</Label>
+      <Label for="widget-help-center">{{ i18n.ngettext('Help center', 'Help centers', 1) }}</Label>
       <Select
         :model-value="String(modelValue.help_center_id || 0)"
         @update:model-value="selectHelpCenter"
       >
         <SelectTrigger id="widget-help-center" class="max-w-md"><SelectValue /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="0">{{ t('globals.terms.none') }}</SelectItem>
+          <SelectItem value="0">{{ i18n.pgettext('No linked help center', 'None') }}</SelectItem>
           <SelectItem
             v-for="center in centers"
             :key="center.id"
@@ -90,13 +90,13 @@ const unusedArticles = computed(() =>
     </div>
 
     <p v-if="failed" role="alert" class="text-sm text-destructive">
-      {{ t('globals.messages.helpLoadError') }}
+      {{ i18n._('Help could not be loaded. Try again or send us a message.') }}
     </p>
 
     <template v-if="modelValue.help_center_id">
 
       <div class="space-y-4">
-        <h4 class="ui-heading">{{ t('widget.helpPlacement') }}</h4>
+        <h4 class="ui-heading">{{ i18n._('Where help appears') }}</h4>
         <div class="grid sm:grid-cols-2 gap-4">
           <div
             v-for="audience in AUDIENCES"
@@ -105,24 +105,24 @@ const unusedArticles = computed(() =>
             class="space-y-4 border rounded-md p-4"
           >
             <p class="text-sm font-medium text-foreground">
-              {{ t(audience === 'visitors' ? 'globals.terms.visitor' : 'globals.terms.users', 2) }}
+              {{ audience === 'visitors' ? i18n.ngettext('Visitor', 'Visitors', 2) : i18n._('Users') }}
             </p>
             <SwitchField
-              :title="t('widget.showHelpTab')"
+              :title="i18n._('Show Help tab')"
               :checked="modelValue[audience]?.tab"
               @update:checked="updateAudience(audience, 'tab', $event)"
             />
           </div>
         </div>
 
-        <p class="ui-description">{{ t('widget.helpOnHomeHint') }}</p>
+        <p class="ui-description">{{ i18n._('To show help on the Home screen, add the help articles card under Home screen apps.') }}</p>
       </div>
 
       <div data-featured-articles class="space-y-4">
         <h4 class="ui-heading">
-          {{ t('globals.terms.featuredArticle', 2) }}
+          {{ i18n.ngettext('Featured article', 'Featured articles', 2) }}
         </h4>
-        <p class="ui-description">{{ t('widget.featuredArticlesHint') }}</p>
+        <p class="ui-description">{{ i18n._('Choose up to 10 articles. Leave empty to show popular articles.') }}</p>
 
         <Draggable
           v-model="featured"
@@ -150,13 +150,13 @@ const unusedArticles = computed(() =>
                 class="flex-1 min-w-0 text-sm break-words"
                 :class="{ 'text-muted-foreground': !item.title }"
               >
-                {{ item.title || t('globals.messages.articleUnavailable') }}
+                {{ item.title || i18n._('Article unavailable') }}
               </span>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                :aria-label="t('globals.terms.remove')"
+                :aria-label="i18n._('Remove')"
                 @click="
                   update(
                     'featured_ids',
@@ -176,7 +176,7 @@ const unusedArticles = computed(() =>
           @update:model-value="update('featured_ids', [...featuredIds, Number($event)])"
         >
           <SelectTrigger class="max-w-md">
-            <SelectValue :placeholder="t('placeholders.selectArticle')" />
+            <SelectValue :placeholder="i18n._('Select article')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem

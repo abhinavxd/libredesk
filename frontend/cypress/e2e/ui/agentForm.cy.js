@@ -107,7 +107,7 @@ describe('Agent form', () => {
     cy.get('button[type="submit"]').click()
 
     cy.contains(/required/i).should('be.visible')
-    fieldBlock('Roles').should('contain', 'Required')
+    fieldBlock('Roles').should('contain', 'Please select at least one role')
     cy.get('@createAgent.all').should('have.length', 0)
     cy.location('pathname').should('eq', newPath)
   })

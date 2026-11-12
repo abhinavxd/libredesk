@@ -33,7 +33,7 @@ const searchTerm = defineModel('searchTerm', { type: String, default: '' })
       class="flex h-9 w-full border-b bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
     />
     <div v-if="!items.length" class="py-6 text-center text-sm">
-      {{ $t('globals.messages.notFound') }}
+      {{ i18n._('Not found') }}
     </div>
     <ComboboxContent>
       <ComboboxViewport class="h-[300px] overflow-y-auto overflow-x-hidden p-1">

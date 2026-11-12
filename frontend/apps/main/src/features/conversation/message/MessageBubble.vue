@@ -74,7 +74,7 @@
                 @click="alertOpen = true"
               >
                 <Trash2 class="mr-2 h-4 w-4" />
-                {{ t('conversation.deletePrivateNote') }}
+                {{ i18n._('Delete note') }}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -98,7 +98,7 @@
               v-if="message.meta?.wa_unsupported"
               class="mb-1 text-muted-foreground italic text-sm"
             >
-              {{ t('conversation.whatsapp.unsupportedMessage') }}
+              {{ i18n._('The contact sent something WhatsApp does not deliver to business tools, like a poll or an animated sticker. It is only visible on their phone.') }}
             </div>
             <div
               v-else
@@ -148,7 +148,7 @@
                   class="pointer-events-auto flex items-center gap-1.5 text-xs font-medium text-foreground bg-accent hover:bg-accent/80 border border-border rounded-full px-3 py-1 mb-1 transition-colors duration-200"
                 >
                   <Maximize2 :size="12" />
-                  {{ t('globals.terms.expand') }}
+                  {{ i18n._('Expand') }}
                 </button>
               </div>
             </div>
@@ -165,7 +165,7 @@
               @click="toggleQuote"
               class="text-xs cursor-pointer text-muted-foreground px-2 py-1 w-max hover:bg-muted hover:text-foreground rounded-md transition-colors duration-200"
             >
-              {{ showQuotedText ? t('conversation.hideQuotedText') : t('conversation.showQuotedText') }}
+              {{ showQuotedText ? i18n._('Hide quoted text') : i18n._('Show quoted text') }}
             </div>
 
             <!-- Attachments -->
@@ -208,7 +208,7 @@
                   <Mail :size="12" class="text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{{ t('conversation.sentViaEmail') }}</p>
+                  <p>{{ i18n._('Sent via email') }}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip v-if="sendFailureReason">
@@ -250,14 +250,14 @@
   <AlertDialog :open="alertOpen" @update:open="alertOpen = $event">
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>{{ t('globals.messages.areYouAbsolutelySure') }}</AlertDialogTitle>
+        <AlertDialogTitle>{{ i18n._('Are you absolutely sure?') }}</AlertDialogTitle>
         <AlertDialogDescription>
-          {{ t('conversation.deletePrivateNoteConfirmation') }}
+          {{ i18n._('This permanently deletes the note. It can\'\'t be recovered.') }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>{{ t('globals.messages.cancel') }}</AlertDialogCancel>
-        <AlertDialogAction variant="destructive" @click="deleteNote">{{ t('globals.messages.delete') }}</AlertDialogAction>
+        <AlertDialogCancel>{{ i18n._('Cancel') }}</AlertDialogCancel>
+        <AlertDialogAction variant="destructive" @click="deleteNote">{{ i18n._('Delete') }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
@@ -269,7 +269,7 @@ const AUTHOR_LINK_CLASS = 'cursor-pointer text-muted-foreground text-sm font-med
 import { computed, ref, onMounted, nextTick, watch } from 'vue'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUserStore } from '@main/stores/user'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import {
   Lock,
   Mail,
@@ -358,7 +358,7 @@ const props = defineProps({
 })
 
 const convStore = useConversationStore()
-const { t } = useI18n()
+const i18n = useI18n()
 const userStore = useUserStore()
 
 const alertOpen = ref(false)
@@ -423,7 +423,7 @@ const rewriteMessageLink = (href) => {
 
 const sanitizedContent = computed(() => {
   if (props.message.meta?.is_csat) {
-    return t('globals.messages.pleaseRateConversation')
+    return i18n._('Please rate this conversation:')
   }
   const content = props.message.content || ''
   if (props.message.content_type === 'text') return content
@@ -458,9 +458,9 @@ const deliveryStatus = computed(() =>
   getMessageDeliveryStatus(props.message, props.direction, convStore.current)
 )
 const deliveryStatusLabel = computed(() => {
-  if (deliveryStatus.value === 'read') return t('globals.terms.read')
-  if (deliveryStatus.value === 'delivered') return t('globals.terms.delivered')
-  return t('globals.terms.sent')
+  if (deliveryStatus.value === 'read') return i18n._('Read')
+  if (deliveryStatus.value === 'delivered') return i18n._('Delivered')
+  return i18n._('Sent')
 })
 const showRetry = computed(() => isOutgoing.value && props.message.status === 'failed' && props.message.sender_id === userStore.userID)
 

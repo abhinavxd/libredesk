@@ -46,7 +46,7 @@
 
         <div class="space-y-2">
           <div class="flex items-center justify-between text-sm">
-            <span class="text-muted-foreground">{{ t('globals.terms.theme') }}</span>
+            <span class="text-muted-foreground">{{ i18n._('Theme') }}</span>
             <Tabs v-model="themePreference">
               <TabsList class="h-7 p-0.5">
                 <Tooltip v-for="option in THEME_OPTIONS" :key="option.value">
@@ -54,12 +54,12 @@
                     <TabsTrigger
                       :value="option.value"
                       class="px-2 py-1"
-                      :aria-label="t(option.label)"
+                      :aria-label="i18n._(option.labelMessage)"
                     >
                       <component :is="option.icon" class="size-3.5" />
                     </TabsTrigger>
                   </TooltipTrigger>
-                  <TooltipContent>{{ t(option.label) }}</TooltipContent>
+                  <TooltipContent>{{ i18n._(option.labelMessage) }}</TooltipContent>
                 </Tooltip>
               </TabsList>
             </Tabs>
@@ -68,7 +68,7 @@
           <div class="border-t border-border pt-3 space-y-3">
             <!-- Away toggle -->
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">{{ t('navigation.away') }}</span>
+              <span class="text-muted-foreground">{{ i18n.pgettext('Conversation navigation', 'Away') }}</span>
               <Switch
                 :checked="
                   ['away_manual', 'away_and_reassigning'].includes(
@@ -82,7 +82,7 @@
             </div>
             <!-- Reassign toggle -->
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">{{ t('navigation.reassignReplies') }}</span>
+              <span class="text-muted-foreground">{{ i18n._('Reassign replies') }}</span>
               <Switch
                 :checked="userStore.user.availability_status === 'away_and_reassigning'"
                 @update:checked="
@@ -98,27 +98,28 @@
       <DropdownMenuGroup>
         <DropdownMenuItem @click.prevent="router.push({ name: 'account' })">
           <CircleUserRound size="18" class="mr-2" />
-          {{ t('globals.terms.account') }}
+          {{ i18n.ngettext('Account', 'Accounts', 1) }}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuItem @click="shortcutsDialog.show">
           <Keyboard size="18" class="mr-2" />
-          {{ t('navigation.keyboardShortcuts') }}
+          {{ i18n._('Keyboard shortcuts') }}
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="logout">
         <LogOut size="18" class="mr-2" />
-        {{ t('navigation.logout') }}
+        {{ i18n._('Logout') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { defineMessage as msg } from '@lingui/core/macro'
+import { useI18n } from '@shared-ui/i18n'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -153,16 +154,16 @@ import { useColorMode } from '@vueuse/core'
 
 // 'auto' follows the OS color scheme.
 const THEME_OPTIONS = [
-  { value: 'auto', label: 'globals.terms.system', icon: Monitor },
-  { value: 'light', label: 'globals.terms.light', icon: Sun },
-  { value: 'dark', label: 'globals.terms.dark', icon: Moon }
+  { value: 'auto', labelMessage: msg({ message: 'System' }), icon: Monitor },
+  { value: 'light', labelMessage: msg({ message: 'Light' }), icon: Sun },
+  { value: 'dark', labelMessage: msg({ message: 'Dark' }), icon: Moon }
 ]
 
 const isMobile = useIsMobile()
 const { store: themePreference } = useColorMode()
 const userStore = useUserStore()
 const router = useRouter()
-const { t } = useI18n()
+const i18n = useI18n()
 const shortcutsDialog = useKeyboardShortcutsDialog()
 const logout = useLogout()
 </script>

@@ -4,11 +4,11 @@
       <FormField v-slot="{ componentField }" name="inbox_id">
         <FormItem :class="ROW_CLASS">
           <div class="flex items-center gap-2">
-            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.from') }}</FormLabel>
+            <FormLabel :class="ROW_LABEL_CLASS">{{ i18n._('From') }}</FormLabel>
             <Select v-bind="componentField">
               <FormControl>
                 <SelectTrigger :class="ROW_INPUT_CLASS">
-                  <SelectValue :placeholder="t('placeholders.selectInbox')" />
+                  <SelectValue :placeholder="i18n._('Select inbox')" />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -31,7 +31,7 @@
               <Select v-bind="sendFromField">
                 <SelectTrigger
                   :class="ROW_INPUT_CLASS"
-                  :aria-label="t('globals.terms.fromEmailAddress', 1)"
+                  :aria-label="i18n.ngettext('From email address', 'From email addresses', 1)"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -52,12 +52,12 @@
       <FormField name="contact_email">
         <FormItem :class="[ROW_CLASS, 'relative']">
           <div class="flex items-center gap-2">
-            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.to') }}</FormLabel>
+            <FormLabel :class="ROW_LABEL_CLASS">{{ i18n._('To') }}</FormLabel>
             <FormControl>
               <Input
                 ref="emailInputRef"
                 type="email"
-                :placeholder="t('conversation.searchContact')"
+                :placeholder="i18n._('Search contact by email or type new email')"
                 v-model="emailQuery"
                 :class="ROW_INPUT_CLASS"
                 @input="handleSearchContacts"
@@ -74,7 +74,7 @@
               :class="RECIPIENT_TOGGLE_CLASS"
               @click="showRecipientField('cc')"
             >
-              {{ $t('replyBox.cc') }}
+              {{ i18n._('CC') }}
             </Button>
             <Button
               v-if="!showBcc"
@@ -84,7 +84,7 @@
               :class="RECIPIENT_TOGGLE_CLASS"
               @click="showRecipientField('bcc')"
             >
-              {{ $t('replyBox.bcc') }}
+              {{ i18n._('BCC') }}
             </Button>
           </div>
           <FormMessage :class="ROW_MESSAGE_CLASS" />
@@ -126,7 +126,7 @@
               <Input
                 :ref="(el) => (recipientInputRefs[field.name] = el)"
                 type="text"
-                :placeholder="t('replyBox.emailAddresess')"
+                :placeholder="i18n._('Email addresses separated by comma')"
                 v-bind="componentField"
                 :class="ROW_INPUT_CLASS"
               />
@@ -147,14 +147,14 @@
       </FormField>
 
       <div :class="[ROW_CLASS, 'flex items-start gap-2']">
-        <span :class="[ROW_LABEL_CLASS, 'h-9 flex items-center']">{{ $t('globals.terms.name', 1) }}</span>
+        <span :class="[ROW_LABEL_CLASS, 'h-9 flex items-center']">{{ i18n.ngettext('Name', 'Names', 1, {}, 'Person name') }}</span>
         <FormField v-slot="{ componentField }" name="first_name">
           <FormItem class="flex-1 min-w-0 space-y-0">
             <FormControl>
               <Input
                 type="text"
-                :placeholder="t('globals.terms.firstName')"
-                :aria-label="t('globals.terms.firstName')"
+                :placeholder="i18n.ngettext('First name', 'First names', 1)"
+                :aria-label="i18n.ngettext('First name', 'First names', 1)"
                 v-bind="componentField"
                 :disabled="!!selectedContact"
                 :class="ROW_INPUT_CLASS"
@@ -168,8 +168,8 @@
             <FormControl>
               <Input
                 type="text"
-                :placeholder="t('globals.terms.lastName')"
-                :aria-label="t('globals.terms.lastName')"
+                :placeholder="i18n.ngettext('Last name', 'Last names', 1)"
+                :aria-label="i18n.ngettext('Last name', 'Last names', 1)"
                 v-bind="componentField"
                 :disabled="!!selectedContact"
                 :class="ROW_INPUT_CLASS"
@@ -182,7 +182,7 @@
       <FormField v-slot="{ componentField }" name="subject">
         <FormItem :class="ROW_CLASS">
           <div class="flex items-center gap-2">
-            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.subject') }}</FormLabel>
+            <FormLabel :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Subject', 'Subjects', 1) }}</FormLabel>
             <FormControl>
               <Input type="text" v-bind="componentField" :class="ROW_INPUT_CLASS" />
             </FormControl>
@@ -194,7 +194,7 @@
       <div :class="[ROW_CLASS, 'grid grid-cols-1 gap-y-1 py-1 sm:grid-cols-2 sm:gap-4']">
         <FormField v-slot="{ componentField }" name="team_id">
           <FormItem class="flex items-center gap-2 min-w-0 space-y-0">
-            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.team', 1) }}</FormLabel>
+            <FormLabel :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Team', 'Teams', 1) }}</FormLabel>
             <FormControl>
               <SelectTeamCombobox
                 v-bind="componentField"
@@ -206,7 +206,7 @@
         </FormField>
         <FormField v-slot="{ componentField }" name="agent_id">
           <FormItem class="flex items-center gap-2 min-w-0 space-y-0">
-            <FormLabel :class="ROW_LABEL_CLASS">{{ $t('globals.terms.agent', 1) }}</FormLabel>
+            <FormLabel :class="ROW_LABEL_CLASS">{{ i18n.ngettext('Agent', 'Agents', 1) }}</FormLabel>
             <FormControl>
               <SelectAgentCombobox
                 v-bind="componentField"
@@ -226,7 +226,7 @@
             <Editor
               v-model:htmlContent="componentField.modelValue"
               @update:htmlContent="(value) => componentField.onChange(value)"
-              :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.newLineCtrlK')"
+              :placeholder="isCramped ? i18n._('Type your message...') : i18n._('Shift + Enter to add a new line. Ctrl + K to open command bar.')"
               :insertContent="insertContent"
               :autoFocus="false"
               :enableInlineImages="true"
@@ -268,7 +268,7 @@
         :showGenerateReply="false"
       />
       <Button type="submit" :disabled="isDisabled" :isLoading="loading">
-        {{ $t('globals.messages.send') }}
+        {{ i18n._('Send') }}
       </Button>
     </div>
   </form>
@@ -309,7 +309,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@shared-ui/components/ui/select'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useFileUpload } from '@/composables/useFileUpload'
 import Editor from '@/components/editor/ConversationEditor.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
@@ -339,7 +339,7 @@ const props = defineProps({
 })
 
 const inboxStore = useInboxStore()
-const { t } = useI18n()
+const i18n = useI18n()
 const isCramped = useIsComposerCramped()
 const userStore = useUserStore()
 const emitter = useEmitter()
@@ -356,8 +356,8 @@ const recipientInputRefs = {}
 
 const visibleRecipientFields = computed(() =>
   [
-    showCc.value && { name: 'cc', label: t('replyBox.cc'), removeLabel: t('replyBox.removeCC') },
-    showBcc.value && { name: 'bcc', label: t('replyBox.bcc'), removeLabel: t('replyBox.removeBCC') }
+    showCc.value && { name: 'cc', label: i18n._('CC'), removeLabel: i18n._('Remove CC') },
+    showBcc.value && { name: 'bcc', label: i18n._('BCC'), removeLabel: i18n._('Remove BCC') }
   ].filter(Boolean)
 )
 
@@ -407,24 +407,26 @@ const isDisabled = computed(() => {
 
 const emailListSchema = z
   .string()
-  .refine((v) => splitEmails(v).every(validateEmail), { message: t('validation.invalidEmail') })
+  .refine((v) => splitEmails(v).every(validateEmail), { message: i18n._('Invalid email address') })
   .default('')
 
 const formSchema = z.object({
-  subject: z.string().min(1, t('validation.subjectCannotBeEmpty')),
-  content: z.string().min(1, t('validation.messageCannotBeEmpty')),
+  subject: z.string().min(1, i18n._('Subject cannot be empty')),
+  content: z.string().min(1, i18n._('Message cannot be empty')),
   inbox_id: z
     .any()
     .refine((val) => inboxStore.emailOptions.some((option) => option.value === val), {
-      message: t('globals.messages.required')
+      message: i18n._('{name} Required', { name: i18n._('From') })
     }),
   team_id: z.any().optional(),
   agent_id: z.any().optional(),
   send_from: z.string().optional(),
-  contact_email: z.string().email(t('validation.invalidEmail')),
+  contact_email: z.string().email(i18n._('Invalid email address')),
   cc: emailListSchema,
   bcc: emailListSchema,
-  first_name: z.string().min(1, t('globals.messages.required')),
+  first_name: z.string().min(1, i18n._('{name} Required', {
+    name: i18n.ngettext('First name', 'First names', 1)
+  })),
   last_name: z.string().optional()
 })
 

@@ -6,21 +6,21 @@
           <template #actions>
             <Dialog v-model:open="importDialogOpen">
               <DialogTrigger as-child>
-                <Button variant="outline">{{ t('admin.ai.snippet.importUrl') }}</Button>
+                <Button variant="outline">{{ i18n._('Import from URL') }}</Button>
               </DialogTrigger>
               <DialogContent class="sm:max-w-[560px]">
                 <DialogHeader>
-                  <DialogTitle>{{ t('admin.ai.snippet.importUrl') }}</DialogTitle>
+                  <DialogTitle>{{ i18n._('Import from URL') }}</DialogTitle>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="importFromUrl">
                   <Input
                     v-model="importUrl"
                     type="url"
-                    :placeholder="t('admin.ai.snippet.importUrlPlaceholder')"
+                    :placeholder="i18n._('https://example.com/help/article')"
                   />
                   <div class="flex justify-end">
                     <Button type="submit" :isLoading="isImporting" :disabled="!importUrl.trim()">
-                      {{ t('globals.messages.import') }}
+                      {{ i18n.pgettext('Action', 'Import') }}
                     </Button>
                   </div>
                 </form>
@@ -28,12 +28,12 @@
             </Dialog>
             <Dialog v-model:open="snippetDialogOpen">
               <DialogTrigger as-child @click="newSnippet">
-                <Button>{{ t('admin.ai.snippet.new') }}</Button>
+                <Button>{{ i18n._('New snippet') }}</Button>
               </DialogTrigger>
               <DialogContent class="sm:max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>
-                    {{ snippetEditing ? t('admin.ai.snippet.edit') : t('admin.ai.snippet.new') }}
+                    {{ snippetEditing ? i18n._('Edit snippet') : i18n._('New snippet') }}
                   </DialogTitle>
                 </DialogHeader>
                 <SnippetForm
@@ -48,7 +48,7 @@
         <DataTable
           v-model:search="searchTerm"
           :searchable="false"
-          :columns="createSnippetColumns(t, { onEdit: editSnippet })"
+          :columns="createSnippetColumns(i18n, { onEdit: editSnippet })"
           :data="snippets"
           :loading="isLoading"
         />
@@ -56,14 +56,14 @@
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.snippetsHelp') }}</p>
+      <p>{{ i18n._('Snippets are the knowledge base the assistant searches to answer questions.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#snippets"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -90,11 +90,11 @@ import { createSnippetColumns } from '@/features/admin/ai/snippetColumns.js'
 import { useEmitter } from '@/composables/useEmitter.js'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)
 
@@ -151,7 +151,7 @@ const importFromUrl = async () => {
     importUrl.value = ''
     getSnippets()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
@@ -186,7 +186,7 @@ const submitSnippet = async (values) => {
     snippetDialogOpen.value = false
     getSnippets()
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

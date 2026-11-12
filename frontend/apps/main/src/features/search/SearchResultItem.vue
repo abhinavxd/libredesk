@@ -62,7 +62,7 @@
         </span>
         <span class="inline-flex items-center gap-1.5 min-w-0">
           <UserRound :class="METADATA_ICON_CLASS" aria-hidden="true" />
-          <span class="truncate">{{ assigneeName || t('globals.terms.unassigned') }}</span>
+          <span class="truncate">{{ assigneeName || i18n._('Unassigned') }}</span>
         </span>
         <span v-if="item.team_name" class="inline-flex items-center gap-1.5 min-w-0">
           <UsersRound :class="METADATA_ICON_CLASS" aria-hidden="true" />
@@ -87,7 +87,7 @@
 import { computed } from 'vue'
 import { format } from 'date-fns'
 import { Mail, Tag, UserRound, UsersRound } from 'lucide-vue-next'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Avatar, AvatarFallback, AvatarImage } from '@shared-ui/components/ui/avatar'
 import { Badge } from '@shared-ui/components/ui/badge'
 import { getRelativeTime } from '@shared-ui/utils/datetime.js'
@@ -103,7 +103,7 @@ const props = defineProps({
   term: { type: String, default: '' }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const fullName = (person) => [person?.first_name, person?.last_name].filter(Boolean).join(' ')
 const initials = (name) => (name || '?').substring(0, 2).toUpperCase()

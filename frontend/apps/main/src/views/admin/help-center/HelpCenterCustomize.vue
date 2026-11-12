@@ -1,7 +1,7 @@
 <template>
   <LoadingOverlay v-if="loading" :loading="loading" reserve-height />
   <p v-else-if="loadFailed" class="ui-description">
-    {{ t('globals.messages.somethingWentWrong') }}
+    {{ i18n._('Something went wrong') }}
   </p>
   <div v-else class="flex flex-col">
     <CustomBreadcrumb :links="breadcrumbLinks" class="mb-5" />
@@ -25,11 +25,11 @@
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="landing">{{ t('helpCenter.styling.landingPage') }}</SelectItem>
+                <SelectItem value="landing">{{ i18n._('Landing page') }}</SelectItem>
                 <SelectItem value="collection">{{
-                  t('helpCenter.styling.collectionPage')
+                  i18n._('Collection page')
                 }}</SelectItem>
-                <SelectItem value="article">{{ t('helpCenter.styling.articlePage') }}</SelectItem>
+                <SelectItem value="article">{{ i18n._('Article page') }}</SelectItem>
               </SelectContent>
             </Select>
             <PreviewThemeToggle v-model="previewTheme" class="ml-auto" />
@@ -38,9 +38,9 @@
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="desktop">{{ t('globals.terms.desktop') }}</SelectItem>
-                <SelectItem value="tablet">{{ t('globals.terms.tablet') }}</SelectItem>
-                <SelectItem value="mobile">{{ t('globals.terms.mobile') }}</SelectItem>
+                <SelectItem value="desktop">{{ i18n._('Desktop') }}</SelectItem>
+                <SelectItem value="tablet">{{ i18n._('Tablet') }}</SelectItem>
+                <SelectItem value="mobile">{{ i18n._('Mobile') }}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -85,7 +85,7 @@
                 :class="{ invisible: preview.id !== activePreview?.id }"
                 :style="frameStyle"
                 :srcdoc="preview.html"
-                :title="t('globals.terms.helpCenter')"
+                :title="i18n.ngettext('Help center', 'Help centers', 1)"
                 :aria-hidden="preview.id !== activePreview?.id"
                 sandbox="allow-same-origin"
                 @load="showPreview(preview)"
@@ -101,7 +101,7 @@
 <script setup>
 import { ref, computed, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ExternalLink, Globe, X } from 'lucide-vue-next'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import {
@@ -127,7 +127,7 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const router = useRouter()
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
@@ -150,8 +150,8 @@ provide('helpCenterPreviewScheme', previewTheme)
 const previewBox = ref(null)
 const previewTitle = computed(() => {
   const values = lastFormValues.value || helpCenter.value || {}
-  if (previewPage.value === 'article') return t('helpCenter.preview.sampleArticleTitle')
-  if (previewPage.value === 'collection') return t('helpCenter.preview.sampleCollection')
+  if (previewPage.value === 'article') return i18n._('Sample article')
+  if (previewPage.value === 'collection') return i18n._('Sample collection')
   return values.page_title || values.name || ''
 })
 
@@ -192,7 +192,7 @@ const lastFormValues = ref(null)
 let previewTimer = null
 
 const breadcrumbLinks = computed(() => [
-  { path: 'help-center-list', label: t('globals.terms.helpCenter', 2) },
+  { path: 'help-center-list', label: i18n._('{count, plural, one {Help center} other {Help centers}}', 2) },
   { path: '', label: helpCenter.value?.name || '' }
 ])
 
@@ -250,7 +250,7 @@ const handleSave = async (formData) => {
     const { data } = await api.updateHelpCenter(props.id, formData)
     helpCenter.value = data.data
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

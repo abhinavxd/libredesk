@@ -8,7 +8,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { isToday, isYesterday, format } from 'date-fns'
 
 const props = defineProps({
@@ -18,12 +18,12 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 
 const label = computed(() => {
   const date = new Date(props.date)
-  if (isToday(date)) return t('globals.terms.today')
-  if (isYesterday(date)) return t('globals.terms.yesterday')
+  if (isToday(date)) return i18n._('Today')
+  if (isYesterday(date)) return i18n._('Yesterday')
   return format(date, 'd MMM yyyy')
 })
 </script>

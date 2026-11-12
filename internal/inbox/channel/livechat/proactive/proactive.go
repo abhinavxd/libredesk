@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -24,14 +24,14 @@ var (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 	mu   sync.Mutex
 }
 
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 type queries struct {
@@ -85,7 +85,7 @@ func (m *Manager) Get(id string, inboxID int, browserKey string, contactID int) 
 	var out Delivery
 	if err := m.q.GetDelivery.Get(&out, id, inboxID, browserKey, contactID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return out, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return out, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		return out, m.error(err)
 	}
@@ -109,7 +109,7 @@ func (m *Manager) Stats(inboxID int, from, to time.Time) ([]Stats, error) {
 
 func (m *Manager) error(err error) error {
 	m.lo.Error("proactive message operation failed", "error", err)
-	return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 }
 
 func Suppression(c Campaign, ctx Context, history []Delivery, cooldown time.Duration) string {

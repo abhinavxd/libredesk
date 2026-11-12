@@ -7,8 +7,8 @@
     </template>
 
     <template #help>
-      <p>{{ $t('admin.notification.help.description') }}</p>
-      <p>{{ $t('admin.notification.help.detail') }}</p>
+      <p>{{ i18n._('Configure SMTP server settings for sending email notifications to team members.') }}</p>
+      <p>{{ i18n._('Once configured, teammates receive automated alerts for conversation assignments, SLA breaches, and other important events.') }}</p>
     </template>
   </AdminSplitLayout>
 </template>
@@ -17,7 +17,7 @@
 import { ref, onMounted } from 'vue'
 import api from '@main/api'
 import AdminSplitLayout from '@main/layouts/admin/AdminSplitLayout.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import NotificationsForm from './NotificationSettingForm.vue'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { useEmitter } from '@main/composables/useEmitter'
@@ -26,7 +26,7 @@ import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useAppSettingsStore } from '@main/stores/appSettings'
 
 const initialValues = ref({})
-const { t } = useI18n()
+const i18n = useI18n()
 const isLoading = ref(false)
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
@@ -67,7 +67,7 @@ const submitForm = async (values) => {
     )
     await api.updateEmailNotificationSettings(updatedValues)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('admin.notification.restartApp')
+      description: i18n._('Settings updated successfully, Please restart the app for changes to take effect.')
     })
     await getNotificationSettings()
     appSettingsStore.fetchSettings()

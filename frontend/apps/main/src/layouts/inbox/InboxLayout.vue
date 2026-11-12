@@ -21,7 +21,7 @@
     <ResizableHandle
       v-if="!isMobile"
       class="w-1 bg-transparent after:w-1 can-hover:hover:after:bg-border"
-      :aria-label="$t('globals.terms.conversation', 2)"
+      :aria-label="i18n.ngettext('Conversation', 'Conversations', 2)"
     />
 
     <!-- v-show, not v-if: the list keeps its scroll position. -->

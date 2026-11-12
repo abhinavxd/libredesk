@@ -8,10 +8,10 @@ const actionSchema = () => z.array(
   })
 )
 
-export const createFormSchema = (t) => z.object({
-  name: z.string().min(1, t('globals.messages.required')),
+export const createFormSchema = (i18n) => z.object({
+  name: z.string().min(1, i18n._('{name} Required')),
   message_content: z.string().optional(),
-  actions: actionSchema(t).optional().default([]),
+  actions: actionSchema(i18n).optional().default([]),
   visibility: z.enum(['all', 'team', 'user']),
   visible_when: z.array(z.enum(['replying', 'starting_conversation', 'adding_private_note'])),
   team_id: z.string().nullable().optional(),
@@ -27,7 +27,7 @@ export const createFormSchema = (t) => z.object({
       return hasMessageContent || hasValidActions
     },
     {
-      message: t('admin.macro.messageOrActionRequired'),
+      message: i18n._('Either message content or actions are required'),
       // Field path to highlight
       path: ['message_content'],
     }
@@ -41,7 +41,7 @@ export const createFormSchema = (t) => z.object({
       return true
     },
     {
-      message: t('globals.messages.required'),
+      message: i18n._('{name} Required'),
       path: ['team_id'],
     }
   )
@@ -54,7 +54,7 @@ export const createFormSchema = (t) => z.object({
       return true
     },
     {
-      message: t('globals.messages.required'),
+      message: i18n._('{name} Required'),
       path: ['user_id'],
     }
   ).refine(
@@ -66,7 +66,7 @@ export const createFormSchema = (t) => z.object({
       return true
     },
     {
-      message: t('admin.macro.actionInvalid'),
+      message: i18n._('Each action must have a type and a value'),
       // Field path to highlight
       path: ['actions'],
     }

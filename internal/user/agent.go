@@ -84,7 +84,7 @@ func (u *Manager) GetAgentsCompact(search, userType string, enabledOnly bool, pa
 	var users = make([]models.UserCompact, 0)
 	if err := u.q.GetAgentsCompact.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), search, userType, enabledOnly, pageSize, dbutil.PageOffset(page, pageSize), dbutil.ContainsPattern(search)); err != nil {
 		u.lo.Error("error fetching users from db", "error", err)
-		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return users, nil
 }
@@ -94,7 +94,7 @@ func (u *Manager) GetAgentsCompactByIDs(ids []int) ([]models.UserCompact, error)
 	var users = make([]models.UserCompact, 0)
 	if err := u.q.GetAgentsCompactByIDs.Select(&users, pq.Array([]string{models.UserTypeAgent, models.UserTypeAIAssistant}), pq.Array(ids)); err != nil {
 		u.lo.Error("error fetching users by ids from db", "error", err)
-		return users, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return users, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return users, nil
 }
@@ -104,7 +104,7 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 	password, err := u.generatePassword()
 	if err != nil {
 		u.lo.Error("error generating password", "error", err)
-		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 
 	var id = 0
@@ -112,14 +112,14 @@ func (u *Manager) CreateAgent(firstName, lastName, email string, roles []string)
 	email = strings.TrimSpace(strings.ToLower(email))
 	if err := u.q.InsertAgent.QueryRow(email, firstName, lastName, password, avatarURL, pq.Array(roles)).Scan(&id); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
+			return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Get("User with same email already exists"), nil)
 		}
 		// The insert joins the named roles, so an unknown role yields no row.
 		if errors.Is(err, sql.ErrNoRows) {
-			return models.User{}, envelope.NewError(envelope.InputError, u.i18n.T("validation.invalidRole"), nil)
+			return models.User{}, envelope.NewError(envelope.InputError, u.i18n.Get("Invalid role"), nil)
 		}
 		u.lo.Error("error creating user", "error", err)
-		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.User{}, envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return u.Get(id, "", []string{models.UserTypeAgent})
 }
@@ -139,7 +139,7 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 		hashedPassword, err = bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 		if err != nil {
 			u.lo.Error("error generating bcrypt password", "error", err)
-			return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 		}
 		u.lo.Info("setting new password for user", "user_id", id)
 	}
@@ -153,10 +153,10 @@ func (u *Manager) UpdateAgent(id int, firstName, lastName, email string, roles [
 
 	if _, err := u.q.UpdateAgent.Exec(id, firstName, lastName, email, pq.Array(roles), null.String{}, hashedPassword, enabled, availability); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return envelope.NewError(envelope.GeneralError, u.i18n.T("user.sameEmailAlreadyExists"), nil)
+			return envelope.NewError(envelope.GeneralError, u.i18n.Get("User with same email already exists"), nil)
 		}
 		u.lo.Error("error updating user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -169,15 +169,15 @@ func (u *Manager) SoftDeleteAgent(id int) error {
 		return err
 	}
 	if id == systemUser.ID {
-		return envelope.NewError(envelope.InputError, u.i18n.T("user.cannotDeleteSystemUser"), nil)
+		return envelope.NewError(envelope.InputError, u.i18n.Get("Cannot delete system user"), nil)
 	}
 	var deleted int
 	if err := u.q.SoftDeleteAgent.Get(&deleted, id); err != nil {
 		u.lo.Error("error deleting user", "error", err)
-		return envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, u.i18n.Get("Something went wrong"), nil)
 	}
 	if deleted == 0 {
-		return envelope.NewError(envelope.NotFoundError, u.i18n.Ts("globals.messages.notFound", "name", u.i18n.T("globals.terms.agent")), nil)
+		return envelope.NewError(envelope.NotFoundError, u.i18n.Get("Not found"), nil)
 	}
 	return nil
 }

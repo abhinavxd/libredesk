@@ -41,15 +41,15 @@
       >
         <TabsTrigger value="home" class="nav-tab">
           <House class="w-5 h-5" aria-hidden="true" />
-          <span class="text-xs font-medium">{{ $t('globals.terms.home') }}</span>
+          <span class="text-xs font-medium">{{ i18n._('Home') }}</span>
         </TabsTrigger>
         <TabsTrigger value="messages" class="nav-tab">
           <MessagesSquare class="w-5 h-5" aria-hidden="true" />
-          <span class="text-xs font-medium">{{ $t('globals.terms.message', 2) }}</span>
+          <span class="text-xs font-medium">{{ i18n.ngettext('Message', 'Messages', 2) }}</span>
         </TabsTrigger>
         <TabsTrigger v-if="help.available && help.data.audience.tab" value="help" class="nav-tab">
           <CircleQuestionMark class="w-5 h-5" aria-hidden="true" />
-          <span class="text-xs font-medium">{{ $t('globals.terms.help') }}</span>
+          <span class="text-xs font-medium">{{ i18n._('Help') }}</span>
         </TabsTrigger>
       </TabsList>
       <div

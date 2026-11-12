@@ -18,7 +18,7 @@ describe('combobox trigger', () => {
           ...props
         })
     })
-    app.config.globalProperties.$t = (key) => key
+    app.config.globalProperties.i18n = { _: (message) => message }
     const html = await renderToString(app)
     const container = document.createElement('div')
     container.innerHTML = html
@@ -46,7 +46,7 @@ describe('combobox trigger', () => {
           onBlur
         })
     })
-    app.config.globalProperties.$t = (key) => key
+    app.config.globalProperties.i18n = { _: (message) => message }
     try {
       app.mount(container)
       const trigger = container.querySelector('button[role="combobox"]')

@@ -2,8 +2,8 @@
 import { describe, test, expect } from 'vitest'
 import { createFormSchema } from './formSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createFormSchema(mockI18n)
 
 const validForm = {
     name: 'Ask for order id',

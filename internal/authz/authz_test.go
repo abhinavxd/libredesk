@@ -8,7 +8,7 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -16,10 +16,7 @@ import (
 
 func newTestEnforcer(t *testing.T) *Enforcer {
 	t.Helper()
-	tr, err := i18n.New([]byte(`{"_.code":"en","_.name":"English","status.deniedPermission":"denied"}`))
-	if err != nil {
-		t.Fatalf("i18n init: %v", err)
-	}
+	tr := gotext.NewLocale("", "en_US")
 	lo := logf.New(logf.Opts{})
 	e, err := NewEnforcer(&lo, tr)
 	if err != nil {

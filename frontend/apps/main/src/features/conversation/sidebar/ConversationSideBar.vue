@@ -2,7 +2,7 @@
   <Tabs v-model="activeTab" class="flex h-full min-h-0 flex-col" @keydown.capture="copilotPointerOpened = false">
     <div class="flex h-14 shrink-0 items-center border-b border-border px-3">
       <TabsList class="h-full w-full justify-start gap-6 rounded-none bg-transparent p-0">
-        <TabsTrigger value="details" :class="SIDEBAR_TAB_CLASS">{{ $t('copilot.details') }}</TabsTrigger>
+        <TabsTrigger value="details" :class="SIDEBAR_TAB_CLASS">{{ i18n._('Details') }}</TabsTrigger>
         <TabsTrigger value="copilot" :class="SIDEBAR_TAB_CLASS" @pointerdown="copilotPointerOpened = activeTab !== 'copilot'">{{ COPILOT_NAME }}</TabsTrigger>
       </TabsList>
     </div>
@@ -18,14 +18,14 @@
                 variant="ghost"
                 size="icon"
                 class="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground focus-visible:text-foreground lg:h-7 lg:w-7 [&_svg]:size-3.5"
-                :aria-label="t('globals.messages.reorderSections')"
+                :aria-label="i18n._('Reorder sections')"
                 :aria-pressed="editingSections"
                 @click="toggleSectionEditor"
               >
                 <Pencil aria-hidden="true" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{{ t('globals.messages.reorderSections') }}</TooltipContent>
+            <TooltipContent>{{ i18n._('Reorder sections') }}</TooltipContent>
           </Tooltip>
         </template>
       </ConversationSideBarContact>
@@ -58,10 +58,10 @@
         </Draggable>
         <div class="flex justify-end gap-2">
           <Button type="button" variant="outline" size="sm" @click="closeSectionEditor">
-            {{ t('globals.messages.cancel') }}
+            {{ i18n._('Cancel') }}
           </Button>
           <Button type="button" size="sm" @click="saveSectionOrder">
-            {{ t('globals.messages.save') }}
+            {{ i18n._('Save') }}
           </Button>
         </div>
       </div>
@@ -96,7 +96,7 @@
               <SelectComboBox
                 v-model="conversationStore.current.priority_id"
                 :items="priorityOptions"
-                :placeholder="t('placeholders.selectPriority')"
+                :placeholder="i18n._('Select priority')"
                 @select="selectPriority"
                 type="priority"
               />
@@ -118,7 +118,7 @@
                         variant="ghost"
                         size="icon"
                         class="h-7 w-7 text-muted-foreground"
-                        :aria-label="t('conversation.sidebar.suggestTags')"
+                        :aria-label="i18n._('Suggest tags')"
                         :disabled="isSuggestingTags"
                         @click="suggestTags"
                       >
@@ -126,7 +126,7 @@
                         <Sparkles v-else aria-hidden="true" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{{ t('conversation.sidebar.suggestTags') }}</TooltipContent>
+                    <TooltipContent>{{ i18n._('Suggest tags') }}</TooltipContent>
                   </Tooltip>
                 </template>
               </SelectTagCombobox>
@@ -208,7 +208,7 @@ import CopilotPanel from '@/features/conversation/sidebar/CopilotPanel.vue'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useStorage, usePreferredReducedMotion } from '@vueuse/core'
 import Draggable from 'vuedraggable'
 import ReorderButtons from '@shared-ui/components/ReorderButtons.vue'
@@ -233,29 +233,29 @@ const userStore = useUserStore()
 const accordionState = useStorage('conversation-sidebar-accordion', [])
 const activeTab = useStorage('conversation-sidebar-tab', 'details')
 const copilotPointerOpened = ref(false)
-const { t } = useI18n()
+const i18n = useI18n()
 customAttributeStore.fetchCustomAttributes()
 
 const sections = computed(() => [
-  { id: 'actions', label: t('globals.terms.action', 2) },
-  { id: 'information', label: t('conversation.sidebar.information') },
+  { id: 'actions', label: i18n._('{count, plural, one {Action} other {Actions}}', 2) },
+  { id: 'information', label: i18n._('Information') },
   {
     id: 'contact_attributes',
-    label: t('conversation.sidebar.contactAttributes'),
+    label: i18n._('Contact attributes'),
     visible: customAttributeStore.contactAttributeOptions.length > 0
   },
   {
     id: 'page_visits',
-    label: t('conversation.sidebar.lastVisitedPages'),
+    label: i18n._('Last visited pages'),
     visible: conversationStore.current?.inbox_channel === 'livechat'
   },
   {
     id: 'contact_notes',
-    label: t('globals.terms.note', 2),
+    label: i18n._('{count, plural, one {Note} other {Notes}}', 2),
     visible: !!conversationStore.current?.contact?.id,
     permitted: userStore.can('contact_notes:read')
   },
-  { id: 'previous_conversations', label: t('globals.terms.conversation', 2) }
+  { id: 'previous_conversations', label: i18n._('{count, plural, one {Conversation} other {Conversations}}', 2) }
 ])
 const sectionOrder = useStorage(
   computed(() => `conversation-sidebar-section-order:${userStore.userID}`),
@@ -316,7 +316,7 @@ const onTagsChange = (newTags) => {
   const conv = conversationStore.current
   if (!conv) return
   const current = conv.tags || []
-  if (newTags.length === current.length && newTags.every((t) => current.includes(t))) return
+  if (newTags.length === current.length && newTags.every((i18n) => current.includes(i18n))) return
   conversationStore.updateConversationTags(conv.uuid, TAG_ACTION.SET, newTags)
 }
 
@@ -344,7 +344,7 @@ const suggestTags = async () => {
     if (suggestions.length === 0) {
       tagSuggestions.value = []
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('conversation.sidebar.noTagSuggestions')
+        description: i18n._('No tag suggestions for this conversation.')
       })
       return
     }
@@ -426,7 +426,7 @@ const updateContactCustomAttributes = async (attributes) => {
     conv.contact.custom_attributes = attributes
     await api.updateContactCustomAttribute(conv.uuid, attributes)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {

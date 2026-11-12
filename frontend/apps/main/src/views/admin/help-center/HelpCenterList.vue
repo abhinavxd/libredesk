@@ -5,7 +5,7 @@
         <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
           <template #actions>
             <Button @click="openCreateModal">
-              {{ $t('globals.messages.new') }}
+              {{ i18n.pgettext('New help center', 'New') }}
             </Button>
           </template>
         </AdminToolbar>
@@ -20,14 +20,14 @@
       </LoadingOverlay>
     </template>
     <template #help>
-      <p>{{ $t('admin.helpCenter.help') }}</p>
+      <p>{{ i18n._('Create public help centers where customers browse and search articles. Published articles can also be used by the AI agent to answer conversations.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/help-center"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ $t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -35,7 +35,7 @@
   <Sheet :open="showCreateModal" @update:open="closeCreateModal">
     <SheetContent class="sm:max-w-lg overflow-y-auto">
       <SheetHeader>
-        <SheetTitle>{{ $t('globals.messages.new') }}</SheetTitle>
+        <SheetTitle>{{ i18n.pgettext('New help center', 'New') }}</SheetTitle>
       </SheetHeader>
 
       <HelpCenterBasicsForm
@@ -63,12 +63,12 @@ import { createHelpCenterColumns } from '@/features/admin/help-center/helpCenter
 import HelpCenterBasicsForm from '@/features/admin/help-center/HelpCenterBasicsForm.vue'
 import api from '@/api'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
 const searchTerm = ref('')
 const router = useRouter()
 const emitter = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const loading = ref(false)
 const isSubmitting = ref(false)
 const helpCenters = ref([])
@@ -114,7 +114,7 @@ const handleSave = async (formData) => {
     isSubmitting.value = true
     const { data } = await api.createHelpCenter(formData)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     closeCreateModal()
     router.push({ name: 'help-center-customize', params: { id: data.data.id } })
@@ -132,7 +132,7 @@ const handleToggle = async (helpCenter) => {
   try {
     await api.toggleHelpCenter(helpCenter.id)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     fetchHelpCenters()
   } catch (error) {
@@ -147,7 +147,7 @@ const handleDelete = async (helpCenter) => {
   try {
     await api.deleteHelpCenter(helpCenter.id)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.deletedSuccessfully')
+      description: i18n._('Deleted successfully')
     })
     fetchHelpCenters()
   } catch (error) {
@@ -158,7 +158,7 @@ const handleDelete = async (helpCenter) => {
   }
 }
 
-const columns = createHelpCenterColumns(t, {
+const columns = createHelpCenterColumns(i18n, {
   onOpen: (helpCenter) => goToTree(helpCenter.id),
   onEdit: openEditModal,
   onDelete: handleDelete,

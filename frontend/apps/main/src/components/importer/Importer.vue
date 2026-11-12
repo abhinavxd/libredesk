@@ -1,13 +1,13 @@
 <template>
   <div>
     <Button variant="secondary" @click="openDialog">
-      {{ $t('globals.terms.import') }}
+      {{ i18n.ngettext('Import', 'Imports', 1) }}
     </Button>
 
     <Dialog v-model:open="showDialog">
       <DialogContent class="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{{ $t('globals.messages.import') }}</DialogTitle>
+          <DialogTitle>{{ i18n.pgettext('Action', 'Import') }}</DialogTitle>
         </DialogHeader>
 
         <div class="space-y-4 py-4">
@@ -20,7 +20,7 @@
                 {{
                   file
                     ? file.name
-                    : $t('placeholders.selectCsvFile')
+                    : i18n._('Select CSV file')
                 }}
               </span>
               <Upload class="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -34,7 +34,7 @@
             />
 
             <Alert>
-              <AlertTitle>{{ $t('importer.requiredCSVFormat') }}</AlertTitle>
+              <AlertTitle>{{ i18n._('Required CSV format') }}</AlertTitle>
               <AlertDescription class="mt-2">
                 <slot name="csv-example" />
               </AlertDescription>
@@ -49,7 +49,7 @@
           <!-- Logs -->
           <div v-if="status?.logs?.some((l) => l && l.trim())" class="space-y-4">
             <div class="space-y-2">
-              <p class="text-sm font-medium">{{ $t('globals.terms.log', 2) }}</p>
+              <p class="text-sm font-medium">{{ i18n.ngettext('Log', 'Logs', 2) }}</p>
               <Card class="p-0 overflow-hidden">
                 <div class="relative">
                   <CopyButton :text="status.logs.join('\n')" class="absolute top-2 right-2 z-10" />
@@ -66,21 +66,21 @@
           </div>
 
           <Alert v-if="error" variant="destructive">
-            <AlertTitle>{{ $t('globals.terms.error') }}</AlertTitle>
+            <AlertTitle>{{ i18n.ngettext('Error', 'Errors', 1) }}</AlertTitle>
             <AlertDescription>{{ error }}</AlertDescription>
           </Alert>
         </div>
 
         <DialogFooter>
           <Button v-if="complete" @click="resetAndClose">
-            {{ $t('globals.messages.close') }}
+            {{ i18n._('Close') }}
           </Button>
           <template v-else>
             <Button variant="outline" @click="closeDialog" :disabled="loading || status?.running">
-              {{ $t('globals.messages.cancel') }}
+              {{ i18n._('Cancel') }}
             </Button>
             <Button @click="startImport" :disabled="!file || loading || status?.running">
-              {{ $t('globals.terms.import') }}
+              {{ i18n.ngettext('Import', 'Imports', 1) }}
             </Button>
           </template>
         </DialogFooter>
@@ -91,7 +91,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Button } from '@shared-ui/components/ui/button'
 import { Card } from '@shared-ui/components/ui/card'
 import { Alert, AlertTitle, AlertDescription } from '@shared-ui/components/ui/alert'
@@ -109,11 +109,10 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 
 const props = defineProps({
-  entityKey: { type: String, required: true },
   uploadFn: { type: Function, required: true },
   getStatusFn: { type: Function, required: true }
 })

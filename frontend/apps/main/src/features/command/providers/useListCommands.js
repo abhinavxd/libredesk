@@ -1,6 +1,8 @@
+
+
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { ArrowUpDown, CheckSquare, CircleDot, Filter } from 'lucide-vue-next'
 import { useConversationStore } from '@main/stores/conversation'
 import { useBulkActionPermissions } from '@main/composables/useBulkActionPermissions'
@@ -21,7 +23,7 @@ export const isConversationListRoute = (route) =>
 
 export function useListCommands() {
   const route = useRoute()
-  const { t } = useI18n()
+  const i18n = useI18n()
   const conversationStore = useConversationStore()
   const { canBulkAct } = useBulkActionPermissions()
 
@@ -36,8 +38,8 @@ export function useListCommands() {
       commands.push(
         {
           id: 'list.status',
-          label: t('command.filterByStatus'),
-          keywords: [t('globals.terms.filter'), t('globals.terms.status')],
+          label: i18n._('Filter by status'),
+          keywords: [i18n._('{count, plural, one {Filter} other {Filters}}'), i18n._('{count, plural, one {Status} other {Statuses}}')],
           section,
           icon: Filter,
           group: true
@@ -57,7 +59,7 @@ export function useListCommands() {
     commands.push(
       {
         id: 'list.sort',
-        label: t('globals.messages.sortBy'),
+        label: i18n._('Sort by'),
         keywords: ['order'],
         section,
         icon: ArrowUpDown,
@@ -65,7 +67,7 @@ export function useListCommands() {
       },
       ...SORT_FIELDS.map((field) => ({
         id: `list.sort.${field}`,
-        label: t(conversationStore.sortFieldI18nKeys[field]),
+        label: i18n._(conversationStore.sortFieldMessages[field]),
         parent: 'list.sort',
         icon: ArrowUpDown,
         run: () => conversationStore.setListSortField(field)
@@ -75,7 +77,7 @@ export function useListCommands() {
     if (canBulkAct.value && conversationStore.conversationsList.length) {
       commands.push({
         id: 'list.select-all',
-        label: t('conversation.bulkActions.selectAll'),
+        label: i18n._('Select all conversations'),
         keywords: ['bulk'],
         section,
         icon: CheckSquare,

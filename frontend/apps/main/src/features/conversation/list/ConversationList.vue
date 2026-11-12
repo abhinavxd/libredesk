@@ -50,25 +50,25 @@
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem @click="handleSortChange('oldest')">
-            {{ $t('conversation.sort.oldestActivity') }}
+            {{ i18n._('Oldest activity') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('newest')">
-            {{ $t('conversation.sort.newestActivity') }}
+            {{ i18n._('Newest activity') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('started_first')">
-            {{ $t('conversation.sort.startedFirst') }}
+            {{ i18n._('Started first') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('started_last')">
-            {{ $t('conversation.sort.startedLast') }}
+            {{ i18n._('Started last') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('waiting_longest')">
-            {{ $t('conversation.sort.waitingLongest') }}
+            {{ i18n._('Waiting longest') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('next_sla_target')">
-            {{ $t('conversation.sort.nextSLATarget') }}
+            {{ i18n._('Next SLA target') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleSortChange('priority_first')">
-            {{ $t('conversation.sort.priorityFirst') }}
+            {{ i18n._('Priority first') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -80,8 +80,8 @@
         v-if="showEmpty"
         key="empty"
         class="px-4 py-8"
-        :title="t('conversation.noConversationsFound')"
-        :message="t('conversation.tryAdjustingFilters')"
+        :title="i18n._('No conversations found')"
+        :message="i18n._('Try adjusting filters')"
         :icon="Inbox"
       />
 
@@ -89,7 +89,7 @@
         v-if="hasErrored"
         key="error"
         class="px-4 py-8"
-        :title="t('conversation.couldNotFetch')"
+        :title="i18n._('Could not fetch conversations')"
         :message="conversationStore.conversations.errorMessage"
         :icon="MessageCircleWarning"
       />
@@ -135,15 +135,15 @@
           />
           {{
             conversationStore.conversations.fetching
-              ? t('globals.terms.loading')
-              : t('globals.terms.loadMore')
+              ? i18n._('Loading')
+              : i18n._('Load more')
           }}
         </Button>
         <p
           class="text-sm text-muted-foreground"
           v-else-if="conversationStore.conversationsList.length > 10"
         >
-          {{ $t('conversation.allLoaded') }}
+          {{ i18n._('All conversations loaded') }}
         </p>
       </div>
     </div>
@@ -155,7 +155,7 @@ const FILTER_TRIGGER_CLASS = 'min-w-0 justify-start gap-1.5 px-2 text-xs'
 
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Inbox, MessageCircleWarning, ChevronDown, Loader2 } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
 import {
@@ -177,7 +177,7 @@ const conversationStore = useConversationStore()
 const teamStore = useTeamStore()
 const { canBulkAct } = useBulkActionPermissions()
 const route = useRoute()
-const { t } = useI18n()
+const i18n = useI18n()
 
 watch(
   () => conversationStore.conversationsList
@@ -190,13 +190,13 @@ watch(
 const hasSelection = computed(() => conversationStore.selectedCount > 0)
 
 const title = computed(() => {
-  const typeKey = route.meta?.typeKey?.(route)
-  if (typeKey) {
-    return t(typeKey)
+  const typeMessage = route.meta?.typeMessage?.(route)
+  if (typeMessage) {
+    return i18n._(typeMessage)
   }
-  const key = route.meta?.titleKey
-  if (!key) return ''
-  return t(key, route.meta?.titleCount || 1)
+  const message = route.meta?.titleMessage
+  if (!message) return ''
+  return i18n._(message, route.meta?.titleCount || 1)
 })
 
 const handleStatusChange = (status) => {

@@ -27,7 +27,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/lib/pq"
 	"github.com/zerodha/logf"
 )
@@ -46,7 +46,7 @@ var (
 type Manager struct {
 	q             queries
 	lo            *logf.Logger
-	i18n          *i18n.I18n
+	i18n          *gotext.Locale
 	db            *sqlx.DB
 	deliveryQueue chan DeliveryTask
 	httpClient    *http.Client
@@ -63,7 +63,7 @@ type Manager struct {
 type Opts struct {
 	DB            *sqlx.DB
 	Lo            *logf.Logger
-	I18n          *i18n.I18n
+	I18n          *gotext.Locale
 	Workers       int
 	QueueSize     int
 	Timeout       time.Duration
@@ -139,7 +139,7 @@ func (m *Manager) GetAllCompact() ([]models.WebhookCompact, error) {
 	var webhooks = make([]models.WebhookCompact, 0)
 	if err := m.q.GetWebhooksCompact.Select(&webhooks); err != nil {
 		m.lo.Error("error fetching webhooks", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return webhooks, nil
 }
@@ -149,7 +149,7 @@ func (m *Manager) GetAll() ([]models.Webhook, error) {
 	var webhooks = make([]models.Webhook, 0)
 	if err := m.q.GetAllWebhooks.Select(&webhooks); err != nil {
 		m.lo.Error("error fetching webhooks", "error", err)
-		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Decrypt secrets
@@ -163,15 +163,15 @@ func (m *Manager) Get(id int) (models.Webhook, error) {
 	var webhook models.Webhook
 	if err := m.q.GetWebhook.Get(&webhook, id); err != nil {
 		if err == sql.ErrNoRows {
-			return webhook, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+			return webhook, envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 		}
 		m.lo.Error("error fetching webhook", "error", err)
-		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Decrypt secret
 	if err := m.decryptWebhook(&webhook); err != nil {
-		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return webhook, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	return webhook, nil
@@ -184,15 +184,15 @@ func (m *Manager) Create(webhook models.Webhook) (models.Webhook, error) {
 	// Encrypt secret before storing
 	encryptedSecret, err := m.encryptSecret(webhook.Secret)
 	if err != nil {
-		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	if err := m.q.InsertWebhook.Get(&result, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
-			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.T("globals.messages.errorAlreadyExists"), nil)
+			return models.Webhook{}, envelope.NewError(envelope.ConflictError, m.i18n.Get("Already exists"), nil)
 		}
 		m.lo.Error("error inserting webhook", "error", err)
-		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Decrypt secret before returning (ignore errors as non-critical)
@@ -211,7 +211,7 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 		var existingSecret string
 		if err := m.q.GetWebhookSecret.Get(&existingSecret, id); err != nil {
 			m.lo.Error("error fetching existing webhook secret", "id", id, "error", err)
-			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 		encryptedSecret = existingSecret
 	} else if !crypto.IsEncrypted(webhook.Secret) {
@@ -219,13 +219,13 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 		var err error
 		encryptedSecret, err = m.encryptSecret(webhook.Secret)
 		if err != nil {
-			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+			return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 		}
 	}
 
 	if err := m.q.UpdateWebhook.Get(&result, id, webhook.Name, webhook.URL, pq.Array(webhook.Events), encryptedSecret, webhook.IsActive); err != nil {
 		m.lo.Error("error updating webhook", "error", err)
-		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 
 	// Decrypt secret before returning (ignore errors as non-critical)
@@ -238,7 +238,7 @@ func (m *Manager) Update(id int, webhook models.Webhook) (models.Webhook, error)
 func (m *Manager) Delete(id int) error {
 	if _, err := m.q.DeleteWebhook.Exec(id); err != nil {
 		m.lo.Error("error deleting webhook", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return nil
 }
@@ -248,7 +248,7 @@ func (m *Manager) Toggle(id int) (models.Webhook, error) {
 	var result models.Webhook
 	if err := m.q.ToggleWebhook.Get(&result, id); err != nil {
 		m.lo.Error("error toggling webhook", "error", err)
-		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return models.Webhook{}, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return result, nil
 }
@@ -257,7 +257,7 @@ func (m *Manager) Toggle(id int) (models.Webhook, error) {
 func (m *Manager) SendTestWebhook(id int) error {
 	webhook, err := m.Get(id)
 	if err != nil {
-		return envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
+		return envelope.NewError(envelope.NotFoundError, m.i18n.Get("Not found"), nil)
 	}
 
 	m.deliverSingleWebhook(webhook, DeliveryTask{

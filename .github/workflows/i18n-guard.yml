@@ -24,11 +24,11 @@ jobs:
             exit 0
           fi
           files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
-          changed=$(printf '%s\n' "$files" | grep '^i18n/.*\.json$' | grep -v '^i18n/en-US\.json$' || true)
+          changed=$(printf '%s\n' "$files" | grep '^locales/[^/]*/LC_MESSAGES/.*\.po$' || true)
           if [ -z "$changed" ]; then
             exit 0
           fi
-          echo "Translations are managed by Crowdin, edit i18n/en-US.json only."
+          echo "Translations are managed by Crowdin. Update source messages and locales/*.pot only."
           echo "Revert these files:"
           echo "$changed"
           exit 1

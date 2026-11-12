@@ -7,17 +7,17 @@ import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
 type Enforcer struct {
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
-func NewEnforcer(lo *logf.Logger, i18n *i18n.I18n) (*Enforcer, error) {
+func NewEnforcer(lo *logf.Logger, i18n *gotext.Locale) (*Enforcer, error) {
 	return &Enforcer{lo: lo, i18n: i18n}, nil
 }
 
@@ -69,7 +69,7 @@ func (e *Enforcer) EnforceMediaAccess(user umodels.User, model string) (bool, er
 		return true, nil
 	}
 	if !slices.Contains(user.Permissions, "messages:read") {
-		return false, envelope.NewError(envelope.UnauthorizedError, e.i18n.T("status.deniedPermission"), nil)
+		return false, envelope.NewError(envelope.UnauthorizedError, e.i18n.Get("Permission denied"), nil)
 	}
 	return true, nil
 }

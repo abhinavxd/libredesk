@@ -4,7 +4,7 @@
       <template #actions>
         <router-link :to="{ name: 'new-macro' }">
           <Button>
-            {{ $t('macro.new') }}
+            {{ i18n._('New macro') }}
           </Button>
         </router-link>
       </template>
@@ -13,7 +13,7 @@
       <DataTable
         v-model:search="searchTerm"
         :searchable="false"
-        :columns="createColumns(t)"
+        :columns="createColumns(i18n)"
         :data="macros"
         :loading="formLoading"
       />
@@ -32,11 +32,11 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { Button } from '@shared-ui/components/ui/button'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import api from '@main/api'
 
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const formLoading = ref(false)
 const macros = ref([])
 const emit = useEmitter()

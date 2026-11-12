@@ -16,7 +16,12 @@ vi.mock('@/api', () => ({
     updateNotificationPreferences: savePreferences
   }
 }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key) => key }) }))
+vi.mock('@shared-ui/i18n', () => ({
+  useI18n: () => ({
+    _: (message) => message,
+    ngettext: (one, other, count) => count === 1 ? one : other
+  })
+}))
 vi.mock('@/composables/useEmitter', () => ({ useEmitter: () => ({ emit }) }))
 vi.mock('@shared-ui/utils/http.js', () => ({ handleHTTPError: (error) => error }))
 vi.mock('@/composables/usePushNotifications', () => ({
@@ -73,7 +78,7 @@ const mount = async (vapidPublicKey = 'test-key') => {
   root = document.createElement('div')
   document.body.append(root)
   app = createApp(NotificationPreferences)
-  app.config.globalProperties.$t = (key) => key
+  app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: (message) => typeof message === 'string' ? message : message.message }
   app.mount(root)
   await settle()
 }
@@ -89,7 +94,7 @@ describe('notification preferences', () => {
     root = document.createElement('div')
     document.body.append(root)
     app = createApp(NotificationPreferences)
-    app.config.globalProperties.$t = (key) => key
+    app.config.globalProperties.i18n = { ngettext: (one, other, count) => count === 1 ? one : other, pgettext: (_, message) => message, _: (message) => typeof message === 'string' ? message : message.message }
     app.mount(root)
     await nextTick()
 
@@ -162,7 +167,7 @@ describe('notification preferences', () => {
     await mount('')
     const browserPush = root.querySelector('button')
     expect(browserPush.disabled).toBe(true)
-    expect(root.textContent).toContain('notification.browserPush.unavailable')
+    expect(root.textContent).toContain('Browser notifications are unavailable because push is not configured.')
   })
 
   it('shows a loader while browser notifications are being enabled', async () => {

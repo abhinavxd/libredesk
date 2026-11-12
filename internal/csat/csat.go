@@ -12,7 +12,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/dbutil"
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -30,14 +30,14 @@ const (
 type Manager struct {
 	q    queries
 	lo   *logf.Logger
-	i18n *i18n.I18n
+	i18n *gotext.Locale
 }
 
 // Opts contains options for initializing the Manager.
 type Opts struct {
 	DB   *sqlx.DB
 	Lo   *logf.Logger
-	I18n *i18n.I18n
+	I18n *gotext.Locale
 }
 
 // queries contains prepared SQL queries.
@@ -72,7 +72,7 @@ func (m *Manager) Create(conversationID int) (models.CSATResponse, error) {
 			return rsp, ErrCSATAlreadyExists
 		}
 		m.lo.Error("error creating CSAT", "error", err)
-		return rsp, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return rsp, envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	return m.Get(uuid)
 }
@@ -83,7 +83,7 @@ func (m *Manager) Get(uuid string) (models.CSATResponse, error) {
 	err := m.q.Get.Get(&csat, uuid)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return csat, envelope.NewError(envelope.InputError, m.i18n.T("validation.notFoundCsatSurvey"), nil)
+			return csat, envelope.NewError(envelope.InputError, m.i18n.Get("CSAT Survey not found"), nil)
 		}
 		m.lo.Error("error getting CSAT", "error", err)
 		return csat, err
@@ -99,7 +99,7 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string, meta j
 	}
 
 	if csat.ResponseTimestamp.Valid {
-		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("CSAT already submitted"), nil)
 	}
 
 	if len(meta) == 0 {
@@ -109,12 +109,12 @@ func (m *Manager) UpdateResponse(uuid string, score int, feedback string, meta j
 	res, err := m.q.Update.Exec(uuid, score, feedback, meta)
 	if err != nil {
 		m.lo.Error("error updating CSAT", "error", err)
-		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+		return envelope.NewError(envelope.GeneralError, m.i18n.Get("Something went wrong"), nil)
 	}
 	// The UPDATE is guarded by response_timestamp IS NULL, so a concurrent
 	// request that already recorded a response updates zero rows here.
 	if n, _ := res.RowsAffected(); n == 0 {
-		return envelope.NewError(envelope.InputError, m.i18n.T("csat.alreadySubmitted"), nil)
+		return envelope.NewError(envelope.InputError, m.i18n.Get("CSAT already submitted"), nil)
 	}
 	return nil
 }

@@ -26,10 +26,10 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 		return sendErrorEnvelope(r, err)
 	}
 	if delivery.Replied && delivery.ConversationUUID == "" {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.NotFoundError, app.i18n.Get("Not found"), nil))
 	}
 	if !delivery.Displayed {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.T("widget.invitationExpired"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.ConflictError, app.i18n.Get("This invitation is no longer available. Start a new chat to contact us."), nil))
 	}
 	var sessionToken string
 	var attrs map[string]any
@@ -41,14 +41,14 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 		}
 		if contact.ID != conversation.ContactID {
 			if contact.ID > 0 {
-				return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationNotPermitted"), nil))
+				return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.Get("You cannot access this conversation. Sign in with the account that started it."), nil))
 			}
 			contact, err = app.user.GetContactOrVisitor(conversation.ContactID, "")
 			if err != nil {
 				return sendErrorEnvelope(r, err)
 			}
 			if contact.Type != "visitor" {
-				return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.T("widget.conversationNotPermitted"), nil))
+				return sendErrorEnvelope(r, envelope.NewError(envelope.PermissionError, app.i18n.Get("You cannot access this conversation. Sign in with the account that started it."), nil))
 			}
 			sessionToken, err = generateSessionToken(app, contact.ID, inbox.ID, true, "", defaultSessionTTL)
 			if err != nil {
@@ -61,7 +61,7 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 		}
 		message := cmodels.Message{ConversationUUID: conversation.UUID, ConversationID: conversation.ID, SenderID: contact.ID, Type: cmodels.MessageIncoming, SenderType: cmodels.SenderTypeContact, Status: cmodels.MessageStatusReceived, Content: req.Message, ContentType: cmodels.ContentTypeText}
 		if _, err := app.conversation.ProcessIncomingLiveChatMessage(message); err != nil {
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Error sending message"), nil))
 		}
 	} else {
 		if contact.ID == 0 {
@@ -82,7 +82,7 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 			if _, ok := err.(envelope.Error); ok {
 				return sendErrorEnvelope(r, err)
 			}
-			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
+			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.Get("Error sending message"), nil))
 		}
 		delivery.ConversationUUID = reply.ConversationUUID
 		if reply.ID > 0 {

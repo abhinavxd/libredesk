@@ -6,8 +6,8 @@ import {
   normalizePrechatConfig
 } from './livechatFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createFormSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createFormSchema(mockI18n)
 
 const validBranding = {
   colors: { primary: '#2563eb' },
@@ -252,8 +252,8 @@ describe('Livechat Inbox Form Schema', () => {
     )
     expect(result.success).toBe(false)
     expect(result.error.issues.map((issue) => issue.message)).toEqual([
-      'globals.terms.required {}',
-      'globals.terms.required {}'
+      'Required {}',
+      'Required {}'
     ])
   })
 
@@ -273,10 +273,10 @@ describe('Livechat Inbox Form Schema', () => {
     )
     expect(result.success).toBe(false)
     expect(result.error.issues.map((issue) => issue.message)).toEqual([
-      'widget.campaignUrlLimit {}',
-      'validation.minmaxNumber {"min":0,"max":86400}',
-      'validation.minmaxNumber {"min":1,"max":8760}',
-      'validation.invalidDuration {}'
+      'Add up to 20 page patterns. {}',
+      'Must be between {min} and {max} {"min":0,"max":86400}',
+      'Must be between {min} and {max} {"min":1,"max":8760}',
+      'Invalid duration format. Please use a valid format (e.g. 30m, 1h, 48h). {}'
     ])
   })
 

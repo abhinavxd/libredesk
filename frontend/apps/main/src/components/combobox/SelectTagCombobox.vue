@@ -27,7 +27,7 @@
 
 <script setup>
 import { computed, onMounted, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useTagStore } from '@/stores/tag'
 import SelectComboBox from '@/components/combobox/SelectCombobox.vue'
 import { SelectTag } from '@shared-ui/components/ui/select'
@@ -55,10 +55,10 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const i18n = useI18n()
 const tagStore = useTagStore()
 
-const placeholderText = computed(() => props.placeholder || t('placeholders.selectTags'))
+const placeholderText = computed(() => props.placeholder || i18n._('Select tags'))
 
 const items = computed(() =>
   props.valueField === 'id'

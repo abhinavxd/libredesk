@@ -1,4 +1,4 @@
-import { createI18n } from 'vue-i18n'
+import { createI18n } from '@shared-ui/i18n'
 
 let i18n = null
 

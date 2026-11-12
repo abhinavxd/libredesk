@@ -10,7 +10,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/jmoiron/sqlx/types"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/zerodha/logf"
 )
 
@@ -18,10 +18,7 @@ const testEncryptionKey = "01234567890123456789012345678901"
 
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
-	tr, err := i18n.New([]byte(`{"_.code":"en","_.name":"English"}`))
-	if err != nil {
-		t.Fatalf("i18n init: %v", err)
-	}
+	tr := gotext.NewLocale("", "en_US")
 	lo := logf.New(logf.Opts{})
 	return &Manager{lo: &lo, i18n: tr, encryptionKey: testEncryptionKey, pendingRuns: make(map[string]*pendingAgentRun)}
 }

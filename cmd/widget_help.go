@@ -89,7 +89,7 @@ func handleWidgetHelpArticle(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 	if helpCenter.ID == 0 {
-		return sendErrorEnvelope(r, envelope.NewError(envelope.NotFoundError, app.i18n.T("globals.messages.notFound"), nil))
+		return sendErrorEnvelope(r, envelope.NewError(envelope.NotFoundError, app.i18n.Get("Not found"), nil))
 	}
 	slug := r.RequestCtx.UserValue("article_slug").(string)
 	locale := resolveQueryLocale(r, helpCenter)

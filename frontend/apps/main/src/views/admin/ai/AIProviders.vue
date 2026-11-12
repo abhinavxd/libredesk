@@ -4,28 +4,28 @@
       <div class="space-y-6">
         <ProviderForm
           type="completion"
-          :title="t('admin.ai.completion')"
-          :description="t('admin.ai.completionDescription')"
+          :title="i18n._('Completion')"
+          :description="i18n._('The model used to draft replies and power copilot.')"
           :show-completion-fields="true"
         />
         <ProviderForm
           type="embedding"
-          :title="t('admin.ai.embedding')"
-          :description="t('admin.ai.embeddingDescription')"
+          :title="i18n._('Embedding')"
+          :description="i18n._('The model used to embed articles and snippets for search.')"
           :show-embedding-fields="true"
         />
       </div>
     </template>
 
     <template #help>
-      <p>{{ t('admin.ai.providersHelp') }}</p>
+      <p>{{ i18n._('Works with any OpenAI-compatible endpoint.') }}</p>
       <a
         href="https://docs.libredesk.io/configuration/ai#providers"
         target="_blank"
         rel="noopener noreferrer"
         class="link-style"
       >
-        {{ t('globals.terms.learnMore') }}
+        {{ i18n._('Learn more') }}
       </a>
     </template>
   </AdminSplitLayout>
@@ -34,7 +34,7 @@
 <script setup>
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import ProviderForm from '@/features/admin/ai/ProviderForm.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 </script>

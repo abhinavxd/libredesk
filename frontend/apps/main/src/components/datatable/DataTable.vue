@@ -4,8 +4,8 @@
       v-if="searchable"
       v-model="globalFilter"
       class="max-w-xs"
-      :placeholder="searchPlaceholder || t('globals.terms.search')"
-      :clear-label="t('globals.messages.clearSearch')"
+      :placeholder="searchPlaceholder || i18n._('Search')"
+      :clear-label="i18n._('Clear search')"
     />
 
     <div
@@ -122,7 +122,7 @@
                   <Spinner
                     v-if="!overlayLoading"
                     :absolute="false"
-                    :text="t('globals.terms.loading')"
+                    :text="i18n._('Loading')"
                   />
                 </div>
               </TableCell>
@@ -154,7 +154,7 @@ import {
   useVueTable
 } from '@tanstack/vue-table'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { computed, inject, ref } from 'vue'
 import { LOADING_OVERLAY_INJECTION_KEY } from '@main/components/layout/loadingOverlay'
 import { ArrowUpDown, ChevronDown, ChevronUp, Ghost } from 'lucide-vue-next'
@@ -169,7 +169,7 @@ import {
   TableRow
 } from '@shared-ui/components/ui/table'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const overlayLoading = inject(LOADING_OVERLAY_INJECTION_KEY, ref(false))
 
 // Hidden until row-hover on pointer devices; always shown on touch, focus, and while the menu is open.
@@ -211,7 +211,7 @@ const props = defineProps({
 const sorting = ref([])
 const globalFilter = defineModel('search', { type: String, default: '' })
 
-const emptyText = computed(() => props.emptyText || t('globals.messages.noResultsFound'))
+const emptyText = computed(() => props.emptyText || i18n._('No results found'))
 
 const table = useVueTable({
   get data() {

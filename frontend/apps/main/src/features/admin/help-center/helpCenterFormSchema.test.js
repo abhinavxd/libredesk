@@ -1,9 +1,9 @@
 import { describe, test, expect } from 'vitest'
 import { createHelpCenterFormSchema, createHelpCenterBasicsSchema } from './helpCenterFormSchema'
 
-const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
-const schema = createHelpCenterFormSchema(mockT)
-const basicsSchema = createHelpCenterBasicsSchema(mockT)
+const mockI18n = { _: (key, params) => `${key} ${JSON.stringify(params || {})}` }
+const schema = createHelpCenterFormSchema(mockI18n)
+const basicsSchema = createHelpCenterBasicsSchema(mockI18n)
 
 const validForm = {
   name: 'Docs',

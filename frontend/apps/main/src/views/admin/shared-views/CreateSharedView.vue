@@ -13,20 +13,20 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useRouter } from 'vue-router'
 import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { useSharedViewStore } from '@/stores/sharedView'
 import api from '@/api'
 
 const router = useRouter()
 const emit = useEmitter()
-const { t } = useI18n()
+const i18n = useI18n()
 const sharedViewStore = useSharedViewStore()
 const formLoading = ref(false)
 const breadcrumbLinks = [
-  { path: 'shared-view-list', label: t('globals.terms.sharedView', 2) },
+  { path: 'shared-view-list', label: i18n._('{count, plural, one {Shared view} other {Shared views}}', 2) },
   {
     path: '',
-    label: t('sharedView.new')
+    label: i18n._('New shared view')
   }
 ]
 
@@ -42,7 +42,7 @@ const createSharedView = async (values) => {
     await sharedViewStore.refresh()
 
     emit.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     router.push({ name: 'shared-view-list' })
   } catch (error) {

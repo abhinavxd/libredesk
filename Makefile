@@ -11,12 +11,12 @@ BIN := libredesk
 FRONTEND_DIR := frontend
 FRONTEND_DIST := ${FRONTEND_DIR}/dist
 WIDGET_JS_MIN := static/widget.min.js
-STATIC := ${FRONTEND_DIST} i18n schema.sql static/email-templates static/public ${WIDGET_JS_MIN}:static/widget.js
+STATIC := ${FRONTEND_DIST} schema.sql static/email-templates static/public ${WIDGET_JS_MIN}:static/widget.js
 GOPATH ?= $(HOME)/go
 STUFFBIN ?= $(GOPATH)/bin/stuffbin
 
 # The default target to run when `make` is executed.
-.DEFAULT_GOAL := build 
+.DEFAULT_GOAL := build
 
 # Install stuffbin if it doesn't exist.
 $(STUFFBIN):
@@ -25,7 +25,10 @@ $(STUFFBIN):
 
 # Install dependencies for both backend and frontend.
 .PHONY: install-deps
-install-deps: $(STUFFBIN)
+install-deps: $(STUFFBIN) install-deps-frontend
+
+.PHONY: install-deps-frontend
+install-deps-frontend:
 	@echo "→ Installing frontend dependencies..."
 	@cd ${FRONTEND_DIR} && pnpm install
 
@@ -52,7 +55,7 @@ frontend-build-widget: install-deps
 
 # Run the Go backend server in development mode.
 .PHONY: run-backend
-run-backend:
+run-backend: i18n-compile
 	@echo "→ Running backend..."
 	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd/
 
@@ -82,11 +85,11 @@ run-frontend-widget:
 
 # Build the backend binary.
 .PHONY: build-backend
-build-backend: $(STUFFBIN)
+build-backend: $(STUFFBIN) i18n-compile
 	@echo "→ Building backend..."
 	@CGO_ENABLED=0 go build \
 		-ldflags="-X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -s -w" \
-		-o ${BIN} cmd/*.go
+		-o ${BIN} ./cmd
 
 # Main build target: builds both frontend and backend, then stuffs static assets into the binary.
 .PHONY: build
@@ -108,7 +111,7 @@ demo-build:
 
 # Run tests. Integration tests need a Postgres; start one with `make test-db` first, else they skip.
 .PHONY: test
-test:
+test: i18n-compile
 	@echo "→ Running Go tests..."
 	go test -count=1 ./...
 	@echo "→ Running frontend tests..."
@@ -124,3 +127,81 @@ test-db:
 .PHONY: test-db-down
 test-db-down:
 	docker rm -f libredesk-test-db
+
+# Go catalogs compile to MO; Lingui frontend catalogs compile to JSON.
+BACKEND_PO := $(wildcard locales/*/LC_MESSAGES/backend.po locales/*/LC_MESSAGES/templates.po)
+FRONTEND_PO := $(wildcard locales/*/LC_MESSAGES/frontend.po)
+BACKEND_MO := $(BACKEND_PO:.po=.mo)
+
+.PHONY: i18n-extract
+i18n-extract: i18n-extract-backend i18n-extract-frontend
+
+.PHONY: i18n-extract-backend
+i18n-extract-backend:
+	@set -e; for domain in backend templates; do \
+		go run ./scripts/gettext -domain $$domain > locales/$$domain.pot.tmp; \
+		mv locales/$$domain.pot.tmp locales/$$domain.pot; \
+	done
+
+.PHONY: i18n-extract-frontend
+i18n-extract-frontend:
+	@cd ${FRONTEND_DIR} && node scripts/gettext.mjs extract
+
+.PHONY: i18n-update
+i18n-update: i18n-update-backend i18n-update-frontend
+
+.PHONY: i18n-update-backend
+i18n-update-backend: i18n-extract-backend
+	@set -e; for po in $(BACKEND_PO); do \
+		domain=$$(basename "$$po" .po); \
+		# Disable fuzzy matching: a changed English message needs a reviewed translation. \
+		msgmerge --quiet --no-fuzzy-matching --no-wrap "$$po" locales/$$domain.pot -o "$$po.merge"; \
+		msgattrib --no-obsolete --no-wrap "$$po.merge" -o "$$po"; \
+		rm "$$po.merge"; \
+	done
+
+.PHONY: i18n-update-frontend
+i18n-update-frontend: i18n-extract-frontend
+	@set -e; for po in $(FRONTEND_PO); do \
+		# Disable fuzzy matching: a changed English message needs a reviewed translation. \
+		msgmerge --quiet --no-fuzzy-matching --no-wrap "$$po" locales/frontend.pot -o "$$po.merge"; \
+		msgattrib --no-obsolete --no-wrap "$$po.merge" -o "$$po"; \
+		rm "$$po.merge"; \
+	done
+
+.PHONY: i18n-compile
+i18n-compile: i18n-compile-backend i18n-compile-frontend
+
+.PHONY: i18n-compile-backend
+i18n-compile-backend: $(BACKEND_MO)
+
+.PHONY: i18n-compile-frontend
+i18n-compile-frontend: install-deps-frontend
+	@cd ${FRONTEND_DIR} && node scripts/gettext.mjs compile
+
+locales/%/LC_MESSAGES/backend.mo: locales/%/LC_MESSAGES/backend.po
+	msgfmt --check --check-format -o $@ $<
+
+locales/%/LC_MESSAGES/templates.mo: locales/%/LC_MESSAGES/templates.po
+	msgfmt --check --check-format -o $@ $<
+
+# Read-only verification of source coverage, PO validity and generated MO/JSON files.
+.PHONY: i18n-check
+i18n-check: i18n-check-backend i18n-check-frontend
+
+.PHONY: i18n-check-backend
+i18n-check-backend:
+	@set -e; for domain in backend templates; do \
+		go run ./scripts/gettext -domain $$domain | cmp - locales/$$domain.pot; \
+	done; \
+	for po in $(BACKEND_PO); do \
+		domain=$$(basename "$$po" .po); \
+		msgfmt --check --check-format -o /dev/null "$$po"; \
+		msgcmp --use-untranslated "$$po" locales/$$domain.pot; \
+		msgcmp --use-untranslated locales/$$domain.pot "$$po"; \
+		msgfmt -o - "$$po" | cmp - "$${po%.po}.mo"; \
+	done
+
+.PHONY: i18n-check-frontend
+i18n-check-frontend:
+	@cd ${FRONTEND_DIR} && node scripts/gettext.mjs check

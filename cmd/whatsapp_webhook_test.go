@@ -8,8 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,7 +19,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/whatsapp"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/jmoiron/sqlx"
-	"github.com/knadh/go-i18n"
+	"github.com/leonelquinteros/gotext"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
@@ -327,17 +325,10 @@ func TestIsPublicWebhookURL(t *testing.T) {
 	}
 }
 
-// testI18nApp carries the real language file, so a renamed i18n key fails the test.
+// testI18nApp uses English source messages.
 func testI18nApp(t *testing.T) *App {
 	t.Helper()
-	raw, err := os.ReadFile(filepath.Join("..", "i18n", "en-US.json"))
-	if err != nil {
-		t.Fatalf("reading the language file: %v", err)
-	}
-	lang, err := i18n.New(raw)
-	if err != nil {
-		t.Fatalf("loading i18n: %v", err)
-	}
+	lang := gotext.NewLocale("", "en_US")
 	return &App{i18n: lang}
 }
 
@@ -396,14 +387,7 @@ func newInboxApp(t *testing.T) (*App, *sqlx.DB) {
 	db := testutil.NewDB(t, "cmd_whatsapp")
 
 	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
-	raw, err := os.ReadFile(filepath.Join("..", "i18n", "en-US.json"))
-	if err != nil {
-		t.Fatalf("reading the language file: %v", err)
-	}
-	lang, err := i18n.New(raw)
-	if err != nil {
-		t.Fatalf("loading i18n: %v", err)
-	}
+	lang := gotext.NewLocale("", "en_US")
 	mgr, err := inbox.New(&lo, db, lang, "0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("inbox.New: %v", err)

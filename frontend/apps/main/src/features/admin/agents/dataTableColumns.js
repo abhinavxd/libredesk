@@ -1,14 +1,16 @@
+
+
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import UserDataTableDropDown from '@/features/admin/agents/dataTableDropdown.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import TableDate from '@main/components/table/TableDate.vue'
 
-export const createColumns = (t) => [
+export const createColumns = (i18n) => [
   {
     accessorKey: 'first_name',
     header: function () {
-      return h('div', null, t('globals.terms.firstName'))
+      return h('div', null, i18n._('{count, plural, one {First name} other {First names}}'))
     },
     cell: function ({ row }) {
       return h('div', null,
@@ -25,7 +27,7 @@ export const createColumns = (t) => [
   {
     accessorKey: 'last_name',
     header: function () {
-      return h('div', null, t('globals.terms.lastName'))
+      return h('div', null, i18n._('{count, plural, one {Last name} other {Last names}}'))
     },
     cell: function ({ row }) {
       return h('div', null, row.getValue('last_name'))
@@ -36,14 +38,14 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.status'))
+      return h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}'))
     },
     cell: function ({ row }) {
       return h(
         'div',
         null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
-          row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          row.getValue('enabled') ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
     }
@@ -51,7 +53,7 @@ export const createColumns = (t) => [
   {
     accessorKey: 'email',
     header: function () {
-      return h('div', null, t('globals.terms.email'))
+      return h('div', null, i18n._('{count, plural, one {Email} other {Emails}}'))
     },
     cell: function ({ row }) {
       return h('div', null, row.getValue('email'))
@@ -62,7 +64,7 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.createdAt'))
+      return h('div', null, i18n._('Created at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('created_at') })
@@ -73,7 +75,7 @@ export const createColumns = (t) => [
     meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', null, t('globals.terms.updatedAt'))
+      return h('div', null, i18n._('Updated at'))
     },
     cell: function ({ row }) {
       return h(TableDate, { value: row.getValue('updated_at') })

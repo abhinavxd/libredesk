@@ -4,7 +4,7 @@
       <SidebarMenuButton
         size="default"
         class="relative"
-        :aria-label="t('globals.terms.notification', 2)"
+        :aria-label="i18n.ngettext('Notification', 'Notifications', 2)"
       >
         <Bell class="h-5 w-5" aria-hidden="true" />
         <span
@@ -13,7 +13,7 @@
         >
           {{ notificationStore.unreadCount > 99 ? '99' : notificationStore.unreadCount }}
         </span>
-        <span v-if="isMobile">{{ t('globals.terms.notification', 2) }}</span>
+        <span v-if="isMobile">{{ i18n.ngettext('Notification', 'Notifications', 2) }}</span>
       </SidebarMenuButton>
     </PopoverTrigger>
     <PopoverContent
@@ -29,7 +29,7 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { Bell } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
 import { SidebarMenuButton } from '@shared-ui/components/ui/sidebar'
@@ -39,7 +39,7 @@ import NotificationPanel from './NotificationPanel.vue'
 
 const notificationStore = useNotificationStore()
 const isMobile = useIsMobile()
-const { t } = useI18n()
+const i18n = useI18n()
 const isOpen = ref(false)
 
 onMounted(() => {

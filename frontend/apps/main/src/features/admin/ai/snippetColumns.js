@@ -1,12 +1,14 @@
+
+
 import { h } from 'vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import dropdown from './snippetDropdown.vue'
 
-export const createSnippetColumns = (t, { onEdit } = {}) => [
+export const createSnippetColumns = (i18n, { onEdit } = {}) => [
   {
     accessorKey: 'title',
-    header: () => h('div', null, t('globals.terms.title')),
+    header: () => h('div', null, i18n._('{count, plural, one {Title} other {Titles}}')),
     cell: ({ row }) => {
       const title = onEdit
         ? h(
@@ -22,7 +24,7 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
       if (row.original.source === 'conversation') {
         children.push(
           h(Badge, { variant: 'secondary', class: 'ml-2 align-middle' }, () =>
-            t('admin.ai.snippet.autoCreated')
+            i18n._('Auto-created')
           )
         )
       }
@@ -31,7 +33,7 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
           h(
             Badge,
             { variant: 'secondary', class: 'ml-2 align-middle', title: row.original.source_url },
-            () => t('admin.ai.snippet.imported')
+            () => i18n._('Imported')
           )
         )
       }
@@ -42,13 +44,13 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
     accessorKey: 'enabled',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) =>
       h(
         'div',
         null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
-          row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          row.getValue('enabled') ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
   },
@@ -56,7 +58,7 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
     accessorKey: 'updated_at',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.updatedAt')),
+    header: () => h('div', null, i18n._('Updated at')),
     cell: ({ row }) =>
       h(TableDate, { value: row.getValue('updated_at') })
   },

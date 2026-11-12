@@ -1,12 +1,14 @@
+
+
 import { h } from 'vue'
 import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import dropdown from './assistantDropdown.vue'
 
-export const createAssistantColumns = (t, { onEdit } = {}) => [
+export const createAssistantColumns = (i18n, { onEdit } = {}) => [
   {
     accessorKey: 'name',
-    header: () => h('div', null, t('globals.terms.name')),
+    header: () => h('div', null, i18n._('{count, plural, one {Name} other {Names}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -25,7 +27,7 @@ export const createAssistantColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'description',
-    header: () => h('div', null, t('globals.terms.description')),
+    header: () => h('div', null, i18n._('{count, plural, one {Description} other {Descriptions}}')),
     cell: ({ row }) =>
       h(
         'div',
@@ -37,13 +39,13 @@ export const createAssistantColumns = (t, { onEdit } = {}) => [
     accessorKey: 'enabled',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.status')),
+    header: () => h('div', null, i18n._('{count, plural, one {Status} other {Statuses}}')),
     cell: ({ row }) =>
       h(
         'div',
         null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
-          row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
+          row.getValue('enabled') ? i18n._('Enabled') : i18n._('Disabled')
         )
       )
   },
@@ -51,7 +53,7 @@ export const createAssistantColumns = (t, { onEdit } = {}) => [
     accessorKey: 'updated_at',
     meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', null, t('globals.terms.updatedAt')),
+    header: () => h('div', null, i18n._('Updated at')),
     cell: ({ row }) =>
       h(TableDate, { value: row.getValue('updated_at') })
   },

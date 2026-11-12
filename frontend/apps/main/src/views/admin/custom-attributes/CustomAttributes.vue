@@ -7,9 +7,9 @@
             <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
               <template #left>
                 <TabsList class="w-max justify-start">
-                  <TabsTrigger value="contact">{{ $t('globals.terms.contact') }}</TabsTrigger>
+                  <TabsTrigger value="contact">{{ i18n.ngettext('Contact', 'Contacts', 1) }}</TabsTrigger>
                   <TabsTrigger value="conversation">{{
-                    $t('globals.terms.conversation')
+                    i18n.ngettext('Conversation', 'Conversations', 1)
                   }}</TabsTrigger>
                 </TabsList>
               </template>
@@ -17,13 +17,13 @@
                 <Dialog v-model:open="dialogOpen">
                   <DialogTrigger as-child @click="newCustomAttribute">
                     <Button type="button">
-                      {{ $t('customAttribute.new') }}
+                      {{ i18n._('New custom attribute') }}
                     </Button>
                   </DialogTrigger>
                   <DialogContent class="sm:max-w-[600px]">
                     <DialogHeader>
                       <DialogTitle>
-                        {{ isEditing ? $t('customAttribute.edit') : $t('customAttribute.new') }}
+                        {{ isEditing ? i18n._('Edit custom attribute') : i18n._('New custom attribute') }}
                       </DialogTitle>
                       <DialogDescription />
                     </DialogHeader>
@@ -33,8 +33,8 @@
                           <Button type="submit" :isLoading="isLoading">
                             {{
                               isEditing
-                                ? $t('globals.messages.save')
-                                : $t('globals.messages.create')
+                                ? i18n._('Save')
+                                : i18n._('Create')
                             }}
                           </Button>
                         </DialogFooter>
@@ -48,7 +48,7 @@
               <DataTable
                 v-model:search="searchTerm"
                 :searchable="false"
-                :columns="createColumns(t, { onEdit: editCustomAttribute })"
+                :columns="createColumns(i18n, { onEdit: editCustomAttribute })"
                 :data="customAttributes"
                 :loading="isLoading"
               />
@@ -57,7 +57,7 @@
               <DataTable
                 v-model:search="searchTerm"
                 :searchable="false"
-                :columns="createColumns(t, { onEdit: editCustomAttribute })"
+                :columns="createColumns(i18n, { onEdit: editCustomAttribute })"
                 :data="customAttributes"
                 :loading="isLoading"
               />
@@ -67,7 +67,7 @@
       </template>
 
       <template #help>
-        <p>{{ $t('admin.customAttribute.help') }}</p>
+        <p>{{ i18n._('Custom attributes help you set additional details about your contacts or conversations such as the subscription plan or the date of their first purchase.') }}</p>
       </template>
     </AdminSplitLayout>
   </div>
@@ -98,13 +98,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { useStorage } from '@vueuse/core'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import api from '@main/api'
 
 const appliesTo = useStorage('appliesTo', 'contact')
 const searchTerm = ref('')
-const { t } = useI18n()
+const i18n = useI18n()
 const customAttributes = ref([])
 const isLoading = ref(false)
 const emitter = useEmitter()
@@ -149,7 +149,7 @@ const newCustomAttribute = () => {
 }
 
 const form = useForm({
-  validationSchema: toTypedSchema(createFormSchema(t)),
+  validationSchema: toTypedSchema(createFormSchema(i18n)),
   initialValues: {
     id: 0,
     name: '',
@@ -181,12 +181,12 @@ const onSubmit = form.handleSubmit(async (values) => {
     if (values.id) {
       await api.updateCustomAttribute(values.id, values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
     } else {
       await api.createCustomAttribute(values)
       emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-        description: t('globals.messages.savedSuccessfully')
+        description: i18n._('Changes saved')
       })
     }
 

@@ -1,5 +1,7 @@
+
+
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { CircleDot, Tag, TagIcon, UserPlus, Users, UsersRound, X } from 'lucide-vue-next'
 import { useConversationStore } from '@main/stores/conversation'
 import { useUsersStore } from '@main/stores/users'
@@ -10,7 +12,7 @@ import { permissions as perms } from '@main/constants/permissions'
 import { SECTIONS } from '../sections'
 
 export function useBulkCommands() {
-  const { t } = useI18n()
+  const i18n = useI18n()
   const conversationStore = useConversationStore()
   const usersStore = useUsersStore()
   const teamStore = useTeamStore()
@@ -24,8 +26,8 @@ export function useBulkCommands() {
     return [
       {
         id: 'bulk.status',
-        label: t('actions.setStatus'),
-        keywords: [t('globals.terms.status')],
+        label: i18n._('Set status'),
+        keywords: [i18n._('{count, plural, one {Status} other {Statuses}}')],
         section,
         icon: CircleDot,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
@@ -40,17 +42,17 @@ export function useBulkCommands() {
       })),
       {
         id: 'bulk.assign-agent',
-        label: t('actions.assignAgent'),
-        keywords: [t('globals.terms.agent')],
+        label: i18n._('Assign agent'),
+        keywords: [i18n._('{count, plural, one {Agent} other {Agents}}')],
         section,
         icon: UserPlus,
         permission: perms.CONVERSATIONS_UPDATE_USER_ASSIGNEE,
         group: true,
-        placeholder: t('command.searchAgents'),
+        placeholder: i18n._('Search agents...'),
         search: async (term) => [
           {
             id: 'bulk.assign-agent.none',
-            label: t('globals.terms.none'),
+            label: i18n.pgettext('No assigned agent', 'None'),
             parent: 'bulk.assign-agent',
             icon: X,
             run: () => bulkAssign('user', 'none')
@@ -66,17 +68,17 @@ export function useBulkCommands() {
       },
       {
         id: 'bulk.assign-team',
-        label: t('actions.assignTeam'),
-        keywords: [t('globals.terms.team')],
+        label: i18n._('Assign team'),
+        keywords: [i18n._('{count, plural, one {Team} other {Teams}}')],
         section,
         icon: Users,
         permission: perms.CONVERSATIONS_UPDATE_TEAM_ASSIGNEE,
         group: true,
-        placeholder: t('command.searchTeams'),
+        placeholder: i18n._('Search teams...'),
         search: async (term) => [
           {
             id: 'bulk.assign-team.none',
-            label: t('globals.terms.none'),
+            label: i18n.pgettext('No assigned team', 'None'),
             parent: 'bulk.assign-team',
             icon: X,
             run: () => bulkAssign('team', 'none')
@@ -92,13 +94,13 @@ export function useBulkCommands() {
       },
       {
         id: 'bulk.add-tag',
-        label: t('actions.addTags'),
-        keywords: [t('globals.terms.tag')],
+        label: i18n._('Add tags'),
+        keywords: [i18n._('{count, plural, one {Tag} other {Tags}}')],
         section,
         icon: Tag,
         permission: perms.CONVERSATIONS_UPDATE_TAGS,
         group: true,
-        placeholder: t('command.searchTags'),
+        placeholder: i18n._('Search tags...'),
         search: async (term) =>
           (await tagStore.searchTagNames(term)).map((tag) => ({
             id: `bulk.add-tag.${tag.value}`,
@@ -110,7 +112,7 @@ export function useBulkCommands() {
       },
       {
         id: 'bulk.clear',
-        label: t('conversation.bulkActions.clearSelection'),
+        label: i18n._('Clear selection'),
         keywords: ['deselect'],
         section,
         icon: X,

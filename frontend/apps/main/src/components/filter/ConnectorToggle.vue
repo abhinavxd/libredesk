@@ -7,7 +7,7 @@
         'inline-flex cursor-pointer items-center rounded-md border border-border bg-background font-semibold uppercase tracking-wide text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         props.variant === 'group' ? 'min-h-8 px-3 text-sm' : 'min-h-7 px-2.5 text-xs'
       ]"
-      :title="t('filter.toggleConnector')"
+      :title="i18n._('Click to switch between and / or')"
       @click.stop="toggle"
     >
       {{ connectorLabel }}
@@ -18,7 +18,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 import { LOGIC } from '@/constants/filterConfig'
 
 const modelValue = defineModel('modelValue', { required: true })
@@ -26,13 +26,13 @@ const props = defineProps({
   mode: { type: String, default: 'and-or' },
   variant: { type: String, default: 'condition' }
 })
-const { t } = useI18n()
+const i18n = useI18n()
 
 const connectorLabel = computed(() => {
   if (props.mode === 'all-any') {
-    return modelValue.value === LOGIC.OR ? t('admin.automation.any') : t('admin.automation.all')
+    return modelValue.value === LOGIC.OR ? i18n._('ANY') : i18n._('ALL')
   }
-  return modelValue.value === LOGIC.OR ? t('admin.automation.or') : t('admin.automation.and')
+  return modelValue.value === LOGIC.OR ? i18n._('OR') : i18n._('AND')
 })
 
 const toggle = () => {

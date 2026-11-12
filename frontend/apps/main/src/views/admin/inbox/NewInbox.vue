@@ -4,7 +4,7 @@
   </div>
   <div class="space-y-6">
     <div v-if="currentStep === 1" class="space-y-4 mt-10">
-      <h3 class="ui-heading">{{ $t('admin.inbox.chooseChannel') }}</h3>
+      <h3 class="ui-heading">{{ i18n._('Choose channel') }}</h3>
       <FormGrid>
         <MenuCard
           v-for="channel in channels"
@@ -20,7 +20,7 @@
     </div>
 
     <div v-else-if="currentStep === 2" class="space-y-6">
-      <Button @click="goBack" variant="link" size="xs">← {{ $t('globals.messages.back') }}</Button>
+      <Button @click="goBack" variant="link" size="xs">← {{ i18n._('Back') }}</Button>
       <div v-if="selectedChannel === 'email'">
         <EmailInboxForm
           :initial-values="{}"
@@ -66,9 +66,9 @@ import api from '@/api'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { useI18n } from 'vue-i18n'
+import { useI18n } from '@shared-ui/i18n'
 
-const { t } = useI18n()
+const i18n = useI18n()
 const emitter = useEmitter()
 const isLoading = ref(false)
 const availableLanguages = ref([])
@@ -76,8 +76,8 @@ const currentStep = ref(1)
 const selectedChannel = ref(null)
 const router = useRouter()
 const breadcrumbLinks = [
-  { path: 'inbox-list', label: t('globals.terms.inbox', 2) },
-  { path: '', label: t('inbox.newInbox') }
+  { path: 'inbox-list', label: i18n._('{count, plural, one {Inbox} other {Inboxes}}', 2) },
+  { path: '', label: i18n._('New inbox') }
 ]
 
 const selectChannel = (channel) => {
@@ -99,23 +99,23 @@ const selectWhatsAppChannel = () => {
 
 const channels = [
   {
-    title: t('globals.terms.email'),
-    subTitle: t('admin.inbox.createEmailInbox'),
+    title: i18n.ngettext('Email', 'Emails', 1, {}, 'Communication channel'),
+    subTitle: i18n._('Create an email inbox for email-based customer support'),
     onClick: selectEmailChannel,
     icon: Mail
   },
   {
-    title: t('globals.terms.liveChat'),
-    subTitle: t('admin.inbox.createLiveChatInbox'),
+    title: i18n._('Live Chat'),
+    subTitle: i18n._('Create a live chat inbox for real-time customer support'),
     onClick: selectLiveChatChannel,
     icon: MessageCircle
   },
   {
-    title: t('globals.terms.whatsapp'),
-    subTitle: t('admin.inbox.help.whatsapp'),
+    title: i18n._('WhatsApp'),
+    subTitle: i18n._('Connect a WhatsApp number through the Meta Cloud API to receive and reply to contact messages on WhatsApp.'),
     onClick: selectWhatsAppChannel,
     icon: WhatsAppIcon,
-    badge: t('globals.terms.beta')
+    badge: i18n._('Beta')
   }
 ]
 
@@ -187,7 +187,7 @@ async function createInbox(payload) {
     isLoading.value = true
     await api.createInbox(payload)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
-      description: t('globals.messages.savedSuccessfully')
+      description: i18n._('Changes saved')
     })
     router.push({ name: 'inbox-list' })
   } catch (error) {

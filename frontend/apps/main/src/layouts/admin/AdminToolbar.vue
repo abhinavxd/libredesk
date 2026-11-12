@@ -16,8 +16,8 @@
         @pointerdown.capture="pointerOpened = true"
         @keydown.capture="pointerOpened = false"
         @focusout="pointerOpened = false"
-        :placeholder="$t('globals.terms.search')"
-        :clear-label="$t('globals.messages.clearSearch')"
+        :placeholder="i18n._('Search')"
+        :clear-label="i18n._('Clear search')"
       />
       <slot name="actions" />
     </div>
