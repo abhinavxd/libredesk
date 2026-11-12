@@ -155,7 +155,7 @@ func handleGetContextLinkURL(r *fastglue.Request) error {
 		return sendErrorEnvelope(r, err)
 	}
 
-	url, err := app.contextLink.GenerateURL(contextLink, conv.Contact, conversationUUID, auser)
+	url, err := app.contextLink.GenerateURL(contextLink, conv.Contact, conv.CustomAttributes, conversationUUID, auser)
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
