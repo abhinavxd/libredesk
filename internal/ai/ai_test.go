@@ -223,3 +223,31 @@ func TestCustomToolHTTPFailureLogsOutcome(t *testing.T) {
 		t.Fatalf("missing HTTP outcome log: %s", logs.String())
 	}
 }
+
+func TestCustomToolReportsRequestOnlyWhenSent(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+	lo := logf.New(logf.Opts{})
+	var reported []string
+	tctx := ToolContext{OnToolRequest: func(name string) { reported = append(reported, name) }}
+
+	blocked := newHTTPTool(models.Tool{Name: "issue_refund", DisplayName: "Issue refund", URL: server.URL, Method: http.MethodPost, RequiresVerification: true}, "" /** encryptionKey **/, &lo, server.Client(), tctx)
+	if _, err := blocked.Execute(t.Context(), `{}`); err != nil {
+		t.Fatalf("blocked tool: %v", err)
+	}
+	if requests != 0 || len(reported) != 0 {
+		t.Fatalf("unverified contact: requests=%d reported=%v, want none", requests, reported)
+	}
+
+	sent := newHTTPTool(models.Tool{Name: "issue_refund", DisplayName: "Issue refund", URL: server.URL, Method: http.MethodPost}, "" /** encryptionKey **/, &lo, server.Client(), tctx)
+	if _, err := sent.Execute(t.Context(), `{}`); err != nil {
+		t.Fatalf("sent tool: %v", err)
+	}
+	if requests != 1 || len(reported) != 1 || reported[0] != "Issue refund" {
+		t.Fatalf("requests=%d reported=%v, want one Issue refund", requests, reported)
+	}
+}

@@ -826,6 +826,7 @@ CREATE TABLE ai_tools (
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	name TEXT NOT NULL UNIQUE,
+	display_name TEXT NOT NULL DEFAULT '',
 	description TEXT NOT NULL DEFAULT '',
 	url TEXT NOT NULL,
 	method TEXT NOT NULL DEFAULT 'POST',
@@ -836,7 +837,8 @@ CREATE TABLE ai_tools (
 	copilot_enabled BOOLEAN NOT NULL DEFAULT false,
 	generate_reply_enabled BOOLEAN NOT NULL DEFAULT false,
 	requires_agent_approval BOOLEAN NOT NULL DEFAULT true,
-	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
+	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64),
+	CONSTRAINT constraint_ai_tools_on_display_name CHECK (length(display_name) <= 140)
 );
 
 DROP TABLE IF EXISTS ai_assistants CASCADE;

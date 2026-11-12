@@ -271,3 +271,21 @@ func TestBuildHistoryPreservesCustomerMessages(t *testing.T) {
 		}
 	})
 }
+
+func TestFailedRunReasonNamesCalledTools(t *testing.T) {
+	m := &Manager{i18n: testutil.NewI18n(t)}
+	const base = "The AI assistant could not respond."
+
+	if got := m.failedRunReason(&runOutcome{}, base); got != base {
+		t.Fatalf("no tools called: got %q, want the reason unchanged", got)
+	}
+
+	outcome := &runOutcome{}
+	outcome.toolCalled("Issue refund")
+	outcome.toolCalled("Issue refund")
+	outcome.toolCalled("Cancel <b>order</b>")
+	got := m.failedRunReason(outcome, base)
+	if !strings.HasPrefix(got, base) || !strings.Contains(got, "Issue refund, Cancel &lt;b&gt;order&lt;/b&gt;") {
+		t.Fatalf("got %q, want the reason followed by each called tool once, HTML-escaped", got)
+	}
+}

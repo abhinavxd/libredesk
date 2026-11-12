@@ -75,6 +75,9 @@ func TestAgentToolDeclineResumesWithoutExecution(t *testing.T) {
 	if result.Status != models.AgentRunApprovalRequired || result.Approval == nil {
 		t.Fatalf("expected approval request, got %#v", result)
 	}
+	if result.Approval.ToolName != "update_balance" || result.Approval.ToolDisplayName != "Update balance" {
+		t.Fatalf("unexpected approval tool names: %#v", result.Approval)
+	}
 	if tool.executions != 0 {
 		t.Fatalf("tool executed before approval: %d", tool.executions)
 	}
@@ -152,6 +155,8 @@ func TestSecondRunInSameScopeIsRejectedWhileOneAwaitsApproval(t *testing.T) {
 }
 
 func (t *approvalTestTool) approvalRequired() bool { return true }
+
+func (t *approvalTestTool) displayName() string { return "Update balance" }
 
 func (t *approvalTestTool) toolID() int { return 1 }
 

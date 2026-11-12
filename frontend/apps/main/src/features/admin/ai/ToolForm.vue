@@ -1,9 +1,18 @@
 <template>
   <form @submit="onSubmit" novalidate class="tool-form space-y-6 w-full">
-    <FormGrid class="tool-connection-grid">
-      <FormField v-slot="{ componentField }" name="name">
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="display_name">
         <FormItem>
           <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.key') }}</FormLabel>
           <FormControl>
             <Input type="text" v-bind="componentField" />
           </FormControl>
@@ -11,6 +20,9 @@
           <FormMessage />
         </FormItem>
       </FormField>
+    </FormGrid>
+
+    <FormGrid class="tool-connection-grid">
       <FormField v-slot="{ componentField }" name="url">
         <FormItem>
           <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
@@ -258,6 +270,11 @@ const formLoading = ref(false)
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
+      display_name: z
+        .string({ required_error: t('globals.messages.required') })
+        .trim()
+        .min(1, { message: t('globals.messages.required') })
+        .max(140, { message: t('globals.messages.maxLength', { max: 140 }) }),
       name: z
         .string({ required_error: t('globals.messages.required') })
         .min(1, { message: t('globals.messages.required') })
@@ -283,6 +300,7 @@ const form = useForm({
     })
   ),
   initialValues: {
+    display_name: '',
     name: '',
     description: '',
     url: '',
@@ -296,6 +314,27 @@ const form = useForm({
     requires_agent_approval: true
   }
 })
+
+const generateKeyFromName = (name) =>
+  (name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 64)
+
+// A new tool's key is generated from its name. An existing tool's key changes only when edited directly.
+watch(
+  () => form.values.display_name,
+  (displayName) => {
+    if (props.isEditing) return
+    const generatedKey = generateKeyFromName(displayName)
+    if (generatedKey !== form.values.name) {
+      form.setFieldError('name', undefined)
+      form.setFieldValue('name', generatedKey, false)
+    }
+  }
+)
 
 const hasAgentSurface = computed(
   () => form.values.copilot_enabled || form.values.generate_reply_enabled
@@ -328,6 +367,7 @@ watch(
   (values) => {
     form.setValues(
       {
+        display_name: values.display_name || '',
         name: values.name || '',
         description: values.description || '',
         url: values.url || '',
@@ -368,6 +408,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   try {
     formLoading.value = true
     await props.submitForm({
+      display_name: values.display_name,
       name: values.name,
       description: values.description || '',
       url: values.url,
@@ -397,7 +438,7 @@ const onSubmit = form.handleSubmit(async (values) => {
 
 @container (min-width: 40rem) {
   .tool-connection-grid.form-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.75fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
   }
 }
 </style>

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -329,6 +330,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		InboxID:           conv.InboxID,
 		ContactEmail:      func() string { return conv.Contact.Email.String },
 		Verified:          verified,
+		OnToolRequest:     outcome.toolCalled,
 	}
 	timeout := emailRunTimeout
 	if conv.InboxChannel != channelEmail {
@@ -353,7 +355,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		if outcome.handedOff {
 			reason = outcome.handoffReason
 		}
-		m.handoff(conv, assistant, reason)
+		m.handoff(conv, assistant, m.failedRunReason(outcome, reason))
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
@@ -369,7 +371,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
 		if err := m.postReply(conv, assistant, answer, replyMeta(answerSuggestions, articleIDs)); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffError")))
 			return
 		}
 	}
@@ -398,8 +400,16 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer == "" {
 		m.lo.Debug("ai agent no answer, handing off", "conversation_uuid", conv.UUID)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
+		m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffNoAnswer")))
 	}
+}
+
+// failedRunReason appends the custom tools a run called, HTML-escaped for the note, to the handoff reason of a run whose reply never reached the customer.
+func (m *Manager) failedRunReason(outcome *runOutcome, reason string) string {
+	if len(outcome.calledTools) == 0 {
+		return reason
+	}
+	return strings.TrimSpace(reason + " " + m.i18n.Ts("ai.agent.handoffToolsCalled", "tools", html.EscapeString(strings.Join(outcome.calledTools, ", "))))
 }
 
 // resolve runs after the reply is queued so the CSAT survey sent on resolve follows the answer.

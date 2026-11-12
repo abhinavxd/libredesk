@@ -68,6 +68,14 @@ type runOutcome struct {
 	handedOff     bool
 	handoffReason string
 	resolved      bool
+	// calledTools holds the display name of each custom tool whose HTTP request was sent, once per name.
+	calledTools []string
+}
+
+func (o *runOutcome) toolCalled(displayName string) {
+	if !slices.Contains(o.calledTools, displayName) {
+		o.calledTools = append(o.calledTools, displayName)
+	}
 }
 
 type searchKnowledgeTool struct {
