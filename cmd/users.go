@@ -308,6 +308,13 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		}
 	}
 
+	// A disabled agent cannot work their open conversations, unassign them so they return to the queue.
+	if !req.Enabled {
+		if err := app.conversation.UnassignOpen(id); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+
 	// Create activity log if user availability status changed.
 	if oldAvailabilityStatus != req.AvailabilityStatus {
 		if err := app.activityLog.UserAvailability(auser.ID, auser.Email, req.AvailabilityStatus, ip, req.Email, id); err != nil {

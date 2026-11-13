@@ -755,6 +755,7 @@
   "conversation.allLoaded": "All conversations loaded",
   "conversation.assignSelfAction": "Assign to me",
   "conversation.assignSelfPrompt": "This conversation isn't assigned to anyone.",
+  "conversation.assigneeDisabled": "This agent is disabled and cannot be assigned conversations. Select another agent.",
   "conversation.bulkActions.clearSelection": "Clear selection",
   "conversation.bulkActions.failedToast": "Some conversations couldn't be updated",
   "conversation.bulkActions.selectAll": "Select all conversations",

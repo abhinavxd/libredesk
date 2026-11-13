@@ -24,12 +24,16 @@ export const useUsersStore = defineStore('users', () => {
         label: user.first_name + ' ' + user.last_name,
         value: String(user.id),
         type: user.type,
+        enabled: user.enabled,
         avatar_url: user.avatar_url,
         availability_status: user.availability_status,
     }))
     const users = lookup.rows
     const options = computed(() => toOptions(users.value))
     const searchUsers = async (query) => toOptions(await lookup.search(query))
+    // Rows built from a conversation's assignee carry no enabled field, only an explicit false marks a disabled agent.
+    const isEnabled = (option) => option.enabled !== false
+    const searchEnabledUsers = async (query) => (await searchUsers(query)).filter(isEnabled)
 
     const setAvailability = (agentID, status) => {
         lookup.patch(agentID, { availability_status: status })
@@ -40,6 +44,8 @@ export const useUsersStore = defineStore('users', () => {
         options,
         fetchUsers: lookup.fetchFirstPage,
         searchUsers,
+        searchEnabledUsers,
+        isEnabled,
         ensureUserIDs: lookup.ensureIDs,
         upsertUsers: lookup.upsert,
         setAvailability,

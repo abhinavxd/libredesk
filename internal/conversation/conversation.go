@@ -868,6 +868,14 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return nil
 	}
 
+	assignee, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
+	if err != nil {
+		return err
+	}
+	if !assignee.Enabled {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.assigneeDisabled"), nil)
+	}
+
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -1755,6 +1763,9 @@ func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipie
 		if err != nil {
 			m.lo.Error("error fetching agent for email notification", "user_id", id, "error", err)
 			recipients = append(recipients, delivery)
+			continue
+		}
+		if !recipient.Enabled {
 			continue
 		}
 

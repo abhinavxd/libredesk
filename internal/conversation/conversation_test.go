@@ -153,3 +153,82 @@ func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestDisabledAgentGetsNoConversations(t *testing.T) {
+	db := testutil.NewDB(t, "disabled_assignee")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, active, disabled, deleted, inbox int
+	for id, columns := range map[*int]string{
+		&contact:  `('contact', 'Contact', '', true, NULL)`,
+		&active:   `('agent', 'Active', '', true, NULL)`,
+		&disabled: `('agent', 'Disabled', '', false, NULL)`,
+		&deleted:  `('agent', 'Deleted', '', true, NOW())`,
+	} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name, enabled, deleted_at) VALUES `+columns+` RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	newConversation := func(status string, assignee int) string {
+		var uuid string
+		if err := db.Get(&uuid, `INSERT INTO conversations (contact_id, inbox_id, status_id, assigned_user_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), NULLIF($4, 0)) RETURNING uuid`, contact, inbox, status, assignee); err != nil {
+			t.Fatal(err)
+		}
+		return uuid
+	}
+	assignee := func(uuid string) int {
+		var id int
+		if err := db.Get(&id, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, uuid); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	for name, tt := range map[string]struct{ assignee, want int }{
+		"active agent keeps a reopened conversation":    {active, active},
+		"disabled agent loses a reopened conversation":  {disabled, 0},
+		"deleted agent loses a reopened conversation":   {deleted, 0},
+		"unassigned conversation reopens as unassigned": {0, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			uuid := newConversation("Resolved", tt.assignee)
+			var id int
+			if err := m.q.ReOpenConversation.QueryRow(uuid).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			if got := assignee(uuid); got != tt.want {
+				t.Fatalf("assignee after reopen = %d, want %d", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("assigning to a disabled agent is rejected", func(t *testing.T) {
+		uuid := newConversation("Open", active)
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if err := m.UpdateConversationUserAssignee(uuid, disabled, umodels.User{ID: active}); err == nil {
+			t.Fatal("assignment to a disabled agent succeeded")
+		}
+		if got := assignee(uuid); got != active {
+			t.Fatalf("assignee = %d, want it unchanged at %d", got, active)
+		}
+	})
+
+	t.Run("disabled agent is dropped from notification recipients", func(t *testing.T) {
+		render := func(umodels.User) (string, string, error) { return "", "", nil }
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if got := m.buildNotificationRecipients([]int{disabled}, render); len(got) != 0 {
+			t.Fatalf("recipients = %+v, want none", got)
+		}
+		m.userStore = replyUserStore{agent: umodels.User{ID: active, Enabled: true}}
+		if got := m.buildNotificationRecipients([]int{active}, render); len(got) != 1 {
+			t.Fatalf("recipients = %+v, want the active agent", got)
+		}
+	})
+}

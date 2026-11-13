@@ -5,7 +5,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="usersStore.searchUsers"
+    :search="search"
   />
   <SelectComboBox
     v-else
@@ -13,7 +13,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="usersStore.searchUsers"
+    :search="search"
     type="user"
   >
     <template v-if="$slots.trigger" #trigger="slotProps">
@@ -60,6 +60,10 @@ const props = defineProps({
   currentUserFirst: {
     type: Boolean,
     default: false
+  },
+  includeDisabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -69,10 +73,21 @@ const userStore = useUserStore()
 
 const placeholderText = computed(() => props.placeholder || t('placeholders.selectAgent'))
 
+const search = computed(() =>
+  props.includeDisabled ? usersStore.searchUsers : usersStore.searchEnabledUsers
+)
+
 const items = computed(() => {
   let options = props.excludeAiAssistants
     ? usersStore.options.filter((option) => option.type !== 'ai_assistant')
     : usersStore.options
+  if (!props.includeDisabled) {
+    // A disabled agent that is already selected stays so its name still renders.
+    const selected = [props.modelValue].flat().map(String)
+    options = options.filter(
+      (option) => usersStore.isEnabled(option) || selected.includes(String(option.value))
+    )
+  }
   if (props.currentUserFirst) {
     const isMe = (option) => String(option.value) === String(userStore.userID)
     const me = options.find(isMe)
