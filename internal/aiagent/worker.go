@@ -409,7 +409,11 @@ func (m *Manager) failedRunReason(outcome *runOutcome, reason string) string {
 	if len(outcome.calledTools) == 0 {
 		return reason
 	}
-	return strings.TrimSpace(reason + " " + m.i18n.Ts("ai.agent.handoffToolsCalled", "tools", html.EscapeString(strings.Join(outcome.calledTools, ", "))))
+	names := make([]string, len(outcome.calledTools))
+	for i, t := range outcome.calledTools {
+		names[i] = t.displayName
+	}
+	return strings.TrimSpace(reason + " " + m.i18n.Ts("ai.agent.handoffToolsCalled", "tools", html.EscapeString(strings.Join(names, ", "))))
 }
 
 // resolve runs after the reply is queued so the CSAT survey sent on resolve follows the answer.

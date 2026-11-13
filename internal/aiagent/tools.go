@@ -63,18 +63,23 @@ var (
 	}`)
 )
 
+type calledTool struct {
+	name        string
+	displayName string
+}
+
 // runOutcome records which terminal tool action the assistant took during one response run.
 type runOutcome struct {
 	handedOff     bool
 	handoffReason string
 	resolved      bool
-	// calledTools holds the display name of each custom tool whose HTTP request was sent, once per name.
-	calledTools []string
+	// calledTools holds each custom tool whose HTTP request was sent, once per tool name.
+	calledTools []calledTool
 }
 
-func (o *runOutcome) toolCalled(displayName string) {
-	if !slices.Contains(o.calledTools, displayName) {
-		o.calledTools = append(o.calledTools, displayName)
+func (o *runOutcome) toolCalled(name, displayName string) {
+	if !slices.ContainsFunc(o.calledTools, func(t calledTool) bool { return t.name == name }) {
+		o.calledTools = append(o.calledTools, calledTool{name: name, displayName: displayName})
 	}
 }
 

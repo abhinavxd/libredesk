@@ -233,7 +233,7 @@ func TestCustomToolReportsRequestOnlyWhenSent(t *testing.T) {
 	defer server.Close()
 	lo := logf.New(logf.Opts{})
 	var reported []string
-	tctx := ToolContext{OnToolRequest: func(name string) { reported = append(reported, name) }}
+	tctx := ToolContext{OnToolRequest: func(name, displayName string) { reported = append(reported, name+"|"+displayName) }}
 
 	blocked := newHTTPTool(models.Tool{Name: "issue_refund", DisplayName: "Issue refund", URL: server.URL, Method: http.MethodPost, RequiresVerification: true}, "" /** encryptionKey **/, &lo, server.Client(), tctx)
 	if _, err := blocked.Execute(t.Context(), `{}`); err != nil {
@@ -247,7 +247,7 @@ func TestCustomToolReportsRequestOnlyWhenSent(t *testing.T) {
 	if _, err := sent.Execute(t.Context(), `{}`); err != nil {
 		t.Fatalf("sent tool: %v", err)
 	}
-	if requests != 1 || len(reported) != 1 || reported[0] != "Issue refund" {
-		t.Fatalf("requests=%d reported=%v, want one Issue refund", requests, reported)
+	if requests != 1 || len(reported) != 1 || reported[0] != "issue_refund|Issue refund" {
+		t.Fatalf("requests=%d reported=%v, want one issue_refund|Issue refund", requests, reported)
 	}
 }
