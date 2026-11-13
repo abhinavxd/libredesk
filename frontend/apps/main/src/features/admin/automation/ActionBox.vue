@@ -235,16 +235,24 @@ const toUserRecipients = (options) => options.map((o) => ({
     value: `user:${o.value}`
   }))
 
+// A disabled agent already picked as a recipient stays so its name still renders.
+const selectableUsers = computed(() => {
+  const selected = recipientIDs('user')
+  return uStore.options.filter(
+    (option) => uStore.isEnabled(option) || selected.includes(String(option.value))
+  )
+})
+
 const notifyRecipientOptions = computed(() => [
   ...recipientKeywords.value,
   ...toTeamRecipients(tStore.options),
-  ...toUserRecipients(uStore.options)
+  ...toUserRecipients(selectableUsers.value)
 ])
 
 const searchRecipients = async (query) => {
   const [teams, users] = await Promise.all([
     tStore.searchTeams(query),
-    uStore.searchUsers(query)
+    uStore.searchEnabledUsers(query)
   ])
   return [
     ...recipientKeywords.value,
