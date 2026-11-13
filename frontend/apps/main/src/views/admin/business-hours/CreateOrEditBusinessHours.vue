@@ -63,7 +63,7 @@ const submitForm = async (values) => {
 }
 
 const breadCrumLabel = () => {
-  return props.id ? t('globals.messages.edit') : t('globals.messages.new')
+  return props.id ? t('globals.actions.edit') : t('globals.labels.new')
 }
 
 const isNewForm = computed(() => {
