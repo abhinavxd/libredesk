@@ -156,8 +156,8 @@ importers:
         specifier: ^9.14.5
         version: 9.14.5(vue@3.5.44)
       vue-letter:
-        specifier: ^0.2.1
-        version: 0.2.2
+        specifier: ^0.2.3
+        version: 0.2.3
       vue-picture-cropper:
         specifier: ^0.7.0
         version: 0.7.0(vue@3.5.44)
@@ -3615,8 +3615,8 @@ packages:
     peerDependencies:
       vue: ^3.0.0
 
-  vue-letter@0.2.2:
-    resolution: {integrity: sha512-Y7Jk1lgNtkJqie2NelUyIUGckEjwji5zOImTBUIViUDkl4US8mv1g+FwobbvIpmUiwglTOJh7wrxlDBQYQIrDw==}
+  vue-letter@0.2.3:
+    resolution: {integrity: sha512-xbN8ufW7e2L5UtzLRmLl5KaBEEcv58w8aObxsiZlt8AZCe0jrOItuIR4sk8oR3WmoORbbmbkwSTjRV4jSJmQuw==}
 
   vue-picture-cropper@0.7.0:
     resolution: {integrity: sha512-NF7+Dgso6d0GB16E5d/BbrcTIHm1VWz8dS3IjLhoBl+ZeC+yDA46CyJphQuO32SisaPmrKHN8VbiE2LgAfhnkQ==}
@@ -7308,7 +7308,7 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.44
 
-  vue-letter@0.2.2:
+  vue-letter@0.2.3:
     dependencies:
       lettersanitizer: 1.0.9
 
