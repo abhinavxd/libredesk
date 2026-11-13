@@ -18,10 +18,15 @@
       </PopoverTrigger>
       <PopoverContent class="w-auto p-0">
         <RangeCalendar
-          :model-value="dateRange"
+          :model-value="draftRange || dateRange"
           :number-of-months="2"
           @update:model-value="handleRangePick"
         />
+        <div v-if="modelValue" class="flex justify-end border-t border-border p-2">
+          <Button type="button" variant="ghost" size="sm" @click="clearRange">
+            {{ t('globals.terms.clear') }}
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
     <Popover v-else v-model:open="open">
@@ -51,10 +56,10 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
 import { parseDate } from '@internationalized/date'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { cn } from '@shared-ui/lib/utils.js'
 import { Button } from '@shared-ui/components/ui/button'
@@ -72,6 +77,11 @@ defineProps({
 
 const open = ref(false)
 const rangeOpen = ref(false)
+const draftRange = ref(null)
+
+watch(rangeOpen, (isOpen) => {
+  if (!isOpen) draftRange.value = null
+})
 
 const toCalendarDate = (v) => {
   if (!v) return undefined
@@ -86,7 +96,8 @@ const dateValue = computed(() => toCalendarDate(modelValue.value))
 
 const formatDisplay = (v) => {
   try {
-    return format(new Date(v), 'MMM dd, yyyy')
+    // parseISO reads "2026-01-01" as local midnight. new Date() reads it as UTC and shows the previous day west of UTC.
+    return format(parseISO(v), 'MMM dd, yyyy')
   } catch {
     return v
   }
@@ -113,14 +124,22 @@ const handlePick = (v) => {
   open.value = false
 }
 
+// A half-picked range stays local so the applied range is kept until the end date is chosen.
 const handleRangePick = (v) => {
-  if (!v) {
-    modelValue.value = ''
+  const start = v?.start ? v.start.toString() : ''
+  const end = v?.end ? v.end.toString() : ''
+  if (!start || !end) {
+    draftRange.value = v || { start: undefined, end: undefined }
     return
   }
-  const start = v.start ? v.start.toString() : ''
-  const end = v.end ? v.end.toString() : ''
-  modelValue.value = start && end ? `${start},${end}` : ''
-  if (start && end) rangeOpen.value = false
+  draftRange.value = null
+  modelValue.value = `${start},${end}`
+  rangeOpen.value = false
+}
+
+const clearRange = () => {
+  draftRange.value = null
+  modelValue.value = ''
+  rangeOpen.value = false
 }
 </script>
