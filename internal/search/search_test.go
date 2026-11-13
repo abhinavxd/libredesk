@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -280,6 +281,73 @@ func TestConversationSearchFieldsAndRanking(t *testing.T) {
 		if len(contacts) != 0 {
 			t.Fatalf("contact search for %q returned %d results", term, len(contacts))
 		}
+	}
+}
+
+func TestConversationSearchMatchesSubject(t *testing.T) {
+	db := testutil.NewDB(t, "search_conversation_subject")
+	lo := logf.New(logf.Opts{})
+	manager, err := New(Opts{
+		DB:             db,
+		Lo:             &lo,
+		I18n:           testutil.NewI18n(t),
+		FilterLocation: func() string { return "UTC" },
+	})
+	if err != nil {
+		t.Fatalf("creating search manager: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO inboxes (name, channel) VALUES ('Search test', 'email')`); err != nil {
+		t.Fatalf("inserting inbox: %v", err)
+	}
+
+	lastMessageAt := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
+	matchID, _ := insertSearchConversation(t, db, "101", "first@example.com", "First", "Contact", "Refund for Invoice 100%", lastMessageAt)
+	otherID, _ := insertSearchConversation(t, db, "102", "second@example.com", "Second", "Contact", "Password reset", lastMessageAt)
+	nullSubjectID, _ := insertSearchConversation(t, db, "103", "third@example.com", "Third", "Contact", "", lastMessageAt)
+	if _, err := db.Exec(`UPDATE conversations SET subject = NULL WHERE id = $1`, nullSubjectID); err != nil {
+		t.Fatal(err)
+	}
+
+	readAll := models.ReadScope{Read: true, ReadAll: true}
+	tests := []struct {
+		name    string
+		term    string
+		scope   models.ReadScope
+		wantIDs []int
+	}{
+		{name: "whole subject", term: "Password reset", scope: readAll, wantIDs: []int{otherID}},
+		{name: "substring in any case", term: "REFUND for inv", scope: readAll, wantIDs: []int{matchID}},
+		{name: "like wildcards are literal", term: "100%", scope: readAll, wantIDs: []int{matchID}},
+		{name: "wildcard does not match other subjects", term: "Pass%set", scope: readAll, wantIDs: nil},
+		{name: "unrelated term", term: "shipping", scope: readAll, wantIDs: nil},
+		{name: "outside the read scope", term: "Password reset", scope: models.ReadScope{Read: true, ReadAssigned: true}, wantIDs: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			results, _, _, err := manager.Conversations(models.Query{Term: tt.term}, tt.scope)
+			if err != nil {
+				t.Fatalf("searching conversations: %v", err)
+			}
+			gotIDs := make([]int, 0, len(results))
+			for _, result := range results {
+				gotIDs = append(gotIDs, result.ID)
+			}
+			if !slices.Equal(gotIDs, tt.wantIDs) {
+				t.Fatalf("Conversations(%q) ids = %v, want %v", tt.term, gotIDs, tt.wantIDs)
+			}
+		})
+	}
+
+	// A conversation matching on both subject and contact email is returned once.
+	if _, err := db.Exec(`UPDATE conversations SET subject = 'Mail from second@example.com' WHERE id = $1`, otherID); err != nil {
+		t.Fatal(err)
+	}
+	results, _, _, err := manager.Conversations(models.Query{Term: "second@example.com"}, readAll)
+	if err != nil {
+		t.Fatalf("searching conversations: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != otherID {
+		t.Fatalf("subject and email match returned %+v, want one result for conversation %d", results, otherID)
 	}
 }
 

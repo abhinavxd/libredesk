@@ -321,6 +321,7 @@ CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
 CREATE INDEX index_conversations_on_last_continuity_email_sent_at ON conversations (last_continuity_email_sent_at);
 CREATE INDEX index_conversations_on_last_inbound_at ON conversations (last_inbound_at);
+CREATE INDEX index_trgm_conversations_on_subject ON conversations USING GIN (subject gin_trgm_ops);
 
 DROP TABLE IF EXISTS conversation_messages CASCADE;
 CREATE TABLE conversation_messages (
