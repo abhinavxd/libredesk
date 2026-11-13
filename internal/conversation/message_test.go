@@ -888,6 +888,29 @@ func TestArticleReferencePublicURL(t *testing.T) {
 	}
 }
 
+func TestReplySubject(t *testing.T) {
+	for _, tt := range []struct{ subject, want string }{
+		{"Login broken", "Re: Login broken"},
+		{"Login broken - #127", "Re: Login broken - #127"},
+		{"#127", "Re: #127"},
+		{"Re: Login broken", "Re: Login broken"},
+		{"RE: Login broken", "RE: Login broken"},
+		{"re:Login broken", "re:Login broken"},
+		{"Re[2]: Login broken", "Re[2]: Login broken"},
+		{"AW: Login kaputt", "AW: Login kaputt"},
+		{"SV: Innlogging", "SV: Innlogging"},
+		{"Fwd: Login broken", "Re: Fwd: Login broken"},
+		{"Reset password", "Re: Reset password"},
+		{"Aware of the issue", "Re: Aware of the issue"},
+		{" Re: Login broken", "Re: Login broken"},
+		{"  Login broken ", "Re: Login broken"},
+	} {
+		if got := replySubject(tt.subject); got != tt.want {
+			t.Errorf("replySubject(%q) = %q, want %q", tt.subject, got, tt.want)
+		}
+	}
+}
+
 func TestContinuityEmailSubject(t *testing.T) {
 	m := &Manager{subjectRefFormat: "#{ref}"}
 	for _, tt := range []struct {
