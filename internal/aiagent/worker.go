@@ -382,7 +382,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		meta := suggestedRepliesMeta(confirmSuggestions)
 		meta["is_confirmation"] = true
 		if err := m.postReply(conv, assistant, confirm, meta); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffError")))
 			return
 		}
 	}
@@ -404,7 +404,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 }
 
-// failedRunReason appends the custom tools a run called, HTML-escaped for the note, to the handoff reason of a run whose reply never reached the customer.
+// failedRunReason appends the custom tools a run called, HTML-escaped for the note, to the handoff reason of a run whose full reply did not reach the customer.
 func (m *Manager) failedRunReason(outcome *runOutcome, reason string) string {
 	if len(outcome.calledTools) == 0 {
 		return reason

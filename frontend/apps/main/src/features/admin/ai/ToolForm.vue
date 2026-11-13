@@ -323,16 +323,13 @@ const generateKeyFromName = (name) =>
     .replace(/[^a-z0-9_-]/g, '')
     .slice(0, 64)
 
-// A new tool's key is generated from its name. An existing tool's key changes only when edited directly.
+// A new tool's key follows its name until the key is edited by hand. An existing tool's key changes only when edited directly.
 watch(
   () => form.values.display_name,
-  (displayName) => {
-    if (props.isEditing) return
-    const generatedKey = generateKeyFromName(displayName)
-    if (generatedKey !== form.values.name) {
-      form.setFieldError('name', undefined)
-      form.setFieldValue('name', generatedKey, false)
-    }
+  (displayName, previousDisplayName) => {
+    if (props.isEditing || form.values.name !== generateKeyFromName(previousDisplayName)) return
+    form.setFieldError('name', undefined)
+    form.setFieldValue('name', generateKeyFromName(displayName), false)
   }
 )
 
