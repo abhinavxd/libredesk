@@ -59,7 +59,7 @@
 import { ref, computed, watch } from 'vue'
 import { Calendar as CalendarIcon } from 'lucide-vue-next'
 import { parseDate } from '@internationalized/date'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { cn } from '@shared-ui/lib/utils.js'
 import { Button } from '@shared-ui/components/ui/button'
@@ -96,7 +96,8 @@ const dateValue = computed(() => toCalendarDate(modelValue.value))
 
 const formatDisplay = (v) => {
   try {
-    return format(new Date(v), 'MMM dd, yyyy')
+    // parseISO reads "2026-01-01" as local midnight. new Date() reads it as UTC and shows the previous day west of UTC.
+    return format(parseISO(v), 'MMM dd, yyyy')
   } catch {
     return v
   }
