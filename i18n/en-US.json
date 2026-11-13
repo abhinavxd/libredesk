@@ -1117,6 +1117,7 @@
   "globals.terms.callbackURL": "Callback URL",
   "globals.terms.category": "Category",
   "globals.terms.channel": "Channel",
+  "globals.terms.clear": "Clear",
   "globals.terms.clientID": "Client ID",
   "globals.terms.clientSecret": "Client secret",
   "globals.terms.closed": "Closed",
