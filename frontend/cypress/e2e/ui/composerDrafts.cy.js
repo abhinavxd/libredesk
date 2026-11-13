@@ -34,6 +34,11 @@ const submit = () => panel().find('form:visible').find('button[type="submit"]').
 const checkSaved = (channel, assertion) => cy.window().should((win) => {
   assertion(JSON.parse(win.localStorage.getItem(`newConversationDraft${channel}`)))
 })
+const applyMacro = (view) => {
+  cy.get('body').trigger('keydown', { key: 'm', code: 'KeyM', ctrlKey: true })
+  cy.wait('@macros').its('request.url').should('include', `view=${view}`)
+  cy.contains('[role="option"]', 'Draft test macro').click()
+}
 
 describe('Composer drafts', () => {
   beforeEach(() => {
@@ -225,11 +230,6 @@ describe('Composer drafts', () => {
     cy.intercept('GET', '**/api/v1/macros/search*', { body: { data: [{ id: 501, name: 'Draft test macro', actions: [], has_message_content: true }] } }).as('macros')
     cy.intercept('GET', '**/api/v1/macros/501', { body: { data: { id: 501, message_content: '<p>Macro target text</p>' } } })
     visitDraft('email', emailDraft, `/inboxes/all/conversation/${uuid}`)
-    const applyMacro = (view) => {
-      cy.get('body').trigger('keydown', { key: 'm', code: 'KeyM', ctrlKey: true })
-      cy.wait('@macros').its('request.url').should('include', `view=${view}`)
-      cy.contains('[role="option"]', 'Draft test macro').click()
-    }
     expand()
     applyMacro('replying')
     cy.get('.tiptap:visible').should('contain.text', 'Macro target text')
@@ -241,5 +241,61 @@ describe('Composer drafts', () => {
     applyMacro('replying')
     panel().find('header button[aria-label="Close"]').click()
     applyMacro('replying')
+  })
+
+  describe('macro content', () => {
+    const uuid = '00000000-0000-4000-8000-000000000902'
+    const conversationPath = `/inboxes/all/conversation/${uuid}`
+    const paragraphs = (expected, root = () => cy.get('.tiptap:visible')) =>
+      root().find('p').should(($p) => {
+        expect([...$p].map((p) => p.textContent)).to.deep.eq(expected)
+      })
+
+    beforeEach(() => {
+      cy.intercept('GET', `**/api/v1/conversations/${uuid}`, { body: { data: {
+        id: 902, uuid, reference_number: 902, inbox_id: 901, inbox: { id: 901, channel: 'email', name: 'Draft email inbox' },
+        channel: 'email', status: 'Open', subject: 'Existing conversation', tags: [],
+        contact: { id: 902, first_name: 'Customer A', last_name: '', email: 'user@example.com' },
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+      } } })
+      cy.intercept('GET', `**/api/v1/conversations/${uuid}/messages*`, { body: { data: { results: [], total: 0, page: 1, total_pages: 0 } } })
+      cy.intercept('GET', '**/api/v1/macros/search*', { body: { data: [{ id: 501, name: 'Draft test macro', actions: [], has_message_content: true }] } }).as('macros')
+      cy.intercept('GET', '**/api/v1/macros/501', { body: { data: { id: 501, message_content: '<p>Macro target text</p>' } } })
+    })
+
+    it('inserts at the reply cursor and can be applied repeatedly', () => {
+      cy.visit(conversationPath)
+      cy.get('.tiptap:visible').type('Hello customer')
+      cy.get('.tiptap:visible').type('{moveToStart}{rightArrow}{rightArrow}{rightArrow}{rightArrow}{rightArrow}{rightArrow}')
+      applyMacro('replying')
+      paragraphs(['Hello ', 'Macro target text', 'customer'])
+      applyMacro('replying')
+      paragraphs(['Hello ', 'Macro target text', 'Macro target text', 'customer'])
+    })
+
+    it('opens a minimized composer and appends to its draft', () => {
+      cy.visit(conversationPath)
+      cy.get('.tiptap:visible').type('Drafted')
+      cy.get('.box button[aria-label="Collapse"]').click()
+      cy.get('.tiptap:visible').should('not.exist')
+      applyMacro('replying')
+      paragraphs(['Drafted', 'Macro target text'])
+    })
+
+    it('opens the fullscreen composer on a cramped screen', () => {
+      cy.viewport(600, 800)
+      cy.visit(conversationPath)
+      cy.get('.tiptap:visible').should('not.exist')
+      // The collapsed composer has not told the macro store which view it is in yet.
+      applyMacro('')
+      paragraphs(['Macro target text'])
+    })
+
+    it('inserts into the new conversation message without replacing the draft', () => {
+      visitDraft()
+      applyMacro('starting_conversation')
+      paragraphs(['Draft message', 'Macro target text'], () => panel().find('.tiptap:visible'))
+      checkSaved('Email', (draft) => expect(draft.values.content).to.eq('<p>Draft message</p><p>Macro target text</p>'))
+    })
   })
 })

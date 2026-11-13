@@ -516,9 +516,12 @@ watch(
   { immediate: true, flush: 'post' }
 )
 
-// Expose focus method for parent components
+// Expose editor methods for parent components
 const focus = () => {
   editorRef.value?.focus()
 }
-defineExpose({ focus })
+const insertHtml = (html) => {
+  editorRef.value?.insertHtml(html)
+}
+defineExpose({ focus, insertHtml })
 </script>
