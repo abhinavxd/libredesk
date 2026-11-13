@@ -2,6 +2,7 @@ package automation
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,6 +39,204 @@ func (m *mockConversationStore) GetConversationsCreatedAfter(t time.Time, afterI
 	return args.Get(0).([]cmodels.ConversationRef), args.Error(1)
 }
 
+func TestAdditionalConversationConditions(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conv := createTestConversation(func(c *cmodels.Conversation) {
+		c.InboxChannel = "whatsapp"
+		c.StatusCategory = null.StringFrom("waiting")
+		c.LastMessageSender = null.StringFrom("contact")
+		c.LastInteractionSender = null.StringFrom("contact")
+		c.WaitingSince = null.TimeFrom(time.Now().Add(-90 * time.Minute))
+		c.LastMessageAt = null.TimeFrom(time.Now().Add(-2 * time.Hour))
+		c.LastInboundAt = null.TimeFrom(time.Now().Add(-3 * time.Hour))
+		c.LastInteractionAt = null.TimeFrom(time.Now().Add(-4 * time.Hour))
+		c.SLAPolicyID = null.IntFrom(7)
+		c.SLABreached = true
+		c.NextSLADeadlineAt = null.TimeFrom(time.Now().Add(30 * time.Minute))
+		c.CSATRating = null.IntFrom(1)
+		c.CSATFeedback = null.StringFrom("Needs help")
+		c.CSATRespondedAt = null.TimeFrom(time.Now())
+		c.Contact.Country = null.StringFrom("India")
+		c.Contact.ExternalUserID = null.StringFrom("customer-123")
+		c.Contact.PhoneNumber = null.StringFrom("9876543210")
+		c.Contact.Type = "contact"
+		c.Subject = null.StringFrom("Billing help")
+		c.LastMessage = null.StringFrom("Refund requested")
+	})
+	for _, tc := range []struct {
+		field, operator, value string
+		want                   bool
+	}{
+		{models.ConversationChannel, models.RuleOperatorEquals, "whatsapp", true},
+		{models.ConversationChannel, models.RuleOperatorEquals, "email", false},
+		{models.ConversationStatusCategory, models.RuleOperatorEquals, "waiting", true},
+		{models.ConversationLastMessageSender, models.RuleOperatorEquals, "contact", true},
+		{models.ContactCountry, models.RuleOperatorEquals, "india", true},
+		{models.ContactExternalID, models.RuleOperatorEquals, "customer-123", true},
+		{models.ContactPhone, models.RuleOperatorStartsWith, "987", true},
+		{models.ContactType, models.RuleOperatorEquals, "contact", true},
+		{models.ConversationSLAPolicy, models.RuleOperatorEquals, "7", true},
+		{models.ConversationSLABreached, models.RuleOperatorEquals, "true", true},
+		{models.ConversationHoursWaiting, models.RuleOperatorGreaterThan, "1.25", true},
+		{models.ConversationHoursWaiting, models.RuleOperatorGreaterThan, "2", false},
+		{models.ConversationHoursSinceLastMessage, models.RuleOperatorGreaterThan, "1", true},
+		{models.ConversationHoursSinceLastIncoming, models.RuleOperatorGreaterThan, "2", true},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorGreaterThan, "1", true},
+		{models.ConversationHoursUntilSLADeadline, models.RuleOperatorLessThan, "1", true},
+		{models.ConversationHoursUntilSLADeadline, models.RuleOperatorLessThan, "0", false},
+		{models.ConversationCSATRating, models.RuleOperatorEquals, "1", true},
+		{models.ConversationCSATRating, models.RuleOperatorLessThan, "3", true},
+		{models.ConversationCSATFeedback, models.RuleOperatorContains, "HELP", true},
+		{models.ConversationSubject, models.RuleOperatorContains, "billing", true},
+		{models.ConversationContent, models.RuleOperatorContains, "refund", true},
+		{models.ContactEmail, models.RuleOperatorEquals, "TEST@EXAMPLE.COM", true},
+	} {
+		t.Run(tc.field+"/"+tc.operator+"/"+tc.value, func(t *testing.T) {
+			assert.Equal(t, tc.want, engine.evaluateRule(models.RuleDetail{Field: tc.field, Operator: tc.operator, Value: tc.value}, conv, nil))
+		})
+	}
+	for _, field := range []string{models.ConversationHoursWaiting, models.ConversationHoursSinceLastMessage,
+		models.ConversationHoursSinceLastIncoming, models.ConversationHoursSinceLastActivity,
+		models.ConversationHoursUntilSLADeadline, models.ConversationCSATRating} {
+		t.Run(field+"/unset", func(t *testing.T) {
+			empty := cmodels.Conversation{}
+			assert.True(t, engine.evaluateRule(models.RuleDetail{Field: field, Operator: models.RuleOperatorNotSet}, empty, nil))
+			assert.False(t, engine.evaluateRule(models.RuleDetail{Field: field, Operator: models.RuleOperatorSet}, empty, nil))
+			assert.False(t, engine.evaluateRule(models.RuleDetail{Field: field, Operator: models.RuleOperatorLessThan, Value: "5"}, empty, nil))
+		})
+	}
+	conv.CSATRespondedAt = null.Time{}
+	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationCSATRating, Operator: models.RuleOperatorSet}, conv, nil))
+	conv.CSATRespondedAt = null.TimeFrom(time.Now())
+	conv.CSATRating = null.IntFrom(0)
+	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationCSATRating, Operator: models.RuleOperatorSet}, conv, nil))
+	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationCSATRating, Operator: models.RuleOperatorLessThan, Value: "3"}, conv, nil))
+}
+
+func TestPublicMessageConditionsIgnorePrivateNotesAndActivity(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conv := cmodels.Conversation{
+		LastMessageAt:         null.TimeFrom(time.Now().Add(-30 * time.Minute)),
+		LastMessageSender:     null.StringFrom("agent"),
+		LastInteractionAt:     null.TimeFrom(time.Now().Add(-26 * time.Hour)),
+		LastInteractionSender: null.StringFrom("contact"),
+	}
+	for _, tc := range []struct {
+		field, operator, value string
+		want                   bool
+	}{
+		{models.ConversationHoursSinceLastMessage, models.RuleOperatorGreaterThan, "24", true},
+		{models.ConversationHoursSinceLastMessage, models.RuleOperatorLessThan, "1", false},
+		{models.ConversationLastMessageSender, models.RuleOperatorEquals, "contact", true},
+		{models.ConversationLastMessageSender, models.RuleOperatorEquals, "agent", false},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorLessThan, "1", true},
+		{models.ConversationHoursSinceLastActivity, models.RuleOperatorGreaterThan, "24", false},
+	} {
+		t.Run(tc.field+"/"+tc.operator+"/"+tc.value, func(t *testing.T) {
+			assert.Equal(t, tc.want, engine.evaluateRule(models.RuleDetail{Field: tc.field, Operator: tc.operator, Value: tc.value}, conv, nil))
+		})
+	}
+	conv.LastInteractionAt = null.TimeFrom(time.Now())
+	conv.LastInteractionSender = null.StringFrom("agent")
+	assert.False(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationHoursSinceLastMessage, Operator: models.RuleOperatorGreaterThan, Value: "24"}, conv, nil))
+	assert.True(t, engine.evaluateRule(models.RuleDetail{Field: models.ConversationLastMessageSender, Operator: models.RuleOperatorEquals, Value: "agent"}, conv, nil))
+}
+
+func TestAutomationTagConditions(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	for _, tc := range []struct {
+		name, tags, operator, value string
+		want                        bool
+	}{
+		{"any match", `["billing","vip"]`, models.RuleOperatorContains, `["refund","vip"]`, true},
+		{"whole names", `["billing"]`, models.RuleOperatorContains, `["bill"]`, false},
+		{"comma in name", `["billing,refund"]`, models.RuleOperatorContains, `["billing,refund"]`, true},
+		{"comma is not a separator", `["billing,refund"]`, models.RuleOperatorContains, `["billing","refund"]`, false},
+		{"duplicates", `["vip","vip"]`, models.RuleOperatorContains, `["vip","vip"]`, true},
+		{"none match", `["billing"]`, models.RuleOperatorNotContains, `["vip","refund"]`, true},
+		{"one disallowed", `["billing","vip"]`, models.RuleOperatorNotContains, `["vip","refund"]`, false},
+		{"empty tags", `[]`, models.RuleOperatorNotContains, `["vip"]`, true},
+		{"empty selection", `["vip"]`, models.RuleOperatorNotContains, `[]`, false},
+		{"invalid selection", `["vip"]`, models.RuleOperatorContains, `vip`, false},
+		{"is set", `["vip"]`, models.RuleOperatorSet, "", true},
+		{"is not set", `[]`, models.RuleOperatorNotSet, "", true},
+		{"malformed data", `{}`, models.RuleOperatorNotSet, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conv := cmodels.Conversation{Tags: null.JSONFrom([]byte(tc.tags))}
+			assert.Equal(t, tc.want, engine.evaluateRule(models.RuleDetail{Field: models.ConversationTags, Operator: tc.operator, Value: tc.value}, conv, nil))
+		})
+	}
+}
+
+func TestConversationAttributeConditions(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conv := cmodels.Conversation{
+		CustomAttributes: json.RawMessage(`{"plan":"conversation","score":1.5,"enabled":false,"zero":0,"date":"2026-10-25","empty":null}`),
+		Contact:          cmodels.ConversationContact{CustomAttributes: json.RawMessage(`{"plan":"contact"}`)},
+	}
+	for _, tc := range []struct {
+		field, operator, value string
+		want                   bool
+	}{
+		{"plan", models.RuleOperatorEquals, "conversation", true},
+		{"plan", models.RuleOperatorEquals, "contact", false},
+		{"score", models.RuleOperatorGreaterThan, "1.25", true},
+		{"score", models.RuleOperatorEquals, "1.5", true},
+		{"enabled", models.RuleOperatorEquals, "false", true},
+		{"enabled", models.RuleOperatorSet, "", true},
+		{"zero", models.RuleOperatorEquals, "0", true},
+		{"zero", models.RuleOperatorSet, "", true},
+		{"date", models.RuleOperatorGreaterThan, "2026-10-24", true},
+		{"date", models.RuleOperatorLessThan, "2026-10-26", true},
+		{"date", models.RuleOperatorGreaterThan, "2026-10-25", false},
+		{"date", models.RuleOperatorGreaterThan, "bad date", false},
+		{"empty", models.RuleOperatorNotSet, "", true},
+		{"empty", models.RuleOperatorSet, "", false},
+		{"missing", models.RuleOperatorLessThan, "10", false},
+	} {
+		t.Run(tc.field+"/"+tc.operator+"/"+tc.value, func(t *testing.T) {
+			assert.Equal(t, tc.want, engine.evaluateRule(models.RuleDetail{Field: tc.field, FieldType: models.FieldTypeConversationCustomAttribute, Operator: tc.operator, Value: tc.value}, conv, nil))
+		})
+	}
+}
+
+func TestBusinessHoursConditionErrorsDoNotMatch(t *testing.T) {
+	engine := createTestEngine(new(mockConversationStore))
+	conv := cmodels.Conversation{AssignedTeamID: null.IntFrom(7)}
+	condition := models.RuleDetail{Field: models.ConversationWithinBusinessHours, Operator: models.RuleOperatorEquals, Value: "false"}
+	assert.False(t, engine.evaluateRule(condition, conv, nil))
+	engine.SetBusinessHoursChecker(func(teamID int, at time.Time) (bool, error) {
+		assert.Equal(t, 7, teamID)
+		assert.WithinDuration(t, time.Now(), at, time.Second)
+		return false, nil
+	})
+	assert.True(t, engine.evaluateRule(condition, conv, nil))
+	engine.SetBusinessHoursChecker(func(int, time.Time) (bool, error) { return true, nil })
+	assert.False(t, engine.evaluateRule(condition, conv, nil))
+	engine.SetBusinessHoursChecker(func(int, time.Time) (bool, error) { return false, fmt.Errorf("missing schedule") })
+	assert.False(t, engine.evaluateRule(condition, conv, nil))
+}
+
+func TestRuleComparisonRejectsInvalidNumbers(t *testing.T) {
+	for _, value := range []string{"", "invalid", "NaN", "Inf", "-Inf"} {
+		_, ok := compareRuleValues(value, "5")
+		assert.False(t, ok, value)
+		_, ok = compareRuleValues("5", value)
+		assert.False(t, ok, value)
+	}
+	for _, tc := range []struct {
+		left, right string
+		want        int
+	}{
+		{"0", "0", 0}, {"-1", "0", -1}, {"1.5", "1.25", 1}, {"2026-10-25", "2026-10-24", 1},
+	} {
+		got, ok := compareRuleValues(tc.left, tc.right)
+		assert.True(t, ok)
+		assert.Equal(t, tc.want, got)
+	}
+}
+
 // Test Helpers
 func createTestEngine(store *mockConversationStore) *Engine {
 	logger := logf.New(logf.Opts{Level: logf.DebugLevel})
@@ -61,11 +260,11 @@ func createTestConversation(opts ...func(*cmodels.Conversation)) cmodels.Convers
 			LastName:  "User",
 		},
 	}
-	
+
 	for _, opt := range opts {
 		opt(&conv)
 	}
-	
+
 	return conv
 }
 
@@ -108,7 +307,7 @@ func TestEvaluateGroup_AND_AllTrue(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called once")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 }
@@ -142,7 +341,7 @@ func TestEvaluateGroup_AND_ShortCircuit(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "ApplyAction should not be called when AND conditions fail")
 }
 
@@ -176,7 +375,7 @@ func TestEvaluateGroup_OR_OnlyOneTrue(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called once for OR condition")
 }
 
@@ -217,7 +416,7 @@ func TestTwoGroups_AND_BothMustPass(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called when both groups pass")
 }
 
@@ -254,7 +453,7 @@ func TestEmptyGroup_Skipped(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "ApplyAction should be called, empty group is skipped")
 }
 
@@ -302,7 +501,7 @@ func TestExecutionMode_FirstMatch(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Only first matching rule should execute in first_match mode")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 }
@@ -351,7 +550,7 @@ func TestExecutionMode_All(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 2, mockStore.callCount, "All matching rules should execute in 'all' mode")
 }
 
@@ -386,7 +585,7 @@ func TestNullFields_SetNotSet(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Should handle null fields with set/not set operators")
 }
 
@@ -426,7 +625,7 @@ func TestCustomAttributes_StringComparison(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Custom attributes should be compared correctly")
 	assert.Equal(t, models.ActionSendCSAT, mockStore.appliedActions[0].Type)
 }
@@ -464,7 +663,7 @@ func TestCustomAttributes_MissingField(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Missing custom attribute should fail the rule")
 }
 
@@ -544,7 +743,7 @@ func TestContainsOperator_MultipleValues(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Contains operator should match with comma-separated values")
 }
 
@@ -577,7 +776,7 @@ func TestNotContainsOperator(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Not contains operator should pass when values are not present")
 }
 
@@ -610,7 +809,7 @@ func TestNumericComparisons(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Greater than operator should work with numeric comparisons")
 }
 
@@ -658,7 +857,7 @@ func TestRealWorld_CSATAutomation(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "CSAT should be sent when status is resolved and client_id matches")
 	assert.Equal(t, models.ActionSendCSAT, mockStore.appliedActions[0].Type)
 }
@@ -694,7 +893,7 @@ func TestRealWorld_NewTicketAutomation(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 2, mockStore.callCount, "Both actions should be executed for new ticket")
 	assert.Equal(t, models.ActionSendPrivateNote, mockStore.appliedActions[0].Type)
 	assert.Equal(t, models.ActionSetSLA, mockStore.appliedActions[1].Type)
@@ -781,7 +980,7 @@ func TestCaseSensitivity_ContainsOperators(t *testing.T) {
 			}
 
 			engine.evalConversationRules(rules, conversation, nil)
-			
+
 			if tc.shouldMatch {
 				assert.Equal(t, 1, mockStore.callCount, "Expected action to be triggered")
 			} else {
@@ -826,7 +1025,7 @@ func TestCaseSensitivity_Equals(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Case insensitive comparison should match")
 }
 
@@ -856,7 +1055,7 @@ func TestInvalidOperator(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Invalid operator should not trigger action")
 }
 
@@ -889,7 +1088,7 @@ func TestContradictoryConditions(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Contradictory conditions should never match")
 }
 
@@ -923,7 +1122,7 @@ func TestTautologyCondition(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Tautology condition should always match")
 }
 
@@ -934,10 +1133,10 @@ func TestCustomAttributeTypes(t *testing.T) {
 	engine := createTestEngine(mockStore)
 
 	customAttrs := map[string]interface{}{
-		"age":        25,          // int
-		"score":      98.5,        // float64
-		"is_premium": true,        // bool
-		"name":       "TestUser",  // string
+		"age":        25,         // int
+		"score":      98.5,       // float64
+		"is_premium": true,       // bool
+		"name":       "TestUser", // string
 	}
 	customJSON, _ := json.Marshal(customAttrs)
 
@@ -976,7 +1175,7 @@ func TestCustomAttributeTypes(t *testing.T) {
 					{
 						LogicalOp: models.OperatorOR,
 						Rules: []models.RuleDetail{
-							{Field: "score", Operator: models.RuleOperatorEquals, Value: "98", FieldType: models.FieldTypeContactCustomAttribute},
+							{Field: "score", Operator: models.RuleOperatorEquals, Value: "98.5", FieldType: models.FieldTypeContactCustomAttribute},
 						},
 					},
 				},
@@ -990,7 +1189,7 @@ func TestCustomAttributeTypes(t *testing.T) {
 		mockStore.appliedActions = nil
 		mockStore.callCount = 0
 		engine.evalConversationRules(rules, conversation, nil)
-		assert.Equal(t, 1, mockStore.callCount, "Float custom attribute should be converted to int for comparison")
+		assert.Equal(t, 1, mockStore.callCount, "Float custom attribute should retain its decimal value")
 	})
 
 	t.Run("Boolean comparison", func(t *testing.T) {
@@ -1046,7 +1245,7 @@ func TestHoursSinceFields_NullHandling(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 0, mockStore.callCount, "Should not trigger action when time field is null")
 }
 
@@ -1082,7 +1281,7 @@ func TestMultipleActions(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 4, mockStore.callCount, "All actions should be executed")
 	assert.Equal(t, models.ActionSetStatus, mockStore.appliedActions[0].Type)
 	assert.Equal(t, models.ActionSetPriority, mockStore.appliedActions[1].Type)
@@ -1147,26 +1346,26 @@ func TestContainsOperator_TextNormalization(t *testing.T) {
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	assert.Equal(t, 1, mockStore.callCount, "Contains should normalize whitespace and match")
 }
 
 // Test: Mock verification precision (The Mock Verifier's Gauntlet)
 func TestMockVerificationPrecision(t *testing.T) {
 	mockStore := new(mockConversationStore)
-	
+
 	expectedAction := models.RuleAction{
 		Type:  models.ActionReply,
 		Value: []string{"<p>Test reply automation!</p>"},
 	}
-	
+
 	conversation := createTestConversation(func(c *cmodels.Conversation) {
 		c.Contact.Email = null.StringFrom("libredesk.io@gmail.com")
 	})
-	
+
 	// Set up precise expectation
 	mockStore.On("ApplyAction", expectedAction, conversation, umodels.User{}).Return(nil).Once()
-	
+
 	engine := createTestEngine(mockStore)
 
 	rules := []models.Rule{
@@ -1179,14 +1378,14 @@ func TestMockVerificationPrecision(t *testing.T) {
 					},
 				},
 			},
-			Actions: []models.RuleAction{expectedAction},
+			Actions:       []models.RuleAction{expectedAction},
 			GroupOperator: models.OperatorOR,
 			ExecutionMode: models.ExecutionModeAll,
 		},
 	}
 
 	engine.evalConversationRules(rules, conversation, nil)
-	
+
 	// This will verify the exact parameters were passed
 	mockStore.AssertExpectations(t)
 	assert.Equal(t, 1, mockStore.callCount, "Action should be called exactly once")
@@ -1693,7 +1892,6 @@ func TestGreaterThanOperator_EqualValueIsStrict(t *testing.T) {
 	assert.Equal(t, 0, equal, "greater than is strict, equal value should not match")
 }
 
-// Atoi failures fall back to 0 on either side; pins current behavior.
 func TestNumericOperators_NonNumericValues(t *testing.T) {
 	conv := createTestConversation(func(c *cmodels.Conversation) {
 		c.Subject = null.StringFrom("hello")
@@ -1702,12 +1900,12 @@ func TestNumericOperators_NonNumericValues(t *testing.T) {
 	gt := runSingleRule(t, conv, models.RuleDetail{
 		Field: models.ConversationSubject, Operator: models.RuleOperatorGreaterThan, Value: "5", FieldType: models.FieldTypeConversationField,
 	})
-	assert.Equal(t, 0, gt, "non-numeric compares as 0, 0 > 5 is false")
+	assert.Equal(t, 0, gt, "non-numeric values must not match numeric conditions")
 
 	lt := runSingleRule(t, conv, models.RuleDetail{
 		Field: models.ConversationSubject, Operator: models.RuleOperatorLessThan, Value: "5", FieldType: models.FieldTypeConversationField,
 	})
-	assert.Equal(t, 1, lt, "non-numeric compares as 0, 0 < 5 is true")
+	assert.Equal(t, 0, lt, "non-numeric values must not match numeric conditions")
 }
 
 func TestStartsWithOperator_CaseSensitive(t *testing.T) {
