@@ -206,6 +206,8 @@
     });
 
     document.addEventListener('click', function (e) {
+        // The button that opens the search modal sits outside the form. Its click focuses the input and must not cancel that lookup.
+        if (e.target.closest('[data-hcd-search-open]')) return;
         if (!form.contains(e.target)) { flush(); close(); }
     });
     // Keeps focus in the input while a suggestion is pressed. A browser that does not focus links on click would otherwise close the panel before the click lands.

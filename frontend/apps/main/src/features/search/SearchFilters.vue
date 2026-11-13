@@ -24,6 +24,7 @@
           :model-value="filters.assignee"
           :placeholder="t('globals.terms.assignee')"
           :prepend-items="unassignedItem"
+          include-disabled
           align="start"
           @select="toggle('assignee', $event)"
         />

@@ -375,7 +375,7 @@ type queries struct {
 	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
 	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
 	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	GetOpenConversationUUIDsByAssignee  *sqlx.Stmt `query:"get-open-conversation-uuids-by-assignee"`
 	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
 	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
@@ -866,6 +866,14 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 	if previousConversation.AssignedUserID.Valid && previousConversation.AssignedUserID.Int == assigneeID {
 		c.lo.Debug("no assignee update: conversation assignee unchanged", "uuid", uuid, "assignee_id", assigneeID)
 		return nil
+	}
+
+	assignee, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
+	if err != nil {
+		return err
+	}
+	if !assignee.Enabled {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.assigneeDisabled"), nil)
 	}
 
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
@@ -1553,12 +1561,24 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	}
 }
 
-// UnassignOpen unassigns all open conversations belonging to a user.
-// i.e conversations without status `Closed` and `Resolved`.
+// UnassignOpen unassigns every conversation of a user that is not in a resolved status, one at a time so each change is broadcast.
 func (m *Manager) UnassignOpen(userID int) error {
-	if _, err := m.q.UnassignOpenConversations.Exec(userID); err != nil {
-		m.lo.Error("error unassigning open conversations", "error", err)
+	var uuids []string
+	if err := m.q.GetOpenConversationUUIDsByAssignee.Select(&uuids, userID); err != nil {
+		m.lo.Error("error fetching open conversations of user", "user_id", userID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
+	}
+	if len(uuids) == 0 {
+		return nil
+	}
+	systemUser, err := m.userStore.GetSystemUser()
+	if err != nil {
+		return err
+	}
+	for _, uuid := range uuids {
+		if err := m.RemoveConversationAssignee(uuid, models.AssigneeTypeUser, systemUser); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1755,6 +1775,9 @@ func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipie
 		if err != nil {
 			m.lo.Error("error fetching agent for email notification", "user_id", id, "error", err)
 			recipients = append(recipients, delivery)
+			continue
+		}
+		if !recipient.Enabled {
 			continue
 		}
 

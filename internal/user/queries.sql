@@ -12,7 +12,8 @@ WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted
     AND ($2 = '' OR CONCAT(users.first_name, ' ', COALESCE(users.last_name, '')) ILIKE $7 ESCAPE '\' OR users.email ILIKE $7 ESCAPE '\')
     AND ($3 = '' OR users.type::text = $3)
     AND (NOT $4 OR users.enabled)
-ORDER BY users.first_name, users.last_name, users.id
+-- Enabled agents sort first so disabled ones never push them off the first page.
+ORDER BY users.enabled DESC, users.first_name, users.last_name, users.id
 LIMIT NULLIF($5, 0) OFFSET $6;
 
 -- name: get-agents-compact-by-ids

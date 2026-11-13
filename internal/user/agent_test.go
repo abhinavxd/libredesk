@@ -103,7 +103,7 @@ func TestGetAgentsCompactFilters(t *testing.T) {
 	mgr, db := newTestManager(t)
 	db.MustExec(`INSERT INTO users (type, email, first_name, last_name, enabled) VALUES
 		('agent', 'active@example.com', 'Active', 'Agent', true),
-		('agent', 'gone@example.com', 'Disabled', 'Agent', false),
+		('agent', 'gone@example.com', 'Aaron', 'Agent', false),
 		('ai_assistant', 'bot@example.com', 'Bot', '', true)`)
 
 	enabledAgents, err := mgr.GetAgentsCompact("", "agent", true, 1, 30)
@@ -120,6 +120,9 @@ func TestGetAgentsCompactFilters(t *testing.T) {
 	}
 	if len(unfiltered) != 3 {
 		t.Fatalf("got %d users without filters, want 3", len(unfiltered))
+	}
+	if unfiltered[2].Email.String != "gone@example.com" {
+		t.Fatalf("order = %+v, want the disabled agent after the enabled ones", unfiltered)
 	}
 }
 

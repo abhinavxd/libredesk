@@ -758,10 +758,8 @@ FROM conversation_messages m
 JOIN conversations c ON m.conversation_id = c.id
 WHERE m.uuid = $1;
 
--- name: unassign-open-conversations
-UPDATE conversations
-SET assigned_user_id = NULL,
-    updated_at = NOW()
+-- name: get-open-conversation-uuids-by-assignee
+SELECT uuid FROM conversations
 WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
 -- name: update-conversation-custom-attributes
@@ -797,7 +795,7 @@ SET
 WHERE uuid = $1;
 
 -- name: re-open-conversation
--- Open conversation if it is not already open and unset the assigned user if they are away and reassigning.
+-- Open conversation if it is not already open and unset the assigned user if they are away and reassigning, disabled or deleted.
 UPDATE conversations
 SET 
   status_id = (SELECT id FROM conversation_statuses WHERE name = 'Open'),
@@ -807,7 +805,7 @@ SET
     WHEN EXISTS (
       SELECT 1 FROM users 
       WHERE users.id = conversations.assigned_user_id 
-        AND users.availability_status = 'away_and_reassigning'
+        AND (users.availability_status = 'away_and_reassigning' OR users.enabled = false OR users.deleted_at IS NOT NULL)
     ) THEN NULL
     ELSE assigned_user_id
   END
