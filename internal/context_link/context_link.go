@@ -169,7 +169,7 @@ func (m *Manager) Toggle(id int) (models.ContextLink, error) {
 
 // GenerateURL builds the final URL for a context link by substituting template
 // variables and optionally generating an AES-256-GCM encrypted token.
-func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.ConversationContact, conversationUUID string, agent authmodels.User) (string, error) {
+func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.ConversationContact, convCustomAttributes json.RawMessage, conversationUUID string, agent authmodels.User) (string, error) {
 	u := link.URLTemplate
 
 	// Substitute plain template variables with URL-encoded values.
@@ -225,6 +225,17 @@ func (m *Manager) GenerateURL(link models.ContextLink, contact convmodels.Conver
 		// Strip "enc:" prefix. External systems receive just the base64 ciphertext.
 		token = strings.TrimPrefix(token, crypto.EncryptedPrefix)
 		u = strings.ReplaceAll(u, "{{token}}", url.QueryEscape(token))
+	}
+
+	// Substitute custom contact and conversation attributes after built-in placeholders
+	// (including {{token}}) so they cannot override reserved variables.
+	for _, attrs := range []json.RawMessage{contact.CustomAttributes, convCustomAttributes} {
+		var m map[string]any
+		if err := json.Unmarshal(attrs, &m); err == nil {
+			for k, v := range m {
+				u = strings.ReplaceAll(u, "{{"+k+"}}", url.QueryEscape(fmt.Sprintf("%v", v)))
+			}
+		}
 	}
 
 	return u, nil
