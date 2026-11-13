@@ -387,6 +387,11 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		e.lo.Warn("no sender received for email", "message_id", env.MessageID)
 		return nil
 	}
+	// A web form can't send as the customer without failing DMARC, so it sends as this inbox with the customer in Reply-To.
+	customer, fromReplyTo := e.formCustomer(env)
+	if fromReplyTo {
+		env.From = []imap.Address{customer}
+	}
 	var fromAddress = strings.ToLower(env.From[0].Addr())
 
 	// Determine final Message ID - prefer IMAP-parsed, fallback to raw header extraction
@@ -471,12 +476,13 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return fmt.Errorf("marshalling meta: %w", err)
 	}
 	incomingMsg := models.IncomingMessage{
-		Channel:  ChannelEmail,
-		InboxID:  inboxID,
-		Contact:  contact,
-		Subject:  env.Subject,
-		SourceID: null.StringFrom(messageID),
-		Meta:     meta,
+		Channel:            ChannelEmail,
+		InboxID:            inboxID,
+		Contact:            contact,
+		ContactFromReplyTo: fromReplyTo,
+		Subject:            env.Subject,
+		SourceID:           null.StringFrom(messageID),
+		Meta:               meta,
 	}
 
 	// Fetch full message body.
@@ -648,6 +654,19 @@ func partToAttachment(part *enmime.Part, disposition string) attachment.Attachme
 		Size:        len(part.Content),
 		Disposition: disposition,
 	}
+}
+
+// formCustomer returns the Reply-To address of mail sent from one of this inbox's own addresses.
+func (e *Email) formCustomer(env *imap.Envelope) (imap.Address, bool) {
+	if !e.ReceivesAddress(env.From[0].Addr()) {
+		return imap.Address{}, false
+	}
+	for _, address := range env.ReplyTo {
+		if address.Addr() != "" && !e.ReceivesAddress(stringutil.RemoveConvPlusAddress(address.Addr())) {
+			return address, true
+		}
+	}
+	return imap.Address{}, false
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.
