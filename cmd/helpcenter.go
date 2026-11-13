@@ -763,6 +763,7 @@ func handleShowHelpCenterCollection(r *fastglue.Request) error {
 	if collection == nil {
 		return renderHelpCenterNotFound(r, &helpCenter)
 	}
+	trail := collectionTrail(tree.Tree, collection.Slug)
 	translated, err := app.helpcenter.GetPublishedCollectionLocales(slug, collection.Slug)
 	if err != nil {
 		translated = []string{locale}
@@ -785,6 +786,7 @@ func handleShowHelpCenterCollection(r *fastglue.Request) error {
 			"JSONLD":           collectionJSONLD(root, helpCenter, *collection, locale, pathFor(locale)),
 			"HelpCenter":       data,
 			"Collection":       collection,
+			"CollectionTrail":  trail[:len(trail)-1],
 			"Tree":             tree.Tree,
 			"ActiveCollection": collection.Slug,
 		},
@@ -872,6 +874,7 @@ func handleShowHelpCenterArticle(r *fastglue.Request) error {
 			"Article":          article,
 			"AuthorInitial":    authorInitial(article),
 			"Collection":       collection,
+			"CollectionTrail":  app.helpcenter.GetCollectionPath(collection),
 			"Related":          related,
 			"Tree":             sidebarTree(app, helpCenter, locale),
 			"ActiveCollection": collection.Slug,
@@ -900,12 +903,22 @@ func handleHelpCenterSearch(r *fastglue.Request) error {
 	if !ok {
 		return renderHelpCenterNotFound(r, &helpCenter)
 	}
-	var articles []hcmodels.Article
+	var (
+		articles []hcmodels.Article
+		count    string
+	)
 	if query != "" {
-		articles, err = app.helpcenter.SearchPublishedArticles(slug, query, locale, publicSearchLimit)
+		// One row past the page limit shows whether more matches exist than the page lists.
+		articles, err = app.helpcenter.SearchPublishedArticles(slug, query, locale, publicSearchLimit+1)
 		if err != nil {
 			articles = nil
-		} else if !isCrawler(r) {
+		}
+		count = strconv.Itoa(len(articles))
+		if len(articles) > publicSearchLimit {
+			articles = articles[:publicSearchLimit]
+			count = strconv.Itoa(publicSearchLimit) + "+"
+		}
+		if err == nil && !isCrawler(r) {
 			app.helpcenter.LogSearch(helpCenter.ID, query, len(articles))
 		}
 	}
@@ -923,6 +936,7 @@ func handleHelpCenterSearch(r *fastglue.Request) error {
 			"HelpCenter":  data,
 			"Query":       query,
 			"Results":     articles,
+			"ResultCount": strings.ReplaceAll(lcl.Tc("helpCenter.resultsCount", len(articles)), "{count}", count),
 			"Tree":        sidebarTree(app, helpCenter, locale),
 		},
 	})
@@ -1740,6 +1754,19 @@ func findCollectionNode(cols []hcmodels.TreeCollection, slug string) *hcmodels.T
 	return nil
 }
 
+// collectionTrail returns the published path from a root collection to the requested collection.
+func collectionTrail(cols []hcmodels.TreeCollection, slug string) []hcmodels.Collection {
+	for _, c := range cols {
+		if c.Slug == slug {
+			return []hcmodels.Collection{c.Collection}
+		}
+		if trail := collectionTrail(c.Children, slug); len(trail) > 0 {
+			return append([]hcmodels.Collection{c.Collection}, trail...)
+		}
+	}
+	return nil
+}
+
 // resolveLocale returns the locale path segment and whether the help center serves it,
 // falling back to the help center's default when the segment is absent.
 func resolveLocale(r *fastglue.Request, hc hcmodels.HelpCenter) (string, bool) {
@@ -2196,6 +2223,7 @@ func renderHelpCenterCollectionPreview(r *fastglue.Request, helpCenter hcmodels.
 				{Slug: "sample-2", Title: i18n.T("helpCenter.preview.sampleArticleHeading2"), Excerpt: excerpt},
 				{Slug: "sample-3", Title: i18n.T("helpCenter.preview.sampleArticleHeading3"), Excerpt: excerpt},
 			},
+			ArticleCount: 3,
 		}
 	)
 	if err := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-collection"), map[string]interface{}{
@@ -2253,16 +2281,17 @@ func renderHelpCenterArticlePreview(r *fastglue.Request, helpCenter hcmodels.Hel
 	if err := app.tmpl.RenderWebPage(r.RequestCtx, hcPageName(helpCenter, "help-article"), map[string]interface{}{
 		"L": i18n,
 		"Data": map[string]interface{}{
-			"Title":         article.Title,
-			"ModifiedTime":  article.UpdatedAt.Format(time.RFC3339),
-			"HelpCenter":    helpCenterPreviewData(app, r, helpCenter, locale),
-			"Article":       article,
-			"AuthorInitial": authorInitial(article),
-			"Collection":    collection,
-			"Related":       related,
-			"TOC":           toc,
-			"Tree":          sidebarTree(app, helpCenter, locale),
-			"Content":       template.HTML(article.Content),
+			"Title":           article.Title,
+			"ModifiedTime":    article.UpdatedAt.Format(time.RFC3339),
+			"HelpCenter":      helpCenterPreviewData(app, r, helpCenter, locale),
+			"Article":         article,
+			"AuthorInitial":   authorInitial(article),
+			"Collection":      collection,
+			"CollectionTrail": []hcmodels.Collection{collection},
+			"Related":         related,
+			"TOC":             toc,
+			"Tree":            sidebarTree(app, helpCenter, locale),
+			"Content":         template.HTML(article.Content),
 		},
 	}); err != nil {
 		return sendErrorEnvelope(r, err)

@@ -58,6 +58,9 @@ body.hcd::after {
     -webkit-mask-image: radial-gradient(95rem 62rem at 100% 0%, rgba(0, 0, 0, .85), transparent 78%);
     mask-image: radial-gradient(95rem 62rem at 100% 0%, rgba(0, 0, 0, .85), transparent 78%);
 }
+.hc-dark body.hcd { background: var(--hc-page); }
+.hc-dark body.hcd::before { opacity: .35; }
+.hc-dark body.hcd::after { opacity: .25; }
 
 .hc-sr-only {
     position: absolute;
@@ -170,10 +173,18 @@ body.hcd::after {
 .hcd-search-layer[hidden] { display: none; }
 .hcd-search-backdrop { position: absolute; inset: 0; background: rgba(13, 15, 20, .45); }
 .hcd-search-panel {
-    position: relative; margin: 13vh auto 0; width: min(37rem, calc(100vw - 2rem));
+    position: relative; margin: 10vh auto 0; width: min(37rem, calc(100vw - 2rem));
     background: var(--hc-bg); border: 1px solid var(--hc-border); border-radius: var(--hc-radius);
     box-shadow: var(--hc-shadow-lift); overflow: hidden;
 }
+.hcd-search-close {
+    position: absolute; inset-inline-end: .35rem; top: .15rem; z-index: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; padding: 0;
+    color: var(--hc-muted); background: none; border: 0; border-radius: var(--hc-radius-sm); cursor: pointer;
+}
+.hcd-search-close:hover { background: var(--hc-accent-tint); color: var(--hc-ink); }
+.hcd-search-close svg { width: 1rem; height: 1rem; }
 .hcd-search-panel .hc-search { position: relative; }
 .hcd-search-panel .hc-search-icon {
     position: absolute; left: 1rem; top: 1.45rem; transform: translateY(-50%);
@@ -183,17 +194,18 @@ body.hcd::after {
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    padding: .85rem 1rem .85rem 2.7rem;
+    padding: .85rem 3.4rem .85rem 2.7rem;
     font-size: 1rem; font-family: inherit;
     color: var(--hc-ink);
-    background: none; border: 0; border-bottom: 1px solid var(--hc-border);
+    background: none; border: 0;
     outline: none;
 }
 .hcd-search-panel .hc-search input::placeholder { color: var(--hc-faint); }
 .hcd-search-panel .hc-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 /* The typeahead panel renders in flow inside the modal, not floating. */
 .hcd-search-panel .hc-typeahead {
-    max-height: min(19rem, 48vh); overflow-y: auto;
+    max-height: min(28rem, 58vh); overflow-y: auto;
+    border-top: 1px solid var(--hc-border);
 }
 .hc-typeahead a {
     display: block; padding: .65rem 1rem; color: var(--hc-ink); font-size: .93rem;
@@ -211,6 +223,9 @@ body.hcd::after {
     font-size: .74rem; color: var(--hc-faint);
 }
 .hcd-search-hints span { display: inline-flex; align-items: center; gap: .3rem; }
+@media (hover: none), (max-width: 640px) {
+    .hcd-search-hints { display: none; }
+}
 
 /* ---- Shell: sidebar + content ---- */
 .hcd-shell {
@@ -231,6 +246,8 @@ body.hcd::after {
     scrollbar-color: var(--hc-border) transparent;
 }
 .hcd-sidebar-backdrop { display: none; }
+.hcd-nav-home { margin-bottom: .75rem; }
+.hcd-nav-home .hcd-nav-head { font-weight: 500; }
 .hcd-nav-group { margin: 0 0 .2rem; }
 .hcd-nav-root { margin: 0 0 .35rem; }
 .hcd-nav-summary {
@@ -354,7 +371,6 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 }
 .hcd-article-rows a:hover { text-decoration: none; }
 .hcd-article-rows a:hover .hcd-row-title { color: var(--hc-accent-ink); }
-.hcd-article-rows .hc-doc { flex: none; width: 1rem; height: 1rem; margin-top: .3rem; color: var(--hc-accent-ink); }
 .hcd-article-rows .hc-arrow { flex: none; margin-inline-start: auto; margin-top: .35rem; width: .85rem; height: .85rem; color: var(--hc-faint); transition: transform .15s, color .15s; }
 [dir="rtl"] .hc-arrow { transform: rotate(180deg); }
 .hcd-row-body { display: flex; flex-direction: column; min-width: 0; }
@@ -439,23 +455,24 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 /* Was this helpful */
 .hcd-article-foot { margin-top: 2.5rem; }
 .hc-helpful {
-    display: flex; align-items: center; gap: .9rem; flex-wrap: wrap;
-    padding: 1rem 1.15rem;
-    background: var(--hcd-sidebar-bg); border: 1px solid var(--hc-border); border-radius: var(--hc-radius);
+    display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem;
+    /* Tall enough for the buttons, so swapping them for the thank-you line moves nothing below. */
+    padding-top: 1.5rem; min-height: calc(1.5rem + 36px);
+    border-top: 1px solid var(--hc-border);
 }
-.hc-helpful-actions { display: flex; align-items: center; gap: .65rem; flex-shrink: 0; }
+.hc-helpful-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
 .hc-helpful-error { flex-basis: 100%; color: var(--hc-muted); font-size: .9rem; }
 .hc-helpful button:disabled { opacity: .6; cursor: wait; }
 .hc-helpful [hidden] { display: none; }
-.hc-helpful .hc-helpful-q { font-size: .95rem; font-weight: 650; }
+.hc-helpful .hc-helpful-q { color: var(--hc-ink); font-size: .95rem; font-weight: 550; }
 .hc-helpful button {
-    display: inline-flex; align-items: center; gap: .4rem;
-    padding: .45rem .9rem; font-size: .9rem; font-weight: 600; cursor: pointer;
-    color: var(--hc-accent-ink); background: var(--hc-bg);
-    border: 1px solid var(--hc-border); border-radius: var(--hc-radius-sm); transition: border-color .15s, background-color .15s ease, scale .12s cubic-bezier(0.23, 1, 0.32, 1);
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+    min-width: 62px; min-height: 36px; padding: .4rem .8rem; font-family: inherit; font-size: .875rem; line-height: 1.25rem; font-weight: 500; cursor: pointer;
+    color: var(--hc-ink); background: var(--hc-bg);
+    border: 1px solid var(--hc-border); border-radius: var(--hc-radius-sm); transition: border-color .15s, background-color .15s, color .15s, scale .12s cubic-bezier(0.23, 1, 0.32, 1);
 }
-.hc-helpful button:hover { border-color: var(--hc-accent-line); background: var(--hc-accent-tint); }
-.hc-helpful .hc-helpful-thanks { color: var(--hc-muted); font-weight: 500; }
+.hc-helpful button:hover:not(:disabled) { border-color: var(--hc-accent-line); background: var(--hc-accent-tint); color: var(--hc-accent-ink); }
+.hc-helpful .hc-helpful-thanks { color: var(--hc-muted); font-size: .95rem; }
 
 .hcd-related { margin-top: 2.25rem; }
 .hcd-related h2 { margin: 0 0 .3rem; font-size: 1.2rem; font-weight: 700; letter-spacing: -.012em; }
@@ -477,12 +494,12 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 .hcd-page-search input::placeholder { color: var(--hc-faint); }
 .hcd-page-title { margin-bottom: 1.25rem; }
 .hcd-results { list-style: none; margin: 0; padding: 0; }
-.hcd-results li { padding: 1rem .15rem; }
+.hcd-results li { margin: 0; }
 .hcd-results li + li { border-top: 1px solid var(--hc-border); }
-.hcd-results a { font-size: 1rem; font-weight: 600; color: var(--hc-ink); }
-.hcd-results a:hover { color: var(--hc-accent-ink); }
+.hcd-results a { display: block; padding: 1rem .15rem; font-size: 1rem; font-weight: 600; color: var(--hc-ink); }
+.hcd-results a:hover { color: var(--hc-accent-ink); text-decoration: none; }
 .hcd-snippet {
-    margin: .3rem 0 0; color: var(--hc-muted); font-size: .9rem;
+    margin: .3rem 0 0; color: var(--hc-muted); font-size: .9rem; font-weight: 400;
     display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
@@ -522,7 +539,7 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
     display: inline-flex; align-items: center; gap: .4rem;
     padding: .4rem .55rem .4rem .6rem; margin: 0;
     font-family: inherit; font-size: .8rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: .03em; color: var(--hc-muted);
+    color: var(--hc-muted);
     background: var(--hc-bg); border: 1px solid var(--hc-border); border-radius: var(--hc-radius-sm);
     cursor: pointer; transition: border-color .15s, color .15s;
 }
@@ -541,7 +558,7 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 .hc-lang[data-open] .hc-lang-menu { display: block; }
 .hc-lang-menu a {
     display: block; padding: .45rem .6rem; border-radius: var(--hc-radius-sm);
-    font-size: .85rem; font-weight: 500; text-transform: uppercase; letter-spacing: .03em;
+    font-size: .85rem; font-weight: 500;
     color: var(--hc-ink);
 }
 .hc-lang-menu a:hover { background: var(--hc-accent-tint); color: var(--hc-accent-ink); text-decoration: none; }
@@ -574,8 +591,12 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
 }
 
 /* ---- Responsive ---- */
+@media (min-width: 1280px) {
+    :root { --hcd-sidebar-w: 19rem; }
+}
 @media (max-width: 1023px) {
     .hcd-nav-toggle { min-width: 44px; min-height: 44px; justify-content: center; }
+    .hcd-nav-home .hcd-nav-head { min-height: 44px; }
     .hcd-shell { display: block; }
     .hcd-sidebar-toggle {
         display: inline-flex; align-items: center; justify-content: center;
@@ -605,12 +626,20 @@ main#hc-main > .hcd-collections-section { max-width: calc(var(--hcd-content-w) +
     .hc-announcement { padding-block: 0; }
     .hc-announcement p { min-width: 0; padding-block: .55rem; overflow-wrap: anywhere; }
     .hc-announcement button { flex-shrink: 0; justify-content: center; }
-    .hcd-topbar-inner { padding: 0 1rem; gap: .8rem; }
+    /* Equal side columns would leave unused room beside the buttons and shrink the logo. */
+    .hcd-topbar-inner { grid-template-columns: minmax(0, 1fr) auto auto; padding: 0 1rem; gap: .5rem; }
     .hcd-search-btn { width: auto; min-width: 44px; min-height: 44px; justify-content: center; justify-self: end; padding: .45rem; border: 1px solid var(--hc-border); }
     .hcd-search-btn-label, .hcd-search-btn .hcd-kbd-combo { display: none; }
+    /* The written language name would squeeze the logo out of the bar. */
+    .hcd-topbar .hc-lang-current { display: none; }
+    .hcd-search-panel { margin-top: .75rem; }
+    .hcd-search-panel .hc-typeahead { max-height: calc(100dvh - 5.5rem); }
+    /* The page heading right below already names the current page. */
+    .hcd-breadcrumb li:has(> .hcd-crumb-current) { display: none; }
     .hcd-search-btn svg { width: 1.1rem; height: 1.1rem; }
     main#hc-main { padding: 1.5rem 1.25rem 3rem; }
     .hcd-hero-search .hcd-kbd-combo { display: none; }
+    .hc-helpful { min-height: calc(1.5rem + 44px); }
     .hc-helpful button { min-height: 44px; }
 }
 @media (hover: hover) and (pointer: fine) {

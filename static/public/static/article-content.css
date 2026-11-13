@@ -173,11 +173,16 @@ body.hc-embed { min-height: 0; }
     --hc-muted: #a3a8ae;
     --hc-faint: #82878e;
     --hc-border: #2c2e31;
-    --hc-bg: #1e1f1e;
+    --hc-bg: #1d1f22;
     --hc-page: #16181b;
     --hcd-sidebar-bg: #1a1c1f;
     --hc-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .5);
     --hc-shadow-lift: 0 4px 12px rgba(0, 0, 0, .5), 0 10px 30px rgba(0, 0, 0, .55);
+}
+
+/* Floors the lightness, since a dark accent color leaves links and icons unreadable on the dark page. */
+@supports (color: oklch(from red l c h)) {
+    .hc-dark { --hc-accent-ink: oklch(from color-mix(in srgb, var(--hc-accent), #ffffff 34%) max(l, .72) c h); }
 }
 
 .hc-dark .hc-prose pre { border: 1px solid var(--hc-border); }
