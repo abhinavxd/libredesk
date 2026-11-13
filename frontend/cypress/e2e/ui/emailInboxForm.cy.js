@@ -34,7 +34,9 @@ const inboxFixture = () => ({
         tls_type: 'tls',
         read_interval: '5m',
         scan_inbox_since: '48h',
-        tls_skip_verify: false
+        tls_skip_verify: false,
+        append_sent: false,
+        sent_mailbox: ''
       }
     ],
     smtp: [
