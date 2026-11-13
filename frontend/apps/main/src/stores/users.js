@@ -30,10 +30,11 @@ export const useUsersStore = defineStore('users', () => {
     }))
     const users = lookup.rows
     const options = computed(() => toOptions(users.value))
-    const searchUsers = async (query) => toOptions(await lookup.search(query))
-    // Rows built from a conversation's assignee carry no enabled field, only an explicit false marks a disabled agent.
-    const isEnabled = (option) => option.enabled !== false
-    const searchEnabledUsers = async (query) => (await searchUsers(query)).filter(isEnabled)
+    const searchUsers = async (query, params) => toOptions(await lookup.search(query, params))
+    // Rows built from a conversation's assignee carry no enabled field and count as disabled until the agent is fetched.
+    const isEnabled = (option) => option.enabled === true
+    // The server drops disabled agents before paging, so they cannot fill the page ahead of enabled matches.
+    const searchEnabledUsers = async (query) => (await searchUsers(query, { enabled: true })).filter(isEnabled)
 
     const setAvailability = (agentID, status) => {
         lookup.patch(agentID, { availability_status: status })
