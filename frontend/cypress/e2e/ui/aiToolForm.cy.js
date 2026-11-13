@@ -1,6 +1,7 @@
 // The steps run in order and share the record created by the first one.
 
 const stamp = Date.now()
+const toolDisplayName = `Cypress tool ${stamp}`
 const toolName = `cypress_tool_${stamp}`
 const toolDescription = `Looks up an order for the tool form spec ${stamp}`
 const toolUrl = `https://api.example.com/orders/${stamp}`
@@ -34,7 +35,8 @@ describe('AI tool form', () => {
 
     cy.visit(newPath)
 
-    cy.get('input[name="name"]').type(toolName)
+    cy.get('input[name="display_name"]').type(toolDisplayName)
+    cy.get('input[name="name"]').should('have.value', toolName)
     cy.get('textarea[name="description"]').type(toolDescription)
     cy.get('input[name="url"]').type(toolUrl)
     pickOption('method', 'GET')
@@ -48,12 +50,24 @@ describe('AI tool form', () => {
     cy.get('button[type="submit"]').click()
     cy.wait('@createTool').then(({ response }) => {
       expect(response.statusCode).to.eq(200)
+      expect(response.body.data.display_name).to.eq(toolDisplayName)
+      expect(response.body.data.name).to.eq(toolName)
       toolId = response.body.data.id
     })
 
     cy.location('pathname').should('eq', listPath)
-    filterList(toolName)
-    cy.contains(toolName).should('exist')
+    filterList(toolDisplayName)
+    cy.contains('tr', toolDisplayName).should('contain', toolName)
+  })
+
+  it('keeps a hand-edited key when the name changes', () => {
+    cy.visit(newPath)
+
+    cy.get('input[name="display_name"]').type('Refund order')
+    cy.get('input[name="name"]').should('have.value', 'refund_order').clear().type('custom_key')
+    cy.get('input[name="display_name"]').type(' now')
+
+    cy.get('input[name="name"]').should('have.value', 'custom_key')
   })
 
   it('loads the saved values back into the edit form', () => {
@@ -61,6 +75,7 @@ describe('AI tool form', () => {
 
     cy.visit(`${listPath}/${toolId}/edit`)
 
+    cy.get('input[name="display_name"]').should('have.value', toolDisplayName)
     cy.get('input[name="name"]').should('have.value', toolName)
     cy.get('textarea[name="description"]').should('have.value', toolDescription)
     cy.get('input[name="url"]').should('have.value', toolUrl)
@@ -118,6 +133,7 @@ describe('AI tool form', () => {
 
     // The scrolling admin pane clips the message, so assert it exists rather than is visible.
     cy.contains(/required/i).should('exist')
+    cy.get('input[name="display_name"]').should('have.attr', 'aria-invalid', 'true')
     cy.get('input[name="name"]').should('have.attr', 'aria-invalid', 'true')
     cy.get('@createTool.all').should('have.length', 0)
     cy.location('pathname').should('eq', newPath)
@@ -127,12 +143,12 @@ describe('AI tool form', () => {
     cy.intercept('DELETE', `**/api/v1/ai/tools/${toolId}`).as('deleteTool')
 
     cy.visit(listPath)
-    filterList(toolName)
-    cy.contains('tr', toolName).find('button[aria-haspopup="menu"]').click()
+    filterList(toolDisplayName)
+    cy.contains('tr', toolDisplayName).find('button[aria-haspopup="menu"]').click()
     cy.get('[role="menuitem"]').contains('Delete').click()
     cy.get('[role="alertdialog"]').contains('button', 'Delete').click()
 
     cy.wait('@deleteTool').its('response.statusCode').should('eq', 200)
-    cy.contains(toolName).should('not.exist')
+    cy.contains(toolDisplayName).should('not.exist')
   })
 })
