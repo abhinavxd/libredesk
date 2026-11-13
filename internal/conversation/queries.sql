@@ -758,10 +758,8 @@ FROM conversation_messages m
 JOIN conversations c ON m.conversation_id = c.id
 WHERE m.uuid = $1;
 
--- name: unassign-open-conversations
-UPDATE conversations
-SET assigned_user_id = NULL,
-    updated_at = NOW()
+-- name: get-open-conversation-uuids-by-assignee
+SELECT uuid FROM conversations
 WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
 -- name: update-conversation-custom-attributes
