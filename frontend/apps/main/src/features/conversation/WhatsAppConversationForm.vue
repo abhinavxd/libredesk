@@ -124,6 +124,7 @@
           <SelectAgentCombobox
             v-model="agentId"
             include-none
+            block-away-reassigning
             :button-class="isUnset(agentId) ? ROW_COMBOBOX_EMPTY_CLASS : ROW_COMBOBOX_CLASS"
           />
         </div>
@@ -206,6 +207,7 @@ import { useContactSearch } from './useContactSearch.js'
 import ContactSearchResults from './ContactSearchResults.vue'
 import api from '@/api'
 import { useNewConversationDraft } from './useNewConversationDraft.js'
+import { useClearBlockedSelfAssignee } from './useClearBlockedSelfAssignee.js'
 import {
   ROW_CLASS,
   ROW_LABEL_CLASS,
@@ -244,6 +246,7 @@ const {
 const inboxId = ref('')
 const teamId = ref(null)
 const agentId = ref(userStore.userID ? String(userStore.userID) : 'none')
+useClearBlockedSelfAssignee(() => agentId.value, () => (agentId.value = 'none'))
 const loading = ref(false)
 
 const selectedContact = ref(null)

@@ -51,5 +51,6 @@ const submitForm = async (values) => {
     Object.entries(values).map(([key, value]) => [`app.${key}`, value])
   )
   await api.updateSettings('general', updatedValues)
+  await settingsStore.fetchSettings('general')
 }
 </script>

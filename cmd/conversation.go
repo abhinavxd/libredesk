@@ -1124,6 +1124,13 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// The assignee is checked before the conversation exists because a failed assignment after creation is not reported.
+	if req.AssignedAgentID > 0 {
+		if err := app.conversation.ValidateUserAssignee(req.AssignedAgentID); err != nil {
+			return "", err
+		}
+	}
+
 	// Validate custom attribute keys. Skip unknown keys.
 	if len(req.CustomAttributes) > 0 {
 		attrs, err := app.customAttribute.GetAll("conversation")

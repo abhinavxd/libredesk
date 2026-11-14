@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	am "github.com/abhinavxd/libredesk/internal/authz/models"
+	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -17,6 +18,7 @@ import (
 	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/zerodha/logf"
 )
 
@@ -25,8 +27,18 @@ type unassignWebhook struct {
 	events []wmodels.WebhookEvent
 }
 
+// assigneeSettingsStore returns blockAwayReassigning as the stored JSON value of every setting.
+type assigneeSettingsStore struct {
+	settingsStore
+	blockAwayReassigning string
+}
+
 func (w *unassignWebhook) TriggerEvent(event wmodels.WebhookEvent, _ any) {
 	w.events = append(w.events, event)
+}
+
+func (s assigneeSettingsStore) Get(string) (types.JSONText, error) {
+	return types.JSONText(s.blockAwayReassigning), nil
 }
 
 func TestCSATSubmissionBroadcastsSavedFeedback(t *testing.T) {
@@ -245,6 +257,68 @@ func TestDisabledAgentGetsNoConversations(t *testing.T) {
 	})
 }
 
+func TestAwayReassigningAssigneeFollowsBlockSetting(t *testing.T) {
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	away := umodels.User{ID: 1, Enabled: true, AvailabilityStatus: umodels.AwayAndReassigning}
+
+	for name, tt := range map[string]struct {
+		agent   umodels.User
+		setting string
+		wantErr bool
+	}{
+		"online agent is assignable with the setting on":                {umodels.User{Enabled: true, AvailabilityStatus: umodels.Online}, `true`, false},
+		"manually away agent is assignable with the setting on":         {umodels.User{Enabled: true, AvailabilityStatus: umodels.AwayManual}, `true`, false},
+		"away and reassigning agent is rejected with the setting on":    {away, `true`, true},
+		"away and reassigning agent is assignable with the setting off": {away, `false`, false},
+		"disabled agent is rejected with the setting off":               {umodels.User{AvailabilityStatus: umodels.Online}, `false`, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m.userStore = replyUserStore{agent: tt.agent}
+			m.settingsStore = assigneeSettingsStore{blockAwayReassigning: tt.setting}
+			if err := m.ValidateUserAssignee(tt.agent.ID); (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateUserAssignee() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+
+	t.Run("assign user action is rejected for an away and reassigning agent", func(t *testing.T) {
+		db := testutil.NewDB(t, "away_assignee")
+		if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+			t.Fatal(err)
+		}
+		var contact, inbox int
+		if err := db.Get(&contact, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Contact', '') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(&away.ID, `INSERT INTO users (type, first_name, last_name, availability_status) VALUES ('agent', 'Away', '', 'away_and_reassigning') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		var conv models.Conversation
+		if err := db.Get(&conv.UUID, `INSERT INTO conversations (contact_id, inbox_id, status_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = 'Open')) RETURNING uuid`, contact, inbox); err != nil {
+			t.Fatal(err)
+		}
+		m.userStore = replyUserStore{agent: away}
+		m.settingsStore = assigneeSettingsStore{blockAwayReassigning: `true`}
+
+		action := amodels.RuleAction{Type: amodels.ActionAssignUser, Value: []string{fmt.Sprint(away.ID)}}
+		if err := m.ApplyAction(action, conv, umodels.User{ID: contact}); err == nil {
+			t.Fatal("assign user action to an away and reassigning agent succeeded")
+		}
+		var assigned int
+		if err := db.Get(&assigned, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, conv.UUID); err != nil {
+			t.Fatal(err)
+		}
+		if assigned != 0 {
+			t.Fatalf("assignee = %d, want the conversation left unassigned", assigned)
+		}
+	})
+}
+
 func TestUnassignOpenUnassignsEachOpenConversation(t *testing.T) {
 	db := testutil.NewDB(t, "unassign_open")
 	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
@@ -317,5 +391,26 @@ func TestUnassignOpenUnassignsEachOpenConversation(t *testing.T) {
 		if event != wmodels.EventConversationUnassigned {
 			t.Fatalf("event = %s, want %s", event, wmodels.EventConversationUnassigned)
 		}
+	}
+
+	// A conversation that changed hands or got resolved after the open list was read is left alone.
+	for subject, want := range map[string]int{"other agent's": staying, "resolved": leaving} {
+		var uuid string
+		if err := db.Get(&uuid, `SELECT uuid FROM conversations WHERE subject = $1`, subject); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.unassignIfStillOpen(uuid, leaving, umodels.User{}); err != nil {
+			t.Fatal(err)
+		}
+		var got int
+		if err := db.Get(&got, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, uuid); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s conversation assignee = %d, want %d", subject, got, want)
+		}
+	}
+	if len(webhooks.events) != 2 {
+		t.Fatalf("unassigned events = %d, want none added for conversations left alone", len(webhooks.events))
 	}
 }
