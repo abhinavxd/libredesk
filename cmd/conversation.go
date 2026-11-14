@@ -567,10 +567,6 @@ func handleUpdateUserAssignee(r *fastglue.Request) error {
 		return r.SendEnvelope(true)
 	}
 
-	if err := validateAgentAssignable(app, req.AssigneeID); err != nil {
-		return sendErrorEnvelope(r, err)
-	}
-
 	if err := app.conversation.UpdateConversationUserAssignee(uuid, req.AssigneeID, user); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -1128,8 +1124,9 @@ func validateCreateConversationRequest(req createConversationRequest, app *App) 
 		return "", envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
+	// The assignee is checked before the conversation exists because a failed assignment after creation is not reported.
 	if req.AssignedAgentID > 0 {
-		if err := validateAgentAssignable(app, req.AssignedAgentID); err != nil {
+		if err := app.conversation.ValidateUserAssignee(req.AssignedAgentID); err != nil {
 			return "", err
 		}
 	}
@@ -1212,19 +1209,4 @@ func accessibleConversationUUID(app *App, uuid string, user umodels.User) (strin
 		return "", err
 	}
 	return uuid, nil
-}
-
-// validateAgentAssignable rejects agents who are away and reassigning when the general setting blocks them.
-func validateAgentAssignable(app *App, agentID int) error {
-	if !app.consts.Load().(*constants).BlockAssignAwayReassigning {
-		return nil
-	}
-	agent, err := app.user.GetAgent(agentID, "")
-	if err != nil {
-		return err
-	}
-	if agent.AvailabilityStatus == umodels.AwayAndReassigning {
-		return envelope.NewError(envelope.InputError, app.i18n.T("conversation.error.agentAwayReassigning"), nil)
-	}
-	return nil
 }
