@@ -49,6 +49,9 @@ var (
 	ErrApiKeyNotSet        = errors.New("api Key not set")
 	ErrRateLimited         = errors.New("rate limited by AI provider")
 	ErrProviderUnavailable = errors.New("AI provider unavailable")
+	// ErrOutputTruncated means the model hit the token limit before producing any text, e.g. a reasoning
+	// model that used the whole budget on thinking.
+	ErrOutputTruncated = errors.New("output truncated by the token limit")
 )
 
 type settingsStore interface {
@@ -516,6 +519,10 @@ func (m *Manager) providerError(err error) error {
 	if errors.Is(err, ErrProviderUnavailable) {
 		m.lo.Error("AI provider unavailable", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("ai.providerUnavailable"), nil)
+	}
+	if errors.Is(err, ErrOutputTruncated) {
+		m.lo.Error("AI output truncated by the token limit", "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("ai.responseTruncated"), nil)
 	}
 	m.lo.Error("error from AI provider", "error", err)
 	return envelope.NewError(envelope.GeneralError, capProviderErrorMessage(err), nil)

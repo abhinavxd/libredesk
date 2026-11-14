@@ -616,6 +616,7 @@
   "ai.apiKeyNotSet": "The AI provider API key is not set. Ask your administrator to add it in AI settings.",
   "ai.assistantUnavailable": "The selected assistant is unavailable. It may have been removed or disabled. Pick another assistant or use the default Copilot.",
   "ai.emptyResponse": "The AI returned an empty response. Nothing was generated. Try again, or rephrase your request.",
+  "ai.responseTruncated": "The AI ran out of output tokens before it finished answering. Ask an admin to raise Max tokens in the AI provider settings, then try again.",
   "ai.faqAlreadyReviewed": "This suggestion has already been reviewed.",
   "ai.invalidAPIKey": "The AI provider rejected the API key. AI features won't work until your administrator updates it in AI settings.",
   "ai.noAnswerWithinSteps": "The AI hit its step limit before answering. Try a simpler request, or ask an admin to raise the limit.",
