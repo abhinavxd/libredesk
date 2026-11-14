@@ -114,6 +114,7 @@ type Tool struct {
 	CreatedAt             time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time      `db:"updated_at" json:"updated_at"`
 	Name                  string         `db:"name" json:"name"`
+	DisplayName           string         `db:"display_name" json:"display_name"`
 	Description           string         `db:"description" json:"description"`
 	URL                   string         `db:"url" json:"url"`
 	Method                string         `db:"method" json:"method"`
@@ -128,9 +129,10 @@ type Tool struct {
 }
 
 type ToolApproval struct {
-	RunID     string `json:"run_id"`
-	ToolName  string `json:"tool_name"`
-	Arguments string `json:"arguments"`
+	RunID           string `json:"run_id"`
+	ToolName        string `json:"tool_name"`
+	ToolDisplayName string `json:"tool_display_name"`
+	Arguments       string `json:"arguments"`
 }
 
 type AgentRunResult struct {

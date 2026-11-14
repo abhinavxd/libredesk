@@ -26,6 +26,23 @@ func newTestManager(t *testing.T) *Manager {
 	return &Manager{lo: &lo, i18n: tr, encryptionKey: testEncryptionKey, pendingRuns: make(map[string]*pendingAgentRun)}
 }
 
+func TestToolDisplayNameDefaultsToName(t *testing.T) {
+	m := newTestManager(t)
+	for _, tc := range []struct{ displayName, want string }{
+		{"", "get_order"},
+		{"   ", "get_order"},
+		{"  Look up order  ", "Look up order"},
+	} {
+		tool := &models.Tool{Name: "get_order", DisplayName: tc.displayName, URL: "https://api.example.com/order", Method: "GET"}
+		if err := m.validateToolInput(tool); err != nil {
+			t.Fatalf("display name %q: %v", tc.displayName, err)
+		}
+		if tool.DisplayName != tc.want {
+			t.Fatalf("display name %q: got %q, want %q", tc.displayName, tool.DisplayName, tc.want)
+		}
+	}
+}
+
 func decodeToolAuth(t *testing.T, raw types.JSONText) models.ToolAuth {
 	t.Helper()
 	var auth models.ToolAuth
@@ -58,6 +75,8 @@ func TestValidateToolInput(t *testing.T) {
 		{"non-http url", func(tl *models.Tool) { tl.URL = "ftp://x/y" }, true},
 		{"url without host", func(tl *models.Tool) { tl.URL = "http:///nohost" }, true},
 		{"invalid params json", func(tl *models.Tool) { tl.Parameters = types.JSONText("not json") }, true},
+		{"140-char display name ok", func(tl *models.Tool) { tl.DisplayName = strings.Repeat("a", 140) }, false},
+		{"display name too long", func(tl *models.Tool) { tl.DisplayName = strings.Repeat("a", 141) }, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
