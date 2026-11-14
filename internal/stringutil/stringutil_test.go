@@ -34,6 +34,33 @@ func TestTruncateUTF8(t *testing.T) {
 	}
 }
 
+func TestTruncateRunes(t *testing.T) {
+	tests := []struct {
+		name  string
+		in    string
+		limit int
+		want  string
+	}{
+		{"empty", "", 5, ""},
+		{"negative limit", "hello", -1, ""},
+		{"zero limit", "hello", 0, ""},
+		{"below limit", "hello", 10, "hello"},
+		{"at limit", "hello", 5, "hello"},
+		{"above limit", "hello", 3, "hel"},
+		{"unicode at limit", "aé界😀", 4, "aé界😀"},
+		{"unicode above limit", "aé界😀x", 4, "aé界😀"},
+		{"emoji", "😀界éa", 1, "😀"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := TruncateRunes(tt.in, tt.limit)
+			if !utf8.ValidString(got) || got != tt.want {
+				t.Fatalf("TruncateRunes(%q, %d) = %q, want %q", tt.in, tt.limit, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestWhatsAppPhoneForDialCode(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -436,6 +463,27 @@ func TestSplitName(t *testing.T) {
 				t.Errorf("SplitName(%q) = (%q, %q), want (%q, %q)", tt.input, first, last, tt.wantFirst, tt.wantLast)
 			}
 		})
+	}
+}
+
+func TestCapitalizeFirst(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{input: "", want: ""},
+		{input: "thulasi", want: "Thulasi"},
+		{input: "Thulasi", want: "Thulasi"},
+		{input: "john.doe", want: "John.doe"},
+		{input: "123abc", want: "123abc"},
+		{input: "élodie", want: "Élodie"},
+		{input: "\xffabc", want: "\xffabc"},
+	}
+
+	for _, tt := range tests {
+		if got := CapitalizeFirst(tt.input); got != tt.want {
+			t.Errorf("CapitalizeFirst(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }
 func TestGenerateSlug(t *testing.T) {

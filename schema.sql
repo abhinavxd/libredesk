@@ -152,6 +152,7 @@ CREATE TABLE teams (
 	emoji TEXT NULL,
 	conversation_assignment_type conversation_assignment_type NOT NULL,
 	max_auto_assigned_conversations INT DEFAULT 0 NOT NULL,
+	skip_offline_agents BOOLEAN DEFAULT false NOT NULL,
 
 	-- Set to NULL when business hours or SLA policy is deleted.
 	business_hours_id INT REFERENCES business_hours(id) ON DELETE SET NULL ON UPDATE CASCADE NULL,
@@ -212,6 +213,7 @@ CREATE TABLE users (
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
+CREATE INDEX index_tgrm_users_on_full_name ON users USING GIN ((first_name || ' ' || COALESCE(last_name, '')) gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
@@ -470,6 +472,7 @@ CREATE TABLE oidc (
 	client_id TEXT NOT NULL,
 	client_secret TEXT NOT NULL,
 	enabled bool DEFAULT TRUE NOT NULL,
+	verify_email BOOLEAN DEFAULT TRUE NOT NULL,
 	provider VARCHAR NULL,
 	logo_url TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_oidc_on_name CHECK (length("name") <= 140)
@@ -823,6 +826,7 @@ CREATE TABLE ai_tools (
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	name TEXT NOT NULL UNIQUE,
+	display_name TEXT NOT NULL DEFAULT '',
 	description TEXT NOT NULL DEFAULT '',
 	url TEXT NOT NULL,
 	method TEXT NOT NULL DEFAULT 'POST',
@@ -833,7 +837,8 @@ CREATE TABLE ai_tools (
 	copilot_enabled BOOLEAN NOT NULL DEFAULT false,
 	generate_reply_enabled BOOLEAN NOT NULL DEFAULT false,
 	requires_agent_approval BOOLEAN NOT NULL DEFAULT true,
-	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
+	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64),
+	CONSTRAINT constraint_ai_tools_on_display_name CHECK (length(display_name) <= 140)
 );
 
 DROP TABLE IF EXISTS ai_assistants CASCADE;
@@ -1175,6 +1180,8 @@ VALUES
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>A new conversation has been assigned to you:</p>
 
 <div>
@@ -1196,6 +1203,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation assigned to you:</p>
 
 <div>
@@ -1221,6 +1230,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation you are participating in:</p>
 
 <div>
@@ -1246,6 +1257,8 @@ VALUES('email_notification'::template_type, '
 INSERT INTO templates
 ("type", body, is_default, "name", subject, is_builtin)
 VALUES('email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied and reopened a conversation assigned to you:</p>
 
 <div>
@@ -1273,6 +1286,7 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
 
 <p>This is a notification that the SLA for conversation {{ .Conversation.ReferenceNumber }} is approaching the SLA deadline for {{ .SLA.Metric }}.</p>
 
@@ -1305,6 +1319,8 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>This is an urgent alert that the SLA for conversation {{ .Conversation.ReferenceNumber }} has been breached for {{ .SLA.Metric }}. Please take immediate action.</p>
 
 <p>
@@ -1336,6 +1352,8 @@ INSERT INTO templates
 VALUES (
   'email_notification'::template_type,
   '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .MentionedBy.FullName }} mentioned you in a private note on conversation #{{ .Conversation.ReferenceNumber }}.</p>
 
 <blockquote style="background-color: #f5f5f5; padding: 12px; margin: 16px 0; border-left: 4px solid #ddd;">

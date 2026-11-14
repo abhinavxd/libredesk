@@ -1,34 +1,30 @@
 <template>
-  <form @submit="onSubmit" novalidate class="space-y-6 w-full">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" v-bind="componentField" />
-        </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.nameHint') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+  <form @submit="onSubmit" novalidate class="tool-form space-y-6 w-full">
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="display_name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.key') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ t('admin.ai.tool.nameHint') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
-    <FormField v-slot="{ componentField }" name="description">
-      <FormItem>
-        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
-        <FormControl>
-          <Textarea
-            rows="3"
-            :placeholder="t('admin.ai.tool.descriptionPlaceholder')"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormDescription>{{ t('admin.ai.tool.descriptionHint') }}</FormDescription>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <div class="grid gap-6 md:grid-cols-3">
+    <FormGrid class="tool-connection-grid">
       <FormField v-slot="{ componentField }" name="url">
-        <FormItem class="md:col-span-2">
+        <FormItem>
           <FormLabel>{{ t('globals.terms.url') }}</FormLabel>
           <FormControl>
             <Input
@@ -59,7 +55,22 @@
           <FormMessage />
         </FormItem>
       </FormField>
-    </div>
+    </FormGrid>
+
+    <FormField v-slot="{ componentField }" name="description">
+      <FormItem>
+        <FormLabel>{{ t('globals.terms.description') }}</FormLabel>
+        <FormControl>
+          <Textarea
+            rows="3"
+            :placeholder="t('admin.ai.tool.descriptionPlaceholder')"
+            v-bind="componentField"
+          />
+        </FormControl>
+        <FormDescription>{{ t('admin.ai.tool.descriptionHint') }}</FormDescription>
+        <FormMessage />
+      </FormItem>
+    </FormField>
 
     <FormField v-slot="{ componentField, handleChange, meta }" name="headers">
       <FormItem>
@@ -123,45 +134,46 @@
       </FormItem>
     </FormField>
 
-    <div class="space-y-5 rounded-lg border border-border p-4">
-      <div>
-        <h3 class="font-medium text-sm text-muted-foreground">{{ t('globals.terms.agentAccess') }}</h3>
+    <fieldset class="min-w-0">
+      <legend class="ui-heading mb-4">
+        {{ t('globals.terms.agentAccess') }}
+      </legend>
+      <div class="space-y-5">
+        <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.availableInCopilot')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.availableInGenerateReply')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+
+        <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.ai.tool.requireAgentApproval')"
+              :description="t('admin.ai.tool.requireAgentApprovalHint')"
+              :checked="componentField.modelValue"
+              :disabled="!hasAgentSurface"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
       </div>
+    </fieldset>
 
-      <FormField v-slot="{ componentField, handleChange }" name="copilot_enabled">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.availableInCopilot')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField, handleChange }" name="generate_reply_enabled">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.availableInGenerateReply')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField, handleChange }" name="requires_agent_approval">
-        <FormItem>
-          <SwitchField
-            :title="t('admin.ai.tool.requireAgentApproval')"
-            :description="t('admin.ai.tool.requireAgentApprovalHint')"
-            :checked="componentField.modelValue"
-            :disabled="!hasAgentSurface"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-    </div>
-
-    <div class="flex justify-end mt-10">
+    <div class="flex justify-end">
       <Button type="submit" :isLoading="formLoading">
         {{ isEditing ? t('globals.messages.save') : t('globals.messages.create') }}
       </Button>
@@ -198,6 +210,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { computed, ref, watch } from 'vue'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -257,6 +270,11 @@ const formLoading = ref(false)
 const form = useForm({
   validationSchema: toTypedSchema(
     z.object({
+      display_name: z
+        .string({ required_error: t('globals.messages.required') })
+        .trim()
+        .min(1, { message: t('globals.messages.required') })
+        .max(140, { message: t('globals.messages.maxLength', { max: 140 }) }),
       name: z
         .string({ required_error: t('globals.messages.required') })
         .min(1, { message: t('globals.messages.required') })
@@ -282,6 +300,7 @@ const form = useForm({
     })
   ),
   initialValues: {
+    display_name: '',
     name: '',
     description: '',
     url: '',
@@ -295,6 +314,24 @@ const form = useForm({
     requires_agent_approval: true
   }
 })
+
+const generateKeyFromName = (name) =>
+  (name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 64)
+
+// A new tool's key follows its name until the key is edited by hand. An existing tool's key changes only when edited directly.
+watch(
+  () => form.values.display_name,
+  (displayName, previousDisplayName) => {
+    if (props.isEditing || form.values.name !== generateKeyFromName(previousDisplayName)) return
+    form.setFieldError('name', undefined)
+    form.setFieldValue('name', generateKeyFromName(displayName), false)
+  }
+)
 
 const hasAgentSurface = computed(
   () => form.values.copilot_enabled || form.values.generate_reply_enabled
@@ -327,6 +364,7 @@ watch(
   (values) => {
     form.setValues(
       {
+        display_name: values.display_name || '',
         name: values.name || '',
         description: values.description || '',
         url: values.url || '',
@@ -367,6 +405,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   try {
     formLoading.value = true
     await props.submitForm({
+      display_name: values.display_name,
       name: values.name,
       description: values.description || '',
       url: values.url,
@@ -384,3 +423,19 @@ const onSubmit = form.handleSubmit(async (values) => {
   }
 })
 </script>
+
+<style scoped>
+.tool-form {
+  container-type: inline-size;
+}
+
+.tool-connection-grid.form-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 40rem) {
+  .tool-connection-grid.form-grid {
+    grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr);
+  }
+}
+</style>

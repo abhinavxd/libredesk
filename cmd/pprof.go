@@ -6,11 +6,11 @@ import (
 	"net/http/pprof"
 	"runtime"
 
-	"github.com/abhinavxd/libredesk/internal/colorlog"
+	"github.com/zerodha/logf"
 )
 
 // startPprof starts the net/http/pprof server on its own address if enabled in config.
-func startPprof() {
+func startPprof(logger *logf.Logger) {
 	if !ko.Bool("app.pprof.enabled") {
 		return
 	}
@@ -36,14 +36,14 @@ func startPprof() {
 
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		colorlog.Red("error starting pprof server: %v", err)
+		logger.Error("error starting pprof server", "error", err)
 		return
 	}
-	colorlog.Green("pprof server started at %s", addr)
+	logger.Info("pprof server started", "address", addr)
 
 	go func() {
 		if err := http.Serve(ln, mux); err != nil {
-			colorlog.Red("pprof server stopped: %v", err)
+			logger.Error("pprof server stopped", "error", err)
 		}
 	}()
 }

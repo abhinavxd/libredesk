@@ -1,11 +1,6 @@
 <template>
   <DropdownMenu>
-    <DropdownMenuTrigger as-child>
-      <Button variant="ghost" class="w-8 h-8 p-0">
-        <span class="sr-only"></span>
-        <MoreVertical class="w-4 h-4" />
-      </Button>
-    </DropdownMenuTrigger>
+    <DataTableActionTrigger />
     <DropdownMenuContent>
       <DropdownMenuItem @click="editRole(props.role.id)">
         <Pencil class="mr-2 h-4 w-4" />
@@ -43,14 +38,14 @@
 </template>
 
 <script setup>
+import DataTableActionTrigger from '@main/components/datatable/DataTableActionTrigger.vue'
 import { ref } from 'vue'
-import { MoreVertical, Pencil, Trash } from 'lucide-vue-next'
+import { Pencil, Trash } from 'lucide-vue-next'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuSeparator
 } from '@shared-ui/components/ui/dropdown-menu'
 import {
   AlertDialog,
@@ -62,13 +57,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@shared-ui/components/ui/alert-dialog'
-import { Button } from '@shared-ui/components/ui/button'
 import { useRouter } from 'vue-router'
-import { useEmitter } from '../../../composables/useEmitter'
+import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
-import { Roles } from '../../../constants/user'
-import api from '../../../api'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
+import { Roles } from '@/constants/user'
+import api from '@/api'
 
 const alertOpen = ref(false)
 const emit = useEmitter()

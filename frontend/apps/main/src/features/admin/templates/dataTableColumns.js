@@ -1,16 +1,16 @@
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 
 export const createOutgoingEmailTableColumns = (t) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-template', params: { id: row.original.id } },
@@ -23,12 +23,13 @@ export const createOutgoingEmailTableColumns = (t) => [
   },
   {
     accessorKey: 'is_default',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.default')),
+    header: () => h('div', null, t('globals.terms.default')),
     cell: ({ row }) => {
       const isDefault = row.getValue('is_default')
 
-      return h('div', { class: 'text-center' }, [
+      return h('div', null, [
         h('input', {
           type: 'checkbox',
           checked: isDefault,
@@ -39,12 +40,13 @@ export const createOutgoingEmailTableColumns = (t) => [
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {
@@ -69,10 +71,10 @@ export const createEmailNotificationTableColumns = (t) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         h(RouterLink,
           {
             to: { name: 'edit-template', params: { id: row.original.id } },
@@ -86,12 +88,13 @@ export const createEmailNotificationTableColumns = (t) => [
 
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {

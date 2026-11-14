@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-2">
+  <Collapsible v-model:open="advancedOpen" class="space-y-2">
     <div class="flex flex-wrap items-center gap-2">
       <div :class="FILTER_CLASS">
         <SelectComboBox
@@ -7,16 +7,7 @@
           :items="statusItems"
           :placeholder="t('globals.terms.status')"
           align="start"
-          @update:model-value="set('status', $event)"
-        />
-      </div>
-      <div :class="FILTER_CLASS">
-        <SelectComboBox
-          :model-value="filters.priority"
-          :items="priorityItems"
-          :placeholder="t('globals.terms.priority')"
-          align="start"
-          @update:model-value="set('priority', $event)"
+          @select="toggle('status', $event)"
         />
       </div>
       <div :class="FILTER_CLASS">
@@ -25,7 +16,7 @@
           :items="inboxStore.options"
           :placeholder="t('globals.terms.inbox')"
           align="start"
-          @update:model-value="set('inbox', $event)"
+          @select="toggle('inbox', $event)"
         />
       </div>
       <div :class="FILTER_CLASS">
@@ -33,31 +24,66 @@
           :model-value="filters.assignee"
           :placeholder="t('globals.terms.assignee')"
           :prepend-items="unassignedItem"
+          include-disabled
           align="start"
-          @update:model-value="set('assignee', $event)"
+          @select="toggle('assignee', $event)"
         />
       </div>
-      <div :class="FILTER_CLASS">
-        <SelectTeamCombobox
-          :model-value="filters.team"
-          :placeholder="t('globals.terms.team')"
-          :prepend-items="unassignedItem"
-          align="start"
-          @update:model-value="set('team', $event)"
-        />
-      </div>
-      <div class="w-36 shrink-0">
-        <SearchTagFilter :model-value="filters.tags" @update:model-value="set('tags', $event)" />
-      </div>
-      <div class="flex-[1.5] min-w-60">
-        <DateFilterValue
-          :model-value="filters.created"
-          :placeholder="t('globals.terms.conversationDate')"
-          range
-          @update:model-value="set('created', $event)"
-        />
-      </div>
+      <CollapsibleTrigger as-child>
+        <Button type="button" variant="outline" class="shrink-0 gap-2 font-normal">
+          <SlidersHorizontal class="size-4" aria-hidden="true" />
+          {{ t('globals.messages.moreFilters') }}
+          <Badge v-if="advancedFilterCount" variant="secondary" class="tabular-nums">
+            {{ advancedFilterCount }}
+          </Badge>
+          <ChevronDown :class="['size-4', { 'rotate-180': advancedOpen }]" aria-hidden="true" />
+        </Button>
+      </CollapsibleTrigger>
+      <Button
+        v-if="hasActiveFilters(filters)"
+        type="button"
+        variant="ghost"
+        class="shrink-0 gap-2 font-normal text-muted-foreground"
+        @click="emit('update:filters', emptyFilters())"
+      >
+        <X class="size-4" aria-hidden="true" />
+        {{ t('globals.messages.clearFilters') }}
+      </Button>
     </div>
+
+    <CollapsibleContent style="animation: none">
+      <div class="flex flex-wrap items-center gap-2 pt-1">
+        <div :class="FILTER_CLASS">
+          <SelectComboBox
+            :model-value="filters.priority"
+            :items="priorityItems"
+            :placeholder="t('globals.terms.priority')"
+            align="start"
+            @select="toggle('priority', $event)"
+          />
+        </div>
+        <div :class="FILTER_CLASS">
+          <SelectTeamCombobox
+            :model-value="filters.team"
+            :placeholder="t('globals.terms.team')"
+            :prepend-items="unassignedItem"
+            align="start"
+            @select="toggle('team', $event)"
+          />
+        </div>
+        <div class="w-36 shrink-0">
+          <SearchTagFilter :model-value="filters.tags" @update:model-value="set('tags', $event)" />
+        </div>
+        <div class="flex-[1.5] min-w-60">
+          <DateFilterValue
+            :model-value="filters.created"
+            :placeholder="t('globals.terms.conversationDate')"
+            range
+            @update:model-value="set('created', $event)"
+          />
+        </div>
+      </div>
+    </CollapsibleContent>
 
     <div v-if="selectedTags.length" class="flex flex-wrap gap-1.5">
       <Button
@@ -74,13 +100,20 @@
         <X aria-hidden="true" />
       </Button>
     </div>
-  </div>
+  </Collapsible>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { X } from 'lucide-vue-next'
+import { computed, onMounted, watch } from 'vue'
+import { useStorage } from '@vueuse/core'
+import { ChevronDown, SlidersHorizontal, X } from 'lucide-vue-next'
 import { Button } from '@shared-ui/components/ui/button'
+import { Badge } from '@shared-ui/components/ui/badge'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@shared-ui/components/ui/collapsible'
 import { useI18n } from 'vue-i18n'
 import SelectComboBox from '@main/components/combobox/SelectCombobox.vue'
 import SelectAgentCombobox from '@main/components/combobox/SelectAgentCombobox.vue'
@@ -90,17 +123,30 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useTagStore } from '@main/stores/tag'
 import SearchTagFilter from './SearchTagFilter.vue'
-import { UNASSIGNED } from './searchFilters'
+import { UNASSIGNED, emptyFilters, hasActiveFilters, toggleFilter } from './searchFilters'
 
 const FILTER_CLASS = 'flex-1 min-w-28'
 
 // The combobox matches the selected value by strict equality against a string.
-const asStringValues = (options) => options.map((option) => ({ ...option, value: String(option.value) }))
+const asStringValues = (options) =>
+  options.map((option) => ({ ...option, value: String(option.value) }))
 
 const props = defineProps({
   filters: { type: Object, required: true }
 })
 const emit = defineEmits(['update:filters'])
+
+const advancedFilterCount = computed(
+  () =>
+    ['priority', 'team', 'tags', 'created'].filter((key) =>
+      key === 'tags' ? props.filters.tags.length > 0 : Boolean(props.filters[key])
+    ).length
+)
+const advancedOpen = useStorage('searchMoreFiltersOpen', advancedFilterCount.value > 0)
+
+watch(advancedFilterCount, (count, previousCount) => {
+  if (count > 0 && previousCount === 0) advancedOpen.value = true
+})
 
 const { t } = useI18n()
 const conversationStore = useConversationStore()
@@ -120,6 +166,10 @@ const selectedTags = computed(() => {
 
 const set = (key, value) => {
   emit('update:filters', { ...props.filters, [key]: value ?? (key === 'tags' ? [] : '') })
+}
+
+const toggle = (key, item) => {
+  emit('update:filters', toggleFilter(props.filters, key, item.value))
 }
 
 const removeTag = (value) => {

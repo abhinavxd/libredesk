@@ -1,5 +1,7 @@
 import { describe, test, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { createFormSchema } from './formSchema'
+import { BUILT_IN_TEMPLATE_BODIES } from './defaults'
 
 const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
 const schema = createFormSchema(mockT)
@@ -65,5 +67,45 @@ describe('Templates Form Schema', () => {
 
     test('empty object', () => {
         expect(() => schema.parse({})).toThrow()
+    })
+})
+
+describe('built-in template defaults', () => {
+    const repositoryURL = new URL('../../../../../../../', import.meta.url)
+    const readBodies = source => new Map(
+        [...source.matchAll(/(?:VALUES\s*\(|SELECT)\s*'email_notification'::template_type,\s*'((?:''|[^'])*)'\s*,\s*false,\s*'([^']+)'/g)]
+            .map(([, body, name]) => [name, body.replaceAll("''", "'").trim()])
+    )
+    const schemaBodies = readBodies(readFileSync(new URL('schema.sql', repositoryURL), 'utf8'))
+    const upgradeBodies = readBodies(readFileSync(new URL('internal/migrations/v2.9.0-rc.8.go', repositoryURL), 'utf8'))
+    const normalize = body => body.replace(/\s+/g, ' ').trim()
+
+    test.each(Object.keys(BUILT_IN_TEMPLATE_BODIES))('%s matches the fresh install default', name => {
+        expect(schemaBodies.has(name)).toBe(true)
+        expect(normalize(BUILT_IN_TEMPLATE_BODIES[name])).toBe(normalize(schemaBodies.get(name)))
+    })
+
+    test.each([
+        'New reply from contact',
+        'New reply on participating conversation',
+        'Conversation reopened'
+    ])('%s matches the upgrade default', name => {
+        expect(upgradeBodies.get(name)).toBe(BUILT_IN_TEMPLATE_BODIES[name])
+    })
+
+    test.each(Object.keys(BUILT_IN_TEMPLATE_BODIES).filter(name => name !== 'CSAT request'))(
+        '%s greets the receiving agent exactly once', name => {
+            const greeting = '<p>Hi {{ .Recipient.FirstName }},</p>'
+            expect(BUILT_IN_TEMPLATE_BODIES[name].startsWith(greeting)).toBe(true)
+            expect(BUILT_IN_TEMPLATE_BODIES[name].split(greeting)).toHaveLength(2)
+        }
+    )
+
+    test('CSAT leaves the greeting to the outgoing template and keeps all five rating links', () => {
+        const body = BUILT_IN_TEMPLATE_BODIES['CSAT request']
+        expect(body).not.toContain('.Recipient.FirstName')
+        for (const rating of [1, 2, 3, 4, 5]) {
+            expect(body).toContain(`{{ .CSATLink }}?rating=${rating}`)
+        }
     })
 })

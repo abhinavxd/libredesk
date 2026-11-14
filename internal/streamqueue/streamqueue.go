@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -260,7 +261,7 @@ func (q *Queue) deadLetter(ids []string) {
 		if err := q.rd.XAck(q.ctx, q.stream, q.group, msg.ID).Err(); err == nil {
 			q.rd.XDel(q.ctx, q.stream, msg.ID)
 		}
-		q.lo.Warn("stream entry dead-lettered, check and fix the issue", "stream", q.stream, "dead_stream", q.deadStream, "id", msg.ID, "max_attempts", q.maxAttempts)
+		q.lo.Error("stream entry dead-lettered, check and fix the issue", "stream", q.stream, "dead_stream", q.deadStream, "id", msg.ID, "max_attempts", q.maxAttempts)
 	}
 	deadLetterLen := q.rd.XLen(q.ctx, q.deadStream).Val()
 	if deadLetterLen > deadLetterWarnThresh {
@@ -287,6 +288,7 @@ func (q *Queue) process(consumer string, msg redis.XMessage) {
 func (q *Queue) invoke(payload []byte) (err error) {
 	defer func() {
 		if rec := recover(); rec != nil {
+			q.lo.Error("stream handler panicked", "stream", q.stream, "panic", rec, "stack", string(debug.Stack()))
 			err = fmt.Errorf("streamqueue: handler panic: %v", rec)
 		}
 	}()

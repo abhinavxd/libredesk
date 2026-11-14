@@ -9,8 +9,8 @@
     </div>
     <div v-show="!showFormFields" class="space-y-4">
       <div class="space-y-2">
-        <h3 class="text-lg font-semibold">{{ $t('admin.inbox.oauth.chooseSetupMethod') }}</h3>
-        <p class="text-sm text-muted-foreground">
+        <h3 class="ui-heading">{{ $t('admin.inbox.oauth.chooseSetupMethod') }}</h3>
+        <p class="ui-description">
           {{ $t('admin.inbox.oauth.selectConnectionMethod') }}
         </p>
       </div>
@@ -41,7 +41,7 @@
           <p class="font-semibold text-foreground">
             {{ $t('admin.inbox.oauth.connectedVia', { provider: oauthProvider }) }}
           </p>
-          <p class="break-all text-sm text-muted-foreground">{{ oauthEmail }}</p>
+          <p class="break-all ui-description">{{ oauthEmail }}</p>
           <p v-show="oauthClientId" class="mt-1 break-all font-mono text-xs text-muted-foreground">
             {{ $t('globals.terms.clientID') }}: {{ oauthClientId.substring(0, 20) }}...{{
               oauthClientId.slice(-8)
@@ -116,7 +116,7 @@
       >
         <div class="space-y-1.5">
           <div class="flex items-center justify-between gap-4">
-            <h3 id="inbox-aliases-heading" class="text-sm font-semibold">
+            <h3 id="inbox-aliases-heading" class="ui-heading">
               {{ $t('globals.terms.emailAlias', 2) }}
             </h3>
             <Button type="button" variant="outline" size="sm" class="shrink-0" @click="addAlias">
@@ -124,7 +124,7 @@
               {{ $t('globals.messages.add') }}
             </Button>
           </div>
-          <p class="text-sm text-muted-foreground">{{ $t('admin.inbox.aliases.description') }}</p>
+          <p class="ui-description">{{ $t('admin.inbox.aliases.description') }}</p>
         </div>
         <ul v-show="aliasFields.length" class="divide-y" role="list">
           <li
@@ -208,188 +208,205 @@
             {{ $t('admin.inbox.imapConfig') }}
           </AccordionTrigger>
           <AccordionContent force-mount class="space-y-4 pb-6 pt-1">
-            <div class="grid grid-cols-2 items-start gap-4 sm:grid-cols-6">
-              <FormField v-slot="{ componentField, handleChange, meta }" name="imap.host">
-                <FormItem class="col-span-2 sm:col-span-3">
-                  <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      placeholder="imap.gmail.com"
-                      :name="componentField.name"
-                      :model-value="componentField.modelValue"
-                      @update:model-value="(v) => handleChange(v, meta.validated)"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-              <FormField v-slot="{ componentField, handleChange, meta }" name="imap.port">
-                <FormItem>
-                  <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="993"
-                      :name="componentField.name"
-                      :model-value="componentField.modelValue"
-                      @update:model-value="(v) => handleChange(v, meta.validated)"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-              <FormField v-slot="{ componentField, handleChange, meta }" name="imap.tls_type">
-                <FormItem class="sm:col-span-2">
-                  <FormLabel>{{ $t('globals.terms.tls') }}</FormLabel>
-                  <FormControl>
-                    <Select
-                      :name="componentField.name"
-                      :model-value="componentField.modelValue"
-                      @update:model-value="(v) => handleChange(v, meta.validated)"
-                    >
-                      <SelectTrigger type="button">
-                        <SelectValue :placeholder="t('globals.messages.selectTLS')" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
-                        <SelectItem value="tls">SSL/TLS</SelectItem>
-                        <SelectItem value="starttls">STARTTLS</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>{{ $t('admin.inbox.imap.tls.description') }}</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-            </div>
-
-            <div
-              v-show="
-                !isOAuthInbox ||
-                form.errors.value['imap.username'] ||
-                form.errors.value['imap.password']
-              "
-              class="grid gap-4 sm:grid-cols-2"
+            <!-- OAuth inboxes always receive over IMAP. -->
+            <FormField
+              v-if="!isOAuthInbox"
+              v-slot="{ componentField, handleChange, meta }"
+              name="imap_enabled"
             >
-              <FormField v-slot="{ componentField, handleChange, meta }" name="imap.username">
-                <FormItem>
-                  <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      placeholder="inbox@example.com"
-                      :name="componentField.name"
-                      :model-value="componentField.modelValue"
-                      @update:model-value="(v) => handleChange(v, meta.validated)"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-              <FormField v-slot="{ componentField, handleChange, meta }" name="imap.password">
-                <FormItem>
-                  <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      :name="componentField.name"
-                      :model-value="componentField.modelValue"
-                      @update:model-value="(v) => handleChange(v, meta.validated)"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              </FormField>
-            </div>
-
-            <Accordion type="single" collapsible v-model="imapAdvanced">
-              <AccordionItem value="advanced" class="border-b-0">
-                <AccordionTrigger type="button" :class="ADVANCED_TRIGGER_CLASS">{{
-                  $t('globals.terms.advanced')
-                }}</AccordionTrigger>
-                <AccordionContent force-mount class="space-y-4 pt-5">
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <FormField v-slot="{ componentField, handleChange, meta }" name="imap.mailbox">
-                      <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.mailbox') }}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="INBOX"
-                            :name="componentField.name"
-                            :model-value="componentField.modelValue"
-                            @update:model-value="(v) => handleChange(v, meta.validated)"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {{ $t('admin.inbox.mailbox.description') }}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-                    <FormField
-                      v-slot="{ componentField, handleChange, meta }"
-                      name="imap.read_interval"
-                    >
-                      <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.imapScanInterval') }}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="5m"
-                            :name="componentField.name"
-                            :model-value="componentField.modelValue"
-                            @update:model-value="(v) => handleChange(v, meta.validated)"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {{ $t('admin.inbox.imapScanInterval.description') }}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-
-                    <FormField
-                      v-slot="{ componentField, handleChange, meta }"
-                      name="imap.scan_inbox_since"
-                    >
-                      <FormItem>
-                        <FormLabel>{{ $t('admin.inbox.imapScanInboxSince') }}</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="text"
-                            placeholder="48h"
-                            :name="componentField.name"
-                            :model-value="componentField.modelValue"
-                            @update:model-value="(v) => handleChange(v, meta.validated)"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          {{ $t('admin.inbox.imapScanInboxSince.description') }}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    </FormField>
-                  </div>
-
-                  <FormField
-                    v-slot="{ componentField, handleChange, meta }"
-                    name="imap.tls_skip_verify"
-                  >
-                    <FormItem v-show="!isOAuthInbox || form.errors.value['imap.tls_skip_verify']">
-                      <SwitchField
-                        :title="$t('admin.inbox.skipTLSVerification')"
-                        :description="$t('admin.inbox.skipTLSVerification.description')"
-                        :checked="componentField.modelValue"
-                        @update:checked="(v) => handleChange(v, meta.validated)"
+              <FormItem>
+                <SwitchField
+                  :title="$t('globals.terms.enabled')"
+                  :checked="componentField.modelValue"
+                  @update:checked="(v) => handleChange(v, meta.validated)"
+                />
+              </FormItem>
+            </FormField>
+            <!-- v-show keeps the fields registered, so switching back restores them. -->
+            <div v-show="isOAuthInbox || form.values.imap_enabled !== false" class="space-y-4">
+              <div class="grid grid-cols-2 items-start gap-4 sm:grid-cols-6">
+                <FormField v-slot="{ componentField, handleChange, meta }" name="imap.host">
+                  <FormItem class="col-span-2 sm:col-span-3">
+                    <FormLabel>{{ $t('globals.terms.host') }}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="imap.gmail.com"
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(v) => handleChange(v, meta.validated)"
                       />
-                    </FormItem>
-                  </FormField>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+                <FormField v-slot="{ componentField, handleChange, meta }" name="imap.port">
+                  <FormItem>
+                    <FormLabel>{{ $t('globals.terms.port') }}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="993"
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(v) => handleChange(v, meta.validated)"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+                <FormField v-slot="{ componentField, handleChange, meta }" name="imap.tls_type">
+                  <FormItem class="sm:col-span-2">
+                    <FormLabel>{{ $t('globals.terms.tls') }}</FormLabel>
+                    <FormControl>
+                      <Select
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(v) => handleChange(v, meta.validated)"
+                      >
+                        <SelectTrigger type="button">
+                          <SelectValue :placeholder="t('globals.messages.selectTLS')" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{{ $t('globals.terms.off') }}</SelectItem>
+                          <SelectItem value="tls">SSL/TLS</SelectItem>
+                          <SelectItem value="starttls">STARTTLS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>{{ $t('admin.inbox.imap.tls.description') }}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+              </div>
+
+              <div
+                v-show="
+                  !isOAuthInbox ||
+                  form.errors.value['imap.username'] ||
+                  form.errors.value['imap.password']
+                "
+                class="grid gap-4 sm:grid-cols-2"
+              >
+                <FormField v-slot="{ componentField, handleChange, meta }" name="imap.username">
+                  <FormItem>
+                    <FormLabel>{{ $t('globals.terms.username') }}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="inbox@example.com"
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(v) => handleChange(v, meta.validated)"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+                <FormField v-slot="{ componentField, handleChange, meta }" name="imap.password">
+                  <FormItem>
+                    <FormLabel>{{ $t('globals.terms.password') }}</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        :name="componentField.name"
+                        :model-value="componentField.modelValue"
+                        @update:model-value="(v) => handleChange(v, meta.validated)"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </FormField>
+              </div>
+
+              <Accordion type="single" collapsible v-model="imapAdvanced">
+                <AccordionItem value="advanced" class="border-b-0">
+                  <AccordionTrigger type="button" :class="ADVANCED_TRIGGER_CLASS">{{
+                    $t('globals.terms.advanced')
+                  }}</AccordionTrigger>
+                  <AccordionContent force-mount class="space-y-4 pt-5">
+                    <FormGrid compact>
+                      <FormField v-slot="{ componentField, handleChange, meta }" name="imap.mailbox">
+                        <FormItem>
+                          <FormLabel>{{ $t('admin.inbox.mailbox') }}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="INBOX"
+                              :name="componentField.name"
+                              :model-value="componentField.modelValue"
+                              @update:model-value="(v) => handleChange(v, meta.validated)"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {{ $t('admin.inbox.mailbox.description') }}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      </FormField>
+                      <FormField
+                        v-slot="{ componentField, handleChange, meta }"
+                        name="imap.read_interval"
+                      >
+                        <FormItem>
+                          <FormLabel>{{ $t('admin.inbox.imapScanInterval') }}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="5m"
+                              :name="componentField.name"
+                              :model-value="componentField.modelValue"
+                              @update:model-value="(v) => handleChange(v, meta.validated)"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {{ $t('admin.inbox.imapScanInterval.description') }}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      </FormField>
+
+                      <FormField
+                        v-slot="{ componentField, handleChange, meta }"
+                        name="imap.scan_inbox_since"
+                      >
+                        <FormItem>
+                          <FormLabel>{{ $t('admin.inbox.imapScanInboxSince') }}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="48h"
+                              :name="componentField.name"
+                              :model-value="componentField.modelValue"
+                              @update:model-value="(v) => handleChange(v, meta.validated)"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {{ $t('admin.inbox.imapScanInboxSince.description') }}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      </FormField>
+                    </FormGrid>
+
+                    <FormField
+                      v-slot="{ componentField, handleChange, meta }"
+                      name="imap.tls_skip_verify"
+                    >
+                      <FormItem v-show="!isOAuthInbox || form.errors.value['imap.tls_skip_verify']">
+                        <SwitchField
+                          :title="$t('admin.inbox.skipTLSVerification')"
+                          :description="$t('admin.inbox.skipTLSVerification.description')"
+                          :checked="componentField.modelValue"
+                          @update:checked="(v) => handleChange(v, meta.validated)"
+                        />
+                      </FormItem>
+                    </FormField>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="smtp" data-section="smtp" data-connection="smtp">
@@ -499,7 +516,7 @@
                   $t('globals.terms.advanced')
                 }}</AccordionTrigger>
                 <AccordionContent force-mount class="space-y-4 pt-5">
-                  <div class="grid gap-4 sm:grid-cols-2">
+                  <FormGrid compact>
                     <FormField
                       v-slot="{ componentField, handleChange, meta }"
                       name="smtp.max_conns"
@@ -543,9 +560,7 @@
                         <FormMessage />
                       </FormItem>
                     </FormField>
-                  </div>
 
-                  <div class="grid gap-4 sm:grid-cols-2">
                     <FormField
                       v-slot="{ componentField, handleChange, meta }"
                       name="smtp.idle_timeout"
@@ -589,7 +604,7 @@
                         <FormMessage />
                       </FormItem>
                     </FormField>
-                  </div>
+                  </FormGrid>
 
                   <div class="grid gap-4 sm:grid-cols-2">
                     <FormField
@@ -677,24 +692,7 @@
                 <FormItem>
                   <div class="flex items-center gap-1">
                     <FormLabel>{{ $t('admin.inbox.fromNameTemplate') }}</FormLabel>
-                    <Popover>
-                      <PopoverTrigger as-child>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          class="size-7 text-muted-foreground"
-                          :aria-label="$t('globals.terms.help')"
-                        >
-                          <CircleHelp aria-hidden="true" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" class="w-[28rem] max-w-[calc(100vw-2rem)]">
-                        <p class="text-xs leading-relaxed">
-                          {{ $t('admin.inbox.fromNameTemplate.variables') }}
-                        </p>
-                      </PopoverContent>
-                    </Popover>
+                    <HelpPopover :text="fromNameVariablesHelp" />
                   </div>
                   <FormControl>
                     <Input
@@ -744,7 +742,7 @@
                 />
                 <p
                   v-show="isMicrosoftInbox"
-                  class="!mt-2 flex items-start gap-1.5 text-xs text-muted-foreground"
+                  :class="AUTH_HINT_CLASS"
                 >
                   <Lightbulb class="size-4 shrink-0" aria-hidden="true" />
                   <span>{{ $t('admin.inbox.enablePlusAddressing.requiredForMicrosoft') }}</span>
@@ -760,7 +758,7 @@
                   @update:checked="(v) => handleChange(v, meta.validated)"
                 />
               </FormItem>
-              <p class="!mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <p :class="AUTH_HINT_CLASS">
                 <Lightbulb class="size-4 shrink-0" aria-hidden="true" />
                 <span
                   >{{ $t('admin.inbox.csatSurveys.description_2') }}
@@ -782,7 +780,7 @@
         </AccordionItem>
       </Accordion>
 
-      <div class="sticky bottom-0 z-10 !mt-0 border-t bg-background py-4">
+      <div class="border-t border-border pt-4">
         <Button type="submit" :is-loading="isLoading" :disabled="isLoading">
           {{ submitLabel }}
         </Button>
@@ -913,10 +911,13 @@
 </template>
 
 <script setup>
+const AUTH_HINT_CLASS = '!mt-2 flex items-start gap-1.5 text-xs text-muted-foreground'
+
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, computed, nextTick, ref } from 'vue'
 import { useFieldArray, useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from './formSchema.js'
+import { createFormSchema, FROM_NAME_TEMPLATE_VARS } from './formSchema.js'
 import {
   FormControl,
   FormField,
@@ -928,7 +929,8 @@ import {
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
-import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
+import HelpPopover from '@main/components/HelpPopover.vue'
+import { formatTemplateVariables } from '@shared-ui/utils/string'
 import {
   Select,
   SelectContent,
@@ -961,7 +963,6 @@ import {
   Lightbulb,
   Plus,
   Trash2,
-  CircleHelp,
   TriangleAlert
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -1051,6 +1052,9 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+const fromNameVariablesHelp = computed(
+  () => `${t('globals.terms.variable', 2)}: ${formatTemplateVariables(FROM_NAME_TEMPLATE_VARS)}`
+)
 const emitter = useEmitter()
 const appSettingsStore = useAppSettingsStore()
 
@@ -1095,6 +1099,7 @@ const form = useForm({
     prompt_tags_on_reply: false,
     enable_plus_addressing: true,
     auth_type: AUTH_TYPE_PASSWORD,
+    imap_enabled: true,
     imap: {
       host: 'imap.gmail.com',
       port: 993,
@@ -1304,7 +1309,7 @@ watch(
       isOAuthInbox.value = false
       setupMethod.value = 'manual'
     }
-    form.resetForm({ values: newValues })
+    form.resetForm({ values: newValues }, { force: true })
   },
   { deep: true, immediate: true }
 )

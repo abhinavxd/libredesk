@@ -104,6 +104,17 @@ func TruncateUTF8(s string, maxBytes int) string {
 	return s[:maxBytes]
 }
 
+func TruncateRunes(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return string(runes[:limit])
+}
+
 // GenerateSlug generates a URL-friendly slug from a title; a script with no ASCII form falls back to a random slug.
 func GenerateSlug(title string) string {
 	slug := strings.ToLower(strings.TrimSpace(foldAccents(title)))
@@ -353,6 +364,15 @@ func SplitName(name string) (string, string) {
 		return fields[0], ""
 	}
 	return fields[0], strings.Join(fields[1:], " ")
+}
+
+// CapitalizeFirst uppercases the first letter of s and leaves the rest unchanged.
+func CapitalizeFirst(s string) string {
+	r, size := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + s[size:]
 }
 
 func htmlToText(html string, opts html2text.Options) string {

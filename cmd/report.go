@@ -24,7 +24,7 @@ func handleOverviewCharts(r *fastglue.Request) error {
 		app     = r.Context.(*App)
 		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
 	)
-	charts, err := app.report.GetOverviewChart(days)
+	charts, err := app.report.GetOverviewChart(days, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -37,7 +37,7 @@ func handleOverviewSLA(r *fastglue.Request) error {
 		app     = r.Context.(*App)
 		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
 	)
-	sla, err := app.report.GetOverviewSLA(days)
+	sla, err := app.report.GetOverviewSLA(days, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -50,7 +50,7 @@ func handleOverviewCSAT(r *fastglue.Request) error {
 		app     = r.Context.(*App)
 		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
 	)
-	csat, err := app.report.GetOverviewCSAT(days)
+	csat, err := app.report.GetOverviewCSAT(days, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -63,7 +63,7 @@ func handleOverviewMessageVolume(r *fastglue.Request) error {
 		app     = r.Context.(*App)
 		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
 	)
-	volume, err := app.report.GetOverviewMessageVolume(days)
+	volume, err := app.report.GetOverviewMessageVolume(days, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -76,7 +76,7 @@ func handleOverviewTagDistribution(r *fastglue.Request) error {
 		app     = r.Context.(*App)
 		days, _ = strconv.Atoi(string(r.RequestCtx.QueryArgs().Peek("days")))
 	)
-	tags, err := app.report.GetOverviewTagDistribution(days)
+	tags, err := app.report.GetOverviewTagDistribution(days, app.setting.GetAppTimezone())
 	if err != nil {
 		return sendErrorEnvelope(r, err)
 	}

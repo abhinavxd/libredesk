@@ -3,9 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref } from 'vue'
 import { useConversationStore } from './conversation'
+import { useUsersStore } from '@main/stores/users'
+import { useNotificationStore } from '@main/stores/notification'
 import { WebSocketClient } from '@main/websocket'
 
-const { api } = vi.hoisted(() => ({ api: { getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn(), markConversationAsUnread: vi.fn() } }))
+const { api } = vi.hoisted(() => ({ api: {
+  getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn(),
+  markConversationAsUnread: vi.fn(), getConversation: vi.fn(), getAllConversations: vi.fn(), getUsersCompact: vi.fn(),
+  updateConversationStatus: vi.fn(), updateAssignee: vi.fn(), removeAssignee: vi.fn(), getSidebarCounts: vi.fn()
+} }))
 vi.mock('@main/api', () => ({ default: api }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ currentRoute: ref({ params: { uuid: 'conversation-a' } }) }) }))
 vi.mock('@main/stores/user', () => ({ useUserStore: () => ({ userID: 7, user: {}, can: () => true }) }))
@@ -26,6 +32,7 @@ const activity = { id: 3, uuid: 'activity', created_at: '2026-01-01T00:00:02Z', 
 beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
+  api.getSidebarCounts.mockResolvedValue({ data: { data: {} } })
 })
 
 const setup = () => {
@@ -35,6 +42,161 @@ const setup = () => {
   store.conversations.data = [{ uuid: 'conversation-a', unread_message_count: 2, last_message_at: reply.created_at }]
   return store
 }
+
+describe('conversation assignees', () => {
+  const agent = { id: 2194, first_name: 'Agent', last_name: 'One', avatar_url: '/avatar.png', type: 'agent', availability_status: 'online' }
+
+  it('loads list assignees and preserves selected agent labels without an id lookup', async () => {
+    const store = useConversationStore()
+    const users = useUsersStore()
+    api.getAllConversations.mockResolvedValueOnce({ data: { data: {
+      results: [{ uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent }],
+      page: 1, total_pages: 1, total: 1
+    } } })
+
+    await store.fetchConversationsList(false, 'all')
+    await users.ensureUserIDs([agent.id])
+
+    expect(store.conversations.data).toHaveLength(1)
+    expect(users.options).toContainEqual(expect.objectContaining({ value: '2194', label: 'Agent One', avatar_url: '/avatar.png' }))
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it('loads the assignee when opening a conversation directly', async () => {
+    const store = useConversationStore()
+    const users = useUsersStore()
+    api.getConversation.mockResolvedValueOnce({ data: { data: { uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent } } })
+
+    await store.fetchConversation('conversation-a')
+    await users.ensureUserIDs([agent.id])
+
+    expect(users.users).toEqual([agent])
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it.each(['new_conversation', 'new_message'])('uses assignee details from %s events without an id lookup', async type => {
+    const store = setup()
+    const users = useUsersStore()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'refreshSidebarCounts').mockImplementation(() => {})
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    const payload = { uuid: 'conversation-a', assigned_user_id: agent.id, assignee: agent }
+
+    client.handleMessage({ target: client.socket, data: JSON.stringify({
+      type, data: type === 'new_message' ? { ...reply, conversation: payload } : payload
+    }) })
+    await users.ensureUserIDs([agent.id])
+
+    expect(users.users).toEqual([agent])
+    expect(store.conversations.data[0].assigned_user_id).toBe(agent.id)
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+
+  it('handles unassignment without adding an empty agent or changing another agent', () => {
+    const store = setup()
+    const users = useUsersStore()
+    store.handleConvPush({ uuid: 'conversation-a', assigned_user_id: agent.id, assignee: { ...agent } })
+    store.handleConvPush({ uuid: 'conversation-a', assigned_user_id: null, assignee: null })
+
+    expect(store.conversations.data[0].assigned_user_id).toBeNull()
+    expect(users.users).toEqual([agent])
+    expect(api.getUsersCompact).not.toHaveBeenCalled()
+  })
+})
+
+describe('conversation changes during navigation', () => {
+  it('keeps a successful status change on its original conversation', async () => {
+    const store = setup()
+    const notifications = useNotificationStore()
+    const markRead = vi.spyOn(notifications, 'markAssignmentAsReadForConversation')
+    store.conversation.data.status = 'Open'
+    let finish
+    api.updateConversationStatus.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+
+    const pending = store.updateStatus('conversation-a', 'Resolved')
+    expect(store.conversation.data.status).toBe('Resolved')
+    store.conversation.data = { uuid: 'conversation-b', status: 'Open' }
+    finish()
+    await pending
+
+    expect(api.updateConversationStatus).toHaveBeenCalledExactlyOnceWith('conversation-a', { status: 'Resolved' })
+    expect(store.conversation.data).toEqual({ uuid: 'conversation-b', status: 'Open' })
+    expect(markRead).toHaveBeenCalledExactlyOnceWith('conversation-a')
+  })
+
+  it('keeps the next conversation unchanged when an earlier status request fails', async () => {
+    const store = setup()
+    const markRead = vi.spyOn(useNotificationStore(), 'markAssignmentAsReadForConversation')
+    store.conversation.data.status = 'Open'
+    let fail
+    api.updateConversationStatus.mockImplementationOnce(() => new Promise((resolve, reject) => { fail = reject }))
+
+    const pending = store.updateStatus('conversation-a', 'Resolved')
+    store.conversation.data = { uuid: 'conversation-b', status: 'Snoozed' }
+    fail(new Error('offline'))
+    await pending
+
+    expect(store.conversation.data).toEqual({ uuid: 'conversation-b', status: 'Snoozed' })
+    expect(markRead).not.toHaveBeenCalled()
+  })
+
+  it('restores the previous status after a failure while the conversation stays open', async () => {
+    const store = setup()
+    store.conversation.data.status = 'Open'
+    api.updateConversationStatus.mockRejectedValueOnce(new Error('offline'))
+
+    await store.updateStatus('conversation-a', 'Resolved')
+
+    expect(store.conversation.data.status).toBe('Open')
+  })
+
+  it('uses the requested conversation when another conversation is already open', async () => {
+    const store = setup()
+    store.conversation.data = { uuid: 'conversation-b', status: 'Open' }
+    api.updateConversationStatus.mockResolvedValueOnce()
+
+    await store.updateStatus('conversation-a', 'Resolved')
+
+    expect(api.updateConversationStatus).toHaveBeenCalledExactlyOnceWith('conversation-a', { status: 'Resolved' })
+    expect(store.conversation.data).toEqual({ uuid: 'conversation-b', status: 'Open' })
+  })
+
+  it.each(['user', 'team'])('keeps a pending %s assignment on its original conversation', async type => {
+    const store = setup()
+    store.conversation.data = { uuid: 'conversation-a', assigned_user_id: 7, assigned_team_id: 3 }
+    const original = store.conversation.data
+    let finish
+    api.updateAssignee.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+
+    const pending = store.updateAssignee(type, { assignee_id: 12 })
+    store.conversation.data = { uuid: 'conversation-b', assigned_user_id: 8, assigned_team_id: 4 }
+    finish()
+    await pending
+
+    expect(api.updateAssignee).toHaveBeenCalledExactlyOnceWith('conversation-a', type, { assignee_id: 12 })
+    expect(original[`assigned_${type}_id`]).toBe(12)
+    if (type === 'team') expect(original.assigned_user_id).toBeNull()
+    expect(store.conversation.data).toEqual({ uuid: 'conversation-b', assigned_user_id: 8, assigned_team_id: 4 })
+  })
+
+  it.each(['user', 'team'])('keeps a pending %s removal on its original conversation', async type => {
+    const store = setup()
+    store.conversation.data = { uuid: 'conversation-a', assigned_user_id: 7, assigned_team_id: 3 }
+    const original = store.conversation.data
+    let finish
+    api.removeAssignee.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+
+    const pending = store.removeAssignee(type)
+    store.conversation.data = { uuid: 'conversation-b', assigned_user_id: 8, assigned_team_id: 4 }
+    finish()
+    await pending
+
+    expect(api.removeAssignee).toHaveBeenCalledExactlyOnceWith('conversation-a', type)
+    expect(original[`assigned_${type}_id`]).toBeNull()
+    expect(store.conversation.data).toEqual({ uuid: 'conversation-b', assigned_user_id: 8, assigned_team_id: 4 })
+  })
+})
 
 describe('conversation read state', () => {
   it('blocks acknowledgements while an earlier reply body is still loading', async () => {
@@ -115,6 +277,39 @@ describe('conversation read state', () => {
     expect(store.conversations.data[0].unread_message_count).toBe(0)
     store.incrementUnread('conversation-a', activity.created_at)
     expect(store.conversations.data[0].unread_message_count).toBe(1)
+  })
+
+  it.each([7, '7'])('keeps the sender unread count stable for replies and private notes (sender: %s)', senderID => {
+    const store = setup()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    for (const privateNote of [false, true]) {
+      client.handleMessage({ target: client.socket, data: JSON.stringify({
+        type: 'new_message', data: {
+          ...reply, type: 'outgoing', sender_type: 'agent', sender_id: senderID,
+          private: privateNote, conversation_uuid: 'conversation-a'
+        }
+      }) })
+      expect(store.conversations.data[0].unread_message_count).toBe(2)
+    }
+    expect(store.updateConversationMessage).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    { sender_type: 'agent', sender_id: 8 },
+    { sender_type: 'contact', sender_id: 7 },
+    { sender_type: 'agent', sender_id: 0 },
+    { sender_type: 'agent' }
+  ])('keeps unread updates for messages that cannot be identified as the sender own message (%j)', sender => {
+    const store = setup()
+    const client = new WebSocketClient()
+    client.socket = {}
+    vi.spyOn(store, 'updateConversationMessage').mockResolvedValue()
+    client.handleMessage({ target: client.socket, data: JSON.stringify({
+      type: 'new_message', data: { ...reply, ...sender, conversation_uuid: 'conversation-a' }
+    }) })
+    expect(store.conversations.data[0].unread_message_count).toBe(3)
   })
 
   it('preserves a read event received before the conversation enters the list', () => {

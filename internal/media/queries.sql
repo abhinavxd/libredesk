@@ -20,9 +20,12 @@ RETURNING id;
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by
 FROM media
 WHERE
-   ($1 > 0 AND id = $1)
-   OR
-   ($2 != '' AND uuid = NULLIF($2, '')::uuid)
+   (($1 > 0 AND id = $1) OR ($2 != '' AND uuid = NULLIF($2, '')::uuid))
+   AND (
+     model_type IS DISTINCT FROM 'messages'
+     OR COALESCE(model_id, 0) = 0
+     OR EXISTS (SELECT 1 FROM conversation_messages cm WHERE cm.id = media.model_id)
+   );
 
 -- name: get-media-by-uuid
 SELECT id, created_at, updated_at, "uuid", store, filename, content_type, content_id, model_id, model_type, disposition, "size", meta, private, uploaded_by

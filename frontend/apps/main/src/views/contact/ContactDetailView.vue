@@ -21,7 +21,7 @@
             />
 
             <div class="flex gap-2 justify-start items-center">
-              <h2 class="text-xl font-semibold text-foreground">
+              <h2 class="ui-display-heading">
                 {{ contact.first_name }} {{ contact.last_name }}
               </h2>
               <Badge v-if="contact.type" variant="secondary">

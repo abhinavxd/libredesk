@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import { useWidgetStore } from '@widget/store/widget.js'
 
@@ -8,6 +9,7 @@ const props = defineProps({
   baseUrl: { type: String, required: true }
 })
 
+const reducedMotion = usePreferredReducedMotion()
 const height = ref('100%')
 const ready = ref(false)
 
@@ -53,7 +55,7 @@ const onMessage = (event) => {
       frame.value.getBoundingClientRect().top -
       element.getBoundingClientRect().top +
       element.scrollTop
-    element.scrollTo({ top: offset + event.data.top, behavior: 'smooth' })
+    element.scrollTo({ top: offset + event.data.top, behavior: reducedMotion.value === 'reduce' ? 'auto' : 'smooth' })
   }
 }
 

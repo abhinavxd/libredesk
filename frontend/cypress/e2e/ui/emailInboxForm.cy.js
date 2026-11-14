@@ -140,6 +140,51 @@ describe('Email inbox form', () => {
     cy.contains('New support inbox').should('be.visible')
   })
 
+  for (const [protocol, value] of [
+    ['None', 'none'],
+    ['Login', 'login'],
+    ['CRAM', 'cram'],
+    ['Plain', 'plain']
+  ]) {
+    it(`validates and saves SMTP credentials with ${protocol} authentication`, () => {
+      openManualForm()
+      fillRequiredFields()
+      field('smtp.username').clear()
+      field('smtp.password').clear()
+      cy.toggleEmailInboxAdvanced('smtp')
+      cy.contains('label', 'Authentication Protocol').parent().find('[role="combobox"]').click()
+      cy.contains('[role="option"]', new RegExp(`^${protocol}$`)).click()
+      submit()
+      if (protocol === 'None') {
+        cy.wait('@createInbox').then(({ request }) => {
+          expect(request.body.config.smtp[0].auth_protocol).to.eq('none')
+          expect(request.body.config.smtp[0].username).to.eq('')
+          expect(request.body.config.smtp[0].password).to.eq('')
+        })
+      } else {
+        cy.get('@createInbox.all').should('have.length', 0)
+        field('smtp.username').parent().parent().should('contain.text', 'Required')
+        field('smtp.password').parent().parent().should('contain.text', 'Required')
+        field('smtp.username').type('support@example.com')
+        submit()
+        field('smtp.password').should('have.attr', 'aria-invalid', 'true')
+        cy.get('@createInbox.all').should('have.length', 0)
+        field('smtp.username').clear()
+        field('smtp.password').type('test-password')
+        submit()
+        field('smtp.username').should('have.attr', 'aria-invalid', 'true')
+        cy.get('@createInbox.all').should('have.length', 0)
+        field('smtp.username').type('support@example.com')
+        submit()
+        cy.wait('@createInbox').then(({ request }) => {
+          expect(request.body.config.smtp[0].auth_protocol).to.eq(value)
+          expect(request.body.config.smtp[0].username).to.eq('support@example.com')
+          expect(request.body.config.smtp[0].password).to.eq('test-password')
+        })
+      }
+    })
+  }
+
   it('loads saved fields once and saves values from closed sections', () => {
     cy.visit(editPath)
     field('name').should('have.value', 'Support')
@@ -386,7 +431,7 @@ describe('Email inbox form', () => {
     cy.get('@updateInbox.all').should('have.length', 0)
   })
 
-  it('fits a narrow viewport and keeps the save action visible', () => {
+  it('fits a narrow viewport and keeps the save action reachable', () => {
     cy.viewport(390, 844)
     cy.visit(editPath)
     field('aliases[0].email').should('be.visible')
@@ -401,7 +446,7 @@ describe('Email inbox form', () => {
     cy.get('form').should(($form) => {
       expect($form[0].scrollWidth).to.be.at.most($form[0].clientWidth)
     })
-    cy.get('form button[type="submit"]').should('be.visible')
+    cy.get('form button[type="submit"]').scrollIntoView().should('be.visible')
     cy.screenshot('email-inbox-mobile-connection', { capture: 'viewport' })
   })
 

@@ -13,13 +13,19 @@
       v-for="conversation in conversationStore.current?.previous_conversations || []"
       :key="conversation.uuid"
       :to="{
-        name: 'inbox-conversation',
+        name: $route.name,
         params: {
-          uuid: conversation.uuid,
-          type: 'assigned'
+          ...$route.params,
+          uuid: conversation.uuid
         }
       }"
-      class="block p-2 rounded-md hover:bg-muted"
+      class="block p-2 rounded-md"
+      :class="
+        conversation.uuid === conversationStore.current?.uuid
+          ? 'bg-accent'
+          : 'hover:bg-accent/40'
+      "
+      :aria-current="conversation.uuid === conversationStore.current?.uuid ? 'page' : undefined"
     >
       <div class="flex flex-wrap items-start justify-between gap-1">
         <div class="flex flex-col flex-1 min-w-[120px]">

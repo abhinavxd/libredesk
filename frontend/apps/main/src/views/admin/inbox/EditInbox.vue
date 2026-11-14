@@ -1,39 +1,44 @@
 <template>
-  <div class="mb-5 flex items-center justify-between gap-4">
-    <CustomBreadcrumb :links="breadcrumbLinks" />
-    <div
-      v-if="inbox.channel === 'livechat' && inbox.uuid"
-      class="flex items-center gap-1.5 text-xs text-muted-foreground/70"
-    >
-      <span>UUID:</span>
-      <code class="font-mono">{{ inbox.uuid }}</code>
-      <CopyButton :text="inbox.uuid" />
+  <AdminToolbar class="mb-5">
+    <template #left>
+      <CustomBreadcrumb :links="breadcrumbLinks" />
+    </template>
+    <template #actions>
+      <div
+        v-if="inbox.channel === 'livechat' && inbox.uuid"
+        class="flex items-center gap-1.5 text-xs text-muted-foreground/70"
+      >
+        <span>UUID:</span>
+        <code class="font-mono">{{ inbox.uuid }}</code>
+        <CopyButton :text="inbox.uuid" />
+      </div>
+    </template>
+  </AdminToolbar>
+  <LoadingOverlay :loading="formLoading" reserve-height>
+    <div v-if="!formLoading">
+      <EmailInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        :verifyAlias="verifyAlias"
+        :aliasVerificationState="aliasVerificationState"
+        v-if="inbox.channel === 'email'"
+      />
+      <LivechatInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        :available-languages="availableLanguages"
+        v-else-if="inbox.channel === 'livechat'"
+      />
+      <WhatsAppInboxForm
+        :initialValues="inbox"
+        :submitForm="submitForm"
+        :isLoading="isLoading"
+        v-else-if="inbox.channel === 'whatsapp'"
+      />
     </div>
-  </div>
-  <Spinner v-if="formLoading"></Spinner>
-  <div v-else>
-    <EmailInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      :verifyAlias="verifyAlias"
-      :aliasVerificationState="aliasVerificationState"
-      v-if="inbox.channel === 'email'"
-    />
-    <LivechatInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      :available-languages="availableLanguages"
-      v-else-if="inbox.channel === 'livechat'"
-    />
-    <WhatsAppInboxForm
-      :initialValues="inbox"
-      :submitForm="submitForm"
-      :isLoading="isLoading"
-      v-else-if="inbox.channel === 'whatsapp'"
-    />
-  </div>
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -44,7 +49,8 @@ import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb/index.js'
 import CopyButton from '@/components/button/CopyButton.vue'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
 import { useEmitter } from '@/composables/useEmitter'
@@ -75,7 +81,7 @@ const submitForm = (values) => {
       auth_type: values.auth_type,
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
-      imap: [{ ...values.imap }],
+      imap: values.imap_enabled === false ? [] : [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
     }
 
@@ -89,7 +95,7 @@ const submitForm = (values) => {
       config
     }
 
-    if (payload.config.imap[0].password?.includes('•')) {
+    if (payload.config.imap[0]?.password?.includes('•')) {
       payload.config.imap[0].password = ''
     }
 
@@ -136,13 +142,13 @@ const submitForm = (values) => {
     }
   }
 
-  updateInbox(payload)
+  return updateInbox(payload)
 }
 const updateInbox = async (payload) => {
   try {
     isLoading.value = true
     const response = await api.updateInbox(inbox.value.id, payload)
-    setAliasVerificationState(response.data.data?.aliases || [])
+    setInboxData(response.data.data)
     await inboxStore.fetchInboxes(true /* force */)
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.savedSuccessfully')
@@ -222,6 +228,25 @@ const startVerificationPolling = () => {
   verificationPollTimer = setInterval(pollAliasVerification, 5000)
 }
 
+const setInboxData = (inboxData) => {
+  // OAuth inboxes always receive over IMAP.
+  inboxData.imap_enabled = inboxData?.config?.auth_type === AUTH_TYPE_OAUTH2 || (inboxData?.config?.imap?.length ?? 0) > 0
+  inboxData.imap = inboxData?.config?.imap?.[0] || {}
+  if (inboxData?.config?.smtp) {
+    inboxData.smtp = inboxData?.config?.smtp[0]
+  }
+  inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
+  inboxData.oauth = inboxData?.config?.oauth || {}
+  inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
+  inboxData.reply_to = inboxData?.config?.reply_to || ''
+  inboxData.aliases = inboxData?.aliases || []
+  inbox.value = inboxData
+  setAliasVerificationState(inboxData.aliases)
+  if (hasPendingAlias()) {
+    startVerificationPolling()
+  }
+}
+
 onMounted(async () => {
   try {
     formLoading.value = true
@@ -230,25 +255,7 @@ onMounted(async () => {
       api.getAvailableLanguages()
     ])
     availableLanguages.value = langsResp.data.data
-    let inboxData = resp.data.data
-
-    // Modify the inbox data as per the zod schema.
-    if (inboxData?.config?.imap) {
-      inboxData.imap = inboxData?.config?.imap[0]
-    }
-    if (inboxData?.config?.smtp) {
-      inboxData.smtp = inboxData?.config?.smtp[0]
-    }
-    inboxData.auth_type = inboxData?.config?.auth_type || AUTH_TYPE_PASSWORD
-    inboxData.oauth = inboxData?.config?.oauth || {}
-    inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
-    inboxData.reply_to = inboxData?.config?.reply_to || ''
-    inboxData.aliases = inboxData?.aliases || []
-    inbox.value = inboxData
-    setAliasVerificationState(inboxData.aliases)
-    if (hasPendingAlias()) {
-      startVerificationPolling()
-    }
+    setInboxData(resp.data.data)
   } catch (error) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',

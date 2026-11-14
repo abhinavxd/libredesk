@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -102,6 +103,7 @@ type ChatConversation struct {
 	ContactLastSeenAt  time.Time         `db:"contact_last_seen_at" json:"contact_last_seen_at"`
 	CreatedAt          time.Time         `db:"created_at" json:"created_at"`
 	UUID               string            `db:"uuid" json:"uuid"`
+	Subject            string            `db:"subject" json:"subject"`
 	Status             string            `db:"status" json:"status"`
 	LastChatMessage    LastChatMessage   `db:"last_message" json:"last_message"`
 	UnreadMessages     []ChatMessage     `db:"-" json:"unread_messages,omitempty"`
@@ -151,6 +153,7 @@ type ConversationListItem struct {
 	PriorityID            null.Int                `db:"priority_id" json:"priority_id"`
 	AssignedUserID        null.Int                `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID        null.Int                `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee              json.RawMessage         `db:"assignee" json:"assignee"`
 	UnreadMessageCount    int                     `db:"unread_message_count" json:"unread_message_count"`
 	Status                null.String             `db:"status" json:"status"`
 	Priority              null.String             `db:"priority" json:"priority"`
@@ -199,6 +202,7 @@ type Conversation struct {
 	LastReplyAt               null.Time              `db:"last_reply_at" json:"last_reply_at"`
 	AssignedUserID            null.Int               `db:"assigned_user_id" json:"assigned_user_id"`
 	AssignedTeamID            null.Int               `db:"assigned_team_id" json:"assigned_team_id"`
+	Assignee                  json.RawMessage        `db:"assignee" json:"assignee"`
 	WaitingSince              null.Time              `db:"waiting_since" json:"waiting_since"`
 	SnoozedUntil              null.Time              `db:"snoozed_until" json:"snoozed_until"`
 	Subject                   null.String            `db:"subject" json:"subject"`
@@ -361,6 +365,7 @@ type Message struct {
 	CC                pq.StringArray         `db:"cc" json:"-"`
 	BCC               pq.StringArray         `db:"bcc" json:"-"`
 	MessageReceiverID int                    `db:"message_receiver_id" json:"-"`
+	ReferenceNumber   string                 `db:"reference_number" json:"-"`
 	Media             []mmodels.Media        `json:"-"`
 	Author            MessageAuthor          `db:"author" json:"author"`
 }
@@ -620,7 +625,8 @@ type MentionInput struct {
 }
 
 // Transcript renders the last max messages as a plaintext "Customer:/Agent:" transcript for AI context.
-func Transcript(msgs []Message, max int) string {
+func Transcript(msgs []Message, max int, loc *time.Location) string {
+	truncated := len(msgs) > max || (len(msgs) > 0 && msgs[0].Total > len(msgs))
 	if len(msgs) > max {
 		msgs = msgs[len(msgs)-max:]
 	}
@@ -636,13 +642,28 @@ func Transcript(msgs []Message, max int) string {
 				text = t
 			}
 		}
+		for _, att := range msg.Attachments {
+			if text != "" {
+				text += "\n"
+			}
+			text += fmt.Sprintf("[Attachment: %q (%s). Contents are unavailable in this transcript.]", att.Name, att.ContentType)
+		}
 		if text == "" {
-			continue
+			if msg.SenderType != SenderTypeContact {
+				continue
+			}
+			text = "[The customer sent a message with no readable text.]"
+		}
+		if !msg.CreatedAt.IsZero() {
+			fmt.Fprintf(&b, "[%s] ", msg.CreatedAt.In(loc).Format(time.RFC3339))
 		}
 		b.WriteString(role)
 		b.WriteString(": ")
 		b.WriteString(text)
 		b.WriteString("\n")
+	}
+	if truncated && b.Len() > 0 {
+		return "[Earlier messages are omitted. This transcript contains only the latest public messages.]\n" + b.String()
 	}
 	return b.String()
 }

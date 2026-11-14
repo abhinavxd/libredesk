@@ -1,21 +1,23 @@
 -- name: get-users-compact
-SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+SELECT COUNT(*) OVER() as total, users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
--- email != 'System' also drops NULL-email users (anonymous visitors); AI assistants have no email and must still be listed.
-WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND type = ANY($1)
+-- Contacts and AI assistants may lack email, while anonymous visitors stay hidden.
+WHERE (users.email != 'System' OR (users.email IS NULL AND users.type IN ('contact', 'ai_assistant')))
+    AND users.deleted_at IS NULL AND type = ANY($1)
 
 -- name: get-agents-compact
-SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
 WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND users.type = ANY($1)
     AND ($2 = '' OR CONCAT(users.first_name, ' ', COALESCE(users.last_name, '')) ILIKE $7 ESCAPE '\' OR users.email ILIKE $7 ESCAPE '\')
     AND ($3 = '' OR users.type::text = $3)
     AND (NOT $4 OR users.enabled)
-ORDER BY users.first_name, users.last_name, users.id
+-- Enabled agents sort first so disabled ones never push them off the first page.
+ORDER BY users.enabled DESC, users.first_name, users.last_name, users.id
 LIMIT NULLIF($5, 0) OFFSET $6;
 
 -- name: get-agents-compact-by-ids
-SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, users.last_name, users.email, users.enabled, users.external_user_id, users.availability_status
+SELECT users.id, users.avatar_url, users.type, users.created_at, users.updated_at, users.first_name, COALESCE(users.last_name, '') AS last_name, users.email, users.enabled, users.external_user_id, users.availability_status
 FROM users
 WHERE (users.email != 'System' OR users.type = 'ai_assistant') AND users.deleted_at IS NULL AND users.type = ANY($1) AND users.id = ANY($2)
 ORDER BY users.first_name, users.last_name, users.id;
@@ -51,7 +53,7 @@ SELECT
     u.enabled,
     u.avatar_url,
     u.first_name,
-    u.last_name,
+    COALESCE(u.last_name, '') AS last_name,
     u.availability_status,
     u.last_active_at,
     u.last_login_at,
@@ -156,6 +158,13 @@ WHERE
   AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')
   AND availability_status NOT IN ('offline', 'away_and_reassigning', 'away_manual')
 RETURNING id, type;
+
+-- name: set-agent-offline
+UPDATE users
+SET availability_status = 'offline'
+WHERE id = $1
+  AND type = 'agent'
+  AND availability_status IN ('online', 'away');
 
 -- name: get-availability-status
 SELECT availability_status FROM users WHERE id = $1;

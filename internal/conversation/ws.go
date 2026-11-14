@@ -43,6 +43,7 @@ func (m *Manager) BroadcastNewMessage(message *cmodels.Message, conv *cmodels.Co
 		"preview":           preview,
 		"created_at":        message.CreatedAt.Format(time.RFC3339Nano),
 		"sender_type":       message.SenderType,
+		"sender_id":         message.SenderID,
 		"conversation":      convToBroadcast(conv),
 	}
 

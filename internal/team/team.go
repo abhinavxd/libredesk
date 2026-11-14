@@ -80,7 +80,7 @@ func (u *Manager) GetAll() ([]models.Team, error) {
 // GetAllCompact retrieves teams with limited fields matching query, all of them when pageSize is 0.
 func (u *Manager) GetAllCompact(query string, page, pageSize int) ([]models.TeamCompact, error) {
 	var teams = make([]models.TeamCompact, 0)
-	if err := u.q.GetTeamsCompact.Select(&teams, query, pageSize, dbutil.PageOffset(page, pageSize)); err != nil {
+	if err := u.q.GetTeamsCompact.Select(&teams, query, pageSize, dbutil.PageOffset(page, pageSize), dbutil.ContainsPattern(query)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return teams, nil
 		}
@@ -108,7 +108,6 @@ func (u *Manager) Get(id int) (models.Team, error) {
 	var team models.Team
 	if err := u.q.GetTeam.Get(&team, id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			u.lo.Error("team not found", "id", id, "error", err)
 			return team, envelope.NewError(envelope.InputError, u.i18n.T("validation.notFoundTeam"), nil)
 		}
 		u.lo.Error("error fetching team", "id", id, "error", err)
@@ -118,9 +117,9 @@ func (u *Manager) Get(id int) (models.Team, error) {
 }
 
 // Create creates a new team.
-func (u *Manager) Create(name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) (models.Team, error) {
+func (u *Manager) Create(name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int, skipOfflineAgents bool) (models.Team, error) {
 	var team models.Team
-	if err := u.q.InsertTeam.Get(&team, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
+	if err := u.q.InsertTeam.Get(&team, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations, skipOfflineAgents); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return team, envelope.NewError(envelope.GeneralError, u.i18n.T("errors.alreadyExistsTeam"), nil)
 		}
@@ -131,9 +130,9 @@ func (u *Manager) Create(name, timezone, conversationAssignmentType string, busi
 }
 
 // Update updates an existing team.
-func (u *Manager) Update(id int, name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) (models.Team, error) {
+func (u *Manager) Update(id int, name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int, skipOfflineAgents bool) (models.Team, error) {
 	var team models.Team
-	if err := u.q.UpdateTeam.Get(&team, id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
+	if err := u.q.UpdateTeam.Get(&team, id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations, skipOfflineAgents); err != nil {
 		u.lo.Error("error updating team", "error", err)
 		return team, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

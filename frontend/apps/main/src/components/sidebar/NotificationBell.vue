@@ -1,8 +1,12 @@
 <template>
   <Popover v-model:open="isOpen">
     <PopoverTrigger as-child>
-      <SidebarMenuButton size="default" class="relative">
-        <Bell class="h-5 w-5" />
+      <SidebarMenuButton
+        size="default"
+        class="relative"
+        :aria-label="t('globals.terms.notification', 2)"
+      >
+        <Bell class="h-5 w-5" aria-hidden="true" />
         <span
           v-if="notificationStore.unreadCount > 0"
           class="absolute top-0.5 left-6 lg:left-auto lg:right-0.5 inline-flex size-3.5 items-center justify-center rounded-full bg-destructive text-[9px] font-medium text-destructive-foreground"

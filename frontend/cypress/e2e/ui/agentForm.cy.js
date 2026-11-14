@@ -14,8 +14,10 @@ const filterList = (text) => cy.get('input[placeholder="Search"]').clear().type(
 
 // Typing narrows the SelectTag combobox list, which is capped at 200 entries.
 const pickTag = (placeholder, optionText) => {
-  cy.get(`input[placeholder="${placeholder}"]`).click().type(optionText)
+  cy.get(`input[aria-label="${placeholder}"]`).click()
+  cy.get(`input[aria-label="${placeholder}"]`).type(optionText)
   cy.get('[role="option"]').contains(optionText).click()
+  cy.get(`input[aria-label="${placeholder}"]`).should('have.attr', 'placeholder', '')
 }
 
 const fieldBlock = (label) => cy.contains('label', label).parent()

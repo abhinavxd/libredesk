@@ -10,13 +10,13 @@ import (
 
 	amodels "github.com/abhinavxd/libredesk/internal/auth/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/image"
 	mmodels "github.com/abhinavxd/libredesk/internal/media/models"
 	notifier "github.com/abhinavxd/libredesk/internal/notification"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	tmpl "github.com/abhinavxd/libredesk/internal/template"
 	"github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/fastglue"
@@ -112,7 +112,7 @@ func handleUpdateAgentAvailability(r *fastglue.Request) error {
 	var (
 		app      = r.Context.(*App)
 		auser    = r.RequestCtx.UserValue("user").(amodels.User)
-		ip       = realip.FromRequest(r.RequestCtx)
+		ip       = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		availReq availabilityRequest
 	)
 
@@ -178,7 +178,7 @@ func handleUpdateCurrentAgent(r *fastglue.Request) error {
 	)
 	form, err := r.RequestCtx.MultipartForm()
 	if err != nil {
-		app.lo.Error("error parsing form data", "error", err)
+		app.lo.Debug("error parsing form data", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
 	}
 
@@ -270,7 +270,7 @@ func handleUpdateAgent(r *fastglue.Request) error {
 		app   = r.Context.(*App)
 		req   = agentReq{}
 		auser = r.RequestCtx.UserValue("user").(amodels.User)
-		ip    = realip.FromRequest(r.RequestCtx)
+		ip    = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		id, _ = strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	)
 	if id == 0 {
@@ -304,6 +304,13 @@ func handleUpdateAgent(r *fastglue.Request) error {
 	app.wsHub.KickUser(id)
 	if req.NewPassword != "" || !req.Enabled {
 		if err := app.auth.DestroyUserSessions(r.RequestCtx, id); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+	}
+
+	// A disabled agent cannot work their open conversations, unassign them so they return to the queue.
+	if !req.Enabled {
+		if err := app.conversation.UnassignOpen(id); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
 	}
@@ -545,7 +552,7 @@ func uploadUserAvatar(r *fastglue.Request, user models.User, files []*multipart.
 
 	resized, err := image.Downscale(image.AvatarMaxDim, file)
 	if err != nil {
-		app.lo.Error("error downscaling avatar", "user_id", user.ID, "error", err)
+		app.lo.Debug("error downscaling avatar", "user_id", user.ID, "error", err)
 		return envelope.NewError(envelope.InputError, app.i18n.T("globals.messages.fileTypeisNotAnImage"), nil)
 	}
 	srcFileSize := resized.Len()

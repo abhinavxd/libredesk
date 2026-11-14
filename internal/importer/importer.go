@@ -3,6 +3,7 @@ package importer
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -81,7 +82,7 @@ func (i *Importer) Submit(namespace string, fn func() error) error {
 				i.mu.Lock()
 				status.Logs = append(status.Logs, fmt.Sprintf("Panic: %v", r))
 				i.mu.Unlock()
-				i.lo.Error("import job panicked", "namespace", namespace, "panic", r)
+				i.lo.Error("import job panicked", "namespace", namespace, "panic", r, "stack", string(debug.Stack()))
 			}
 
 			i.mu.Lock()

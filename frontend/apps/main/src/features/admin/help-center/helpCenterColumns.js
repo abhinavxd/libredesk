@@ -1,21 +1,21 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import HelpCenterDropdown from './HelpCenterDropdown.vue'
 
 export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle } = {}) => [
   {
     accessorKey: 'name',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.name')),
+    header: () => h('div', null, t('globals.terms.name')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         h(
           'button',
           {
             type: 'button',
-            class: 'text-foreground font-medium hover:underline cursor-pointer',
+            class: 'text-left text-foreground font-medium hover:underline cursor-pointer',
             onClick: () => onOpen?.(row.original)
           },
           row.getValue('name')
@@ -24,22 +24,23 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
   },
   {
     accessorKey: 'slug',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.slug')),
+    header: () => h('div', null, t('globals.terms.slug')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         h(Badge, { variant: 'secondary', class: 'font-normal' }, () => `/${row.getValue('slug')}`)
       )
   },
   {
     accessorKey: 'is_active',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
+    header: () => h('div', null, t('globals.terms.status')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         h(Badge, { variant: row.getValue('is_active') ? 'success' : 'secondary' }, () =>
           row.getValue('is_active') ? t('globals.terms.active') : t('globals.terms.paused')
         )
@@ -47,10 +48,11 @@ export const createHelpCenterColumns = (t, { onOpen, onEdit, onDelete, onToggle 
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
+    header: () => h('div', null, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h(TableDate, { value: row.getValue('updated_at') })
   },
   {
     id: 'actions',

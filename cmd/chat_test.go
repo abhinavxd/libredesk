@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"math"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -96,5 +99,59 @@ func TestValidateHandoffFormUsesSubmittedContactDetails(t *testing.T) {
 	}
 	if name != "QA Visitor" {
 		t.Fatalf("got name %q", name)
+	}
+}
+
+func TestWidgetSessionStorageFailureIsVisible(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { client.Close() })
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	app := &App{lo: &lo, redis: client}
+	const token = "private-session-token"
+	if _, err := loadSession(app, token, livechat.Config{}); err == nil {
+		t.Fatal("missing session accepted")
+	}
+	if logs.Len() != 0 {
+		t.Fatal("expired session produced an application error")
+	}
+	server.SetError("storage unavailable")
+	if _, err := loadSession(app, token, livechat.Config{}); err == nil {
+		t.Fatal("storage failure ignored")
+	}
+	if !strings.Contains(logs.String(), "level=error") || strings.Contains(logs.String(), token) {
+		t.Fatalf("storage failure logging is missing or exposes the session: %s", logs.String())
+	}
+}
+
+func TestNormalizeChatSubject(t *testing.T) {
+	ascii := strings.Repeat("a", maxChatSubjectLength)
+	cyrillic := strings.Repeat("ж", maxChatSubjectLength)
+	emoji := strings.Repeat("😀", maxChatSubjectLength)
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty stays empty", "", ""},
+		{"whitespace only", " \t\n\r ", ""},
+		{"whitespace collapsed and trimmed", "  Login \t fails\n after  update  ", "Login fails after update"},
+		{"ascii at the limit", ascii, ascii},
+		{"ascii over the limit", ascii + "extra", ascii},
+		{"cyrillic at the limit", cyrillic, cyrillic},
+		{"cyrillic over the limit", cyrillic + "ж", cyrillic},
+		{"emoji over the limit", emoji + "😀", emoji},
+		{"mixed character widths", strings.Repeat("aé界😀", 100), strings.Repeat("aé界😀", 63) + "aé界"},
+		{"normalize before truncating", strings.Repeat(" \t\n", 300) + ascii + "extra", ascii},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := normalizeChatSubject(tt.in)
+			if !utf8.ValidString(got) || got != tt.want {
+				t.Fatalf("normalizeChatSubject(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
 	}
 }

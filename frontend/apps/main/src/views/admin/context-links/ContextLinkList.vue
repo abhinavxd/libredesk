@@ -1,20 +1,27 @@
 <template>
   <LoadingOverlay :loading="isLoading" reserve-height>
-    <div class="flex justify-between mb-5">
-      <div></div>
-      <div>
+    <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+      <template #actions>
         <RouterLink :to="{ name: 'new-context-link' }">
           <Button>{{ $t('contextLink.new') }}</Button>
         </RouterLink>
-      </div>
-    </div>
+      </template>
+    </AdminToolbar>
     <div>
-      <DataTable :columns="createColumns(t)" :data="links" :loading="isLoading" />
+      <DataTable
+        v-model:search="searchTerm"
+        :searchable="false"
+        :columns="createColumns(t)"
+        :data="links"
+        :loading="isLoading"
+      />
     </div>
   </LoadingOverlay>
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import { createColumns } from '@/features/admin/context-links/dataTableColumns.js'
@@ -26,6 +33,7 @@ import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import api from '@/api'
 
 const links = ref([])
+const searchTerm = ref('')
 const { t } = useI18n()
 const isLoading = ref(false)
 const emit = useEmitter()

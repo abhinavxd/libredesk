@@ -1,209 +1,161 @@
-# Libredesk Design System
+# libredesk Design System
 
-Reference for colors, typography, spacing, radius, elevation, and component conventions
-across both apps (agent dashboard + livechat widget).
+Update this guide only for verified shared styles and component usage. Keep screen decisions in PRs or audit notes.
 
-**Source of truth:**
-- Tokens (CSS variables): `shared-ui/assets/styles/main.scss` - `:root, .light` and `.dark` blocks
-- Tailwind mapping: `tailwind.config.cjs` - `theme.extend.colors` and `borderRadius`
-- Primitives: `shared-ui/components/ui/` (shadcn-vue)
+Styling and component usage for the agent dashboard and shared widget UI.
 
-**Golden rule:** never hardcode a value that a token exists for. Use `bg-success`, not
-`bg-green-600`. Use `rounded-lg`, not `rounded`. Every token has a light and a dark value;
-if you add one, define both.
+## Sources
 
----
+Read these files before changing shared styles:
 
-## 1. Color tokens
+- [Theme tokens and typography](shared-ui/assets/styles/main.scss)
+- [Tailwind mappings](tailwind.config.cjs)
+- [UI primitives](shared-ui/components/ui/)
 
-HSL channel triples in CSS variables, consumed via `hsl(var(--x))` (Tailwind classes like
-`bg-primary` do it for you). Opacity modifiers work: `bg-success/10`, `text-primary/80`.
+Keep token values in their source files. Use the classes and components below when building UI.
 
-| Token | Light | Dark | Use for |
-|---|---|---|---|
-| `background` | `0 0% 99.2%` | `120 2.6% 7.6%` | app/content surface |
-| `foreground` | `0 0% 1%` | `150 6% 93%` | primary text |
-| `foreground-lighter` | `0 0% 41%` | `150 1% 60%` | idle sidebar nav items |
-| `card` / `card-foreground` | `0 0% 100%` / `0 0% 1%` | `120 2% 10%` / `150 6% 93%` | raised card surface |
-| `popover` / `popover-foreground` | `0 0% 100%` / `0 0% 1%` | `120 2% 12%` / `150 6% 93%` | menus, popovers, dropdowns |
-| `primary` / `primary-foreground` | `152 39% 30%` / `0 0% 100%` | `152 58% 54%` / `120 2.6% 7.6%` | brand, active state, unread badges, primary buttons |
-| `secondary` / `secondary-foreground` | `0 0% 96%` / `0 0% 1%` | `150 3% 12%` / `150 6% 93%` | secondary buttons, outgoing message bubbles |
-| `muted` / `muted-foreground` | `0 0% 96%` / `0 0% 27%` | `150 3% 13%` / `120 1% 74%` | muted backgrounds, captions/meta text, secondary labels |
-| `accent` / `accent-foreground` | `0 0% 95%` / `0 0% 1%` | `150 3% 15%` / `150 6% 93%` | hover and selected states |
-| `destructive` / `destructive-foreground` | `2 47% 46%` / `9 100% 99%` | `4 92% 74%` / `12 38% 3%` | errors, delete, SLA breached, overdue, offline |
-| `success` / `success-foreground` | `142 72% 37%` / `0 0% 98%` | `142 55% 55%` / `142 40% 10%` | positive/met, verified, online, connected, delivered |
-| `warning` / `warning-foreground` | `39 85% 43%` / `24 45% 2%` | `36 87% 62%` / `24 45% 2%` | away, pending, SLA approaching, connecting (as background) |
-| `warning-600` | `35 92% 33%` | `36 87% 62%` | warning as TEXT/icon color. Plain `warning` fails 4.5:1 on light |
-| `link` | `210 100% 40%` | `210 90% 66%` | links inside rendered email/message content only. UI links use `.link-style` |
-| `border` | `0 0% 91%` | `150 2% 16%` | all borders/dividers |
-| `input` | `0 0% 85%` | `150 2% 19%` | form field borders |
-| `ring` | `151 41% 45%` | `152 45% 33%` | focus rings |
-| `private` | `35 90% 94%` | `30 35% 18%` | private-note background tint |
-| `canvas` | `0 0% 82%` | `120 3% 4%` | app gutter behind floating panels (deepest surface) |
+## Colors and surfaces
 
-**Sidebar tokens** (left nav chrome): `sidebar-background` matches `background` in both
-themes, plus `sidebar-foreground`, `sidebar-primary`, `sidebar-accent`,
-`sidebar-accent-foreground`, `sidebar-border`, `sidebar-ring`.
+Use semantic theme tokens for dashboard controls. The shared stylesheet provides light and dark values.
+Pair background tokens with their foreground tokens, such as `bg-primary text-primary-foreground`.
+Opacity modifiers such as `bg-success/10` work with these classes.
 
-**Chart tokens** (unovis): `--vis-primary-color: var(--primary)`,
-`--vis-secondary-color: var(--success)`, `--vis-text-color: var(--muted-foreground)`.
+| Token | Use |
+| --- | --- |
+| `canvas` | Gutters behind content panels |
+| `background` / `foreground` | Main surfaces and primary text |
+| `card` / `card-foreground` | Cards and raised panels |
+| `popover` / `popover-foreground` | Menus, popovers, and dropdowns |
+| `primary` / `primary-foreground` | Primary actions and active states |
+| `secondary` / `secondary-foreground` | Secondary controls and surfaces |
+| `muted` / `muted-foreground` | Subtle surfaces, descriptions, and metadata |
+| `accent` / `accent-foreground` | Hover and selected surfaces |
+| `foreground-lighter` | Idle sidebar navigation text |
+| `destructive` / `destructive-foreground` | Errors, removal, and breached targets |
+| `success` / `success-foreground` | Successful, verified, or connected states |
+| `warning` / `warning-foreground` | Warning backgrounds |
+| `warning-600` | Warning text and icons |
+| `link` | Links inside rendered content |
+| `border` | Borders and dividers |
+| `input` | Field borders |
+| `ring` | Keyboard focus indicators |
+| `private` | Private content tint |
 
-### Semantic status mapping
+Use `warning-600` for readable warning text in light mode.
+Use `foreground` or `muted-foreground` for neutral counts and timestamps.
+Pair small status colors with text, an icon, or a shape.
 
-Color carries meaning; use the semantic token, never a raw palette color.
+Use `sidebar-*` tokens for navigation surfaces and states.
+Charts inherit `primary`, `success`, and `muted-foreground` through the shared Unovis variables.
 
-- **success (green):** SLA met, identity verified, agent online, widget connected, message delivered/read
-- **warning (amber):** agent away, SLA approaching/remaining, widget connecting, no-internet banner
-- **destructive (red):** error, delete, SLA breached, SLA overdue
-- **primary (green):** brand identity, active nav, unread count badges, primary actions
-- **foreground / muted:** neutral data (counts, totals, timestamps). Do not color a number
-  unless the color means something. On the reports dashboard numbers are neutral; only
-  met=success and breached=destructive are colored.
+Keep customer branding within customer surfaces and their previews.
+Preserve authored colors in rendered email content. Use `.email-light-canvas` for a light email surface.
 
-### Deliberate exceptions
+## Typography
 
-- `features/conversation/message/attachment/BubbleAttachmentItem.vue` colors attachment
-  icons by file type (pdf=red, spreadsheet=green, doc=blue, archive=amber, audio=purple)
-  with raw palette classes. The color is file-type identity, not status, and no token means
-  "blue = document". Leave it.
-- `components/editor/TextEditor.vue` - styles for rendered email HTML. Emails are
-  standalone documents, not themed.
-- `features/admin/inbox/LivechatInboxForm.vue` / `LivechatWidgetPreview.vue` - the
-  customer-configurable widget brand color and its defaults.
-- `features/conversation/ReplyBox.vue` - a `linear-gradient(#000 0 0)` CSS mask trick, not
-  a color choice.
+Geist is the shared font. Use typography classes for these roles:
 
----
+| Role | Class | Size | Weight | Line height |
+| --- | --- | --- | --- | --- |
+| Page, card, sidebar, and form section headings | `ui-heading` | 16px | 600 | 24px |
+| Nested headings and compact item titles | `ui-subheading` | 14px | 600 | 20px |
+| Descriptions and form hints | `ui-description` | 14px | 400 | 20px |
+| Dialog and sheet titles | `ui-dialog-heading` | 18px | 600 | 28px |
+| Large introductory headings | `ui-display-heading` | 24px | 600 | 32px |
 
-## 2. Surfaces and depth
+Keep heading levels semantic when applying these classes.
+`CardTitle`, `DialogTitle`, `SheetTitle`, and shared description components provide their default styles.
+Use `tabular-nums` for metrics and numeric columns. Use 12px text for compact metadata.
 
-Both themes use three tiers so panels read as floating, not flat:
+## Spacing and layout
 
-```text
-canvas (deepest gutter behind the panels)
-  └─ background (app content + sidebar chrome, same value)
-        └─ card / popover (lifted by border + shadow-sm)
-```
+Use a 4px spacing rhythm. Common group spacing is 16px, 24px, or 32px.
+Leave 16px between section headings and controls, with 24px or 32px between form sections.
+Keep icon and value pairs together, with larger gaps between separate groups.
 
-In light mode `card` is pure white against a near-white background. In dark mode `card` and
-`popover` are lighter than the background, so lift comes from the surface, not the shadow.
+Use [FormGrid](shared-ui/components/FormGrid.vue) for responsive form fields.
+Pass `compact` for narrower fields. Use container queries when columns need stable widths.
+Keep short fields compact and preserve room for names, URLs, and translated labels.
+Group conditional controls with their related fields.
 
----
+Use [AdminSplitLayout](apps/main/src/layouts/admin/AdminSplitLayout.vue) for forms with help or a preview.
+Put the form in `#content` and supporting content in `#help`.
+Pass `fixedHelp` for the preview layout. The component manages responsive columns.
 
-## 3. Typography
+Use [AdminToolbar](apps/main/src/layouts/admin/AdminToolbar.vue) for list controls.
+Put tabs in `#left` and actions in `#actions`.
+Pass `searchable` and bind `v-model:search` for search controls.
 
-Font: Geist. Sizes: `text-xs` 12 · `text-sm` 14 · `text-base` 16 · `text-lg` 18 ·
-`text-xl` 20 · `text-2xl` 24 · `text-3xl` 30. Weights: 400 body · 500 labels · 600 headings ·
-700 rare emphasis.
+## Radius and elevation
 
-| Role | Style |
-|---|---|
-| Page / panel title | `text-xl font-semibold` |
-| KPI / stat value | `text-2xl` (or `text-3xl`) `font-bold tabular-nums` |
-| Section label | `.sidebar-section-label` utility, or the classes it applies |
-| Body | `text-sm` |
-| Caption / meta / helper | `text-xs text-muted-foreground` |
+Use named Tailwind classes. The shared `--radius` value defines the control radius scale.
 
-Use `tabular-nums` for any numeric column, timer, or metric to stop width jitter.
+| Radius class | Use |
+| --- | --- |
+| `rounded-sm` | Small insets |
+| `rounded-md` | Controls, chips, and badges |
+| `rounded-lg` | Cards, containers, and dialogs |
+| `rounded-xl` | Large surfaces |
+| `rounded-2xl` | Widget frames and bubbles |
+| `rounded-full` | Avatars, dots, and pills |
 
----
+| Shadow class | Use |
+| --- | --- |
+| `shadow-sm` | Cards and standard controls |
+| `shadow-md` | Popovers and floating controls |
+| `shadow-lg` | Dialogs, modals, and widget windows |
 
-## 4. Radius
+## Buttons and indicators
 
-`--radius` = `0.5rem` (8px). The Tailwind scale derives from it:
+Use the shared `Button` component for styled actions.
+Reserve `default` for primary actions. Use `outline`, `secondary`, or `ghost` for supporting actions.
+Use `destructive` for removal and `link` for text actions.
 
-| Class | Value | Use for |
-|---|---|---|
-| `rounded-xl` | radius + 4 (12px) | large surfaces, widget window preview, dashboard message bubbles |
-| `rounded-lg` | radius (8px) | cards, containers, dialogs |
-| `rounded-md` | radius - 2 (6px) | buttons, inputs, chips, badges, small interactive |
-| `rounded-sm` | radius - 4 (4px) | tiny insets |
-| `rounded-full` | - | avatars, status dots, count badges, pills |
+| Button size | Dimensions | Use |
+| --- | --- | --- |
+| `default` | 36px high | Standard controls |
+| `sm` | 32px high | Dense controls with 12px text |
+| `xs` | 28px high | Compact controls |
+| `lg` | 40px high | Prominent actions |
+| `icon` | 36px square | Icon actions |
 
-**Never use bare `rounded`.** It is Tailwind's fixed 4px and ignores the token.
+Standard button icons use `size-4`. Keep icons within a group consistent in size, stroke, and color.
+Give icon actions an accessible label and hide decorative icons with `aria-hidden="true"`.
+Inside forms, give every supporting button `type="button"` and submit buttons `type="submit"`.
 
----
+Use `Badge` variants: `default`, `secondary`, `destructive`, `success`, or `outline`.
+Use `AlertDialogAction` with `variant="destructive"` for removal confirmations.
+Use the shared `Tooltip` for its inverted surface, 12px text, and `rounded-md` corners.
 
-## 5. Elevation
+## Fields and interaction states
 
-| Class | Use for |
-|---|---|
-| `shadow-sm` | cards, `.box`, default buttons |
-| `shadow-md` | popovers, dropdown menus, hover/floating elements |
-| `shadow-lg` | dialogs, modals, the widget window |
+Use shared `Input`, `Select`, combobox, and `TimeField` components to inherit control styles.
+Standard fields use 36px height, with 16px text below `sm` and 14px above it.
+Use visible labels. Placeholders provide examples or format guidance.
+Use `text-muted-foreground` for empty prompts and 12px left padding for select and combobox text.
 
-**Never use bare `shadow`.** Depth comes from the surface tiers and borders, not heavy
-shadows.
+Keep focus rings visible. Reveal hover actions on keyboard focus and keep touch actions visible.
+Use the existing `can-hover` variant for styles requiring a mouse or fine pointer.
+Use shared component transitions and preserve their reduced motion behavior.
 
----
+Use `LoadingOverlay` for page loading and `Spinner` for inline feedback.
+Pass `reserve-height` when a page needs space for a centered loading indicator.
 
-## 6. Spacing
+## Shared utilities
 
-Follow a 4 / 8px rhythm for padding and gaps. Vertical section spacing tiers: 16 / 24 / 32 /
-48. Keep the dense-desk feel; this is a high-volume support tool, not a marketing page.
+| Utility | Style |
+| --- | --- |
+| `.box` | Border, small shadow, and large radius |
+| `.sidebar-section-label` | 12px muted uppercase text with wider tracking |
+| `.link-style` | Muted underlined text with foreground hover color |
 
----
+Use these utilities when their shared style fits the control.
 
-## 7. Utilities
+## Admin tables
 
-Defined in `main.scss`. Prefer them over repeating the class list.
+Show timestamps as `28 Aug 2026, 3:46 AM`. Keep seconds and the timezone in the full timestamp on hover.
 
-| Utility | Expands to | Use for |
-|---|---|---|
-| `.box` | `border shadow-sm rounded-lg` | the standard card surface |
-| `.sidebar-section-label` | `text-xs font-medium uppercase tracking-wider text-muted-foreground` | sidebar group headers (Views, Team Inboxes) |
-| `.link-style` | `text-muted-foreground underline underline-offset-4 hover:text-foreground` | UI links. Not brand-colored, so links in chrome stay quiet |
-
----
-
-## 8. Components
-
-Reuse `shared-ui/components/ui/` primitives; do not hand-roll a styled `<button>`/`<input>`
-when one exists.
-
-**Button** - use the `size` variant, never an ad-hoc `h-*`:
-
-| size | height | notes |
-|---|---|---|
-| `default` | h-9 | standard |
-| `sm` | h-8 | dense (text-xs) |
-| `xs` | h-7 | very dense |
-| `lg` | h-10 | prominent |
-| `icon` | h-9 w-9 | icon-only |
-
-Variants: `default` (primary), `destructive`, `outline`, `secondary`, `ghost`, `link`.
-`h-8 w-8` ghost triggers for dense table row actions are an intentional pattern.
-
-Every button inside a `<form>` that is not the submit button needs an explicit
-`type="button"`. HTML defaults to `type="submit"`, so a typeless button submits the form on
-click and gets activated when the user presses Enter in any input. This includes buttons in
-child components rendered inside a parent's form.
-
-**Badge** variants: `default`, `secondary`, `destructive`, `success`, `outline`.
-
-**AlertDialogAction** takes a `variant` prop, so destructive confirms use
-`variant="destructive"` instead of a hand-written class.
-
-**Sidebar nav items** are `font-medium text-foreground-lighter`; hover and active states use
-`bg-sidebar-accent` (hover at `/50`). Group headers use `.sidebar-section-label`.
-
-**Tooltip** is `bg-foreground text-background`, not brand-colored.
-
-**Table row actions** stay hidden until hover: `[@media(hover:hover)]:opacity-0` with
-`group-hover/row:opacity-100`, plus `focus-within:!opacity-100` and
-`[&:has([data-state=open])]:!opacity-100`. The media query keeps them visible on touch and
-focus-within keeps them reachable by keyboard.
-
----
-
-## 9. Checklist
-
-Before merging UI work:
-
-- [ ] No hardcoded palette colors (`bg-green-600`, `text-blue-500`, ...). Only exception: file-type icons.
-- [ ] No bare `rounded` or `shadow`.
-- [ ] Every non-submit button in a form has `type="button"`.
-- [ ] Color on a number or element means something, and is not decoration.
-- [ ] Both light and dark verified.
-- [ ] New shared words go through i18n (`i18n/en-US.json`); reused nouns in `globals.terms`.
-- [ ] Reused an existing `ui/` primitive rather than building a variant.
+Align headers and cells left. Let data columns share available width naturally, keep statuses and dates on one line, and keep action columns compact.
+Wrap long text to three lines and expose the full value through its title. Keep horizontal overflow inside the table.
+Measure rendered rows so wrapping and resizing preserve virtual scrolling.
+Use compact sorting controls without hover backgrounds. Show unsorted arrows on hover or keyboard focus, and keep the active sort direction visible.

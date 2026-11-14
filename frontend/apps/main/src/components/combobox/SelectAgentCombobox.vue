@@ -5,7 +5,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="searchUsers"
+    :search="search"
   />
   <SelectComboBox
     v-else
@@ -13,7 +13,7 @@
     :model-value="modelValue"
     :items="items"
     :placeholder="placeholderText"
-    :search="searchUsers"
+    :search="search"
     type="user"
   >
     <template v-if="$slots.trigger" #trigger="slotProps">
@@ -65,6 +65,10 @@ const props = defineProps({
   blockAwayReassigning: {
     type: Boolean,
     default: false
+  },
+  includeDisabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -87,12 +91,22 @@ const markBlocked = (options) =>
       )
     : options
 
-const searchUsers = async (query) => markBlocked(await usersStore.searchUsers(query))
+const search = computed(() => {
+  const searchUsers = props.includeDisabled ? usersStore.searchUsers : usersStore.searchEnabledUsers
+  return async (query) => markBlocked(await searchUsers(query))
+})
 
 const items = computed(() => {
   let options = props.excludeAiAssistants
     ? usersStore.options.filter((option) => option.type !== 'ai_assistant')
     : usersStore.options
+  if (!props.includeDisabled) {
+    // A disabled agent that is already selected stays so its name still renders.
+    const selected = [props.modelValue].flat().map(String)
+    options = options.filter(
+      (option) => usersStore.isEnabled(option) || selected.includes(String(option.value))
+    )
+  }
   options = markBlocked(options)
   if (props.currentUserFirst) {
     const isMe = (option) => String(option.value) === String(userStore.userID)

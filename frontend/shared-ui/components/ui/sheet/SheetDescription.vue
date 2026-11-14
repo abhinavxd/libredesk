@@ -1,7 +1,7 @@
 <script setup>
 import { reactiveOmit } from '@vueuse/core';
 import { DialogDescription } from 'radix-vue';
-import { cn } from '../../../lib/utils';
+import { cn } from '@shared-ui/lib/utils';
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -14,7 +14,7 @@ const delegatedProps = reactiveOmit(props, 'class');
 
 <template>
   <DialogDescription
-    :class="cn('text-sm text-muted-foreground', props.class)"
+    :class="cn('ui-description', props.class)"
     v-bind="delegatedProps"
   >
     <slot />

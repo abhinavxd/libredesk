@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { AlertDialogTitle } from 'radix-vue'
-import { cn } from '../../../lib/utils'
+import { cn } from '@shared-ui/lib/utils'
 
 const props = defineProps({
   asChild: { type: Boolean, required: false },
@@ -17,7 +17,7 @@ const delegatedProps = computed(() => {
 </script>
 
 <template>
-  <AlertDialogTitle v-bind="delegatedProps" :class="cn('text-lg font-semibold', props.class)">
+  <AlertDialogTitle v-bind="delegatedProps" :class="cn('ui-dialog-heading', props.class)">
     <slot />
   </AlertDialogTitle>
 </template>

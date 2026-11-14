@@ -38,6 +38,15 @@ describe('API: ai tools', () => {
     }).its('status').should('eq', 400)
   })
 
+  it('rejects a display name longer than 140 characters', () => {
+    cy.api('POST', '/api/v1/ai/tools', validTool({ display_name: 'a'.repeat(141) }), {
+      failOnStatusCode: false
+    }).then(({ status, body }) => {
+      expect(status).to.eq(400)
+      expect(body.error_type).to.eq('InputException')
+    })
+  })
+
   it('rejects a url that is not http or https', () => {
     cy.api('POST', '/api/v1/ai/tools', validTool({ url: 'notaurl' }), {
       failOnStatusCode: false
@@ -52,6 +61,8 @@ describe('API: ai tools', () => {
       expect(status).to.eq(200)
       toolId = body.data.id
       expect(body.data.name).to.eq(name)
+      // A create without a display name falls back to the name.
+      expect(body.data.display_name).to.eq(name)
       expect(body.data.description).to.eq('A probe tool')
       expect(body.data.url).to.eq('https://example.com/probe')
       expect(body.data.method).to.eq('GET')
@@ -76,11 +87,14 @@ describe('API: ai tools', () => {
 
   it('updates the tool', () => {
     cy.api('PUT', `/api/v1/ai/tools/${toolId}`, validTool({
+      display_name: '  Probe tool  ',
       description: 'Updated description',
       requires_verification: true
     })).its('status').should('eq', 200)
 
     cy.api('GET', `/api/v1/ai/tools/${toolId}`).then(({ body }) => {
+      expect(body.data.name).to.eq(name)
+      expect(body.data.display_name).to.eq('Probe tool')
       expect(body.data.description).to.eq('Updated description')
       expect(body.data.requires_verification).to.eq(true)
     })

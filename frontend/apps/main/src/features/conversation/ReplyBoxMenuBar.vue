@@ -1,17 +1,27 @@
 <template>
   <div
-    class="relative flex min-h-14 flex-wrap justify-between gap-y-2"
+    class="relative flex min-h-14 shrink-0 flex-wrap justify-between gap-y-2"
+    @keydown.capture="emojiPickerPointerOpened = false"
     :class="{ 'items-end': isFullscreen, 'items-center': !isFullscreen }"
   >
-    <EmojiPicker
-      ref="emojiPickerRef"
-      :native="true"
-      @select="onSelectEmoji"
-      class="absolute bottom-14 left-0 md:left-14 z-20"
-      v-if="isEmojiPickerVisible"
-    />
+    <Transition
+      :css="emojiPickerPointerOpened"
+      enter-active-class="transition-[opacity,transform] [transition-duration:125ms] ease-out motion-reduce:duration-100"
+      enter-from-class="opacity-0 scale-[0.98] motion-reduce:scale-100"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition-[opacity,transform] duration-100 ease-out"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-[0.98] motion-reduce:scale-100"
+    >
+      <EmojiPicker
+        ref="emojiPickerRef"
+        :native="true"
+        @select="onSelectEmoji"
+        class="origin-bottom-left absolute bottom-14 left-0 md:left-14 z-20"
+        v-if="isEmojiPickerVisible"
+      />
+    </Transition>
     <div class="flex items-center gap-1">
-      <!-- File inputs -->
       <input
         type="file"
         class="hidden"
@@ -48,6 +58,7 @@
             :class="ICON_BUTTON_CLASS"
             variant="outline"
             :aria-label="$t('globals.messages.addEmoji')"
+            ref="emojiTriggerRef"
             @click="toggleEmojiPicker"
             :pressed="isEmojiPickerVisible"
           >
@@ -165,12 +176,12 @@ const EmojiPicker = defineAsyncComponent(async () => {
 })
 
 const attachmentInput = ref(null)
-// const inlineImageInput = ref(null)
 const isEmojiPickerVisible = ref(false)
+const emojiPickerPointerOpened = ref(false)
 const emojiPickerRef = ref(null)
+const emojiTriggerRef = ref(null)
 const emit = defineEmits(['emojiSelect', 'generateReply'])
 
-// Using defineProps for props that don't need two-way binding
 const props = defineProps({
   isFullscreen: Boolean,
   isWhatsApp: Boolean,
@@ -192,9 +203,13 @@ const props = defineProps({
   handleInlineImageUpload: Function
 })
 
-onClickOutside(emojiPickerRef, () => {
-  isEmojiPickerVisible.value = false
-})
+onClickOutside(
+  emojiPickerRef,
+  () => {
+    isEmojiPickerVisible.value = false
+  },
+  { ignore: [emojiTriggerRef] }
+)
 
 const triggerFileUpload = () => {
   if (attachmentInput.value) {
@@ -204,7 +219,8 @@ const triggerFileUpload = () => {
   }
 }
 
-const toggleEmojiPicker = () => {
+const toggleEmojiPicker = (event) => {
+  emojiPickerPointerOpened.value = event.detail > 0
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
 }
 

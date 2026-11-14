@@ -288,6 +288,9 @@ func TestExtractStatuses_FailedWithError(t *testing.T) {
 		t.Fatalf("expected 1 status, got %d", len(st))
 	}
 	s := st[0]
+	if s.ErrorCode != 131047 {
+		t.Fatalf("provider error code lost: %d", s.ErrorCode)
+	}
 	if s.Status != "failed" {
 		t.Fatalf("failed status fields not extracted: %+v", s)
 	}

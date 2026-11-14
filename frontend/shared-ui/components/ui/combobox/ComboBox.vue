@@ -3,12 +3,14 @@
     <PopoverTrigger as-child>
       <slot name="trigger" :selected="selectedItem" :open="open">
         <Button
+          v-bind="$attrs"
           type="button"
           :disabled="disabled"
           variant="outline"
           role="combobox"
           :aria-expanded="open"
-          :class="['w-full justify-between', buttonClass]"
+          :class="['w-full justify-between bg-transparent px-3', buttonClass]"
+          @blur="emit('blur', $event)"
         >
           <span class="flex min-w-0 flex-1 items-center text-left">
             <slot name="selected" :selected="selectedItem">
@@ -20,7 +22,25 @@
       </slot>
     </PopoverTrigger>
     <PopoverContent class="p-0" :align="align">
-      <Command v-model:search-term="searchTerm" :filter-function="passThroughFilter">
+      <VirtualCommand
+        v-if="virtual"
+        v-model:search-term="searchTerm"
+        :model-value="selectedItem"
+        :items="filteredItems"
+        :placeholder="placeholder"
+        @select="selectItem"
+        @blur="emit('blur', $event)"
+      >
+        <template #default="{ item }">
+          <slot name="item" :item="item">{{ item.label }}</slot>
+          <CheckIcon
+            v-if="String(value) === item.value"
+            class="ml-auto h-4 w-4 shrink-0"
+            aria-hidden="true"
+          />
+        </template>
+      </VirtualCommand>
+      <Command v-else v-model:search-term="searchTerm" :filter-function="passThroughFilter">
         <CommandInput class="h-9" :placeholder="placeholder" :loading="searching" />
         <CommandEmpty v-if="!searching">{{ $t('globals.messages.notFound') }}</CommandEmpty>
         <CommandList>
@@ -53,6 +73,7 @@ import { cn } from '@shared-ui/lib/utils'
 import { useRemoteSearch } from '@shared-ui/composables/useRemoteSearch'
 import { Button } from '@shared-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@shared-ui/components/ui/popover'
+import VirtualCommand from './VirtualCommand.vue'
 import {
   CommandEmpty,
   CommandGroup,
@@ -62,6 +83,8 @@ import {
   CommandList
 } from '@shared-ui/components/ui/command'
 
+defineOptions({ inheritAttrs: false })
+
 const RENDER_CAP = 300
 const SEARCH_DEBOUNCE_MS = 250
 
@@ -70,6 +93,7 @@ const props = defineProps({
     type: Array,
     required: true
   },
+  virtual: { type: Boolean, default: false },
   placeholder: String,
   disabled: { type: Boolean, default: false },
   defaultLabel: String,
@@ -88,7 +112,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'blur'])
 const value = defineModel()
 const open = ref(false)
 const searchTerm = ref('')
@@ -139,7 +163,7 @@ const selectedItem = computed(
     props.items.find((i) => i.value === value.value) ||
     (pickedItem.value?.value === value.value ? pickedItem.value : null)
 )
-const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel)
+const selectedLabel = computed(() => selectedItem.value?.label || props.defaultLabel || props.placeholder)
 
 watch(
   [value, () => props.items],
@@ -155,13 +179,17 @@ const handleSelect = (ev) => {
   if (typeof ev.detail.value === 'string') {
     try {
       const selected = JSON.parse(ev.detail.value)
-      pickedItem.value = selected
-      value.value = selected.value
-      open.value = false
-      emit('select', selected)
+      selectItem(selected)
     } catch (e) {
       console.error('Invalid selection value')
     }
   }
+}
+
+const selectItem = (selected) => {
+  pickedItem.value = selected
+  value.value = selected.value
+  open.value = false
+  emit('select', selected)
 }
 </script>

@@ -2,7 +2,9 @@
 package status
 
 import (
+	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -136,7 +138,9 @@ func (m *Manager) Update(id int, name, category string) (models.Status, error) {
 func (m *Manager) Get(id int) (models.Status, error) {
 	var status models.Status
 	if err := m.q.GetStatus.Get(&status, id); err != nil {
-		m.lo.Error("error fetching status", "error", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			m.lo.Error("error fetching status", "error", err)
+		}
 		return status, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return status, nil

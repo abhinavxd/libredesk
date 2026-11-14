@@ -2,12 +2,16 @@
   <AdminSplitLayout>
     <template #content>
       <LoadingOverlay :loading="isLoading" reserve-height>
-        <div class="flex justify-end mb-4">
-          <Button @click="router.push({ name: 'new-ai-tool' })">{{
-            t('admin.ai.tool.new')
-          }}</Button>
-        </div>
+        <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+          <template #actions>
+            <Button @click="router.push({ name: 'new-ai-tool' })">{{
+              t('admin.ai.tool.new')
+            }}</Button>
+          </template>
+        </AdminToolbar>
         <DataTable
+          v-model:search="searchTerm"
+          :searchable="false"
           :columns="createToolColumns(t, { onEdit: editTool })"
           :data="tools"
           :loading="isLoading"
@@ -30,6 +34,8 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
@@ -43,6 +49,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const emitter = useEmitter()
 const router = useRouter()

@@ -1,27 +1,30 @@
 <template>
   <form @submit.prevent="onSubmit" class="space-y-8">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input type="text" :placeholder="t('globals.terms.agent')" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-    <FormField v-slot="{ componentField }" name="description">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
-        <FormControl>
-          <Input
-            type="text"
-            :placeholder="t('admin.role.roleForAllSupportAgents')"
-            v-bind="componentField"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem v-auto-animate>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" :placeholder="t('globals.terms.agent')" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="description">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.description') }}</FormLabel>
+          <FormControl>
+            <Input
+              type="text"
+              :placeholder="t('admin.role.roleForAllSupportAgents')"
+              v-bind="componentField"
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <div>
       <div class="mb-5 text-lg">{{ $t('admin.role.setPermissionsForThisRole') }}</div>
@@ -33,7 +36,7 @@
           class="rounded-md border border-border bg-card"
         >
           <div class="border-b border-border bg-muted/30 px-5 py-3">
-            <h4 class="font-medium text-card-foreground">{{ entity.name }}</h4>
+            <h4 class="ui-subheading">{{ entity.name }}</h4>
           </div>
 
           <div class="p-5">
@@ -64,6 +67,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, ref, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -71,10 +75,16 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { createFormSchema } from './formSchema.js'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@shared-ui/components/ui/form/index.js'
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage
+} from '@shared-ui/components/ui/form/index.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { useI18n } from 'vue-i18n'
-import { permissions as perms } from '../../../constants/permissions.js'
+import { permissions as perms } from '@main/constants/permissions.js'
 
 const props = defineProps({
   initialValues: {
@@ -103,7 +113,10 @@ const props = defineProps({
 const { t } = useI18n()
 
 const submitLabel = computed(() => {
-  return props.submitLabel || (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  return (
+    props.submitLabel ||
+    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+  )
 })
 
 // TODO: Prepare this by fetching all perms from the file, so we don't have to update this manually.

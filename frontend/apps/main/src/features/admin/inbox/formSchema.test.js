@@ -150,6 +150,25 @@ describe('Email Inbox Form Schema', () => {
         expect(() => schema.parse(form)).toThrow()
     })
 
+    test('imap off needs no imap block', () => {
+        const { imap, ...form } = validForm
+        expect(() => schema.parse({ ...form, imap_enabled: false })).not.toThrow()
+    })
+
+    test('imap off ignores an invalid imap block', () => {
+        expect(() => schema.parse({ ...withImap({ host: '' }), imap_enabled: false })).not.toThrow()
+    })
+
+    test('imap on still validates the imap block', () => {
+        expect(() => schema.parse({ ...withImap({ host: '' }), imap_enabled: true })).toThrow()
+    })
+
+    test('imap errors keep their imap.* path', () => {
+        const result = schema.safeParse(withImap({ host: '' }))
+        expect(result.success).toBe(false)
+        expect(result.error.issues.some((i) => i.path.join('.') === 'imap.host')).toBe(true)
+    })
+
     test('imap host empty', () => {
         expect(() => schema.parse(withImap({ host: '' }))).toThrow()
     })
@@ -245,6 +264,28 @@ describe('Email Inbox Form Schema', () => {
     test('all smtp auth_protocol values accepted', () => {
         for (const auth_protocol of ['login', 'cram', 'plain', 'none']) {
             expect(() => schema.parse(withSmtp({ auth_protocol }))).not.toThrow()
+        }
+    })
+
+    test('unauthenticated SMTP accepts empty and omitted credentials', () => {
+        for (const credential of ['', undefined]) {
+            expect(() => schema.parse(withSmtp({
+                auth_protocol: 'none', username: credential, password: credential
+            }))).not.toThrow()
+        }
+    })
+
+    test('authenticated SMTP requires both credentials', () => {
+        for (const auth_protocol of ['login', 'cram', 'plain']) {
+            for (const field of ['username', 'password']) {
+                for (const credential of ['', undefined]) {
+                    const result = schema.safeParse(withSmtp({ auth_protocol, [field]: credential }))
+                    expect(result.success).toBe(false)
+                    expect(result.error.issues).toEqual(expect.arrayContaining([
+                        expect.objectContaining({ path: ['smtp', field] })
+                    ]))
+                }
+            }
         }
     })
 

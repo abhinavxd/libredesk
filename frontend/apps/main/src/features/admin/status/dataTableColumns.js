@@ -1,6 +1,6 @@
 import { h } from 'vue'
 import dropdown from './dataTableDropdown.vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import { CONVERSATION_DEFAULT_STATUSES_LIST } from '@/constants/conversation.js'
 
 const DEFAULT_STATUS_KEY = {
@@ -14,13 +14,13 @@ export const createColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'name',
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.name'))
+      return h('div', null, t('globals.terms.name'))
     },
     cell: function ({ row }) {
       const name = row.getValue('name')
       const isDefault = CONVERSATION_DEFAULT_STATUSES_LIST.includes(name)
       const label = isDefault ? t(DEFAULT_STATUS_KEY[name]) : name
-      return h('div', { class: 'text-center' },
+      return h('div', null,
         onEdit && !isDefault
           ? h('span', {
               class: 'text-foreground font-medium hover:underline cursor-pointer',
@@ -32,21 +32,23 @@ export const createColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'category',
+    meta: { compact: true },
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.category'))
+      return h('div', null, t('globals.terms.category'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, t(`globals.terms.${row.getValue('category')}`))
+      return h('div', null, t(`globals.terms.${row.getValue('category')}`))
     }
   },
   {
     accessorKey: 'created_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
     header: function () {
-      return h('div', { class: 'text-center' }, t('globals.terms.createdAt'))
+      return h('div', null, t('globals.terms.createdAt'))
     },
     cell: function ({ row }) {
-      return h('div', { class: 'text-center' }, format(row.getValue('created_at'), 'PPpp'))
+      return h(TableDate, { value: row.getValue('created_at') })
     }
   },
   {

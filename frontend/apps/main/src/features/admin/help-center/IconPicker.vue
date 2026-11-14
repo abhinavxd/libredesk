@@ -46,11 +46,11 @@
         </div>
         <p
           v-if="iconNames.length && !filteredIcons.length"
-          class="py-4 text-center text-sm text-muted-foreground"
+          class="py-4 text-center ui-description"
         >
           {{ t('globals.messages.noResultsFound') }}
         </p>
-        <p v-if="loadError" class="py-4 text-center text-sm text-muted-foreground">
+        <p v-if="loadError" class="py-4 text-center ui-description">
           {{ t('globals.messages.somethingWentWrong') }}
         </p>
       </div>

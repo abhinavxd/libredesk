@@ -1,6 +1,7 @@
 describe('API: templates', () => {
   const stamp = Date.now()
   const name = `api-template-${stamp}`
+  const reply = '{{ template "content" . }}'
   let templateId
 
   before(() => cy.login())
@@ -64,12 +65,22 @@ describe('API: templates', () => {
     })
   })
 
+  it('rejects an outgoing template without the reply block', () => {
+    cy.api('POST', '/api/v1/templates', {
+      name: `${name}-noreply`, type: 'email_outgoing', body: '<p>no reply</p>'
+    }, { failOnStatusCode: false }).then(({ status, body }) => {
+      expect(status).to.eq(400)
+      expect(body.error_type).to.eq('InputException')
+      expect(body.message).to.contain('{{ template "content" . }}')
+    })
+  })
+
   it('creates a template and persists every field', () => {
     cy.api('POST', '/api/v1/templates', {
       name,
       type: 'email_outgoing',
       subject: 'Api subject',
-      body: '<p>api body</p>',
+      body: `<p>api body</p>${reply}`,
       is_default: false
     }).then(({ status, body }) => {
       expect(status).to.eq(200)
@@ -79,7 +90,7 @@ describe('API: templates', () => {
       expect(body.data.name).to.eq(name)
       expect(body.data.type).to.eq('email_outgoing')
       expect(body.data.subject).to.eq('Api subject')
-      expect(body.data.body).to.eq('<p>api body</p>')
+      expect(body.data.body).to.eq(`<p>api body</p>${reply}`)
       expect(body.data.is_default).to.eq(false)
       expect(body.data.is_builtin).to.eq(false)
     })
@@ -113,14 +124,14 @@ describe('API: templates', () => {
       name: `${name}-renamed`,
       type: 'email_outgoing',
       subject: 'Api subject updated',
-      body: '<p>updated</p>',
+      body: `<p>updated</p>${reply}`,
       is_default: false
     }).its('status').should('eq', 200)
 
     cy.api('GET', `/api/v1/templates/${templateId}`).then(({ body }) => {
       expect(body.data.name).to.eq(`${name}-renamed`)
       expect(body.data.subject).to.eq('Api subject updated')
-      expect(body.data.body).to.eq('<p>updated</p>')
+      expect(body.data.body).to.eq(`<p>updated</p>${reply}`)
     })
   })
 

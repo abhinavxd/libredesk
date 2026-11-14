@@ -1,5 +1,8 @@
 <template>
-  <div class="flex flex-col h-full relative">
+  <div
+    class="flex flex-col h-full relative"
+    :class="{ 'pb-[env(safe-area-inset-bottom)]': widgetStore.isMobileFullScreen }"
+  >
     <div
       v-if="widgetStore.currentView === 'home'"
       class="absolute right-2 z-20"
@@ -53,14 +56,7 @@
         v-if="widgetStore.config?.show_powered_by !== false && widgetStore.isChatView"
         class="flex items-center justify-center pb-1.5"
       >
-        <a
-          href="https://libredesk.io"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors no-underline"
-        >
-          Powered by <span class="font-medium">libredesk</span>
-        </a>
+        <PoweredBy />
       </div>
       <ConnectionBanner />
     </Tabs>
@@ -68,7 +64,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import PoweredBy from '@shared-ui/components/PoweredBy.vue'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@shared-ui/components/ui/tabs'
 import HomeView from '@widget/views/HomeView.vue'
 import { House, MessagesSquare, CircleQuestionMark } from 'lucide-vue-next'
@@ -100,9 +96,9 @@ const handleTabChange = (value) => {
 .nav-tab {
   @apply flex flex-col items-center justify-center gap-1 w-full px-0 py-4
          rounded-none shadow-none cursor-pointer transition-colors
-         text-muted-foreground;
+         text-muted-foreground border-t-2 border-transparent;
 }
 .nav-tab[data-state='active'] {
-  @apply bg-transparent shadow-none text-primary;
+  @apply bg-transparent shadow-none text-primary border-primary;
 }
 </style>

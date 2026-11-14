@@ -113,6 +113,13 @@ func initConfig(ko *koanf.Koanf) {
 			return key, val
 		},
 	}), nil)
+	if ko.String("app.server.client_ip_header") == "" {
+		header := "X-Client-IP"
+		if os.Getenv("RAILWAY_ENVIRONMENT_ID") != "" {
+			header = "X-Real-IP"
+		}
+		ko.Set("app.server.client_ip_header", header)
+	}
 }
 
 // validateConfig logs warnings/fatals for invalid config values.
@@ -703,23 +710,24 @@ func initNotifier() *notifier.Service {
 
 // initEmailInbox loads inbox config from DB and initializes the email inbox.
 func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, mgr *inbox.Manager, authStatusHook email.AuthStatusCallback) (inbox.Inbox, error) {
+	lo := initLogger("email_inbox")
 	var config imodels.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
 	if len(config.SMTP) == 0 {
-		log.Printf("WARNING: Zero SMTP servers configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
+		lo.Warn("no SMTP servers configured for inbox", "inbox_id", inboxRecord.ID, "channel", inboxRecord.Channel)
 	}
 
 	if len(config.IMAP) == 0 {
-		log.Printf("WARNING: Zero IMAP clients configured for `%s` inbox: Name: `%s`", inboxRecord.Channel, inboxRecord.Name)
+		lo.Warn("no IMAP clients configured for inbox", "inbox_id", inboxRecord.ID, "channel", inboxRecord.Channel)
 	}
 
 	config.From = inboxRecord.From
@@ -734,17 +742,16 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		// Marshal updated config to JSON
 		updatedConfigJSON, err := json.Marshal(updatedConfig)
 		if err != nil {
-			log.Printf("ERROR: Failed to marshal updated config during token refresh for inbox %d: %v", inboxID, err)
+			lo.Error("error encoding refreshed inbox tokens", "inbox_id", inboxID, "error", err)
 			return err
 		}
 
 		// Persist updated config to DB
 		if err := mgr.UpdateConfig(inboxID, updatedConfigJSON); err != nil {
-			log.Printf("ERROR: Failed to persist refreshed tokens during operation for inbox %d: %v", inboxID, err)
 			return err
 		}
 
-		log.Printf("INFO: Successfully persisted refreshed tokens during operation for inbox: %d", inboxID)
+		lo.Info("inbox tokens refreshed", "inbox_id", inboxID)
 		return nil
 	}
 
@@ -754,7 +761,7 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		Name:                 inboxRecord.Name,
 		Aliases:              inboxRecord.Aliases,
 		Config:               config,
-		Lo:                   initLogger("email_inbox"),
+		Lo:                   lo,
 		TokenRefreshCallback: tokenRefreshCallback,
 		AuthStatusCallback:   authStatusHook,
 		AliasVerificationCallback: func(ctx context.Context, token, from string) error {
@@ -769,21 +776,22 @@ func initEmailInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrS
 		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
-	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+	lo.Info("inbox initialized", "inbox_id", inboxRecord.ID, "channel", inboxRecord.Channel)
 
 	return inbox, nil
 }
 
 // initLiveChatInbox initializes the live chat inbox.
 func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, usrStore inbox.UserStore, signAvatarURL func(*null.String)) (inbox.Inbox, error) {
+	lo := initLogger("livechat_inbox")
 	var config livechat.Config
 
-	// Load JSON data into Koanf.
-	if err := ko.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
+	inboxConfig := koanf.New(".")
+	if err := inboxConfig.Load(rawbytes.Provider([]byte(inboxRecord.Config)), kjson.Parser()); err != nil {
 		return nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	if err := ko.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
+	if err := inboxConfig.UnmarshalWithConf("", &config, koanf.UnmarshalConf{Tag: "json"}); err != nil {
 		return nil, fmt.Errorf("unmarshalling `%s` %s config: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
@@ -791,7 +799,7 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 		ID:            inboxRecord.ID,
 		Name:          inboxRecord.Name,
 		Config:        config,
-		Lo:            initLogger("livechat_inbox"),
+		Lo:            lo,
 		SignAvatarURL: signAvatarURL,
 	})
 
@@ -799,13 +807,14 @@ func initLiveChatInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, u
 		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error : %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
-	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+	lo.Info("inbox initialized", "inbox_id", inboxRecord.ID, "channel", inboxRecord.Channel)
 
 	return inbox, nil
 }
 
 // initWhatsAppInbox initializes a WhatsApp Cloud API inbox.
 func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, client *whatsappapi.Client, sourceUpdater whatsappChannel.SourceIDUpdater) (inbox.Inbox, error) {
+	lo := initLogger("whatsapp_inbox")
 	var config whatsappChannel.Config
 	if err := json.Unmarshal(inboxRecord.Config, &config); err != nil {
 		return nil, fmt.Errorf("unmarshalling whatsapp config for inbox %q: %w", inboxRecord.Name, err)
@@ -816,14 +825,14 @@ func initWhatsAppInbox(inboxRecord imodels.Inbox, msgStore inbox.MessageStore, c
 		Name:          inboxRecord.Name,
 		Config:        config,
 		Client:        client,
-		Lo:            initLogger("whatsapp_inbox"),
+		Lo:            lo,
 		SourceUpdater: sourceUpdater,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initializing `%s` inbox: `%s` error: %w", inboxRecord.Channel, inboxRecord.Name, err)
 	}
 
-	log.Printf("`%s` inbox successfully initialized", inboxRecord.Name)
+	lo.Info("inbox initialized", "inbox_id", inboxRecord.ID, "channel", inboxRecord.Channel)
 	return inb, nil
 }
 
@@ -981,6 +990,7 @@ func buildProviders(o *oidc.Manager) ([]auth_.Provider, error) {
 			RedirectURL:  func() (string, error) { return o.RedirectURL(config.ID) },
 			ClientID:     config.ClientID,
 			ClientSecret: config.ClientSecret,
+			VerifyEmail:  config.VerifyEmail,
 		})
 	}
 	return providers, nil
@@ -1003,12 +1013,13 @@ func initOIDC(db *sqlx.DB, settings *setting.Manager, i18n *i18n.I18n) *oidc.Man
 
 // initI18n inits i18n.
 func initI18n(fs stuffbin.FileSystem) *i18n.I18n {
+	lo := initLogger("i18n")
 	lang := cmp.Or(ko.String("app.lang"), defLang)
 	log.Printf("loading i18n language file: %s", lang)
 	if _, err := fs.Read("/i18n/" + lang + ".json"); err != nil {
 		log.Fatalf("error reading i18n language file `%s` : %v", lang, err)
 	}
-	i18n, err := loadI18nLang(lang, fs)
+	i18n, err := loadI18nLang(lang, fs, lo)
 	if err != nil {
 		log.Fatalf("error initializing i18n: %v", err)
 	}
@@ -1105,7 +1116,7 @@ func initPriority(db *sqlx.DB, i18n *i18n.I18n) *priority.Manager {
 }
 
 // initAI inits AI manager.
-func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *ai.Manager {
+func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control, settings *setting.Manager) *ai.Manager {
 	lo := initLogger("ai")
 	m, err := ai.New(ai.Opts{
 		Ctx:           ctx,
@@ -1114,6 +1125,7 @@ func initAI(ctx context.Context, db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.
 		I18n:          i18n,
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		Settings:      settings,
 	})
 	if err != nil {
 		log.Fatalf("error initializing AI manager: %v", err)
@@ -1237,6 +1249,8 @@ func initWebhook(db *sqlx.DB, i18n *i18n.I18n, dialControl ssrf.Control) *webhoo
 		Timeout:       ko.MustDuration("webhook.timeout"),
 		EncryptionKey: ko.MustString("app.encryption_key"),
 		DialControl:   dialControl,
+		MaxRetries:    ko.Int("webhook.max_retries"),
+		RetryBackoff:  ko.Duration("webhook.retry_backoff"),
 	})
 	if err != nil {
 		log.Fatalf("error initializing webhook manager: %v", err)
@@ -1368,8 +1382,8 @@ func getLogLevel(lvl string) logf.Level {
 
 // initRateLimit initializes the rate limiter with default rules.
 // Defaults are used unless overridden in config.toml under [rate_limit.<name>].
-func initRateLimit(redisClient *redis.Client) *ratelimit.Limiter {
-	limiter := ratelimit.New(redisClient)
+func initRateLimit(redisClient *redis.Client, clientIPHeader string) *ratelimit.Limiter {
+	limiter := ratelimit.New(redisClient, initLogger("rate_limit"), clientIPHeader)
 
 	defaults := []struct {
 		Name string

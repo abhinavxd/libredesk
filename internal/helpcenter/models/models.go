@@ -144,6 +144,7 @@ type Article struct {
 	CreatedAt          time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt          time.Time `db:"updated_at" json:"updated_at"`
 	CollectionID       int       `db:"collection_id" json:"collection_id"`
+	CollectionName     string    `db:"collection_name" json:"collection_name,omitempty"`
 	AuthorID           *int64    `db:"author_id" json:"author_id"`
 	TranslationGroupID string    `db:"translation_group_id" json:"-"`
 	AuthorName         *string   `db:"author_name" json:"author_name"`

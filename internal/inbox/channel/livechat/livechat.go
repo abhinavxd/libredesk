@@ -468,7 +468,7 @@ func (lc *LiveChat) Send(message models.OutboundMessage) error {
 		}
 		select {
 		case client.Channel <- messageJSON:
-			lc.lo.Info("message sent to live chat client", "client_id", client.ID, "message_id", message.UUID)
+			lc.lo.Debug("message sent to live chat client", "client_id", client.ID, "message_id", message.UUID)
 		default:
 			lc.lo.Warn("client channel full, dropping message", "client_id", client.ID, "message_id", message.UUID)
 		}
@@ -592,7 +592,7 @@ func (lc *LiveChat) BroadcastTypingToClients(conversationUUID string, contactID 
 			case client.Channel <- messageJSON:
 				lc.lo.Debug("typing status sent to widget client", "contact_id", contactID, "client_id", client.ID, "conversation_uuid", conversationUUID, "is_typing", isTyping)
 			default:
-				lc.lo.Warn("client channel full, dropping typing message", "contact_id", contactID, "client_id", client.ID)
+				lc.lo.Debug("client channel full, dropping typing message", "contact_id", contactID, "client_id", client.ID)
 			}
 		}
 	}

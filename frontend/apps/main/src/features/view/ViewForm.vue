@@ -20,7 +20,7 @@
                   ref="nameInputRef"
                   id="name"
                   class="col-span-3"
-                  placeholder=""
+
                   v-bind="componentField"
                   @keydown.enter.prevent="onSubmit"
                 />
@@ -80,10 +80,10 @@ import {
   isPartialLeaf,
   createRoot
 } from '@main/components/filter/filterTree'
-import { useConversationFilters } from '../../composables/useConversationFilters'
+import { useConversationFilters } from '@main/composables/useConversationFilters'
 import { toTypedSchema } from '@vee-validate/zod'
-import { EMITTER_EVENTS } from '../../constants/emitterEvents.js'
-import { useEmitter } from '../../composables/useEmitter'
+import { EMITTER_EVENTS } from '@main/constants/emitterEvents.js'
+import { useEmitter } from '@main/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'

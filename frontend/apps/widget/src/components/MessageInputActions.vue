@@ -1,6 +1,5 @@
 <template>
-  <div class="flex items-center gap-1">
-    <!-- File Upload Input -->
+  <div class="flex items-center gap-1" @keydown.capture="emojiPickerPointerOpened = false">
     <input
       type="file"
       class="hidden"
@@ -10,8 +9,8 @@
       :disabled="!fileUploadEnabled"
     />
 
-    <!-- File Upload Button -->
     <Button
+      type="button"
       v-if="fileUploadEnabled && canUploadFiles"
       @click="triggerFileUpload"
       :disabled="uploading || disabled"
@@ -20,13 +19,14 @@
       size="sm"
       class="h-8 w-8 p-0 hover:bg-muted/50 border-0"
     >
-      <Paperclip class="h-4 w-4 text-muted-foreground" />
+      <Paperclip class="h-4 w-4 text-muted-foreground" aria-hidden="true" />
     </Button>
 
-    <!-- Emoji Picker -->
     <div class="relative">
       <Button
+        type="button"
         v-if="emojiEnabled"
+        ref="emojiTriggerRef"
         @click="toggleEmojiPicker"
         :disabled="disabled"
         :class="{ 'bg-muted': isEmojiPickerVisible }"
@@ -36,16 +36,26 @@
         size="sm"
         class="h-8 w-8 p-0 hover:bg-muted/50 border-0"
       >
-        <Smile class="h-4 w-4 text-muted-foreground" />
+        <Smile class="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </Button>
 
-      <EmojiPicker
-        v-if="isEmojiPickerVisible && emojiEnabled"
-        ref="emojiPickerRef"
-        :native="true"
-        @select="onSelectEmoji"
-        class="absolute bottom-12 left-0 z-50"
-      />
+      <Transition
+        :css="emojiPickerPointerOpened"
+        enter-active-class="transition-[opacity,transform] [transition-duration:125ms] ease-out motion-reduce:duration-100"
+        enter-from-class="opacity-0 scale-[0.98] motion-reduce:scale-100"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition-[opacity,transform] duration-100 ease-out"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-[0.98] motion-reduce:scale-100"
+      >
+        <EmojiPicker
+          v-if="isEmojiPickerVisible && emojiEnabled"
+          ref="emojiPickerRef"
+          :native="true"
+          @select="onSelectEmoji"
+          class="origin-bottom-left absolute bottom-12 left-0 z-50"
+        />
+      </Transition>
     </div>
   </div>
 </template>
@@ -57,10 +67,7 @@ import { Button } from '@shared-ui/components/ui/button'
 import { Smile, Paperclip } from 'lucide-vue-next'
 
 const EmojiPicker = defineAsyncComponent(async () => {
-  const [mod] = await Promise.all([
-    import('vue3-emoji-picker'),
-    import('vue3-emoji-picker/css'),
-  ])
+  const [mod] = await Promise.all([import('vue3-emoji-picker'), import('vue3-emoji-picker/css')])
   return mod.default
 })
 
@@ -91,12 +98,17 @@ const emit = defineEmits(['fileUpload', 'emojiSelect'])
 
 const fileInput = ref(null)
 const isEmojiPickerVisible = ref(false)
+const emojiPickerPointerOpened = ref(false)
 const emojiPickerRef = ref(null)
+const emojiTriggerRef = ref(null)
 
-// Close emoji picker when clicking outside
-onClickOutside(emojiPickerRef, () => {
-  isEmojiPickerVisible.value = false
-})
+onClickOutside(
+  emojiPickerRef,
+  () => {
+    isEmojiPickerVisible.value = false
+  },
+  { ignore: [emojiTriggerRef] }
+)
 
 const triggerFileUpload = () => {
   if (fileInput.value && props.fileUploadEnabled && !props.uploading) {
@@ -112,7 +124,8 @@ const handleFileUpload = (event) => {
   }
 }
 
-const toggleEmojiPicker = () => {
+const toggleEmojiPicker = (event) => {
+  emojiPickerPointerOpened.value = event.detail > 0
   isEmojiPickerVisible.value = !isEmojiPickerVisible.value
 }
 

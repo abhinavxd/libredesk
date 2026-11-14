@@ -1,16 +1,111 @@
 package conversation
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 
 	am "github.com/abhinavxd/libredesk/internal/authz/models"
+	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/csat"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/abhinavxd/libredesk/internal/user"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
+	"github.com/abhinavxd/libredesk/internal/ws"
+	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/zerodha/logf"
 )
+
+type unassignWebhook struct {
+	webhookStore
+	events []wmodels.WebhookEvent
+}
+
+func (w *unassignWebhook) TriggerEvent(event wmodels.WebhookEvent, _ any) {
+	w.events = append(w.events, event)
+}
+
+func TestCSATSubmissionBroadcastsSavedFeedback(t *testing.T) {
+	db := testutil.NewDB(t, "csat_live_update")
+	lo := logf.New(logf.Opts{})
+	lang := testutil.NewI18n(t)
+	csats, err := csat.New(csat.Opts{DB: db, Lo: &lo, I18n: lang})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hub := ws.NewHub(&lo, nil /** userStore **/)
+	m := &Manager{lo: &lo, i18n: lang, csatStore: csats, wsHub: hub}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contactID, inboxID int
+	if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Customer', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Chat', 'livechat') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	for _, rating := range []int{0, 5} {
+		t.Run(fmt.Sprint(rating), func(t *testing.T) {
+			var conv models.Conversation
+			if err := db.Get(&conv, `INSERT INTO conversations (contact_id, inbox_id, status_id)
+				VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, contactID, inboxID); err != nil {
+				t.Fatal(err)
+			}
+			response, err := csats.Create(conv.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var messageUUID string
+			if err := db.Get(&messageUUID, `INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, meta)
+				VALUES ($1, 'outgoing', 'sent', $2, 'agent', jsonb_build_object('is_csat', true, 'csat_uuid', $3::text)) RETURNING uuid`, conv.ID, contactID, response.UUID); err != nil {
+				t.Fatal(err)
+			}
+			client := &ws.Client{Send: make(chan wsmodels.WSMessage, 2)}
+			hub.SubscribeOpenConv(client, conv.UUID)
+			feedback := "Helpful support. Café 日本語."
+			if err := m.UpdateCSATResponse(response.UUID, rating, feedback, nil /** meta **/); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case update := <-client.Send:
+				var payload struct {
+					Type string `json:"type"`
+					Data struct {
+						UUID             string         `json:"uuid"`
+						ConversationUUID string         `json:"conversation_uuid"`
+						Meta             map[string]any `json:"meta"`
+					} `json:"data"`
+				}
+				if err := json.Unmarshal(update.Data, &payload); err != nil {
+					t.Fatal(err)
+				}
+				if payload.Type != wsmodels.MessageTypeMessageUpdate || payload.Data.UUID != messageUUID || payload.Data.ConversationUUID != conv.UUID {
+					t.Fatalf("wrong message update: %+v", payload)
+				}
+				meta := payload.Data.Meta
+				if meta["csat_submitted"] != true || meta["submitted_feedback"] != feedback || meta["csat_uuid"] != nil {
+					t.Fatalf("incorrect or exposed CSAT metadata: %+v", meta)
+				}
+				if rating > 0 && meta["submitted_rating"] != float64(rating) {
+					t.Fatalf("wrong rating: %+v", meta)
+				}
+			default:
+				t.Fatal("no live CSAT update")
+			}
+			if err := m.UpdateCSATResponse(response.UUID, 1 /** rating **/, "duplicate", nil /** meta **/); err == nil {
+				t.Fatal("duplicate response accepted")
+			}
+			if len(client.Send) != 0 {
+				t.Fatal("rejected response broadcast an update")
+			}
+		})
+	}
+}
 
 func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 	db := testutil.NewDB(t, "previous_access")
@@ -68,5 +163,159 @@ func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 				t.Fatalf("missing base permission: rows=%d err=%v", len(got), err)
 			}
 		})
+	}
+}
+
+func TestDisabledAgentGetsNoConversations(t *testing.T) {
+	db := testutil.NewDB(t, "disabled_assignee")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, active, disabled, deleted, inbox int
+	for id, columns := range map[*int]string{
+		&contact:  `('contact', 'Contact', '', true, NULL)`,
+		&active:   `('agent', 'Active', '', true, NULL)`,
+		&disabled: `('agent', 'Disabled', '', false, NULL)`,
+		&deleted:  `('agent', 'Deleted', '', true, NOW())`,
+	} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name, enabled, deleted_at) VALUES `+columns+` RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	newConversation := func(status string, assignee int) string {
+		var uuid string
+		if err := db.Get(&uuid, `INSERT INTO conversations (contact_id, inbox_id, status_id, assigned_user_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), NULLIF($4, 0)) RETURNING uuid`, contact, inbox, status, assignee); err != nil {
+			t.Fatal(err)
+		}
+		return uuid
+	}
+	assignee := func(uuid string) int {
+		var id int
+		if err := db.Get(&id, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, uuid); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	for name, tt := range map[string]struct{ assignee, want int }{
+		"active agent keeps a reopened conversation":    {active, active},
+		"disabled agent loses a reopened conversation":  {disabled, 0},
+		"deleted agent loses a reopened conversation":   {deleted, 0},
+		"unassigned conversation reopens as unassigned": {0, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			uuid := newConversation("Resolved", tt.assignee)
+			var id int
+			if err := m.q.ReOpenConversation.QueryRow(uuid).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			if got := assignee(uuid); got != tt.want {
+				t.Fatalf("assignee after reopen = %d, want %d", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("assigning to a disabled agent is rejected", func(t *testing.T) {
+		uuid := newConversation("Open", active)
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if err := m.UpdateConversationUserAssignee(uuid, disabled, umodels.User{ID: active}); err == nil {
+			t.Fatal("assignment to a disabled agent succeeded")
+		}
+		if got := assignee(uuid); got != active {
+			t.Fatalf("assignee = %d, want it unchanged at %d", got, active)
+		}
+	})
+
+	t.Run("disabled agent is dropped from notification recipients", func(t *testing.T) {
+		render := func(umodels.User) (string, string, error) { return "", "", nil }
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if got := m.buildNotificationRecipients([]int{disabled}, render); len(got) != 0 {
+			t.Fatalf("recipients = %+v, want none", got)
+		}
+		m.userStore = replyUserStore{agent: umodels.User{ID: active, Enabled: true}}
+		if got := m.buildNotificationRecipients([]int{active}, render); len(got) != 1 {
+			t.Fatalf("recipients = %+v, want the active agent", got)
+		}
+	})
+}
+
+func TestUnassignOpenUnassignsEachOpenConversation(t *testing.T) {
+	db := testutil.NewDB(t, "unassign_open")
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	lang := testutil.NewI18n(t)
+	inboxes, err := inbox.New(&lo, db, lang, "0123456789abcdef0123456789abcdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	users, err := user.New(lang, user.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	webhooks := &unassignWebhook{}
+	m := &Manager{
+		db: db, lo: &lo, i18n: lang, inboxStore: inboxes, userStore: users,
+		webhookStore: webhooks, wsHub: ws.NewHub(&lo, nil /** userStore **/),
+	}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, leaving, staying, inboxID int
+	for id, name := range map[*int]string{&contact: "Contact", &leaving: "Leaving", &staying: "Staying"} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name) VALUES ('agent', $1, '') RETURNING id`, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', $1, 'System', '')`, umodels.SystemUserEmail)
+	assignees := map[string]int{}
+	for subject, tt := range map[string]struct {
+		status   string
+		assignee int
+	}{
+		"open":           {"Open", leaving},
+		"snoozed":        {"Snoozed", leaving},
+		"resolved":       {"Resolved", leaving},
+		"other agent's":  {"Open", staying},
+		"never assigned": {"Open", 0},
+	} {
+		if _, err := db.Exec(`INSERT INTO conversations (contact_id, inbox_id, status_id, subject, assigned_user_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), $4, NULLIF($5, 0))`, contact, inboxID, tt.status, subject, tt.assignee); err != nil {
+			t.Fatal(err)
+		}
+		assignees[subject] = tt.assignee
+	}
+	assignees["open"], assignees["snoozed"] = 0, 0
+
+	// A second run finds nothing left to unassign.
+	for range 2 {
+		if err := m.UnassignOpen(leaving); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for subject, want := range assignees {
+		var got int
+		if err := db.Get(&got, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE subject = $1`, subject); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s conversation assignee = %d, want %d", subject, got, want)
+		}
+	}
+	if len(webhooks.events) != 2 {
+		t.Fatalf("unassigned events = %d, want one each for the open and snoozed conversations", len(webhooks.events))
+	}
+	for _, event := range webhooks.events {
+		if event != wmodels.EventConversationUnassigned {
+			t.Fatalf("event = %s, want %s", event, wmodels.EventConversationUnassigned)
+		}
 	}
 }

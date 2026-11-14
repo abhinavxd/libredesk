@@ -29,18 +29,22 @@ import (
 )
 
 const (
-	maxCollectionDepth = 3
-	defaultLocale      = "en"
-	defaultAccentColor = "#1f93ff"
-	maxCardAuthors     = 3
-	maxSearchQueryLen  = 200
-	maxSlugLen         = 200
-	maxNameLen         = 200
-	maxPageTitleLen    = 200
-	maxMetaDescLen     = 500
+	maxCollectionDepth  = 3
+	defaultLocale       = "en"
+	defaultAccentColor  = "#1f93ff"
+	maxCardAuthors      = 3
+	maxSearchQueryLen   = 200
+	maxSearchExcerptLen = 240
+	maxSlugLen          = 200
+	maxNameLen          = 200
+	maxPageTitleLen     = 200
+	maxMetaDescLen      = 500
 
 	// minSearchQueryLen mirrors the typeahead's floor; shorter terms miss the trigram index and seq-scan.
 	minSearchQueryLen = 2
+
+	// searchSnippetLead is how many characters a search preview keeps before the first query match.
+	searchSnippetLead = 60
 
 	// searchLogRetentionDays bounds both what insights read and what the cleaner keeps.
 	searchLogRetentionDays = 90
@@ -436,6 +440,22 @@ func (m *Manager) GetCollectionByID(id int) (models.Collection, error) {
 		return collection, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return collection, nil
+}
+
+// GetCollectionPath returns a collection preceded by its ancestors, root first.
+func (m *Manager) GetCollectionPath(collection models.Collection) []models.Collection {
+	if collection.ID == 0 {
+		return nil
+	}
+	path := []models.Collection{collection}
+	for path[0].ParentID != nil && len(path) < maxCollectionDepth {
+		parent, err := m.GetCollectionByID(*path[0].ParentID)
+		if err != nil {
+			break
+		}
+		path = append([]models.Collection{parent}, path...)
+	}
+	return path
 }
 
 // CreateCollection creates a new collection; the help center row lock keeps a concurrent re-parent from pushing the new node past maxCollectionDepth.
@@ -1070,18 +1090,26 @@ func (m *Manager) GetPublishedCollectionLocales(helpCenterSlug, collectionSlug s
 	return locales, nil
 }
 
-// SearchPublishedArticles searches published articles in a help center, content trimmed to an excerpt, filtered to locale.
+// SearchPublishedArticles searches published articles in one locale and sets Content to a short plain-text preview.
 func (m *Manager) SearchPublishedArticles(helpCenterSlug, query, locale string, limit int) ([]models.Article, error) {
 	var articles = make([]models.Article, 0)
 	query = strings.TrimSpace(query)
 	if utf8.RuneCountInString(query) < minSearchQueryLen {
 		return articles, nil
 	}
-	query = truncateRunes(query, maxSearchQueryLen)
+	query = stringutil.TruncateRunes(query, maxSearchQueryLen)
 	tsQuery := prefixTSQuery(query)
 	if err := m.q.SearchPublishedArticles.Select(&articles, helpCenterSlug, dbutil.ContainsPattern(query), limit, locale, tsQuery); err != nil {
 		m.lo.Error("error searching published articles", "error", err, "help_center_slug", helpCenterSlug)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	match := searchMatcher(query)
+	for i := range articles {
+		if articles[i].Excerpt != "" {
+			articles[i].Content = articles[i].Excerpt
+			continue
+		}
+		articles[i].Content = searchSnippet(stringutil.HTMLPreviewText(articles[i].Content), match)
 	}
 	return articles, nil
 }
@@ -1111,7 +1139,7 @@ func (m *Manager) RecordArticleFeedback(articleID int, isHelpful bool) error {
 // LogSearch records a public search term and how many results it returned. Terms under
 // the search floor never ran, so logging them would pollute the zero-result insights.
 func (m *Manager) LogSearch(helpCenterID int, query string, resultsCount int) {
-	query = truncateRunes(strings.TrimSpace(query), maxSearchQueryLen)
+	query = stringutil.TruncateRunes(strings.TrimSpace(query), maxSearchQueryLen)
 	if utf8.RuneCountInString(query) < minSearchQueryLen {
 		return
 	}
@@ -1601,7 +1629,7 @@ func GenerateSlug(title string) string {
 
 // withSuffix truncates a slug so the suffix still fits inside maxSlugLen.
 func withSuffix(slug, suffix string) string {
-	return strings.Trim(truncateRunes(slug, maxSlugLen-len(suffix)), "-") + suffix
+	return strings.Trim(stringutil.TruncateRunes(slug, maxSlugLen-len(suffix)), "-") + suffix
 }
 
 func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterRequest, error) {
@@ -1619,7 +1647,7 @@ func (m *Manager) normalizeHelpCenterRequest(req HelpCenterRequest) (HelpCenterR
 	}
 	theme, err := normalizeTheme(req.Theme)
 	if err != nil {
-		m.lo.Error("error normalizing help center theme", "error", err)
+		m.lo.Debug("error normalizing help center theme", "error", err)
 		return req, envelope.NewError(envelope.InputError, m.i18n.T("helpCenter.invalidTheme"), nil)
 	}
 	req.Theme = theme
@@ -1770,14 +1798,6 @@ func isValidArticleStatus(status string) bool {
 	return status == models.ArticleStatusDraft || status == models.ArticleStatusPublished
 }
 
-func truncateRunes(s string, limit int) string {
-	runes := []rune(s)
-	if len(runes) <= limit {
-		return s
-	}
-	return string(runes[:limit])
-}
-
 // buildArticleSanitizer returns the HTML sanitization policy for article content.
 func buildArticleSanitizer() *bluemonday.Policy {
 	p := bluemonday.UGCPolicy()
@@ -1804,6 +1824,53 @@ func buildArticleSanitizer() *bluemonday.Policy {
 	// unrestricted policy wins, since any matching policy passes.
 	p.AllowAttrs("alt").OnElements("img")
 	return p
+}
+
+// searchSnippet cuts text to preview length, starting just before the first query match when the match would fall outside it.
+func searchSnippet(text string, match *regexp.Regexp) string {
+	var (
+		runes = []rune(text)
+		// Leaves room for both ellipses within maxSearchExcerptLen.
+		size  = maxSearchExcerptLen - 2
+		start = 0
+	)
+	if len(runes) <= size {
+		return text
+	}
+	if match != nil {
+		if loc := match.FindStringIndex(text); loc != nil {
+			if at := utf8.RuneCountInString(text[:loc[0]]); at > size-searchSnippetLead {
+				start = at - searchSnippetLead
+				for start < at && runes[start-1] != ' ' {
+					start++
+				}
+			}
+		}
+	}
+	end := min(start+size, len(runes))
+	out := strings.TrimSpace(string(runes[start:end]))
+	if start > 0 {
+		out = "…" + out
+	}
+	if end < len(runes) {
+		out += "…"
+	}
+	return out
+}
+
+// searchMatcher matches any query word of two or more characters, the same words the search page highlights.
+func searchMatcher(query string) *regexp.Regexp {
+	var words []string
+	for _, word := range strings.Fields(query) {
+		if utf8.RuneCountInString(word) > 1 {
+			words = append(words, regexp.QuoteMeta(word))
+		}
+	}
+	if len(words) == 0 {
+		return nil
+	}
+	match, _ := regexp.Compile("(?i)" + strings.Join(words, "|"))
+	return match
 }
 
 // prefixTSQuery builds an AND-ed prefix tsquery from the reader's search terms.

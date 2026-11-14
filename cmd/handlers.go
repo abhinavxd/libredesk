@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"mime"
 	"net/http"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/ws"
@@ -23,7 +25,7 @@ const (
 func initHandlers(g *fastglue.Fastglue, hub *ws.Hub) {
 	// Authentication.
 	g.POST("/api/v1/auth/login", rateLimit(sessionLogin(handleLogin), "auth"))
-	g.GET("/logout", auth(handleLogout))
+	g.POST("/api/v1/auth/logout", auth(handleLogout))
 	g.GET("/api/v1/oidc/{id}/login", rateLimit(handleOIDCLogin, "auth"))
 	g.GET("/api/v1/oidc/{id}/finish", rateLimit(sessionLogin(handleOIDCCallback), "auth"))
 
@@ -685,7 +687,18 @@ func sendErrorEnvelope(r *fastglue.Request, err error) error {
 	return r.SendErrorEnvelope(e.Code, e.Error(), e.Data, fastglue.ErrorType(e.ErrorType))
 }
 
-// handleHealthCheck handles the health check endpoint.
+// healthCheckTimeout bounds the database ping, so a hung connection fails the check instead of stalling it.
+const healthCheckTimeout = 3 * time.Second
+
+// handleHealthCheck handles the health check endpoint. It reports healthy only while the database answers.
 func handleHealthCheck(r *fastglue.Request) error {
+	app := r.Context.(*App)
+
+	ctx, cancel := context.WithTimeout(context.Background(), healthCheckTimeout)
+	defer cancel()
+	if err := app.db.PingContext(ctx); err != nil {
+		app.lo.Error("health check: database unreachable", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "database unreachable", nil, envelope.GeneralError)
+	}
 	return r.SendEnvelope(true)
 }

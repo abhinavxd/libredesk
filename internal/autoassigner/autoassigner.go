@@ -120,7 +120,6 @@ func (e *Engine) reloadBalancer() error {
 
 	err := e.populateTeamBalancer()
 	if err != nil {
-		e.lo.Error("error updating team balancer pool", "error", err)
 		return err
 	}
 	return nil
@@ -161,6 +160,12 @@ func (e *Engine) populateTeamBalancer() error {
 			// Skip user if availability status is `away_manual` or `away_and_reassigning`
 			if user.AvailabilityStatus == umodels.AwayManual || user.AvailabilityStatus == umodels.AwayAndReassigning {
 				e.lo.Debug("user is away, skipping autoasssignment ", "team_id", team.ID, "user_id", user.ID, "availability_status", user.AvailabilityStatus)
+				continue
+			}
+
+			// Skip offline users if the team has opted out of assigning to them.
+			if team.SkipOfflineAgents && user.AvailabilityStatus == umodels.Offline {
+				e.lo.Debug("user is offline, skipping autoassignment", "team_id", team.ID, "user_id", user.ID)
 				continue
 			}
 
@@ -245,9 +250,15 @@ func (e *Engine) assignConversations() error {
 					e.lo.Debug("conversation already assigned, skipping", "conversation_uuid", conv.UUID)
 					break
 				}
+				// User went away, was disabled or deleted, or left the team after the pool was last reloaded, try the next one.
+				if errors.Is(err, conversation.ErrAssigneeUnavailable) {
+					e.lo.Debug("user is unavailable, trying next user", "conversation_uuid", conv.UUID, "user_id", userID)
+					continue
+				}
 				e.lo.Error("error assigning conversation", "conversation_uuid", conv.UUID, "user_id", userID, "error", err)
 				continue
 			}
+			e.lo.Info("conversation automatically assigned", "conversation_uuid", conv.UUID, "user_id", userID, "team_id", teamID)
 			break
 		}
 	}

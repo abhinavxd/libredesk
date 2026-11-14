@@ -11,6 +11,8 @@
     :scroll-sensitivity="120"
     :scroll-speed="18"
     ghost-class="tree-node--ghost"
+    :animation="reducedMotion === 'reduce' ? 0 : 200"
+    easing="cubic-bezier(0.23, 1, 0.32, 1)"
     @end="emitCollectionOrder"
   >
     <template #item="{ element, index }">
@@ -37,8 +39,11 @@
 <script setup>
 import { provide, ref, watch } from 'vue'
 import Draggable from 'vuedraggable'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import TreeNode from './TreeNode.vue'
 import { moveWithin } from './treeReorder.js'
+
+const reducedMotion = usePreferredReducedMotion()
 
 const props = defineProps({
   data: {

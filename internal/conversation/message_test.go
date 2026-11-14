@@ -3,17 +3,20 @@ package conversation
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
+	"github.com/abhinavxd/libredesk/internal/dbutil"
 	hcmodels "github.com/abhinavxd/libredesk/internal/helpcenter/models"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
 )
 
@@ -54,6 +57,80 @@ func (s citationSettingsStore) GetAppRootURL() (string, error) {
 		(*s.lookups)++
 	}
 	return s.rootURL, nil
+}
+
+func TestAIConversationMessagesFilterBeforePagination(t *testing.T) {
+	db := testutil.NewDB(t, "ai_message_history")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{db: db, lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contactID, inboxID int
+	if err := db.Get(&contactID, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Customer', '') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Support', 'livechat') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name    string
+		replies int
+		surveys int
+		limit   int
+	}{
+		{name: "complete page with a survey", replies: 14, surveys: 1, limit: 15},
+		{name: "newer surveys fill a page", replies: 1, surveys: 20, limit: 15},
+		{name: "older replies omitted", replies: 16, surveys: 3, limit: 15},
+		{name: "single message limit", replies: 2, surveys: 20, limit: 1},
+		{name: "surveys only", surveys: 20, limit: 15},
+		{name: "empty", limit: 15},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var conv models.Conversation
+			if err := db.QueryRow(`INSERT INTO conversations (contact_id, inbox_id, status_id)
+				VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id, uuid`, contactID, inboxID).Scan(&conv.ID, &conv.UUID); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, created_at)
+				SELECT $1, 'incoming', 'received', $2, 'contact', 'reply ' || n, 'reply ' || n, 'text', '2026-11-01 10:00:00Z'::timestamptz
+				FROM generate_series(1, $3::int) AS n`, conv.ID, contactID, tc.replies); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, meta, created_at)
+				SELECT $1, 'outgoing', 'sent', $2, 'agent', 'rate us', 'rate us', 'text', '{"is_csat":true}'::jsonb, '2026-11-02 10:00:00Z'::timestamptz
+				FROM generate_series(1, $3::int)`, conv.ID, contactID, tc.surveys); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type, content, text_content, content_type, private)
+				VALUES ($1, 'outgoing', 'sent', $2, 'agent', 'private note', 'private note', 'text', true)`, conv.ID, contactID); err != nil {
+				t.Fatal(err)
+			}
+			messages, _, err := m.GetAIConversationMessages(conv.UUID, 1 /** page **/, tc.limit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(messages) != min(tc.replies, tc.limit) {
+				t.Fatalf("eligible replies missing: got %d, want %d", len(messages), min(tc.replies, tc.limit))
+			}
+			for i, msg := range messages {
+				if msg.Total != tc.replies || msg.Private || msg.HasCSAT() || msg.TextContent != fmt.Sprintf("reply %d", tc.replies-i) {
+					t.Fatalf("incorrect AI history: %#v", messages)
+				}
+			}
+			if got := strings.Contains(models.Transcript(messages, tc.limit, time.UTC), "Earlier messages are omitted"); got != (tc.replies > tc.limit) {
+				t.Fatalf("incorrect history notice for %d replies and %d surveys", tc.replies, tc.surveys)
+			}
+			private := false
+			all, _, err := m.GetConversationMessages(conv.UUID, 1 /** page **/, tc.limit, &private, []string{models.MessageIncoming, models.MessageOutgoing})
+			if err != nil || len(all) != min(tc.replies+tc.surveys, tc.limit) {
+				t.Fatalf("generic history changed: %#v, error %v", all, err)
+			}
+			if len(all) > 0 && all[0].Total != tc.replies+tc.surveys {
+				t.Fatalf("generic total lost surveys: %#v", all)
+			}
+		})
+	}
 }
 
 func TestImgSrcUploadsPattern(t *testing.T) {
@@ -790,7 +867,7 @@ func TestInlineArticleReferences(t *testing.T) {
 	if strings.Contains(mailContent, "ld-cite:") || strings.Contains(mailContent, "<sup>") {
 		t.Fatalf("email retained widget markers: %s", mailContent)
 	}
-	if !strings.Contains(data["ArticleReferences"].(string), ">(1)</a>") {
+	if !strings.Contains(mailContent, ">(1)</a>") {
 		t.Fatal("email lost its numbered references")
 	}
 }
@@ -808,6 +885,33 @@ func TestArticleReferencePublicURL(t *testing.T) {
 		if got := reference.PublicURL(tt.root); got != tt.want {
 			t.Errorf("PublicURL(%q, %q) = %q, want %q", tt.root, tt.custom, got, tt.want)
 		}
+	}
+}
+
+func TestContinuityEmailSubject(t *testing.T) {
+	m := &Manager{subjectRefFormat: "#{ref}"}
+	for _, tt := range []struct {
+		name, text, saved, want string
+	}{
+		{"multiline", " Hello\n\n\tthere\r\nfriend ", "", "Hello there friend - #127"},
+		{"normalize before truncation", "Hello\n" + strings.Repeat(" \t", 100) + "there", "", "Hello there - #127"},
+		{"truncate normalized text", "Hello\n\t" + strings.Repeat("a", 100), "", "Hello " + strings.Repeat("a", 94) + "... - #127"},
+		{"Unicode boundary", "\n" + strings.Repeat("界", 33) + "🙂", "", strings.Repeat("界", 33) + "... - #127"},
+		{"exact limit", strings.Repeat("a", 100), "", strings.Repeat("a", 100) + " - #127"},
+		{"empty", "", "", "#127"},
+		{"blank", "\n\r\t ", "", "#127"},
+		{"saved subject", "Different\nreply", "Original - #127", "Original - #127"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			conv := models.ContinuityConversation{ReferenceNumber: "127", ContinuityEmailSubject: null.StringFrom(tt.saved)}
+			got := m.buildContinuityEmailSubject(conv, tt.text)
+			if got != tt.want {
+				t.Fatalf("subject = %q, want %q", got, tt.want)
+			}
+			if !utf8.ValidString(got) {
+				t.Fatalf("subject contains invalid Unicode: %q", got)
+			}
+		})
 	}
 }
 
@@ -836,16 +940,7 @@ func TestContinuityEmailArticleReferences(t *testing.T) {
 	}
 	message := models.Message{Content: rendered, Meta: json.RawMessage(`{"continuity_email":true}`)}
 	data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
-	content := m.emailTemplateContent(&message, data)
-	tmpl, err := template.New("content").Parse(content)
-	if err != nil {
-		t.Fatalf("parsing offline email: %v", err)
-	}
-	var output strings.Builder
-	if err := tmpl.Execute(&output, data); err != nil {
-		t.Fatalf("rendering offline email: %v", err)
-	}
-	if output.String() != rendered || data["IsContinuityEmail"] != true {
+	if m.emailTemplateContent(&message, data) != rendered || data["IsContinuityEmail"] != true {
 		t.Fatal("offline email changed literal message content or lost its template flag")
 	}
 	if strings.Index(rendered, wantURL) > strings.Index(rendered, "Human answer.") {
@@ -886,19 +981,11 @@ func TestEmailTemplateArticleReferences(t *testing.T) {
 			}
 			data := map[string]any{"Author": map[string]any{"FirstName": "Agent"}}
 			content := m.emailTemplateContent(&message, data)
-			tmpl, err := template.New("content").Parse(content)
-			if err != nil {
-				t.Fatalf("parsing email: %v", err)
+			want := `<p>Hello {{ .Author.FirstName }}.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
+			if content != want || data["IsContinuityEmail"] != false {
+				t.Fatalf("unexpected email content: %s", content)
 			}
-			var output strings.Builder
-			if err := tmpl.Execute(&output, data); err != nil {
-				t.Fatalf("rendering email: %v", err)
-			}
-			want := `<p>Hello Agent.</p><p><a href="https://desk.example.com/hc/support/en/articles/refunds" target="_blank" rel="noopener noreferrer">(1)</a> <a href="https://help.example.com/fr/articles/delivery" target="_blank" rel="noopener noreferrer">(2)</a></p>`
-			if output.String() != want || data["IsContinuityEmail"] != false {
-				t.Fatalf("unexpected email content: %s", output.String())
-			}
-			plain := stringutil.HTML2TextMarkdownLinks(output.String())
+			plain := stringutil.HTML2TextMarkdownLinks(content)
 			for _, part := range []string{"(1)", "(2)", "https://desk.example.com/hc/support/en/articles/refunds", "https://help.example.com/fr/articles/delivery"} {
 				if !strings.Contains(plain, part) {
 					t.Errorf("plain text email is missing %q: %s", part, plain)

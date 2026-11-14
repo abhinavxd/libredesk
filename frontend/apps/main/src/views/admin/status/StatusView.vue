@@ -3,24 +3,18 @@
     <AdminSplitLayout>
       <template #content>
         <LoadingOverlay :loading="isLoading" reserve-height>
-          <div class="flex justify-between mb-5">
-            <div class="flex justify-end mb-4 w-full">
+          <AdminToolbar v-model:search="searchTerm" searchable class="mb-5">
+            <template #actions>
               <Dialog v-model:open="dialogOpen">
                 <DialogTrigger as-child @click="newStatus">
                   <Button class="ml-auto">
-                    {{
-                      $t('status.new')
-                    }}
+                    {{ $t('status.new') }}
                   </Button>
                 </DialogTrigger>
                 <DialogContent class="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>
-                      {{
-                        isEditing
-                          ? $t('status.edit')
-                          : $t('status.new')
-                      }}
+                      {{ isEditing ? $t('status.edit') : $t('status.new') }}
                     </DialogTitle>
                     <DialogDescription>
                       {{ $t('admin.conversationStatus.name.description') }}
@@ -30,17 +24,25 @@
                     <template #footer>
                       <DialogFooter class="mt-10">
                         <Button type="submit" :isLoading="isLoading" :disabled="isLoading">
-                          {{ isEditing ? $t('globals.messages.save') : $t('globals.messages.create') }}
+                          {{
+                            isEditing ? $t('globals.messages.save') : $t('globals.messages.create')
+                          }}
                         </Button>
                       </DialogFooter>
                     </template>
                   </StatusForm>
                 </DialogContent>
               </Dialog>
-            </div>
-          </div>
+            </template>
+          </AdminToolbar>
           <div>
-            <DataTable :columns="createColumns(t, { onEdit: editStatus })" :data="statuses" :loading="isLoading" />
+            <DataTable
+              v-model:search="searchTerm"
+              :searchable="false"
+              :columns="createColumns(t, { onEdit: editStatus })"
+              :data="statuses"
+              :loading="isLoading"
+            />
           </div>
         </LoadingOverlay>
       </template>
@@ -53,10 +55,12 @@
 </template>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+
 import { ref, onMounted, onUnmounted } from 'vue'
 import DataTable from '@main/components/datatable/DataTable.vue'
 import AdminSplitLayout from '@/layouts/admin/AdminSplitLayout.vue'
-import { createColumns } from '../../../features/admin/status/dataTableColumns.js'
+import { createColumns } from '@/features/admin/status/dataTableColumns.js'
 import { Button } from '@shared-ui/components/ui/button'
 import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import StatusForm from '@/features/admin/status/StatusForm.vue'
@@ -71,13 +75,14 @@ import {
 } from '@shared-ui/components/ui/dialog'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
-import { createFormSchema } from '../../../features/admin/status/formSchema.js'
-import { useEmitter } from '../../../composables/useEmitter'
-import { EMITTER_EVENTS } from '../../../constants/emitterEvents.js'
+import { createFormSchema } from '@/features/admin/status/formSchema.js'
+import { useEmitter } from '@/composables/useEmitter'
+import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
-import api from '../../../api'
+import api from '@/api'
 
+const searchTerm = ref('')
 const { t } = useI18n()
 const isLoading = ref(false)
 const statuses = ref([])

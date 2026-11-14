@@ -33,8 +33,8 @@ import { useEmitter } from '@main/composables/useEmitter'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents'
 import { permissions as perms } from '@main/constants/permissions'
 import { CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@main/constants/conversation'
-import { MACROS_COMMAND } from '../useCommandPalette'
-import { SECTIONS } from '../sections'
+import { MACROS_COMMAND } from '@main/features/command/useCommandPalette'
+import { SECTIONS } from '@main/features/command/sections'
 
 export const SNOOZE_COMMAND = 'conv.snooze'
 export const SNOOZE_CUSTOM_COMMAND = 'conv.snooze.custom'
@@ -110,7 +110,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         icon: CheckCircle2,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
         shortcut: ['Alt', 'E'],
-        run: () => conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.RESOLVED)
+        run: () => conversationStore.updateStatus(conv.uuid, CONVERSATION_DEFAULT_STATUSES.RESOLVED)
       })
     }
     if (REOPENABLE_STATUSES.includes(current)) {
@@ -122,7 +122,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         icon: RotateCcw,
         permission: perms.CONVERSATIONS_UPDATE_STATUS,
         shortcut: ['Alt', 'O'],
-        run: () => conversationStore.updateStatus(CONVERSATION_DEFAULT_STATUSES.OPEN)
+        run: () => conversationStore.updateStatus(conv.uuid, CONVERSATION_DEFAULT_STATUSES.OPEN)
       })
     }
     commands.push(...snoozeCommands())
@@ -144,7 +144,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
         parent: 'conv.status',
         icon: isSnooze ? CalendarClock : CircleDot,
         navigateTo: isSnooze ? SNOOZE_COMMAND : undefined,
-        run: isSnooze ? undefined : () => conversationStore.updateStatus(status.label)
+        run: isSnooze ? undefined : () => conversationStore.updateStatus(conv.uuid, status.label)
       })
     }
     return commands
@@ -205,7 +205,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       shortcut: ['Alt', 'A'],
       placeholder: t('command.searchAgents'),
       search: async (term) =>
-        (await usersStore.searchUsers(term))
+        (await usersStore.searchEnabledUsers(term))
           .filter((agent) => String(agent.value) !== String(conv.assigned_user_id))
           .map((agent) => ({
             id: `conv.assign-agent.${agent.value}`,
@@ -394,8 +394,24 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       keywords: ['export'],
       section,
       icon: Download,
+      group: true
+    },
+    {
+      id: 'conv.transcript.txt',
+      label: t('globals.terms.plainText'),
+      keywords: ['txt', 'text'],
+      parent: 'conv.transcript',
+      icon: Download,
       run: () =>
         emitter.emit(EMITTER_EVENTS.CONVERSATION_ACTION, CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT)
+    },
+    {
+      id: 'conv.transcript.pdf',
+      label: t('globals.terms.pdf'),
+      parent: 'conv.transcript',
+      icon: Download,
+      run: () =>
+        emitter.emit(EMITTER_EVENTS.CONVERSATION_ACTION, CONVERSATION_ACTIONS.DOWNLOAD_TRANSCRIPT_PDF)
     },
     {
       id: 'conv.summarize',

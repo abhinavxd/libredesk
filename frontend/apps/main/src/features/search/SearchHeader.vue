@@ -1,7 +1,7 @@
 <template>
-  <div class="flex items-center space-x-4 px-2 h-12 border-b shrink-0">
+  <div class="flex h-14 shrink-0 items-center gap-3 border-b border-border px-3">
     <SidebarTrigger class="cursor-pointer" />
-    <span class="text-xl font-semibold">{{ t('globals.terms.search') }}</span>
+    <h1 class="ui-heading min-w-0 truncate">{{ t('globals.terms.search') }}</h1>
   </div>
 </template>
 

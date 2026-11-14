@@ -3,9 +3,7 @@ import { isGoDuration } from '@shared-ui/utils/string';
 
 export const createFormSchema = (t) => z.object({
     enabled: z.boolean().default(false),
-    username: z.string().nonempty({
-        message: t('globals.messages.required')
-    }),
+    username: z.string().default(''),
     host: z.string().nonempty({
         message: t('globals.messages.required')
     }),
@@ -17,9 +15,7 @@ export const createFormSchema = (t) => z.object({
         .min(1, { message: t('validation.minmaxNumber', { min: 1, max: 65535 }) })
         .max(65535, { message: t('validation.minmaxNumber', { min: 1, max: 65535 }) })
         .default(587),
-    password: z.string().nonempty({
-        message: t('globals.messages.required')
-    }),
+    password: z.string().default(''),
     max_conns: z
         .number({
             invalid_type_error: t('globals.messages.mustBeNumber'),
@@ -54,4 +50,11 @@ export const createFormSchema = (t) => z.object({
     hello_hostname: z.string().optional(),
     tls_type: z.enum(['none', 'starttls', 'tls']),
     tls_skip_verify: z.boolean().optional(),
+}).superRefine((smtp, ctx) => {
+    if (smtp.auth_protocol === 'none') return
+    for (const field of ['username', 'password']) {
+        if (!smtp[field]) {
+            ctx.addIssue({ code: 'custom', path: [field], message: t('globals.messages.required') })
+        }
+    }
 });

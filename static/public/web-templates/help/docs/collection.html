@@ -8,6 +8,7 @@
     <div class="hcd-collection-headings">
         <h1>{{ .Data.Collection.Name }}</h1>
         {{ if .Data.Collection.Description }}<p class="hcd-lead">{{ .Data.Collection.Description }}</p>{{ end }}
+        {{ if not .Data.HelpCenter.Theme.Cards.HideCount }}<span class="hc-count">{{ .Data.Collection.ArticleCount }} {{ .L.Tc "helpCenter.article" .Data.Collection.ArticleCount }}</span>{{ end }}
     </div>
 </header>
 
@@ -30,7 +31,7 @@
                     <span class="hcd-row-title">{{ .Name }}</span>
                     {{ if .Description }}<span class="hcd-row-excerpt">{{ .Description }}</span>{{ end }}
                 </span>
-                <span class="hcd-row-count">{{ len .Articles }} {{ $.L.Tc "globals.terms.article" (len .Articles) }}</span>
+                <span class="hcd-row-count">{{ .ArticleCount }} {{ $.L.Tc "helpCenter.article" .ArticleCount }}</span>
                 {{ template "hc-arrow-icon" }}
             </a>
         </li>

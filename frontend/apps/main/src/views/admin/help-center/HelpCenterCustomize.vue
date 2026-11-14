@@ -1,13 +1,13 @@
 <template>
-  <Spinner v-if="loading" />
-  <p v-else-if="loadFailed" class="text-sm text-muted-foreground">
+  <LoadingOverlay v-if="loading" :loading="loading" reserve-height />
+  <p v-else-if="loadFailed" class="ui-description">
     {{ t('globals.messages.somethingWentWrong') }}
   </p>
   <div v-else class="flex flex-col">
     <CustomBreadcrumb :links="breadcrumbLinks" class="mb-5" />
 
-    <div class="flex gap-6">
-      <div class="w-[420px] shrink-0 pr-2">
+    <div class="help-center-customizer grid min-w-0 items-start gap-6">
+      <div class="min-w-0">
         <HelpCenterForm
           :help-center="helpCenter"
           :submit-form="handleSave"
@@ -17,16 +17,18 @@
         />
       </div>
 
-      <!-- The preview page pins its footer to the bottom of the frame; an unbounded frame strands it below the content. -->
-      <div class="flex-1 min-w-0">
-        <div class="sticky top-0 space-y-2">
-          <div class="flex items-center gap-2">
+      <div class="help-center-preview min-w-0">
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
             <Select v-model="previewPage">
               <SelectTrigger class="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="landing">{{ t('helpCenter.styling.landingPage') }}</SelectItem>
+                <SelectItem value="collection">{{
+                  t('helpCenter.styling.collectionPage')
+                }}</SelectItem>
                 <SelectItem value="article">{{ t('helpCenter.styling.articlePage') }}</SelectItem>
               </SelectContent>
             </Select>
@@ -74,14 +76,19 @@
                 <ExternalLink class="size-3 shrink-0" />
               </a>
             </div>
-            <div ref="previewBox" class="h-[calc(100dvh-13rem)] overflow-hidden bg-muted">
+            <div ref="previewBox" class="relative h-[calc(100dvh-13rem)] overflow-hidden bg-muted">
               <iframe
-                ref="previewFrame"
-                class="border-0 bg-background block origin-top-left"
+                v-for="preview in previews"
+                :key="preview.id"
+                :ref="(el) => setPreviewFrame(preview.id, el)"
+                class="absolute left-0 top-0 border-0 bg-background block origin-top-left"
+                :class="{ invisible: preview.id !== activePreview?.id }"
                 :style="frameStyle"
+                :srcdoc="preview.html"
                 :title="t('globals.terms.helpCenter')"
+                :aria-hidden="preview.id !== activePreview?.id"
                 sandbox="allow-same-origin"
-                @load="lockPreview"
+                @load="showPreview(preview)"
               />
             </div>
           </div>
@@ -96,7 +103,7 @@ import { ref, computed, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ExternalLink, Globe, X } from 'lucide-vue-next'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import {
   Select,
   SelectContent,
@@ -129,7 +136,10 @@ const loading = ref(true)
 const loadFailed = ref(false)
 const isSubmitting = ref(false)
 const helpCenter = ref(null)
-const previewFrame = ref(null)
+const activePreview = ref(null)
+const pendingPreview = ref(null)
+const previewFrames = new Map()
+const previews = computed(() => [activePreview.value, pendingPreview.value].filter(Boolean))
 const origin = computed(() =>
   (appSettingsStore.settings?.['app.root_url'] || window.location.origin).replace(/\/$/, '')
 )
@@ -141,6 +151,7 @@ const previewBox = ref(null)
 const previewTitle = computed(() => {
   const values = lastFormValues.value || helpCenter.value || {}
   if (previewPage.value === 'article') return t('helpCenter.preview.sampleArticleTitle')
+  if (previewPage.value === 'collection') return t('helpCenter.preview.sampleCollection')
   return values.page_title || values.name || ''
 })
 
@@ -152,9 +163,10 @@ const helpCenterPath = (values) => `/hc/${values.slug || ''}/${values.default_lo
 
 const previewURL = computed(() => {
   const path = helpCenterPath(lastFormValues.value || helpCenter.value || {})
-  return previewPage.value === 'article'
-    ? `${origin.value}${path}/articles/sample-article`
-    : `${origin.value}${path}`
+  if (previewPage.value === 'article') return `${origin.value}${path}/articles/sample-article`
+  if (previewPage.value === 'collection')
+    return `${origin.value}${path}/collections/sample-collection`
+  return `${origin.value}${path}`
 })
 // Uses the saved slug, not the form: an unsaved slug has no live page yet.
 const previewLiveURL = computed(() => `${origin.value}${helpCenterPath(helpCenter.value || {})}`)
@@ -186,20 +198,37 @@ const breadcrumbLinks = computed(() => [
 
 const goBack = () => router.push({ name: 'help-center-list' })
 
-// Links resolve against the admin origin; following one would replace the preview.
-const lockPreview = () => {
-  const body = previewFrame.value?.contentDocument?.body
-  if (body) body.inert = true
+const setPreviewFrame = (id, el) => {
+  if (el) previewFrames.set(id, el)
+  else previewFrames.delete(id)
 }
 
 // A slower earlier render can land after a newer one, so only the latest request may paint.
 let previewRequest = 0
 
+const showPreview = async (preview) => {
+  const frame = previewFrames.get(preview.id)
+  const doc = frame?.contentDocument
+  if (!doc) return
+  doc.body.inert = true
+  await doc.fonts.ready
+  if (preview.id !== previewRequest || preview.id !== pendingPreview.value?.id) return
+
+  const current = previewFrames.get(activePreview.value?.id)
+  if (current && activePreview.value.page === preview.page) {
+    frame.contentWindow.scrollTo(current.contentWindow.scrollX, current.contentWindow.scrollY)
+  }
+  activePreview.value = preview
+  pendingPreview.value = null
+}
+
 const renderPreview = async (values) => {
   const request = ++previewRequest
+  const page = previewPage.value
+  pendingPreview.value = null
   try {
-    const { data } = await api.previewHelpCenter(props.id, values, previewPage.value, previewTheme.value)
-    if (request === previewRequest && previewFrame.value) previewFrame.value.srcdoc = data
+    const { data } = await api.previewHelpCenter(props.id, values, page, previewTheme.value)
+    if (request === previewRequest) pendingPreview.value = { id: request, page, html: data }
   } catch {
     // A half-filled form can fail validation while typing; the last good preview stays up.
   }
@@ -261,7 +290,25 @@ watch(previewBox, (box) => {
 })
 
 onBeforeUnmount(() => {
+  previewRequest++
   clearTimeout(previewTimer)
   boxObserver?.disconnect()
 })
 </script>
+
+<style scoped>
+.help-center-customizer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container (min-width: 56rem) {
+  .help-center-customizer {
+    grid-template-columns: 26.25rem minmax(0, 1fr);
+  }
+
+  .help-center-preview {
+    position: sticky;
+    top: 0;
+  }
+}
+</style>

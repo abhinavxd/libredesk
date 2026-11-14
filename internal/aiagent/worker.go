@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
+	"runtime/debug"
 	"slices"
 	"strings"
-
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
@@ -19,7 +20,6 @@ import (
 	imageutil "github.com/abhinavxd/libredesk/internal/image"
 	"github.com/abhinavxd/libredesk/internal/inbox"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
-
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 )
@@ -107,7 +107,7 @@ func (m *Manager) worker(ctx context.Context) {
 func (m *Manager) handleWithRecover(ctx context.Context, convID int) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.lo.Error("recovered from panic in ai agent worker", "conversation_id", convID, "panic", r)
+			m.lo.Error("recovered from panic in ai agent worker", "conversation_id", convID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	m.handle(ctx, convID)
@@ -164,7 +164,7 @@ func (m *Manager) enqueue(convID int) {
 func (m *Manager) handoffByConvID(convID int, reason string) {
 	defer func() {
 		if r := recover(); r != nil {
-			m.lo.Error("recovered from panic handing off dropped ai job", "conversation_id", convID, "panic", r)
+			m.lo.Error("recovered from panic handing off dropped ai job", "conversation_id", convID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	conv, err := m.convo.GetConversation(convID, "", "")
@@ -223,8 +223,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		return
 	}
 
-	private := false
-	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, m.maxHistoryMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, _, err := m.convo.GetAIConversationMessages(conv.UUID, 1 /** page **/, m.maxHistoryMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for ai agent", "conversation_uuid", conv.UUID, "error", err)
 		return
@@ -234,14 +233,16 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if inbound == nil {
 		return
 	}
-	// Only respond to a fresh inbound customer message, never to the assistant's own or automated
-	// replies. A requeued run sees the previous run's just-posted reply as the last message, so it
-	// instead checks for an inbound message the previous run's history never included.
 	m.mu.Lock()
 	prevSeen, hasPrev := m.lastSeen[convID]
 	m.lastSeen[convID] = msgs[len(msgs)-1].ID
 	m.mu.Unlock()
-	if !lastIsInboundContact(msgs) && (!hasPrev || inbound.ID <= prevSeen) {
+	// Providers reject a history that ends with the reply, so put it above messages sent while it was written.
+	if hasPrev {
+		msgs = previousReplyFirst(msgs, prevSeen)
+	}
+	// A human or automated reply after the customer's message leaves nothing to answer.
+	if !lastIsInboundContact(msgs) {
 		return
 	}
 	// The reply and any identity-scoped tools act as the primary contact. An email thread can carry
@@ -267,13 +268,17 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 
 	contactLines := contactFieldLines(conv.Contact)
 	systemPrompt := buildSystemPrompt(assistant)
+	if msgs[0].Total > len(msgs) {
+		systemPrompt += "\n\nOnly the latest public messages are included. Earlier messages are omitted."
+	}
 	if len(contactLines) == 0 {
 		systemPrompt += "\n\n" + noContactIdentityNote
 	}
-	history := m.buildHistory(msgs, conv.ContactID)
+	loc := m.ai.WorkspaceLocation()
+	history := m.buildHistory(msgs, conv.ContactID, loc)
 	// Keep customer-controlled data (contact fields, subject, attributes) out of the system prompt; it
 	// stays in a user-role block so it ranks below the assistant's instructions, not beside them.
-	if block := customerContextBlock(conv, contactLines); block != "" {
+	if block := customerContextBlock(conv, contactLines, loc); block != "" {
 		history = append([]aimodels.ChatMessage{{Role: aimodels.RoleUser, Content: block}}, history...)
 	}
 	m.lo.Debug("ai agent running", "conversation_uuid", conv.UUID, "history_messages", len(history), "turns", turns)
@@ -325,6 +330,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		InboxID:           conv.InboxID,
 		ContactEmail:      func() string { return conv.Contact.Email.String },
 		Verified:          verified,
+		OnToolRequest:     outcome.toolCalled,
 	}
 	timeout := emailRunTimeout
 	if conv.InboxChannel != channelEmail {
@@ -349,7 +355,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		if outcome.handedOff {
 			reason = outcome.handoffReason
 		}
-		m.handoff(conv, assistant, reason)
+		m.handoff(conv, assistant, m.failedRunReason(outcome, reason))
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
@@ -365,7 +371,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
 		if err := m.postReply(conv, assistant, answer, replyMeta(answerSuggestions, articleIDs)); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffError")))
 			return
 		}
 	}
@@ -376,7 +382,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		meta := suggestedRepliesMeta(confirmSuggestions)
 		meta["is_confirmation"] = true
 		if err := m.postReply(conv, assistant, confirm, meta); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffError")))
 			return
 		}
 	}
@@ -394,8 +400,20 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer == "" {
 		m.lo.Debug("ai agent no answer, handing off", "conversation_uuid", conv.UUID)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
+		m.handoff(conv, assistant, m.failedRunReason(outcome, m.i18n.T("ai.agent.handoffNoAnswer")))
 	}
+}
+
+// failedRunReason appends the custom tools a run called, HTML-escaped for the note, to the handoff reason of a run whose full reply did not reach the customer.
+func (m *Manager) failedRunReason(outcome *runOutcome, reason string) string {
+	if len(outcome.calledTools) == 0 {
+		return reason
+	}
+	names := make([]string, len(outcome.calledTools))
+	for i, t := range outcome.calledTools {
+		names[i] = t.displayName
+	}
+	return strings.TrimSpace(reason + " " + m.i18n.Ts("ai.agent.handoffToolsCalled", "tools", html.EscapeString(strings.Join(names, ", "))))
 }
 
 // resolve runs after the reply is queued so the CSAT survey sent on resolve follows the answer.
@@ -642,7 +660,7 @@ func latestInboundContact(msgs []cmodels.Message) *cmodels.Message {
 	return nil
 }
 
-func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels.ChatMessage {
+func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int, loc *time.Location) []aimodels.ChatMessage {
 	// Tools act as the primary contact, so a CC'd participant's message must never enter the prompt
 	// as a trusted user turn - it could inject instructions that drive those tools under the
 	// contact's identity. Keep the contact's own messages and the agent's replies; drop other contacts.
@@ -716,13 +734,19 @@ func (m *Manager) buildHistory(msgs []cmodels.Message, contactID int) []aimodels
 		}
 
 		if text == "" && len(images) == 0 && len(markers) == 0 {
-			continue
+			if role != aimodels.RoleUser {
+				continue
+			}
+			text = "[The customer sent a message with no readable text.]"
 		}
 		if len(markers) > 0 {
 			if text != "" {
 				text += "\n"
 			}
 			text += strings.Join(markers, "\n")
+		}
+		if !msg.CreatedAt.IsZero() {
+			text = "[" + msg.CreatedAt.In(loc).Format(time.RFC3339) + "]\n" + text
 		}
 		history = append(history, aimodels.ChatMessage{Role: role, Content: text, Images: images})
 	}
@@ -866,4 +890,26 @@ func messageMetaBool(raw json.RawMessage, key string) bool {
 	}
 	value, _ := meta[key].(bool)
 	return value
+}
+
+// previousReplyFirst moves AI replies posted after prevSeen above the other messages that arrived since.
+func previousReplyFirst(msgs []cmodels.Message, prevSeen int) []cmodels.Message {
+	out := make([]cmodels.Message, 0, len(msgs))
+	var later []cmodels.Message
+	for _, msg := range msgs {
+		if msg.ID > prevSeen && !isAIReply(msg) {
+			later = append(later, msg)
+			continue
+		}
+		out = append(out, msg)
+	}
+	return append(out, later...)
+}
+
+// isAIReply matches replies from any assistant, so a reassignment mid-run still finds the old reply.
+func isAIReply(msg cmodels.Message) bool {
+	var meta struct {
+		AssistantID int `json:"ai_assistant_id"`
+	}
+	return json.Unmarshal(msg.Meta, &meta) == nil && meta.AssistantID > 0
 }

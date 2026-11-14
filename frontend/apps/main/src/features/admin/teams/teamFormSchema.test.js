@@ -47,6 +47,12 @@ describe('Team Form Schema', () => {
         expect(() => schema.parse({ ...validForm, emoji: 1 })).toThrow()
     })
 
+    test('emoji rejects empty or blank selections', () => {
+        for (const emoji of ['', '   ']) {
+            expect(() => schema.parse({ ...validForm, emoji })).toThrow()
+        }
+    })
+
     test('conversation_assignment_type missing', () => {
         const { conversation_assignment_type, ...form } = validForm
         expect(() => schema.parse(form)).toThrow()
@@ -68,6 +74,15 @@ describe('Team Form Schema', () => {
 
     test('max_auto_assigned_conversations rejects non numeric string', () => {
         expect(() => schema.parse({ ...validForm, max_auto_assigned_conversations: 'abc' })).toThrow()
+    })
+
+    // Skip offline agents
+    test('skip_offline_agents defaults to false', () => {
+        expect(schema.parse(validForm).skip_offline_agents).toBe(false)
+    })
+
+    test('skip_offline_agents accepts true', () => {
+        expect(schema.parse({ ...validForm, skip_offline_agents: true }).skip_offline_agents).toBe(true)
     })
 
     test('business_hours_id accepts null', () => {

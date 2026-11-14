@@ -2,13 +2,14 @@
   <div class="mb-5">
     <CustomBreadcrumb :links="breadcrumbLinks" />
   </div>
-  <Spinner v-if="isLoading" />
-  <SharedViewForm
-    :initialValues="sharedView"
-    :submitForm="submitForm"
-    :isLoading="formLoading"
-    v-else
-  />
+  <LoadingOverlay :loading="isLoading" reserve-height>
+    <SharedViewForm
+      :initialValues="sharedView"
+      :submitForm="submitForm"
+      :isLoading="formLoading"
+      v-if="!isLoading"
+    />
+  </LoadingOverlay>
 </template>
 
 <script setup>
@@ -20,7 +21,7 @@ import { handleHTTPError } from '@shared-ui/utils/http.js'
 import SharedViewForm from '@/features/admin/shared-views/SharedViewForm.vue'
 import { CustomBreadcrumb } from '@shared-ui/components/ui/breadcrumb'
 import { useI18n } from 'vue-i18n'
-import { Spinner } from '@shared-ui/components/ui/spinner'
+import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import { useSharedViewStore } from '@/stores/sharedView'
 
 const sharedView = ref({})

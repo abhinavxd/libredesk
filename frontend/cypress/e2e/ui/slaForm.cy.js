@@ -27,9 +27,29 @@ describe('SLA form', () => {
     cy.get('input[name="resolution_time"]').type('8h')
     cy.get('input[name="next_response_time"]').type('45m')
 
+    cy.contains('button', 'Add breach alert').click()
+    cy.get('select[name="notifications.0.time_delay_type"]')
+      .siblings('button[role="combobox"]')
+      .click()
+    cy.contains('[role="option"]', 'After specific duration').click()
+    cy.get('input[name="notifications.0.time_delay"]').type('15m')
+    cy.get('.sla-alert-card').eq(0).find('input[role="combobox"]').click()
+    cy.contains('[role="option"]', 'Assigned user').click()
+    cy.contains('h3', 'Alert configuration').click()
+
+    cy.contains('button', 'Add warning alert').click()
+    cy.get('.sla-alert-card').eq(1).find('input[role="combobox"]').click()
+    cy.contains('[role="option"]', 'Assigned user').click()
+    cy.contains('h3', 'Alert configuration').click()
+
     cy.get('button[type="submit"]').click()
-    cy.wait('@createSla').then(({ response }) => {
+    cy.wait('@createSla').then(({ request, response }) => {
       expect(response.statusCode).to.eq(200)
+      expect(request.body.notifications).to.have.length(2)
+      expect(request.body.notifications[0]).to.include({ type: 'breach', time_delay: '15m' })
+      expect(request.body.notifications[1]).to.include({ type: 'warning', time_delay: '10m' })
+      expect(request.body.notifications[0].recipients).to.deep.eq(['assigned_user'])
+      expect(request.body.notifications[1].recipients).to.deep.eq(['assigned_user'])
       policyId = response.body.data.id
     })
 
@@ -48,6 +68,9 @@ describe('SLA form', () => {
     cy.get('input[name="first_response_time"]').should('have.value', '2h')
     cy.get('input[name="resolution_time"]').should('have.value', '8h')
     cy.get('input[name="next_response_time"]').should('have.value', '45m')
+    cy.get('.sla-alert-card').should('have.length', 2)
+    cy.get('input[name="notifications.0.time_delay"]').should('have.value', '15m')
+    cy.get('input[name="notifications.1.time_delay"]').should('have.value', '10m')
   })
 
   it('persists a changed field', () => {

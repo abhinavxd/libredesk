@@ -1,12 +1,12 @@
 import { h } from 'vue'
-import { format } from 'date-fns'
+import TableDate from '@main/components/table/TableDate.vue'
 import { Badge } from '@shared-ui/components/ui/badge/index.js'
 import dropdown from './snippetDropdown.vue'
 
 export const createSnippetColumns = (t, { onEdit } = {}) => [
   {
     accessorKey: 'title',
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.title')),
+    header: () => h('div', null, t('globals.terms.title')),
     cell: ({ row }) => {
       const title = onEdit
         ? h(
@@ -35,17 +35,18 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
           )
         )
       }
-      return h('div', { class: 'text-center' }, children)
+      return h('div', null, children)
     }
   },
   {
     accessorKey: 'enabled',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.status')),
+    header: () => h('div', null, t('globals.terms.status')),
     cell: ({ row }) =>
       h(
         'div',
-        { class: 'text-center' },
+        null,
         h(Badge, { variant: row.getValue('enabled') ? 'success' : 'secondary' }, () =>
           row.getValue('enabled') ? t('globals.terms.enabled') : t('globals.terms.disabled')
         )
@@ -53,10 +54,11 @@ export const createSnippetColumns = (t, { onEdit } = {}) => [
   },
   {
     accessorKey: 'updated_at',
+    meta: { compact: true },
     enableGlobalFilter: false,
-    header: () => h('div', { class: 'text-center' }, t('globals.terms.updatedAt')),
+    header: () => h('div', null, t('globals.terms.updatedAt')),
     cell: ({ row }) =>
-      h('div', { class: 'text-center' }, format(row.getValue('updated_at'), 'PPpp'))
+      h(TableDate, { value: row.getValue('updated_at') })
   },
   {
     id: 'actions',

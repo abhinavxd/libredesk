@@ -1,28 +1,26 @@
 <template>
   <form @submit.prevent="onSubmit" class="space-y-6">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem v-auto-animate>
-        <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
-        <FormControl>
-          <Input
-            type="text"
-            v-bind="componentField"
-            :disabled="!isOutgoingTemplate"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+    <FormGrid>
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem v-auto-animate>
+          <FormLabel>{{ $t('globals.terms.name') }}</FormLabel>
+          <FormControl>
+            <Input type="text" v-bind="componentField" :disabled="!isOutgoingTemplate" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
 
-    <FormField v-slot="{ componentField }" name="subject" v-if="!hideSubject">
-      <FormItem>
-        <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
-        <FormControl>
-          <Input type="text" placeholder="" v-bind="componentField" />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+      <FormField v-slot="{ componentField }" name="subject" v-if="!hideSubject">
+        <FormItem>
+          <FormLabel>{{ $t('globals.terms.subject') }}</FormLabel>
+          <FormControl>
+            <Input type="text" placeholder="" v-bind="componentField" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormGrid>
 
     <FormField v-slot="{ componentField, handleChange }" name="body">
       <FormItem>
@@ -57,7 +55,7 @@
     <div class="flex gap-2">
       <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
       <Button
-        v-if="initialValues?.is_builtin && defaultBody"
+        v-if="(isOutgoingTemplate || initialValues?.is_builtin) && defaultBody"
         type="button"
         variant="outline"
         :disabled="isLoading"
@@ -70,6 +68,7 @@
 </template>
 
 <script setup>
+import FormGrid from '@shared-ui/components/FormGrid.vue'
 import { watch, computed } from 'vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import { useForm } from 'vee-validate'
@@ -89,7 +88,7 @@ import CodeEditor from '@main/components/editor/CodeEditor.vue'
 import { Checkbox } from '@shared-ui/components/ui/checkbox/index.js'
 import { Label } from '@shared-ui/components/ui/label/index.js'
 import { useI18n } from 'vue-i18n'
-import { BUILT_IN_TEMPLATE_BODIES } from './defaults.js'
+import { BUILT_IN_TEMPLATE_BODIES, DEFAULT_OUTGOING_TEMPLATE_BODY } from './defaults.js'
 
 const props = defineProps({
   initialValues: {
@@ -134,6 +133,7 @@ const hideSubject = computed(() => {
 })
 
 const defaultBody = computed(() => {
+  if (isOutgoingTemplate.value) return DEFAULT_OUTGOING_TEMPLATE_BODY
   return BUILT_IN_TEMPLATE_BODIES[props.initialValues?.name]
 })
 

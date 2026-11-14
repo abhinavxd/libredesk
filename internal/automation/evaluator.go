@@ -38,7 +38,9 @@ func (e *Engine) evalConversationRules(rules []models.Rule, conversation cmodels
 			e.suppress(conversation.UUID)
 			for _, action := range rule.Actions {
 				if err := e.conversationStore.ApplyAction(action, conversation, umodels.User{}); err != nil {
-					e.lo.Error("error applying action on conversation", "action", action, "conversation_uuid", conversation.UUID, "error", err)
+					e.lo.Error("error applying action on conversation", "rule_id", rule.ID, "action", action, "conversation_uuid", conversation.UUID, "error", err)
+				} else {
+					e.lo.Info("automation action completed", "rule_id", rule.ID, "action", action.Type, "conversation_uuid", conversation.UUID)
 				}
 			}
 			e.unsuppress(conversation.UUID)

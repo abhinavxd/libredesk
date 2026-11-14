@@ -17,14 +17,18 @@
     />
 
     <Tabs v-if="prechatConfig.enabled" v-model="selectedAudience">
-      <TabsList class="grid w-full grid-cols-2">
-        <TabsTrigger value="visitors">
-          {{ $t('admin.inbox.livechat.userSettings.visitors') }}
-        </TabsTrigger>
-        <TabsTrigger value="users">
-          {{ $t('globals.terms.users') }}
-        </TabsTrigger>
-      </TabsList>
+      <AdminToolbar>
+        <template #left>
+          <TabsList class="w-max justify-start">
+            <TabsTrigger value="visitors">
+              {{ $t('admin.inbox.livechat.userSettings.visitors') }}
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              {{ $t('globals.terms.users') }}
+            </TabsTrigger>
+          </TabsList>
+        </template>
+      </AdminToolbar>
 
       <div class="mt-4 space-y-6">
         <SwitchField
@@ -47,7 +51,7 @@
           </div>
 
           <div class="space-y-4">
-            <h4 class="font-medium text-foreground">
+            <h4 class="ui-heading">
               {{ $t('admin.inbox.livechat.prechatForm.fields') }}
             </h4>
 
@@ -57,7 +61,7 @@
                 :item-key="
                   (field) => field.key || `field_${field.custom_attribute_id || 'unknown'}`
                 "
-                :animation="200"
+                :animation="reducedMotion === 'reduce' ? 0 : 200"
                 handle=".drag-handle"
                 :force-fallback="true"
                 fallback-on-body
@@ -66,7 +70,7 @@
                 class="space-y-3"
               >
                 <template #item="{ element: field, index }">
-                  <div :key="field.key || `field-${index}`" class="border rounded-lg p-4 space-y-4">
+                  <div :key="field.key || `field-${index}`" class="group/reorder border rounded-lg p-4 space-y-4">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center space-x-3">
                         <div class="drag-handle cursor-move text-muted-foreground">
@@ -141,7 +145,7 @@
             </div>
 
             <div v-if="availableCustomAttributes.length > 0" class="space-y-3">
-              <h5 class="font-medium text-sm">
+              <h5 class="ui-subheading">
                 {{ $t('admin.inbox.livechat.prechatForm.availableFields') }}
               </h5>
               <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
@@ -202,6 +206,8 @@ export const getDefaultPrechatFields = () => [
 </script>
 
 <script setup>
+import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
+import { usePreferredReducedMotion } from '@vueuse/core'
 import { computed, onMounted, ref } from 'vue'
 import { Input } from '@shared-ui/components/ui/input'
 import { Label } from '@shared-ui/components/ui/label'
@@ -214,6 +220,8 @@ import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import { Plus, X, GripVertical } from 'lucide-vue-next'
 import Draggable from 'vuedraggable'
 import api from '@/api'
+
+const reducedMotion = usePreferredReducedMotion()
 
 const prechatConfig = defineModel({
   default: () => ({

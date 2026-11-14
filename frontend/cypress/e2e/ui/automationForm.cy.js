@@ -10,7 +10,7 @@ const newPath = '/admin/automations/new'
 const listPath = '/admin/automations'
 
 // Condition and action rows are not vee-validate fields, so they have no name attribute.
-const conditionRows = () => cy.get('div.flex.space-x-5.items-start')
+const conditionRows = () => cy.get('[data-cy="automation-condition"]')
 const actionRows = () => cy.get('div.flex.items-start.justify-between.gap-5')
 
 const pickOption = (trigger, optionText) => {

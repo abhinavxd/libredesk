@@ -251,6 +251,8 @@ func V2_9_0_RC8(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`
 		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
 		SELECT 'email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation assigned to you:</p>
 
 <div>
@@ -280,6 +282,8 @@ func V2_9_0_RC8(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`
 		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
 		SELECT 'email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied to a conversation you are participating in:</p>
 
 <div>
@@ -309,6 +313,8 @@ func V2_9_0_RC8(db *sqlx.DB, fs stuffbin.FileSystem, ko *koanf.Koanf) error {
 	if _, err := db.Exec(`
 		INSERT INTO templates ("type", body, is_default, "name", subject, is_builtin)
 		SELECT 'email_notification'::template_type, '
+<p>Hi {{ .Recipient.FirstName }},</p>
+
 <p>{{ .Author.FullName }} replied and reopened a conversation assigned to you:</p>
 
 <div>

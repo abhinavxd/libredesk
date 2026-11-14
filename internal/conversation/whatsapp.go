@@ -60,7 +60,7 @@ func (m *Manager) WhatsAppReadReceiptTarget(uuid string, userID int, messageUUID
 	return row.InboxID, row.SourceID, nil
 }
 
-func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.Time, errorMsg string) error {
+func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.Time, errorMsg string, errorCode int) error {
 	if sourceID == "" || metaStatus == "" {
 		return nil
 	}
@@ -109,6 +109,9 @@ func (m *Manager) ApplyWhatsAppStatus(sourceID, metaStatus string, eventAt time.
 		}
 		m.lo.Error("error applying whatsapp message status", "source_id", sourceID, "error", err)
 		return err
+	}
+	if metaStatus == WhatsAppStatusFailed {
+		m.lo.Error("whatsapp message delivery failed", "conversation_uuid", row.ConversationUUID, "message_uuid", row.UUID, "source_id", sourceID, "provider_status", metaStatus, "provider_error_code", errorCode)
 	}
 	m.BroadcastMessageUpdate(row.ConversationUUID, row.UUID, map[string]any{"status": row.Status, "meta": stripCSATUUID(row.Meta)})
 	return nil
