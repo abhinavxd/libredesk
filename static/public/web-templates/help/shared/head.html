@@ -4,6 +4,16 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {{ if .Data.HelpCenter.FollowSystemTheme }}<script data-cfasync="false">
+    (function () {
+        try {
+            var saved = localStorage.getItem('libredesk-hc-theme');
+            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('hc-dark');
+            }
+        } catch (e) {}
+    })();
+    </script>{{ end }}
     <title>{{ .Data.Title }}</title>
     {{ if .Data.MetaDescription }}<meta name="description" content="{{ .Data.MetaDescription }}" />{{ end }}
     {{ if .Data.NoIndex }}<meta name="robots" content="noindex" />{{ end }}
@@ -35,15 +45,5 @@
     :root.hc-dark { --hc-accent: {{ .Data.HelpCenter.ColorDark }};{{ with .Data.HelpCenter.ThemeCSSDark }} {{ . }}{{ end }} }</style>
     {{ if .Data.HelpCenter.CustomCSS }}<style>{{ .Data.HelpCenter.CustomCSS }}</style>{{ end }}
     {{ if .Data.JSONLD }}<script type="application/ld+json">{{ .Data.JSONLD }}</script>{{ end }}
-    {{ if .Data.HelpCenter.FollowSystemTheme }}<script>
-    (function () {
-        try {
-            var saved = localStorage.getItem('libredesk-hc-theme');
-            if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('hc-dark');
-            }
-        } catch (e) {}
-    })();
-    </script>{{ end }}
 </head>
 {{ end }}
