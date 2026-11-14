@@ -107,6 +107,7 @@
           <FormItem>
             <SwitchField
               :title="t('admin.general.blockAssignAwayReassigning')"
+              :description="t('admin.general.blockAssignAwayReassigning.description')"
               :checked="componentField.modelValue"
               @update:checked="handleChange"
             />

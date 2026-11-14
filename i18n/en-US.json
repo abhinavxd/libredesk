@@ -254,6 +254,7 @@
   "admin.general.allowedFileUploadExtensions": "Allowed file upload extensions",
   "admin.general.allowedFileUploadExtensions.description": "Use `*` to permit all file types. For example: `jpg, png, pdf`",
   "admin.general.blockAssignAwayReassigning": "Block assigning conversations to agents who are away and reassigning",
+  "admin.general.blockAssignAwayReassigning.description": "Agents who are only away can still be assigned conversations.",
   "admin.general.businessHours.placeholder": "Select business hours",
   "admin.general.faviconURL": "Favicon URL",
   "admin.general.faviconURL.valid": "Favicon URL should be a valid URL",
