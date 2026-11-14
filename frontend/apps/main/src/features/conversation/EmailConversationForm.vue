@@ -331,6 +331,7 @@ import api from '@/api'
 import { useContactSearch } from '@/features/conversation/useContactSearch.js'
 import ContactSearchResults from '@/features/conversation/ContactSearchResults.vue'
 import { useNewConversationDraft } from '@/features/conversation/useNewConversationDraft.js'
+import { useClearBlockedSelfAssignee } from '@/features/conversation/useClearBlockedSelfAssignee.js'
 import { hasPendingInlineUpload } from '@main/composables/useInlineImageUpload'
 import { useIsComposerCramped } from '@main/composables/useIsComposerCramped'
 
@@ -464,6 +465,11 @@ const form = useForm({
     last_name: ''
   }
 })
+
+useClearBlockedSelfAssignee(
+  () => form.values.agent_id,
+  () => form.setFieldValue('agent_id', null, false /** shouldValidate **/)
+)
 
 const fromOptions = computed(() => {
   const inbox = inboxStore.inboxes.find((item) => String(item.id) === String(form.values.inbox_id))
