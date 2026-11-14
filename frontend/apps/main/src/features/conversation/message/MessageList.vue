@@ -25,6 +25,8 @@
               <MessageBubble
                 :message="row.message"
                 :direction="row.message.type"
+                :dark-mode="colorMode === 'dark'"
+                :show-original-email-colors="showOriginalEmailColors"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -33,6 +35,8 @@
               <MessageBubble
                 :message="row.message"
                 direction="outgoing"
+                :dark-mode="colorMode === 'dark'"
+                :show-original-email-colors="showOriginalEmailColors"
                 :group-with-prev="row.groupWithPrev"
                 :group-with-next="row.groupWithNext"
               />
@@ -78,6 +82,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useColorMode } from '@vueuse/core'
 import { useRoute } from 'vue-router'
 import { useElementSize } from '@vueuse/core'
 import { useConversationRead } from '@main/composables/useConversationRead'
@@ -104,7 +109,15 @@ const MENTION_MAX_ANCHOR_FRAMES = 90
 const HIGHLIGHT_MS = 2500
 const OLDER_MESSAGES_SCROLL_DISTANCE = 48
 
+defineProps({
+  showOriginalEmailColors: {
+    type: Boolean,
+    default: false
+  }
+})
+
 const route = useRoute()
+const colorMode = useColorMode()
 
 const conversationStore = useConversationStore()
 const userStore = useUserStore()
