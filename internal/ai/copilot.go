@@ -93,7 +93,7 @@ func (m *Manager) Copilot(ctx context.Context, conversationContext string, histo
 
 // Summarize produces a short handover summary of a conversation transcript.
 func (m *Manager) Summarize(ctx context.Context, transcript string) (string, error) {
-	resp, err := m.CompletionRaw(ctx, summarizeSystemPrompt, "Conversation:\n"+transcript)
+	resp, err := m.CompletionRaw(ctx, summarizeSystemPrompt+"\n\n"+historyTimestampPrompt, "Conversation:\n"+transcript)
 	if err != nil {
 		return "", err
 	}
@@ -112,7 +112,7 @@ func (m *Manager) SuggestTags(ctx context.Context, transcript string) ([]string,
 
 	allowed := m.tagShortlist(ctx, transcript, tags)
 	userPrompt := "Allowed tags:\n" + strings.Join(allowed, "\n") + "\n\nConversation:\n" + transcript
-	resp, err := m.CompletionRaw(ctx, suggestTagsSystemPrompt, userPrompt)
+	resp, err := m.CompletionRaw(ctx, suggestTagsSystemPrompt+"\n\n"+historyTimestampPrompt, userPrompt)
 	if err != nil {
 		return nil, err
 	}

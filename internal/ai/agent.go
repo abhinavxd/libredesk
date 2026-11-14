@@ -7,7 +7,13 @@ import (
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 )
 
-const defaultMaxSteps = 5
+const (
+	defaultMaxSteps = 5
+
+	historyTimestampPrompt = `Leading [timestamp] markers show when messages were sent, in the workspace time zone.
+Treat these markers as metadata and omit them from replies.
+Interpret relative dates in a message using that message's timestamp.`
+)
 
 // RunAgent runs the tool-calling loop for agent-facing callers: built-in knowledge search only, no custom tools.
 func (m *Manager) RunAgent(ctx context.Context, systemPrompt string, history []models.ChatMessage, maxSteps int, tctx ToolContext) (string, error) {
@@ -45,7 +51,8 @@ func (m *Manager) newAgentRun(systemPrompt string, history []models.ChatMessage,
 	if err != nil {
 		return nil, err
 	}
-	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient)
+	client := NewOpenAIClient(cfg, m.lo, m.providerHTTPClient, m.WorkspaceLocation())
+	systemPrompt += "\n\n" + historyTimestampPrompt
 	if instructions := strings.TrimSpace(cfg.Instructions); appendWorkspaceInstructions && instructions != "" {
 		if systemPrompt != "" {
 			systemPrompt += "\n\n"

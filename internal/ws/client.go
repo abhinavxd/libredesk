@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
 )
@@ -88,8 +89,12 @@ func (c *Client) Listen() {
 // processIncomingMessage processes incoming messages from the client.
 func (c *Client) processIncomingMessage(data []byte) {
 	if string(data) == "ping" {
-		if _, err := c.Hub.userStore.UpdateLastActive(c.ID); err != nil {
+		wasOffline, err := c.Hub.userStore.UpdateLastActive(c.ID)
+		if err != nil {
 			c.Hub.lo.Error("UpdateLastActive failed", "client_id", c.ID, "error", err)
+		}
+		if wasOffline {
+			c.Hub.broadcastAgentAvailability(c.ID, umodels.Online)
 		}
 		c.SendMessage([]byte("pong"), websocket.TextMessage)
 		return

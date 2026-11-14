@@ -73,6 +73,7 @@
               <SelectAgentCombobox
                 v-else-if="getFieldEntity(modelFilter) === 'agent'"
                 v-model="modelFilter.value"
+                include-disabled
                 :placeholder="t('placeholders.selectValue')"
               />
 

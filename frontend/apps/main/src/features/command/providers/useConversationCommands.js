@@ -205,7 +205,7 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
       shortcut: ['Alt', 'A'],
       placeholder: t('command.searchAgents'),
       search: async (term) =>
-        (await usersStore.searchUsers(term))
+        (await usersStore.searchEnabledUsers(term))
           .filter((agent) => String(agent.value) !== String(conv.assigned_user_id))
           .map((agent) => ({
             id: `conv.assign-agent.${agent.value}`,

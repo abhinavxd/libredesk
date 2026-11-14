@@ -152,6 +152,7 @@ CREATE TABLE teams (
 	emoji TEXT NULL,
 	conversation_assignment_type conversation_assignment_type NOT NULL,
 	max_auto_assigned_conversations INT DEFAULT 0 NOT NULL,
+	skip_offline_agents BOOLEAN DEFAULT false NOT NULL,
 
 	-- Set to NULL when business hours or SLA policy is deleted.
 	business_hours_id INT REFERENCES business_hours(id) ON DELETE SET NULL ON UPDATE CASCADE NULL,
@@ -828,6 +829,7 @@ CREATE TABLE ai_tools (
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	name TEXT NOT NULL UNIQUE,
+	display_name TEXT NOT NULL DEFAULT '',
 	description TEXT NOT NULL DEFAULT '',
 	url TEXT NOT NULL,
 	method TEXT NOT NULL DEFAULT 'POST',
@@ -838,7 +840,8 @@ CREATE TABLE ai_tools (
 	copilot_enabled BOOLEAN NOT NULL DEFAULT false,
 	generate_reply_enabled BOOLEAN NOT NULL DEFAULT false,
 	requires_agent_approval BOOLEAN NOT NULL DEFAULT true,
-	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
+	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64),
+	CONSTRAINT constraint_ai_tools_on_display_name CHECK (length(display_name) <= 140)
 );
 
 DROP TABLE IF EXISTS ai_assistants CASCADE;
@@ -1124,6 +1127,7 @@ VALUES
 	('app.timezone', '"Asia/Kolkata"'::jsonb),
 	('app.business_hours_id', '""'::jsonb),
 	('app.show_conversation_subject', 'true'::jsonb),
+	('app.block_assign_away_reassigning', 'false'::jsonb),
 	('ai_agent.faq_learning_enabled', 'false'::jsonb),
     ('notification.email.username', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.host', '""'::jsonb),

@@ -117,9 +117,9 @@ func (u *Manager) Get(id int) (models.Team, error) {
 }
 
 // Create creates a new team.
-func (u *Manager) Create(name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) (models.Team, error) {
+func (u *Manager) Create(name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int, skipOfflineAgents bool) (models.Team, error) {
 	var team models.Team
-	if err := u.q.InsertTeam.Get(&team, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
+	if err := u.q.InsertTeam.Get(&team, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations, skipOfflineAgents); err != nil {
 		if dbutil.IsUniqueViolationError(err) {
 			return team, envelope.NewError(envelope.GeneralError, u.i18n.T("errors.alreadyExistsTeam"), nil)
 		}
@@ -130,9 +130,9 @@ func (u *Manager) Create(name, timezone, conversationAssignmentType string, busi
 }
 
 // Update updates an existing team.
-func (u *Manager) Update(id int, name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int) (models.Team, error) {
+func (u *Manager) Update(id int, name, timezone, conversationAssignmentType string, businessHrsID, slaPolicyID null.Int, emoji string, maxAutoAssignedConversations int, skipOfflineAgents bool) (models.Team, error) {
 	var team models.Team
-	if err := u.q.UpdateTeam.Get(&team, id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations); err != nil {
+	if err := u.q.UpdateTeam.Get(&team, id, name, timezone, conversationAssignmentType, businessHrsID, slaPolicyID, emoji, maxAutoAssignedConversations, skipOfflineAgents); err != nil {
 		u.lo.Error("error updating team", "error", err)
 		return team, envelope.NewError(envelope.GeneralError, u.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}

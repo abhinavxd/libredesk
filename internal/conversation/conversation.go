@@ -376,7 +376,8 @@ type queries struct {
 	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
 	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
 	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	GetOpenConversationUUIDsByAssignee  *sqlx.Stmt `query:"get-open-conversation-uuids-by-assignee"`
+	UnassignOpenConversation            *sqlx.Stmt `query:"unassign-open-conversation"`
 	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
 	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
@@ -869,10 +870,42 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return nil
 	}
 
+	if err := c.ValidateUserAssignee(assigneeID); err != nil {
+		return err
+	}
+
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return c.afterUserAssignedHooks(uuid, assigneeID, actor, amodels.PreviousValues(previousConversation))
+}
+
+// ValidateUserAssignee rejects agents who are disabled, or away and reassigning while the general setting blocks them.
+func (c *Manager) ValidateUserAssignee(assigneeID int) error {
+	assignee, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
+	if err != nil {
+		return err
+	}
+	if !assignee.Enabled {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.assigneeDisabled"), nil)
+	}
+	if assignee.AvailabilityStatus == umodels.AwayAndReassigning && c.blocksAwayReassigningAssignees() {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.error.agentAwayReassigning"), nil)
+	}
+	return nil
+}
+
+// blocksAwayReassigningAssignees reports whether the general setting blocks assigning to away and reassigning agents.
+func (c *Manager) blocksAwayReassigningAssignees() bool {
+	b, err := c.settingsStore.Get("app.block_assign_away_reassigning")
+	if err != nil {
+		return false
+	}
+	var block bool
+	if err := json.Unmarshal(b, &block); err != nil {
+		return false
+	}
+	return block
 }
 
 // ClaimUnassignedConversation atomically assigns a conversation only if still unassigned, still in expectedTeamID and the assignee is an enabled, non-away agent of that team.
@@ -1554,13 +1587,41 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	}
 }
 
-// UnassignOpen unassigns all open conversations belonging to a user.
-// i.e conversations without status `Closed` and `Resolved`.
+// UnassignOpen unassigns every conversation of a user that is not in a resolved status, one at a time so each change is broadcast.
 func (m *Manager) UnassignOpen(userID int) error {
-	if _, err := m.q.UnassignOpenConversations.Exec(userID); err != nil {
-		m.lo.Error("error unassigning open conversations", "error", err)
+	var uuids []string
+	if err := m.q.GetOpenConversationUUIDsByAssignee.Select(&uuids, userID); err != nil {
+		m.lo.Error("error fetching open conversations of user", "user_id", userID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
 	}
+	if len(uuids) == 0 {
+		return nil
+	}
+	systemUser, err := m.userStore.GetSystemUser()
+	if err != nil {
+		return err
+	}
+	for _, uuid := range uuids {
+		if err := m.unassignIfStillOpen(uuid, userID, systemUser); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// unassignIfStillOpen clears the user assignee only if the conversation is still assigned to userID and unresolved, and reports the change only then.
+func (m *Manager) unassignIfStillOpen(uuid string, userID int, actor umodels.User) error {
+	prev, prevErr := m.GetConversationListItem(uuid)
+	res, err := m.q.UnassignOpenConversation.Exec(uuid, userID)
+	if err != nil {
+		m.lo.Error("error unassigning open conversation", "uuid", uuid, "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
+	}
+	// The conversation was reassigned or resolved after the list of open conversations was read.
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return nil
+	}
+	m.afterAssigneeRemoved(uuid, models.AssigneeTypeUser, actor, prev, prevErr)
 	return nil
 }
 
@@ -1758,6 +1819,9 @@ func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipie
 			recipients = append(recipients, delivery)
 			continue
 		}
+		if !recipient.Enabled {
+			continue
+		}
 
 		if recipient.Email.String != "" {
 			subject, content, err := render(recipient)
@@ -1860,7 +1924,12 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 		m.lo.Error("error removing conversation assignee", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
 	}
+	m.afterAssigneeRemoved(uuid, typ, actor, prev, prevErr)
+	return nil
+}
 
+// afterAssigneeRemoved fires the webhook and broadcasts that follow a removed assignee, given the conversation's prior list item.
+func (m *Manager) afterAssigneeRemoved(uuid, typ string, actor umodels.User, prev models.ConversationListItem, prevErr error) {
 	// Trigger webhook for conversation unassigned from user.
 	if typ == models.AssigneeTypeUser {
 		conversation, err := m.GetConversation(0, uuid, "")
@@ -1881,18 +1950,7 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 		}
 	}
 
-	next, nextErr := m.GetConversationListItem(uuid)
-	if nextErr != nil {
-		m.lo.Error("error fetching conversation list item for unassign broadcast", "uuid", uuid, "error", nextErr)
-		return nil
-	}
-	var prevPtr *models.ConversationListItem
-	if prevErr == nil {
-		prevPtr = &prev
-	}
-	m.BroadcastConvReassignment(prevPtr, &next)
-
-	return nil
+	m.broadcastReassignment(uuid, prev, prevErr)
 }
 
 // SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent.

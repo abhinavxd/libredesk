@@ -684,6 +684,9 @@ func (m *Manager) SendNotification(scheduledNotification models.ScheduledSLANoti
 			m.lo.Error("error fetching agent for SLA notification", "recipient_id", recipientID, "error", err)
 			continue
 		}
+		if !agent.Enabled {
+			continue
+		}
 
 		var (
 			dueIn, overdueBy string

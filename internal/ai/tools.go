@@ -28,6 +28,8 @@ const (
 	maxToolResultChars = 64 << 10
 
 	maxToolNameLen = 64
+	// maxToolDisplayNameLen must stay in sync with the ai_tools.display_name DB check constraint.
+	maxToolDisplayNameLen = 140
 )
 
 var (
@@ -135,6 +137,8 @@ type ToolContext struct {
 	// Verified is evaluated live per tool call (never snapshotted) so a contact who verifies
 	// mid-turn passes on the same turn. A nil func is treated as unverified (fail closed).
 	Verified func() bool
+	// OnToolRequest receives a custom tool's name and display name just before its HTTP request is sent.
+	OnToolRequest func(name, displayName string)
 }
 
 func (c ToolContext) verified() bool { return c.Verified != nil && c.Verified() }
@@ -177,6 +181,8 @@ func (t *httpTool) Parameters() types.JSONText {
 }
 
 func (t *httpTool) approvalRequired() bool { return t.tool.RequiresAgentApproval }
+
+func (t *httpTool) displayName() string { return t.tool.DisplayName }
 
 func (t *httpTool) toolID() int { return t.tool.ID }
 
@@ -266,6 +272,9 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	}
 	if t.tctx.InboxID != 0 {
 		req.Header.Set("X-Libredesk-Inbox-Id", strconv.Itoa(t.tctx.InboxID))
+	}
+	if t.tctx.OnToolRequest != nil {
+		t.tctx.OnToolRequest(t.tool.Name, t.tool.DisplayName)
 	}
 	resp, err := t.client.Do(req)
 	if err != nil {

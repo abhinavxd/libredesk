@@ -44,6 +44,12 @@ export const queryFromFilters = (filters) => {
 export const hasActiveFilters = (filters) =>
   FILTER_KEYS.some((key) => (key === 'tags' ? filters.tags?.length > 0 : Boolean(filters[key])))
 
+// Picking the value a filter already holds clears that filter.
+export const toggleFilter = (filters, key, value) => ({
+  ...filters,
+  [key]: filters[key] === String(value) ? '' : String(value)
+})
+
 const leaf = (field, operator, value = '') => ({
   model: 'conversations',
   field,

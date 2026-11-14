@@ -3,9 +3,9 @@ package main
 import (
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/zerodha/fastglue"
 )
 
@@ -76,7 +76,7 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 		if err := checkConversationPermissions(app, config, visitor, contact.ID, inbox.ID); err != nil {
 			return sendErrorEnvelope(r, err)
 		}
-		meta := map[string]any{"ip": realip.FromRequest(r.RequestCtx), "user_agent": string(r.RequestCtx.Request.Header.Peek("User-Agent")), "campaign_id": delivery.CampaignID}
+		meta := map[string]any{"ip": httputil.ClientIP(r.RequestCtx, app.clientIPHeader), "user_agent": string(r.RequestCtx.Request.Header.Peek("User-Agent")), "campaign_id": delivery.CampaignID}
 		reply, err := app.conversation.CreateProactiveConversation(delivery, contact.ID, req.Message, attrs, meta, maxChatConversationsPerContact, chatConversationRateLimitWindow)
 		if err != nil {
 			if _, ok := err.(envelope.Error); ok {

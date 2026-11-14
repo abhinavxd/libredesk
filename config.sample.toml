@@ -19,6 +19,11 @@ encryption_key = "your-32-char-random-string-here!"
 address = "0.0.0.0:9000"
 # Unix socket path (leave empty to use TCP address instead)
 socket = ""
+# Read the client IP only from this header. The reverse proxy must overwrite it.
+# Block direct access to the app port to prevent clients from spoofing this header.
+# Empty defaults to X-Client-IP, or X-Real-IP when RAILWAY_ENVIRONMENT_ID is set.
+# Missing or invalid header values use the connection IP.
+client_ip_header = ""
 # Do NOT disable secure cookies in production environment if you don't know exactly what you're doing!
 disable_secure_cookies = false
 # Session lifetime duration.
@@ -146,6 +151,13 @@ workers = 5
 queue_size = 10000
 # HTTP timeout for webhook requests
 timeout = "15s"
+# Maximum retries after the initial delivery. 0 disables retries.
+# Network errors and HTTP 408, 425, 429 and 5xx responses are retried.
+# Retries preserve the body, signature and X-Libredesk-Delivery-Id so receivers can drop duplicates.
+# Pending retries live in memory and are lost on restart.
+max_retries = 3
+# Initial retry delay. Doubles between retries (5s, 10s, 20s), capped at 10 minutes.
+retry_backoff = "5s"
 
 # SSRF guard for admin-configured outbound URLs (webhooks, OIDC discovery, AI provider and tool calls).
 [ssrf]

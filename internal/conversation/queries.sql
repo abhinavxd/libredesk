@@ -569,12 +569,15 @@ WHERE uuid = $1;
 
 -- name: claim-unassigned-conversation
 -- Assigns only if the conversation is still unassigned in the team and the user is still an enabled, non-away agent of that team.
+-- Offline agents are also rejected when the team has skip_offline_agents enabled.
 WITH assignee AS (
     SELECT u.id
     FROM users u
     JOIN team_members tm ON tm.user_id = u.id AND tm.team_id = $3
+    JOIN teams t ON t.id = tm.team_id
     WHERE u.id = $2 AND u.deleted_at IS NULL AND u.type = 'agent' AND u.enabled = true
     AND u.availability_status NOT IN ('away_manual', 'away_and_reassigning')
+    AND NOT (t.skip_offline_agents AND u.availability_status = 'offline')
 ),
 claimed AS (
     UPDATE conversations
@@ -771,11 +774,16 @@ FROM conversation_messages m
 JOIN conversations c ON m.conversation_id = c.id
 WHERE m.uuid = $1;
 
--- name: unassign-open-conversations
+-- name: get-open-conversation-uuids-by-assignee
+SELECT uuid FROM conversations
+WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
+
+-- name: unassign-open-conversation
+-- Clears the user assignee only while the conversation is still assigned to that user and not resolved.
 UPDATE conversations
 SET assigned_user_id = NULL,
     updated_at = NOW()
-WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
+WHERE uuid = $1 AND assigned_user_id = $2 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
 -- name: update-conversation-custom-attributes
 UPDATE conversations
@@ -810,7 +818,7 @@ SET
 WHERE uuid = $1;
 
 -- name: re-open-conversation
--- Open conversation if it is not already open and unset the assigned user if they are away and reassigning.
+-- Open conversation if it is not already open and unset the assigned user if they are away and reassigning, disabled or deleted.
 UPDATE conversations
 SET 
   status_id = (SELECT id FROM conversation_statuses WHERE name = 'Open'),
@@ -820,7 +828,7 @@ SET
     WHEN EXISTS (
       SELECT 1 FROM users 
       WHERE users.id = conversations.assigned_user_id 
-        AND users.availability_status = 'away_and_reassigning'
+        AND (users.availability_status = 'away_and_reassigning' OR users.enabled = false OR users.deleted_at IS NOT NULL)
     ) THEN NULL
     ELSE assigned_user_id
   END
@@ -1077,6 +1085,7 @@ WHERE m.conversation_id = (
 AND ($2::boolean IS NULL OR m.private = $2)
 AND ($3::text[] IS NULL OR m.type::text = ANY($3))
 AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
+AND (NOT $4::boolean OR NOT COALESCE((m.meta->>'is_csat')::boolean, false))
 ORDER BY m.created_at DESC, m.id DESC %s
 
 -- name: insert-message

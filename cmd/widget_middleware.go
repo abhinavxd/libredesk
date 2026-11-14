@@ -10,7 +10,6 @@ import (
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/google/uuid"
 	"github.com/valyala/fasthttp"
 	"github.com/zerodha/fastglue"
@@ -62,7 +61,7 @@ func validateWidgetInbox(next func(*fastglue.Request) error) func(*fastglue.Requ
 		}
 
 		if len(config.BlockedIPs) > 0 {
-			clientIP := realip.FromRequest(r.RequestCtx)
+			clientIP := httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 			if httputil.IsIPBlocked(clientIP, config.BlockedIPs) {
 				return r.SendErrorEnvelope(fasthttp.StatusForbidden, app.i18n.T("widget.ipBlocked"), nil, envelope.PermissionError)
 			}

@@ -198,8 +198,7 @@ func (m *Manager) mine(ctx context.Context, convID int) {
 		return
 	}
 
-	private := false
-	msgs, _, err := m.convo.GetConversationMessages(conv.UUID, 1, maxMiningMessages, &private, []string{cmodels.MessageIncoming, cmodels.MessageOutgoing})
+	msgs, _, err := m.convo.GetAIConversationMessages(conv.UUID, 1 /** page **/, maxMiningMessages)
 	if err != nil {
 		m.lo.Error("error fetching messages for faq mining", "conversation_uuid", conv.UUID, "error", err)
 		return

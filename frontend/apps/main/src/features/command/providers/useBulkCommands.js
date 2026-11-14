@@ -55,7 +55,7 @@ export function useBulkCommands() {
             icon: X,
             run: () => bulkAssign('user', 'none')
           },
-          ...(await usersStore.searchUsers(term)).map((agent) => ({
+          ...(await usersStore.searchEnabledUsers(term)).map((agent) => ({
             id: `bulk.assign-agent.${agent.value}`,
             label: agent.label,
             parent: 'bulk.assign-agent',
