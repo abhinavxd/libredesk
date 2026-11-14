@@ -69,9 +69,10 @@ type Opts struct {
 
 // queries contains all the prepared queries
 type queries struct {
-	SearchConversations string     `query:"search-conversations"`
-	SearchMessages      string     `query:"search-messages"`
-	SearchContacts      *sqlx.Stmt `query:"search-contacts"`
+	SearchConversations     string     `query:"search-conversations"`
+	SearchConversationsPage string     `query:"search-conversations-page"`
+	SearchMessages          string     `query:"search-messages"`
+	SearchContacts          *sqlx.Stmt `query:"search-contacts"`
 }
 
 // New creates a new search manager
@@ -129,10 +130,11 @@ func (s *Manager) searchConversations(query models.Query, scope models.ReadScope
 	if err != nil {
 		return nil, false, "", envelope.NewError(envelope.InputError, s.i18n.T("globals.messages.invalidFilters"), nil)
 	}
-	sql, args, err := s.buildQuery(s.q.SearchConversations, query, scope, orderBy, s.filterFields, conversationCursorCondition)
+	sql, args, err := s.buildQuery(s.q.SearchConversationsPage, query, scope, orderBy, s.filterFields, conversationCursorCondition)
 	if err != nil {
 		return nil, false, "", err
 	}
+	sql = fmt.Sprintf(s.q.SearchConversations, sql, orderBy)
 	var results = make([]models.ConversationResult, 0)
 	if err := s.db.Select(&results, sql, args...); err != nil {
 		s.lo.Error("error searching conversations", "error", err)

@@ -60,8 +60,8 @@ import MobileDrawerFooter from './MobileDrawerFooter.vue'
 import SidebarCountBadge from './SidebarCountBadge.vue'
 import { filterNavItems } from '@main/utils/nav-permissions'
 import { permissions } from '@main/constants/permissions'
-import { useStorage } from '@vueuse/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { useDocumentVisibility, useIntervalFn, useStorage } from '@vueuse/core'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@main/stores/user'
 import { useConversationStore } from '@main/stores/conversation'
@@ -156,9 +156,20 @@ const viewSidebarCount = (viewID) => {
   return conversationStore.sidebarCounts.views?.[viewID] ?? 0
 }
 
-onMounted(() => {
-  conversationStore.fetchSidebarCounts({ force: true })
-})
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(
+  () => conversationStore.fetchSidebarCounts({ force: true }),
+  120_000,
+  { immediate: false }
+)
+watch([visibility, () => isInboxRoute(route.path)], ([visible, inbox]) => {
+  if (visible === 'visible' && inbox) {
+    conversationStore.fetchSidebarCounts()
+    resume()
+  } else {
+    pause()
+  }
+}, { immediate: true })
 </script>
 
 <template>

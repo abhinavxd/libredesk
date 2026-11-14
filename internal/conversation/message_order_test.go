@@ -18,18 +18,43 @@ func TestGetOutgoingPendingMessagesSerializesConversations(t *testing.T) {
 	}
 
 	conversationA, conversationB, senderID := seedOutgoingOrderTest(t, db)
+	for _, row := range []struct {
+		kind, status string
+		private      bool
+	}{
+		{"incoming", "pending", false},
+		{"activity", "pending", false},
+		{"outgoing", "sent", false},
+		{"outgoing", "failed", false},
+		{"outgoing", "pending", true},
+	} {
+		if _, err := db.Exec(`INSERT INTO conversation_messages (conversation_id, sender_id, sender_type, type, status, private)
+			VALUES ($1, $2, 'agent', $3, $4, $5)`, conversationA, senderID, row.kind, row.status, row.private); err != nil {
+			t.Fatal(err)
+		}
+	}
 	firstA := insertPendingMessage(t, db, conversationA, senderID, "a1")
 	secondA := insertPendingMessage(t, db, conversationA, senderID, "a2")
 	firstB := insertPendingMessage(t, db, conversationB, senderID, "b1")
 	insertPendingMessage(t, db, conversationB, senderID, "b2")
+	if _, err := db.Exec(`UPDATE conversation_messages SET created_at = NOW() + INTERVAL '1 day' WHERE id = $1`, firstA); err != nil {
+		t.Fatal(err)
+	}
 
 	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, nil, []int{firstA, firstB})
 	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, []int{conversationA}, []int{firstB})
+	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, []int{conversationA, conversationA, 0, -1}, []int{firstB})
+	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, []int{0, -1}, []int{firstA, firstB})
+	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, []int{conversationA, conversationB}, nil /** want **/)
 
 	if _, err := db.Exec(`UPDATE conversation_messages SET status = 'sent' WHERE id = $1`, firstA); err != nil {
 		t.Fatalf("marking first message sent: %v", err)
 	}
 	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, nil, []int{secondA, firstB})
+	if _, err := db.Exec(`UPDATE conversation_messages SET status = 'sent' WHERE type = 'outgoing' AND private = false`); err != nil {
+		t.Fatal(err)
+	}
+	assertPendingMessageIDs(t, q.GetOutgoingPendingMessages, nil /** processing **/, nil /** want **/)
 }
 
 func seedOutgoingOrderTest(t *testing.T, db *sqlx.DB) (int, int, int) {
