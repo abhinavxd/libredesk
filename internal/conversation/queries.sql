@@ -762,6 +762,13 @@ WHERE m.uuid = $1;
 SELECT uuid FROM conversations
 WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
+-- name: unassign-open-conversation
+-- Clears the user assignee only while the conversation is still assigned to that user and not resolved.
+UPDATE conversations
+SET assigned_user_id = NULL,
+    updated_at = NOW()
+WHERE uuid = $1 AND assigned_user_id = $2 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
+
 -- name: update-conversation-custom-attributes
 UPDATE conversations
 SET custom_attributes = $2,

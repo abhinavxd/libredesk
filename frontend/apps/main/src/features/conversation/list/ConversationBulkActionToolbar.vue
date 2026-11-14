@@ -21,6 +21,7 @@
     <SelectAgentCombobox
       v-if="canAssignAgent"
       include-none
+      block-away-reassigning
       align="start"
       @select="(item) => onAssigneeSelect('user', item)"
     >

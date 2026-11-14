@@ -11,6 +11,7 @@ type General struct {
 	Timezone                    string   `json:"app.timezone"`
 	BusinessHoursID             string   `json:"app.business_hours_id"`
 	ShowConversationSubject     bool     `json:"app.show_conversation_subject"`
+	BlockAssignAwayReassigning  bool     `json:"app.block_assign_away_reassigning"`
 }
 
 type EmailNotification struct {
