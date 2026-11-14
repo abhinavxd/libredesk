@@ -92,25 +92,27 @@
           </FormItem>
         </FormField>
       </FormGrid>
-      <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
-        <FormItem class="mt-5">
-          <SwitchField
-            :title="t('admin.general.showConversationSubject')"
-            :description="t('admin.general.showConversationSubject.description')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
-      <FormField v-slot="{ componentField, handleChange }" name="block_assign_away_reassigning">
-        <FormItem class="mt-5">
-          <SwitchField
-            :title="t('admin.general.blockAssignAwayReassigning')"
-            :checked="componentField.modelValue"
-            @update:checked="handleChange"
-          />
-        </FormItem>
-      </FormField>
+      <FormGrid class="workspace-grid mt-5">
+        <FormField v-slot="{ componentField, handleChange }" name="show_conversation_subject">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.general.showConversationSubject')"
+              :description="t('admin.general.showConversationSubject.description')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+        <FormField v-slot="{ componentField, handleChange }" name="block_assign_away_reassigning">
+          <FormItem>
+            <SwitchField
+              :title="t('admin.general.blockAssignAwayReassigning')"
+              :checked="componentField.modelValue"
+              @update:checked="handleChange"
+            />
+          </FormItem>
+        </FormField>
+      </FormGrid>
     </fieldset>
     <fieldset class="min-w-0">
       <legend :class="SECTION_HEADING_CLASS">{{ t('globals.terms.branding') }}</legend>
