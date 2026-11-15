@@ -22,8 +22,7 @@ var (
 )
 
 const (
-	ChannelLiveChat       = "livechat"
-	MaxConnectionsPerUser = 10
+	ChannelLiveChat = "livechat"
 
 	HomeAppAnnouncement = "announcement"
 	HomeAppExternalLink = "external_link"
@@ -41,6 +40,8 @@ const (
 	DefaultLanguage = "en-US"
 	// Matches the session TTL the chat handlers fall back to when this is unset.
 	DefaultSessionDuration = "4320h"
+	// Used when livechat.max_connections_per_user is unset or invalid in config.toml.
+	DefaultMaxConnectionsPerUser = 10
 )
 
 type Colors struct {
@@ -216,40 +217,47 @@ func (c *Client) CloseChannel() {
 
 // LiveChat represents the live chat inbox.
 type LiveChat struct {
-	id            int
-	name          string
-	config        Config
-	from          string
-	lo            *logf.Logger
-	messageStore  inbox.MessageStore
-	userStore     inbox.UserStore
-	signAvatarURL func(*null.String)   // Signs a raw /uploads/ avatar path into a signed URL.
-	clients       map[string][]*Client // Maps user IDs to slices of clients (to handle multiple devices)
-	clientsMutex  sync.RWMutex
+	id                    int
+	name                  string
+	config                Config
+	from                  string
+	lo                    *logf.Logger
+	messageStore          inbox.MessageStore
+	userStore             inbox.UserStore
+	signAvatarURL         func(*null.String)   // Signs a raw /uploads/ avatar path into a signed URL.
+	clients               map[string][]*Client // Maps user IDs to slices of clients (to handle multiple devices)
+	clientsMutex          sync.RWMutex
+	maxConnectionsPerUser int
 }
 
 // Opts holds the options required for the live chat inbox.
 type Opts struct {
-	ID            int
-	Name          string
-	Config        Config
-	From          string
-	Lo            *logf.Logger
-	SignAvatarURL func(*null.String)
+	ID                    int
+	Name                  string
+	Config                Config
+	From                  string
+	Lo                    *logf.Logger
+	SignAvatarURL         func(*null.String)
+	MaxConnectionsPerUser int
 }
 
 // New returns a new instance of the live chat inbox.
 func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*LiveChat, error) {
+	maxConnectionsPerUser := opts.MaxConnectionsPerUser
+	if maxConnectionsPerUser <= 0 {
+		maxConnectionsPerUser = DefaultMaxConnectionsPerUser
+	}
 	lc := &LiveChat{
-		id:            opts.ID,
-		name:          opts.Name,
-		config:        opts.Config,
-		from:          opts.From,
-		lo:            opts.Lo,
-		messageStore:  store,
-		userStore:     userStore,
-		signAvatarURL: opts.SignAvatarURL,
-		clients:       make(map[string][]*Client),
+		id:                    opts.ID,
+		name:                  opts.Name,
+		config:                opts.Config,
+		from:                  opts.From,
+		lo:                    opts.Lo,
+		messageStore:          store,
+		userStore:             userStore,
+		signAvatarURL:         opts.SignAvatarURL,
+		clients:               make(map[string][]*Client),
+		maxConnectionsPerUser: maxConnectionsPerUser,
 	}
 	return lc, nil
 }
@@ -523,8 +531,8 @@ func (lc *LiveChat) AddClient(userID string, disconnect func()) (*Client, error)
 	defer lc.clientsMutex.Unlock()
 
 	// Check if the user already has the maximum allowed connections.
-	if clients, exists := lc.clients[userID]; exists && len(clients) >= MaxConnectionsPerUser {
-		lc.lo.Warn("maximum connections reached for user", "client_id", userID, "max_connections", MaxConnectionsPerUser)
+	if clients, exists := lc.clients[userID]; exists && len(clients) >= lc.maxConnectionsPerUser {
+		lc.lo.Warn("maximum connections reached for user", "client_id", userID, "max_connections", lc.maxConnectionsPerUser)
 		return nil, fmt.Errorf("maximum connections reached")
 	}
 
