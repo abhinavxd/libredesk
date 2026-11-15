@@ -5,9 +5,11 @@ import (
 	"sort"
 	"testing"
 
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	"github.com/lib/pq"
 	"github.com/mr-karan/balance"
 	"github.com/volatiletech/null/v9"
 	"github.com/zerodha/logf"
@@ -16,6 +18,8 @@ import (
 type assignmentStore struct {
 	count, countCalls, claims int
 }
+
+var canReply = pq.StringArray{authzmodels.PermMessagesWrite}
 
 type fakeTeamStore struct {
 	teams   []tmodels.Team
@@ -43,10 +47,10 @@ func (s *assignmentStore) ClaimUnassignedConversation(uuid string, userID, teamI
 
 func TestPopulateTeamBalancerSkipOfflineAgents(t *testing.T) {
 	members := []tmodels.TeamMember{
-		{ID: 1, AvailabilityStatus: umodels.Online},
-		{ID: 2, AvailabilityStatus: umodels.Offline},
-		{ID: 3, AvailabilityStatus: umodels.Away},
-		{ID: 4, AvailabilityStatus: umodels.AwayManual},
+		{ID: 1, AvailabilityStatus: umodels.Online, Permissions: canReply},
+		{ID: 2, AvailabilityStatus: umodels.Offline, Permissions: canReply},
+		{ID: 3, AvailabilityStatus: umodels.Away, Permissions: canReply},
+		{ID: 4, AvailabilityStatus: umodels.AwayManual, Permissions: canReply},
 	}
 	tests := []struct {
 		name string
@@ -84,7 +88,7 @@ func TestPopulateTeamBalancerSkipOfflineAgents(t *testing.T) {
 func TestPopulateTeamBalancerRemovesAgentWhoGoesOffline(t *testing.T) {
 	store := &fakeTeamStore{
 		teams:   []tmodels.Team{{ID: 10, ConversationAssignmentType: AssignmentTypeRoundRobin, SkipOfflineAgents: true}},
-		members: map[int][]tmodels.TeamMember{10: {{ID: 1, AvailabilityStatus: umodels.Online}}},
+		members: map[int][]tmodels.TeamMember{10: {{ID: 1, AvailabilityStatus: umodels.Online, Permissions: canReply}}},
 	}
 	lo := logf.New(logf.Opts{Writer: io.Discard})
 	e, _ := New(store, nil, umodels.User{}, &lo)
@@ -93,6 +97,34 @@ func TestPopulateTeamBalancerRemovesAgentWhoGoesOffline(t *testing.T) {
 	}
 
 	store.members[10][0].AvailabilityStatus = umodels.Offline
+	if err := e.populateTeamBalancer(); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.roundRobinBalancer[10].ItemIDs(); len(got) != 0 {
+		t.Fatalf("pool = %v, want empty", got)
+	}
+}
+
+func TestPopulateTeamBalancerSkipsAgentsWhoCannotReply(t *testing.T) {
+	store := &fakeTeamStore{
+		teams: []tmodels.Team{{ID: 10, ConversationAssignmentType: AssignmentTypeRoundRobin}},
+		members: map[int][]tmodels.TeamMember{10: {
+			{ID: 1, AvailabilityStatus: umodels.Online, Permissions: canReply},
+			{ID: 2, AvailabilityStatus: umodels.Online, Permissions: pq.StringArray{authzmodels.PermMessagesWritePrivate}},
+			{ID: 3, AvailabilityStatus: umodels.Online},
+		}},
+	}
+	lo := logf.New(logf.Opts{Writer: io.Discard})
+	e, _ := New(store, nil, umodels.User{}, &lo)
+	if err := e.populateTeamBalancer(); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.roundRobinBalancer[10].ItemIDs(); len(got) != 1 || got[0] != "1" {
+		t.Fatalf("pool = %v, want [1]", got)
+	}
+
+	// An agent whose role loses the permission leaves the pool on the next refresh.
+	store.members[10][0].Permissions = nil
 	if err := e.populateTeamBalancer(); err != nil {
 		t.Fatal(err)
 	}

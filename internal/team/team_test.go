@@ -1,8 +1,10 @@
 package team
 
 import (
+	"slices"
 	"testing"
 
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/jmoiron/sqlx"
 	"github.com/zerodha/logf"
@@ -33,6 +35,42 @@ func TestSearchLiteralPunctuation(t *testing.T) {
 				t.Fatalf("search %q returned %+v, want only the literal name", term, results)
 			}
 		})
+	}
+}
+
+func TestGetMembersReturnsRolePermissions(t *testing.T) {
+	mgr, db := newTestManager(t)
+	team := seedTeams(t, db, "support")["support"]
+	db.MustExec(`INSERT INTO roles (name, permissions) VALUES ('Notes only', '{conversations:read,messages:write_private}')`)
+
+	roles := map[string]string{"agent": "Agent", "notes": "Notes only", "none": ""}
+	ids := make(map[string]int, len(roles))
+	for name, role := range roles {
+		var id int
+		if err := db.Get(&id, `INSERT INTO users (type, first_name, last_name, enabled) VALUES ('agent', $1, '', true) RETURNING id`, name); err != nil {
+			t.Fatal(err)
+		}
+		db.MustExec(`INSERT INTO team_members (team_id, user_id) VALUES ($1, $2)`, team, id)
+		db.MustExec(`INSERT INTO user_roles (user_id, role_id) SELECT $1, id FROM roles WHERE name = $2`, id, role)
+		ids[name] = id
+	}
+
+	members, err := mgr.GetMembers(team)
+	if err != nil {
+		t.Fatal(err)
+	}
+	canReply := make(map[int]bool, len(members))
+	for _, member := range members {
+		canReply[member.ID] = slices.Contains(member.Permissions, authzmodels.PermMessagesWrite)
+	}
+	want := map[int]bool{ids["agent"]: true, ids["notes"]: false, ids["none"]: false}
+	if len(canReply) != len(want) {
+		t.Fatalf("members = %+v, want %d members", members, len(want))
+	}
+	for id, w := range want {
+		if canReply[id] != w {
+			t.Fatalf("member %d can reply = %v, want %v (members %+v)", id, canReply[id], w, members)
+		}
 	}
 }
 

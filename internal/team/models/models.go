@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/volatiletech/null/v9"
 )
 
@@ -30,9 +31,10 @@ type TeamCompact struct {
 }
 
 type TeamMember struct {
-	ID                 int    `db:"id" json:"id"`
-	AvailabilityStatus string `db:"availability_status" json:"availability_status"`
-	TeamID             int    `db:"team_id" json:"team_id"`
+	ID                 int            `db:"id" json:"id"`
+	AvailabilityStatus string         `db:"availability_status" json:"availability_status"`
+	TeamID             int            `db:"team_id" json:"team_id"`
+	Permissions        pq.StringArray `db:"permissions" json:"permissions"`
 }
 
 type TeamsCompact []TeamCompact
