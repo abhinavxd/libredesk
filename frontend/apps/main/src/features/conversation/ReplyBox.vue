@@ -703,20 +703,20 @@ const processSend = async (
 const processSendAndSetStatus = (status) => processSend(false, false, status)
 
 /**
- * Watches for changes in the conversation's macro id and update message content.
+ * Inserts the content of each applied macro at the cursor, keeping what the agent already wrote.
+ * Watches the macro object rather than its id so the same macro can be applied more than once.
  */
 watch(
-  () => conversationStore.getMacro('reply').id,
-  (newId) => {
-    // No macro set.
-    if (!newId) return
-
-    // If macro has message content, set it in the editor.
-    if (conversationStore.getMacro('reply').message_content) {
-      htmlContent.value = conversationStore.getMacro('reply').message_content
+  () => conversationStore.getMacro(MACRO_CONTEXT.REPLY),
+  async (macro) => {
+    if (!macro.message_content) return
+    // A collapsed composer has no editor to insert into.
+    if (isCollapsed.value && !isEditorFullscreen.value) {
+      expandComposer()
+      await nextTick()
     }
-  },
-  { deep: true }
+    activeContentRef()?.insertHtml(macro.message_content)
+  }
 )
 
 const pickSender = (value) => {
