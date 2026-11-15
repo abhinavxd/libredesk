@@ -14,7 +14,14 @@ SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, ma
 SELECT id, created_at, updated_at, name, emoji, conversation_assignment_type, max_auto_assigned_conversations, skip_offline_agents, business_hours_id, sla_policy_id, timezone from teams where id = $1;
 
 -- name: get-team-members
-SELECT u.id, t.id as team_id, u.availability_status
+SELECT u.id, t.id as team_id, u.availability_status,
+    ARRAY(
+        SELECT DISTINCT p
+        FROM user_roles ur
+        JOIN roles r ON r.id = ur.role_id
+        CROSS JOIN LATERAL unnest(r.permissions) AS p
+        WHERE ur.user_id = u.id
+    ) AS permissions
 FROM users u
 JOIN team_members tm ON tm.user_id = u.id
 JOIN teams t ON t.id = tm.team_id

@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
 
+	authzmodels "github.com/abhinavxd/libredesk/internal/authz/models"
 	"github.com/abhinavxd/libredesk/internal/conversation"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
@@ -166,6 +168,12 @@ func (e *Engine) populateTeamBalancer() error {
 			// Skip offline users if the team has opted out of assigning to them.
 			if team.SkipOfflineAgents && user.AvailabilityStatus == umodels.Offline {
 				e.lo.Debug("user is offline, skipping autoassignment", "team_id", team.ID, "user_id", user.ID)
+				continue
+			}
+
+			// Skip users whose roles do not allow replying to the conversations they would get.
+			if !slices.Contains(user.Permissions, authzmodels.PermMessagesWrite) {
+				e.lo.Debug("user cannot reply to conversations, skipping autoassignment", "team_id", team.ID, "user_id", user.ID)
 				continue
 			}
 
