@@ -2,6 +2,7 @@
 import { useChatStore } from './store/chat.js'
 import { useWidgetStore } from './store/widget.js'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound.js'
+import { websocketURL } from '@shared-ui/utils/websocket.js'
 
 export const WS_EVENT = {
   JOIN: 'join',
@@ -57,7 +58,7 @@ export class WidgetWebSocketClient {
     if (this.socket) this.socket.close()
 
     try {
-      this.socket = new WebSocket('/widget/ws')
+      this.socket = new WebSocket(websocketURL('/widget/ws'))
       this.socket.addEventListener('open', this.handleOpen.bind(this))
       this.socket.addEventListener('message', this.handleMessage.bind(this))
       this.socket.addEventListener('error', this.handleError.bind(this))

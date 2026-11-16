@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"html"
 	"mime"
 	"net/http"
 	"path"
@@ -477,7 +479,7 @@ func serveIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(injectWSURL(file.ReadBytes()))
 
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
@@ -508,9 +510,18 @@ func serveWidgetIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(injectWSURL(file.ReadBytes()))
 
 	return nil
+}
+
+func injectWSURL(page []byte) []byte {
+	wsURL := strings.TrimRight(ko.String("app.ws_url"), "/")
+	if wsURL == "" {
+		return page
+	}
+	meta := `<meta name="libredesk-ws-url" content="` + html.EscapeString(wsURL) + `">`
+	return bytes.Replace(page, []byte("</head>"), []byte(meta+"</head>"), 1)
 }
 
 // serveStaticFiles serves static assets from the filesystem.
