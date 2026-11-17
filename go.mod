@@ -11,7 +11,6 @@ require (
 	github.com/emersion/go-imap/v2 v2.0.0-beta.3
 	github.com/emersion/go-message v0.18.1
 	github.com/fasthttp/websocket v1.5.9
-	github.com/ferluci/fast-realip v1.0.1
 	github.com/gabriel-vasile/mimetype v1.4.11
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
@@ -73,7 +72,7 @@ require (
 	github.com/fasthttp/router v1.5.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect

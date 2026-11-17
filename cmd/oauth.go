@@ -127,7 +127,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	if code == "" {
 		errorMsg := string(r.RequestCtx.QueryArgs().Peek("error"))
 		errorDesc := string(r.RequestCtx.QueryArgs().Peek("error_description"))
-		app.lo.Error("OAuth authorization failed", "error", errorMsg, "description", errorDesc)
+		app.lo.Warn("inbox OAuth authorization failed", "error", errorMsg, "description", errorDesc)
 		return r.Redirect("/admin/inboxes?error=oauth_denied", fasthttp.StatusFound, nil, "")
 	}
 
@@ -138,8 +138,13 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	// Retrieve OAuth data from Redis
 	redisKey := "inbox_oauth:" + state
 	oauthData, err := app.redis.HGetAll(ctx, redisKey).Result()
-	if err != nil || len(oauthData) == 0 {
-		app.lo.Error("Invalid or expired OAuth state", "error", err, "state", state)
+	if err != nil {
+		app.lo.Error("error loading inbox OAuth state", "error", err)
+		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError,
+			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
+	}
+	if len(oauthData) == 0 {
+		app.lo.Warn("inbox OAuth callback rejected: state is invalid or expired")
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest,
 			app.i18n.Ts("globals.messages.somethingWentWrong"), nil, envelope.InputError)
 	}
@@ -219,7 +224,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 	// Validate flow type matches actual state
 	// New inbox flow: reject if inbox already exists
 	if flowType == FlowTypeNewInbox && existingInbox != nil {
-		app.lo.Error("Inbox already exists for email", "email", userEmail)
+		app.lo.Debug("Inbox already exists for email", "email", userEmail)
 		return r.Redirect("/admin/inboxes?error=inbox_already_exists", fasthttp.StatusFound, nil, "")
 	}
 
@@ -242,7 +247,7 @@ func handleOAuthCallback(r *fastglue.Request) error {
 		// Verify the authorized email matches the target inbox's email
 		targetEmailAddr, _ := stringutil.ExtractEmail(targetInbox.From)
 		if targetEmailAddr != userEmailAddr {
-			app.lo.Error("Email mismatch during reconnect", "target_email", targetEmailAddr, "authorized_email", userEmailAddr)
+			app.lo.Warn("inbox reconnect rejected: authorized email does not match inbox", "target_email", targetEmailAddr, "authorized_email", userEmailAddr)
 			return r.Redirect("/admin/inboxes?error=email_mismatch", fasthttp.StatusFound, nil, "")
 		}
 

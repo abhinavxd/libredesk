@@ -31,7 +31,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 
 	csat, err := app.csat.Get(uuid)
 	if err != nil {
-		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
+		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
 			},
@@ -39,7 +39,7 @@ func handleShowCSAT(r *fastglue.Request) error {
 	}
 
 	if csat.ResponseTimestamp.Valid {
-		return app.tmpl.RenderWebPage(r.RequestCtx, "info", map[string]interface{}{
+		return renderCSATPage(r, "info", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"Title":   app.i18n.T("globals.messages.thankYou"),
 				"Message": app.i18n.T("csat.thankYouMessage"),
@@ -49,14 +49,14 @@ func handleShowCSAT(r *fastglue.Request) error {
 
 	conversation, err := app.conversation.GetConversation(csat.ConversationID, "", "")
 	if err != nil {
-		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
+		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
 			},
 		})
 	}
 
-	return app.tmpl.RenderWebPage(r.RequestCtx, "csat", map[string]interface{}{
+	return renderCSATPage(r, "csat", map[string]interface{}{
 		"Data": map[string]interface{}{
 			"Title": app.i18n.T("csat.pageTitle"),
 			"CSAT": map[string]interface{}{
@@ -79,7 +79,7 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 
 	rating, feedback, metaJSON, errKey := validateCSATForm(r)
 	if errKey != "" {
-		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
+		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": app.i18n.T(errKey),
 			},
@@ -93,14 +93,14 @@ func handleUpdateCSATResponse(r *fastglue.Request) error {
 		if e, ok := err.(envelope.Error); ok {
 			msg = e.Error()
 		}
-		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
+		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": msg,
 			},
 		})
 	}
 
-	return app.tmpl.RenderWebPage(r.RequestCtx, "info", map[string]interface{}{
+	return renderCSATPage(r, "info", map[string]interface{}{
 		"Data": map[string]interface{}{
 			"Title":   app.i18n.T("globals.messages.thankYou"),
 			"Message": app.i18n.T("csat.thankYouMessage"),
@@ -117,14 +117,14 @@ func handleShowCSATWidget(r *fastglue.Request) error {
 
 	csat, err := app.csat.Get(uuid)
 	if err != nil {
-		return app.tmpl.RenderWebPage(r.RequestCtx, "error", map[string]interface{}{
+		return renderCSATPage(r, "error", map[string]interface{}{
 			"Data": map[string]interface{}{
 				"ErrorMessage": app.i18n.T("globals.messages.pageNotFound"),
 			},
 		})
 	}
 
-	return app.tmpl.RenderWebPage(r.RequestCtx, "csat-widget", map[string]interface{}{
+	return renderCSATPage(r, "csat-widget", map[string]interface{}{
 		"Data": map[string]interface{}{
 			"CSAT": map[string]interface{}{
 				"UUID":      csat.UUID,
@@ -227,4 +227,13 @@ func truncateFeedback(s string) string {
 		return s
 	}
 	return string(r[:maxCsatFeedbackLength])
+}
+
+func renderCSATPage(r *fastglue.Request, name string, data map[string]any) error {
+	app := r.Context.(*App)
+	if err := app.tmpl.RenderWebPage(r.RequestCtx, name, data); err != nil {
+		app.lo.Error("error rendering CSAT page", "template", name, "error", err)
+		return err
+	}
+	return nil
 }

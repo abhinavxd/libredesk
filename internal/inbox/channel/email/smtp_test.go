@@ -291,6 +291,32 @@ func TestResolveReplyTo_PlusAddressIsRoundTrippable(t *testing.T) {
 	}
 }
 
+func TestSMTPSubjectWhitespace(t *testing.T) {
+	for _, tt := range []struct {
+		name, subject, want string
+	}{
+		{"line breaks", "Hello, good morning!\n\nYes, it does. - #127", "Hello, good morning! Yes, it does. - #127"},
+		{"CRLF", "Hello\r\nthere", "Hello there"},
+		{"CR", "Hello\rthere", "Hello there"},
+		{"whitespace", " \tHello\t  there\n", "Hello there"},
+		{"Unicode", "日本語\nCafé\u2028🙂", "日本語 Café 🙂"},
+		{"single line", "Re: Support #127", "Re: Support #127"},
+		{"empty", "", ""},
+		{"blank", "\r\n\t ", ""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			message := captureSMTPMessage(t, func(e *Email) error {
+				return e.Send(models.OutboundMessage{
+					From: "support@example.com", To: []string{"customer@example.net"},
+					Subject: tt.subject, ContentType: "plain", Content: "Hello\n\nthere\n",
+				})
+			})
+			require.Equal(t, tt.want, message.GetHeader("Subject"))
+			require.Equal(t, "Hello\n\nthere\n", message.Text)
+		})
+	}
+}
+
 func TestAliasReplyRouting(t *testing.T) {
 	for _, tt := range []struct {
 		name        string

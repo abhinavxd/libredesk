@@ -238,6 +238,14 @@ func TestOutgoingTemplatePreservesReply(t *testing.T) {
 			}
 		})
 	}
+	if _, err := db.Exec(`UPDATE templates SET body = $1 WHERE id = $2`, valid.Body, saved.ID); err != nil {
+		t.Fatal(err)
+	}
+	const contactText = `<p>Hi {{range(99999999999)}}A{{end}} {{ .Show }}</p>`
+	got, err := m.RenderEmailWithTemplate(map[string]any{"Show": true}, contactText)
+	if err != nil || !strings.Contains(got, contactText) {
+		t.Fatalf("reply text was run as a template: %q, %v", got, err)
+	}
 }
 
 func TestRenderNotificationEmailUsesSystemLayout(t *testing.T) {

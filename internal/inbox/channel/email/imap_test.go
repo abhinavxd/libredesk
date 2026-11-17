@@ -2,6 +2,7 @@ package email
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -41,6 +42,11 @@ type fakeMessageStore struct {
 
 type fakeUserStore struct{}
 
+type failingFetchSession struct {
+	imapserver.Session
+	failEnvelope bool
+}
+
 func (f *fakeMessageStore) MessageExists(string) (bool, error) { return false, nil }
 
 func (f *fakeMessageStore) EnqueueIncoming(m models.IncomingMessage) error {
@@ -51,6 +57,13 @@ func (f *fakeMessageStore) EnqueueIncoming(m models.IncomingMessage) error {
 func (fakeUserStore) GetAgent(int, string) (umodels.User, error) { return umodels.User{}, nil }
 
 func (fakeUserStore) IsEmailBlocked(string) (bool, error) { return false, nil }
+
+func (s *failingFetchSession) Fetch(w *imapserver.FetchWriter, numSet imap.NumSet, options *imap.FetchOptions) error {
+	if options.Envelope == s.failEnvelope {
+		return &imap.Error{Type: imap.StatusResponseTypeNo, Text: "forced fetch failure"}
+	}
+	return s.Session.Fetch(w, numSet, options)
+}
 
 func TestAliasVerificationRetriesAfterFailure(t *testing.T) {
 	user := imapmemserver.NewUser("test", "" /* password */)
@@ -1368,6 +1381,54 @@ func TestSearchMessagesExcludesDeletedAndOldMessages(t *testing.T) {
 			results, err = e.searchMessages(client, since)
 			require.NoError(t, err)
 			require.Empty(t, results.AllSeqNums())
+		})
+	}
+}
+
+func TestFetchCompletionFailureIsReturned(t *testing.T) {
+	for _, envelope := range []bool{true, false} {
+		name := "body"
+		if envelope {
+			name = "headers"
+		}
+		t.Run(name, func(t *testing.T) {
+			user := imapmemserver.NewUser("test", "" /** password **/)
+			require.NoError(t, user.Create("INBOX", nil /** options **/))
+			server := imapserver.New(&imapserver.Options{
+				NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+					return &failingFetchSession{Session: imapmemserver.NewUserSession(user), failEnvelope: envelope}, &imapserver.GreetingData{PreAuth: true}, nil
+				},
+				Caps: imap.CapSet{imap.CapIMAP4rev1: {}},
+			})
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { server.Close() })
+			go server.Serve(listener)
+			client, err := imapclient.DialInsecure(listener.Addr().String(), nil /** options **/)
+			require.NoError(t, err)
+			t.Cleanup(func() { client.Close() })
+			raw := "From: customer@example.com\r\nTo: support@example.com\r\nMessage-ID: <fetch-test@example.com>\r\n\r\nHello"
+			appendCmd := client.Append("INBOX", int64(len(raw)), nil /** options **/)
+			_, err = io.WriteString(appendCmd, raw)
+			require.NoError(t, err)
+			require.NoError(t, appendCmd.Close())
+			_, err = appendCmd.Wait()
+			require.NoError(t, err)
+			_, err = client.Select("INBOX", nil /** options **/).Wait()
+			require.NoError(t, err)
+			results, err := client.Search(&imap.SearchCriteria{}, nil /** options **/).Wait()
+			require.NoError(t, err)
+			var logs bytes.Buffer
+			logger := logf.New(logf.Opts{Writer: &logs})
+			e := &Email{primary: "support@example.com", lo: &logger, messageStore: &fakeMessageStore{}, userStore: fakeUserStore{}}
+			err = e.fetchAndProcessMessages(t.Context(), client, results, 1 /** inboxID **/)
+			if envelope {
+				require.ErrorContains(t, err, "forced fetch failure")
+			} else {
+				require.NoError(t, err)
+				require.Contains(t, logs.String(), "forced fetch failure")
+				require.Contains(t, logs.String(), "level=error")
+			}
 		})
 	}
 }

@@ -36,8 +36,6 @@ func (p *inApp) Send(delivery Delivery) Result {
 	notification, err := p.store.Create(delivery.Recipient.UserID, n.Type, n.Title, n.Body,
 		n.ConversationID, n.MessageID, n.ActorID, n.Meta)
 	if err != nil {
-		p.lo.Error("error creating in-app notification", "recipient_id", delivery.Recipient.UserID,
-			"type", n.Type, "error", err)
 		return Result{}
 	}
 	notification.ConversationUUID = null.StringFrom(n.ConversationUUID)

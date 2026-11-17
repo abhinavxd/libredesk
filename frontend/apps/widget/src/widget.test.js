@@ -107,3 +107,115 @@ describe('campaign navigation', () => {
     } })
   })
 })
+
+describe('opening proactive messages', () => {
+  beforeEach(() => {
+    widget.renderPreviews.mockRestore()
+    widget.widgetSettings = { launcher: { position: 'right', spacing: { side: 20, bottom: 20 } } }
+    widget.createElements()
+    widget.setupEventListeners()
+    widget.widgetLoaded = true
+    widget.previewData = {
+      identity: 'visitor',
+      previews: [],
+      theme: { background: 'Canvas', foreground: 'CanvasText' },
+      labels: { open: 'Open', dismiss: 'Dismiss' }
+    }
+    widget.campaignData = {
+      id: 'pricing-message',
+      snapshot: { sender: 'Support', message: 'Need help choosing a plan?' }
+    }
+    widget.renderPreviews()
+  })
+
+  afterEach(() => {
+    window.removeEventListener('message', widget._boundHandleMessage)
+    widget.clearPreviews()
+    widget.iframe.remove()
+    widget.widgetButtonWrapper.remove()
+  })
+
+  test.each(['launcher', 'bubble'])('opens the visible message through the %s once', entry => {
+    const button = entry === 'launcher' ? widget.toggleButton : widget.previewHost.shadowRoot.querySelector('.open')
+
+    button.click()
+
+    expect(widget.postToIframe.mock.calls.map(([message]) => message)).toEqual([
+      { type: 'CAMPAIGN_EVENT', event: 'opened', id: 'pricing-message' },
+      { type: 'WIDGET_OPENED' }
+    ])
+    expect(widget.campaignData).toBeNull()
+    expect(widget.previewHost).toBeNull()
+    expect(widget.iframe.style.display).toBe('block')
+    expect(widget.toggleButton.getAttribute('aria-expanded')).toBe('true')
+
+    widget.showChat()
+    widget.hideChat()
+    widget.toggleButton.click()
+
+    expect(widget.postToIframe.mock.calls.filter(([message]) => message.event === 'opened')).toHaveLength(1)
+  })
+
+  test('keeps normal navigation after the message is dismissed', () => {
+    widget.previewHost.shadowRoot.querySelector('.close').click()
+    widget.postToIframe.mockClear()
+
+    widget.toggleButton.click()
+
+    expect(widget.postToIframe).toHaveBeenCalledExactlyOnceWith({ type: 'WIDGET_OPENED' })
+  })
+
+  test('keeps unread replies ahead of a proactive message', () => {
+    widget.updateUnreadCount(1 /* count */)
+
+    expect(widget.previewHost).toBeNull()
+
+    widget.toggleButton.click()
+
+    expect(widget.postToIframe).toHaveBeenCalledExactlyOnceWith({ type: 'WIDGET_OPENED' })
+  })
+
+  test.each(['before', 'after'])('opens a reply when its unread count arrives %s its preview', order => {
+    if (order === 'before') widget.updateUnreadCount(1 /* count */)
+    widget.handleMessage({
+      source: widget.iframe.contentWindow,
+      origin: window.location.origin,
+      data: {
+        type: 'REPLY_PREVIEWS',
+        ...widget.previewData,
+        previews: [{ key: 'support-reply', conversation: 'support-thread', name: 'Support', text: 'Your answer' }]
+      }
+    })
+    if (order === 'after') widget.updateUnreadCount(1 /* count */)
+    widget.postToIframe.mockClear()
+
+    widget.previewHost.shadowRoot.querySelector('.open').click()
+
+    expect(widget.postToIframe.mock.calls.map(([message]) => message)).toEqual([
+      { type: 'OPEN_CONVERSATION', uuid: 'support-thread' },
+      { type: 'WIDGET_OPENED' }
+    ])
+  })
+
+  test('restores the proactive bubble when the unread count clears', () => {
+    widget.updateUnreadCount(1 /* count */)
+    expect(widget.previewHost).toBeNull()
+
+    widget.updateUnreadCount(0 /* count */)
+
+    expect(widget.previewHost.shadowRoot.querySelector('.text').textContent).toBe('Need help choosing a plan?')
+
+    widget.previewHost.shadowRoot.querySelector('.open').click()
+
+    expect(widget.postToIframe).toHaveBeenCalledWith({ type: 'CAMPAIGN_EVENT', event: 'opened', id: 'pricing-message' })
+  })
+
+  test('does not open a proactive message without a visible bubble', () => {
+    widget.hideLauncher = true
+    widget.renderPreviews()
+
+    widget.showChat()
+
+    expect(widget.postToIframe).toHaveBeenCalledExactlyOnceWith({ type: 'WIDGET_OPENED' })
+  })
+})

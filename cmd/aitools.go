@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/abhinavxd/libredesk/internal/ai"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
@@ -135,7 +136,7 @@ func (t *listContactConversationsTool) Execute(ctx context.Context, args string)
 	if len(rows) == 0 {
 		return "No previous conversations found for this customer.", nil
 	}
-	return renderAIConversations(rows), nil
+	return renderAIConversations(rows, t.app.ai.WorkspaceLocation()), nil
 }
 
 func (t *searchConversationsByEmailTool) Name() string { return toolSearchConversationsByEmail }
@@ -162,7 +163,7 @@ func (t *searchConversationsByEmailTool) Execute(ctx context.Context, args strin
 	if len(rows) == 0 {
 		return "No conversations found for that email.", nil
 	}
-	return renderAIConversations(rows), nil
+	return renderAIConversations(rows, t.app.ai.WorkspaceLocation()), nil
 }
 
 func (t *fetchConversationTool) Name() string { return toolFetchConversation }
@@ -201,11 +202,10 @@ func (t *fetchConversationTool) Execute(ctx context.Context, args string) (strin
 
 	var b strings.Builder
 	b.WriteString(untrustedConversationData)
-	fmt.Fprintf(&b, "Subject: %s\n", strings.TrimSpace(conv.Subject.String))
-	fmt.Fprintf(&b, "Status: %s\n", strings.TrimSpace(conv.Status.String))
-	fmt.Fprintf(&b, "Contact: %s\n", strings.TrimSpace(conv.Contact.FullName()))
-	fmt.Fprintf(&b, "Created: %s\n\n", conv.CreatedAt.Format("2006-01-02 15:04"))
-	b.WriteString(capTranscript(conversationTranscript(t.app, conv.UUID)))
+	loc := t.app.ai.WorkspaceLocation()
+	b.WriteString(conversationHeader(&conv, loc))
+	b.WriteString("\n\n")
+	b.WriteString(capTranscript(conversationTranscript(t.app, conv.UUID, loc)))
 	return b.String(), nil
 }
 
@@ -266,7 +266,7 @@ func filterAccessibleAIConversations(app *App, user umodels.User, rows []cmodels
 	return out
 }
 
-func renderAIConversations(rows []cmodels.AIConversationSummary) string {
+func renderAIConversations(rows []cmodels.AIConversationSummary, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString(untrustedConversationData)
 	for i, r := range rows {
@@ -280,9 +280,9 @@ func renderAIConversations(rows []cmodels.AIConversationSummary) string {
 		if r.Status.Valid && r.Status.String != "" {
 			fmt.Fprintf(&b, " | Status: %s", r.Status.String)
 		}
-		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.Format("2006-01-02 15:04"))
+		fmt.Fprintf(&b, " | Created: %s", r.CreatedAt.In(loc).Format(time.RFC3339))
 		if r.LastMessageAt.Valid {
-			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.Format("2006-01-02 15:04"))
+			fmt.Fprintf(&b, " | Last message: %s", r.LastMessageAt.Time.In(loc).Format(time.RFC3339))
 		}
 		b.WriteString("\n")
 	}

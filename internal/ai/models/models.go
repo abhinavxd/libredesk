@@ -114,6 +114,7 @@ type Tool struct {
 	CreatedAt             time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time      `db:"updated_at" json:"updated_at"`
 	Name                  string         `db:"name" json:"name"`
+	DisplayName           string         `db:"display_name" json:"display_name"`
 	Description           string         `db:"description" json:"description"`
 	URL                   string         `db:"url" json:"url"`
 	Method                string         `db:"method" json:"method"`
@@ -128,9 +129,10 @@ type Tool struct {
 }
 
 type ToolApproval struct {
-	RunID     string `json:"run_id"`
-	ToolName  string `json:"tool_name"`
-	Arguments string `json:"arguments"`
+	RunID           string `json:"run_id"`
+	ToolName        string `json:"tool_name"`
+	ToolDisplayName string `json:"tool_display_name"`
+	Arguments       string `json:"arguments"`
 }
 
 type AgentRunResult struct {
@@ -194,9 +196,10 @@ type ChatImage struct {
 
 // CopilotMessage is one persisted turn of an agent's copilot chat on a conversation.
 type CopilotMessage struct {
-	Role     string        `db:"role" json:"role"`
-	Content  string        `db:"content" json:"content"`
-	Approval *ToolApproval `db:"-" json:"approval,omitempty"`
+	CreatedAt time.Time     `db:"created_at" json:"-"`
+	Role      string        `db:"role" json:"role"`
+	Content   string        `db:"content" json:"content"`
+	Approval  *ToolApproval `db:"-" json:"approval,omitempty"`
 }
 
 // MarshalJSON emits plain string content when there are no images, or the OpenAI multimodal

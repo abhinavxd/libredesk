@@ -35,8 +35,13 @@ RETURNING id, uuid;
 -- name: get-conversations
 -- $1 = viewing user ID for per-agent unread count
 -- $2 = include mentioned message UUID (true for mentioned inbox, false otherwise)
+WITH matching AS MATERIALIZED (
+    %[2]s
+), page AS MATERIALIZED (
+    %[1]s
+)
 SELECT
-    COUNT(*) OVER() as total,
+    (SELECT COUNT(*) FROM matching) as total,
     conversations.id,
     conversations.created_at,
     conversations.updated_at,
@@ -108,7 +113,8 @@ SELECT
         ORDER BY cm2.created_at DESC
         LIMIT 1
     ) ELSE NULL END as mentioned_message_uuid
-    FROM conversations
+    FROM page
+    JOIN conversations ON conversations.id = page.id
     JOIN users ON contact_id = users.id
     LEFT JOIN users assignee ON conversations.assigned_user_id = assignee.id
         AND assignee.deleted_at IS NULL AND (assignee.email != 'System' OR assignee.type = 'ai_assistant')
@@ -129,6 +135,15 @@ SELECT
         ORDER BY se.created_at DESC
         LIMIT 1
     ) nxt_resp_event ON true
+ORDER BY page.sort_value %[3]s NULLS LAST
+
+-- name: get-conversations-page-base
+SELECT conversations.id, %s AS sort_value
+FROM conversations
+-- Foreign keys guarantee these rows exist. LEFT JOIN lets unused filter joins be removed.
+LEFT JOIN users ON conversations.contact_id = users.id
+LEFT JOIN inboxes ON conversations.inbox_id = inboxes.id
+LEFT JOIN conversation_statuses ON conversations.status_id = conversation_statuses.id
 WHERE 1=1 %s
 
 -- name: get-conversation-list-item
@@ -407,6 +422,7 @@ SELECT
     COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
+    COALESCE(c.subject, '') AS subject,
     cs.name as status,
     COALESCE(c.last_interaction, '') as "last_message.content",
     c.last_interaction_at as "last_message.created_at",
@@ -503,6 +519,7 @@ SELECT
     COALESCE(c.contact_last_seen_at, c.created_at) AS contact_last_seen_at,
     c.created_at,
     c.uuid,
+    COALESCE(c.subject, '') AS subject,
     cs.name as status,
     COALESCE(c.last_interaction, '') as "last_message.content",
     c.last_interaction_at as "last_message.created_at",
@@ -552,12 +569,15 @@ WHERE uuid = $1;
 
 -- name: claim-unassigned-conversation
 -- Assigns only if the conversation is still unassigned in the team and the user is still an enabled, non-away agent of that team.
+-- Offline agents are also rejected when the team has skip_offline_agents enabled.
 WITH assignee AS (
     SELECT u.id
     FROM users u
     JOIN team_members tm ON tm.user_id = u.id AND tm.team_id = $3
+    JOIN teams t ON t.id = tm.team_id
     WHERE u.id = $2 AND u.deleted_at IS NULL AND u.type = 'agent' AND u.enabled = true
     AND u.availability_status NOT IN ('away_manual', 'away_and_reassigning')
+    AND NOT (t.skip_offline_agents AND u.availability_status = 'offline')
 ),
 claimed AS (
     UPDATE conversations
@@ -703,7 +723,8 @@ SELECT
     inb.name as inbox_name
 FROM conversations c
     JOIN inboxes inb ON c.inbox_id = inb.id 
-WHERE assigned_user_id IS NULL AND assigned_team_id IS NOT NULL
+WHERE c.assigned_user_id IS NULL
+  AND c.assigned_team_id IN (SELECT id FROM teams WHERE conversation_assignment_type = 'Round robin')
 ORDER BY c.created_at ASC;
 
 -- name: add-conversation-tags
@@ -753,11 +774,16 @@ FROM conversation_messages m
 JOIN conversations c ON m.conversation_id = c.id
 WHERE m.uuid = $1;
 
--- name: unassign-open-conversations
+-- name: get-open-conversation-uuids-by-assignee
+SELECT uuid FROM conversations
+WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
+
+-- name: unassign-open-conversation
+-- Clears the user assignee only while the conversation is still assigned to that user and not resolved.
 UPDATE conversations
 SET assigned_user_id = NULL,
     updated_at = NOW()
-WHERE assigned_user_id = $1 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
+WHERE uuid = $1 AND assigned_user_id = $2 AND status_id IN (SELECT id FROM conversation_statuses WHERE category != 'resolved');
 
 -- name: update-conversation-custom-attributes
 UPDATE conversations
@@ -792,7 +818,7 @@ SET
 WHERE uuid = $1;
 
 -- name: re-open-conversation
--- Open conversation if it is not already open and unset the assigned user if they are away and reassigning.
+-- Open conversation if it is not already open and unset the assigned user if they are away and reassigning, disabled or deleted.
 UPDATE conversations
 SET 
   status_id = (SELECT id FROM conversation_statuses WHERE name = 'Open'),
@@ -802,7 +828,7 @@ SET
     WHEN EXISTS (
       SELECT 1 FROM users 
       WHERE users.id = conversations.assigned_user_id 
-        AND users.availability_status = 'away_and_reassigning'
+        AND (users.availability_status = 'away_and_reassigning' OR users.enabled = false OR users.deleted_at IS NOT NULL)
     ) THEN NULL
     ELSE assigned_user_id
   END
@@ -916,6 +942,13 @@ ORDER BY (m.type = 'outgoing') DESC, m.id DESC
 LIMIT 1;
 
 -- name: get-outgoing-pending-messages
+WITH pending AS MATERIALIZED (
+    SELECT DISTINCT ON (conversation_id) id
+    FROM conversation_messages
+    WHERE status = 'pending' AND type = 'outgoing' AND private = false
+      AND NOT (conversation_id = ANY($1::INT[]))
+    ORDER BY conversation_id, id
+)
 SELECT
     m.id,
     m.created_at,
@@ -945,19 +978,9 @@ SELECT
     c.contact_id as message_receiver_id,
     c.subject,
     c.reference_number
-FROM conversation_messages m
+FROM pending
+JOIN conversation_messages m ON m.id = pending.id
 INNER JOIN conversations c ON c.id = m.conversation_id
-WHERE m.status = 'pending' AND m.type = 'outgoing' AND m.private = false
-AND NOT (m.conversation_id = ANY($1::INT[]))
-AND NOT EXISTS (
-    SELECT 1
-    FROM conversation_messages earlier
-    WHERE earlier.conversation_id = m.conversation_id
-      AND earlier.status = 'pending'
-      AND earlier.type = 'outgoing'
-      AND earlier.private = false
-      AND earlier.id < m.id
-)
 ORDER BY m.id
 
 -- name: get-csat-messages
@@ -1062,6 +1085,7 @@ WHERE m.conversation_id = (
 AND ($2::boolean IS NULL OR m.private = $2)
 AND ($3::text[] IS NULL OR m.type::text = ANY($3))
 AND (m.meta IS NULL OR NOT COALESCE((m.meta->>'continuity_email')::boolean, false))
+AND (NOT $4::boolean OR NOT COALESCE((m.meta->>'is_csat')::boolean, false))
 ORDER BY m.created_at DESC, m.id DESC %s
 
 -- name: insert-message

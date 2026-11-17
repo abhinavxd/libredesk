@@ -4,11 +4,15 @@
 {{ if .Data.Query }}
 <h1 class="hc-page-title">{{ $.L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
 {{ if .Data.Results }}
+<p class="hc-search-count">{{ .Data.ResultCount }}</p>
 <ul class="hc-results">
     {{ range .Data.Results }}
     <li>
-        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ .Title }}</a>
-        {{ if .Content }}<p class="hc-snippet">{{ .Content }}</p>{{ end }}
+        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">
+            <span data-hc-search-text>{{ .Title }}</span>
+            {{ if .CollectionName }}<span class="hc-typeahead-collection">{{ .CollectionName }}</span>{{ end }}
+            {{ if .Content }}<p class="hc-snippet" data-hc-search-text>{{ .Content }}</p>{{ end }}
+        </a>
     </li>
     {{ end }}
 </ul>

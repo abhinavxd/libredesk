@@ -9,7 +9,7 @@ const canHover = plugin(({ addVariant }) => addVariant("can-hover", "@media (hov
 module.exports = {
   mode: 'jit',
   darkMode: "class",
-  safelist: ["dark"],
+  safelist: ["dark", "animate-fade-in"],
   prefix: "",
 
   content: [
@@ -164,6 +164,16 @@ module.exports = {
             transform: 'translateY(0)'
           }
         },
+        'swing-in': {
+          from: {
+            opacity: '0.4',
+            transform: 'perspective(1000px) rotateX(-15deg)'
+          },
+          to: {
+            opacity: '1',
+            transform: 'perspective(1000px) rotateX(0deg)'
+          }
+        },
         pop: {
           '0%': {
             opacity: '0',
@@ -217,6 +227,7 @@ module.exports = {
         'collapsible-down': 'collapsible-down 0.2s ease-in-out',
         'collapsible-up': 'collapsible-up 0.2s ease-in-out',
         'fade-in-down': 'fade-in-down 0.3s ease-out',
+        'swing-in': 'swing-in 150ms cubic-bezier(0.23, 1, 0.32, 1)',
         'fade-in': 'fade-in 0.3s ease-out',
         'fade-out': 'fade-out 0.3s ease-out',
         'slide-in': 'slide-in 200ms cubic-bezier(0.23, 1, 0.32, 1)',

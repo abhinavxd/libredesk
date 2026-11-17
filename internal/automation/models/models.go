@@ -114,6 +114,7 @@ type RuleRecord struct {
 }
 
 type Rule struct {
+	ID            int          `json:"-"`
 	Type          string       `json:"type"`
 	ExecutionMode string       `json:"execution_mode"`
 	Events        []string     `json:"event"`

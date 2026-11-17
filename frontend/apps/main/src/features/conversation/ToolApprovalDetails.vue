@@ -3,10 +3,7 @@
     <p class="text-xs text-muted-foreground">
       <i18n-t keypath="ai.toolApprovalDescription" scope="global">
         <template #tool
-          ><code
-            class="inline-flex items-center rounded-md border bg-muted px-1.5 py-0.5 font-mono text-xs font-medium text-foreground"
-            >{{ approval.tool_name }}</code
-          ></template
+          ><span class="font-medium text-foreground">{{ approval.tool_display_name }}</span></template
         >
       </i18n-t>
     </p>

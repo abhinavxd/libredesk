@@ -716,6 +716,10 @@
             :open="openSection === 'code'"
             @toggle="toggleSection('code')"
           >
+            <Alert>
+              <Info class="h-4 w-4" />
+              <AlertDescription>{{ t('helpCenter.customCodeHint') }}</AlertDescription>
+            </Alert>
             <FormField v-slot="{ componentField }" name="custom_css">
               <FormItem>
                 <FormLabel>{{ t('helpCenter.customCSS') }}</FormLabel>
@@ -787,7 +791,8 @@ import {
   FormMessage,
   FormDescription
 } from '@shared-ui/components/ui/form/index.js'
-import { X, Sun, Moon } from 'lucide-vue-next'
+import { X, Sun, Moon, Info } from 'lucide-vue-next'
+import { Alert, AlertDescription } from '@shared-ui/components/ui/alert/index.js'
 import { RadioGroup, RadioGroupItem } from '@shared-ui/components/ui/radio-group'
 import { Tabs, TabsList, TabsTrigger } from '@shared-ui/components/ui/tabs'
 import CollapsibleSection from './CollapsibleSection.vue'

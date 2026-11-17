@@ -152,6 +152,7 @@ CREATE TABLE teams (
 	emoji TEXT NULL,
 	conversation_assignment_type conversation_assignment_type NOT NULL,
 	max_auto_assigned_conversations INT DEFAULT 0 NOT NULL,
+	skip_offline_agents BOOLEAN DEFAULT false NOT NULL,
 
 	-- Set to NULL when business hours or SLA policy is deleted.
 	business_hours_id INT REFERENCES business_hours(id) ON DELETE SET NULL ON UPDATE CASCADE NULL,
@@ -212,6 +213,7 @@ CREATE TABLE users (
 );
 CREATE INDEX index_tgrm_users_on_email ON users USING GIN (email gin_trgm_ops);
 CREATE INDEX index_tgrm_users_on_phone_number ON users USING GIN (phone_number gin_trgm_ops);
+CREATE INDEX index_tgrm_users_on_full_name ON users USING GIN ((first_name || ' ' || COALESCE(last_name, '')) gin_trgm_ops);
 CREATE INDEX index_users_on_api_key ON users(api_key);
 CREATE INDEX index_users_on_availability_status_when_agent ON users(availability_status) WHERE type = 'agent' AND deleted_at IS NULL;
 CREATE UNIQUE INDEX index_unique_users_on_email_when_type_is_agent
@@ -314,6 +316,7 @@ CREATE INDEX index_conversations_on_priority_id ON conversations (priority_id);
 CREATE INDEX index_conversations_on_created_at ON conversations (created_at);
 CREATE INDEX index_conversations_on_resolved_at ON conversations (resolved_at);
 CREATE INDEX index_conversations_on_last_message_at ON conversations (last_message_at);
+CREATE INDEX index_conversations_on_last_message_at_desc ON conversations (last_message_at DESC NULLS LAST);
 CREATE INDEX index_conversations_on_last_interaction_at ON conversations (last_interaction_at);
 CREATE INDEX index_conversations_on_next_sla_deadline_at ON conversations (next_sla_deadline_at);
 CREATE INDEX index_conversations_on_waiting_since ON conversations (waiting_since);
@@ -344,6 +347,7 @@ CREATE INDEX index_conversation_messages_on_created_at ON conversation_messages 
 CREATE INDEX index_conversation_messages_on_source_id ON conversation_messages (source_id);
 CREATE INDEX index_conversation_messages_on_status ON conversation_messages (status);
 CREATE INDEX index_conversation_messages_on_conversation_id_and_created_at ON conversation_messages (conversation_id, created_at);
+CREATE INDEX index_conversation_messages_on_sender_id_and_created_at ON conversation_messages (sender_id, created_at);
 
 DROP TABLE IF EXISTS automation_rules CASCADE;
 CREATE TABLE automation_rules (
@@ -470,6 +474,7 @@ CREATE TABLE oidc (
 	client_id TEXT NOT NULL,
 	client_secret TEXT NOT NULL,
 	enabled bool DEFAULT TRUE NOT NULL,
+	verify_email BOOLEAN DEFAULT TRUE NOT NULL,
 	provider VARCHAR NULL,
 	logo_url TEXT NOT NULL DEFAULT '',
 	CONSTRAINT constraint_oidc_on_name CHECK (length("name") <= 140)
@@ -563,6 +568,7 @@ CREATE TABLE conversation_tags (
 	conversation_id BIGINT REFERENCES conversations(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX index_conversation_tags_on_conversation_id_and_tag_id ON conversation_tags (conversation_id, tag_id);
+CREATE INDEX index_conversation_tags_on_tag_id_and_conversation_id ON conversation_tags (tag_id, conversation_id);
 
 DROP TABLE IF EXISTS csat_responses CASCADE;
 CREATE TABLE csat_responses (
@@ -823,6 +829,7 @@ CREATE TABLE ai_tools (
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 	name TEXT NOT NULL UNIQUE,
+	display_name TEXT NOT NULL DEFAULT '',
 	description TEXT NOT NULL DEFAULT '',
 	url TEXT NOT NULL,
 	method TEXT NOT NULL DEFAULT 'POST',
@@ -833,7 +840,8 @@ CREATE TABLE ai_tools (
 	copilot_enabled BOOLEAN NOT NULL DEFAULT false,
 	generate_reply_enabled BOOLEAN NOT NULL DEFAULT false,
 	requires_agent_approval BOOLEAN NOT NULL DEFAULT true,
-	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64)
+	CONSTRAINT constraint_ai_tools_on_name CHECK (name ~ '^[a-zA-Z0-9_-]+$' AND length(name) <= 64),
+	CONSTRAINT constraint_ai_tools_on_display_name CHECK (length(display_name) <= 140)
 );
 
 DROP TABLE IF EXISTS ai_assistants CASCADE;
@@ -1119,6 +1127,7 @@ VALUES
 	('app.timezone', '"Asia/Kolkata"'::jsonb),
 	('app.business_hours_id', '""'::jsonb),
 	('app.show_conversation_subject', 'true'::jsonb),
+	('app.block_assign_away_reassigning', 'false'::jsonb),
 	('ai_agent.faq_learning_enabled', 'false'::jsonb),
     ('notification.email.username', '"admin@yourcompany.com"'::jsonb),
     ('notification.email.host', '""'::jsonb),

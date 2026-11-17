@@ -107,12 +107,16 @@ func TestQueueWhatsAppReplyVariables(t *testing.T) {
 		{"rendered text at limit", strings.Repeat("x", whatsAppMaxTextLength-len("Customer")) + "{{ .Contact.FirstName }}", map[string]any{}, strings.Repeat("x", whatsAppMaxTextLength-len("Customer")) + "Customer"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			content := tc.content
+			if extractInt(tc.meta, "whatsapp_template_id") <= 0 {
+				content = m.RenderStaffTemplate(conv.UUID, senderID, content)
+			}
 			message, err := m.QueueReply(nil, /** media **/
-				inboxID, senderID, contactID, conv.UUID, tc.content,
+				inboxID, senderID, contactID, conv.UUID, content,
 				nil, /** to **/
 				nil, /** cc **/
 				nil, /** bcc **/
-				"", /** sendFrom **/
+				"",  /** sendFrom **/
 				tc.meta)
 			if err != nil {
 				t.Fatal(err)
@@ -134,17 +138,35 @@ func TestQueueWhatsAppReplyVariables(t *testing.T) {
 		})
 	}
 
+	t.Run("literal content is never expanded by the queue", func(t *testing.T) {
+		const content = "{{ .Contact.FirstName }} {{ range 3 }}A{{ end }}"
+		message, err := m.QueueReply(nil, /** media **/
+			inboxID, senderID, contactID, conv.UUID, content,
+			nil, /** to **/
+			nil, /** cc **/
+			nil, /** bcc **/
+			"",  /** sendFrom **/
+			map[string]any{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if message.Content != content || message.TextContent != content {
+			t.Fatalf("literal message changed: %+v", message)
+		}
+	})
+
 	t.Run("expanded content exceeds limit", func(t *testing.T) {
 		if _, err := db.Exec(`UPDATE users SET first_name = $1 WHERE id = $2`, strings.Repeat("a", 64), contactID); err != nil {
 			t.Fatal(err)
 		}
 		content := strings.Repeat("x", whatsAppMaxTextLength-32) + "{{ .Contact.FirstName }}"
+		content = m.RenderStaffTemplate(conv.UUID, senderID, content)
 		if _, err := m.QueueReply(nil, /** media **/
 			inboxID, senderID, contactID, conv.UUID, content,
 			nil, /** to **/
 			nil, /** cc **/
 			nil, /** bcc **/
-			"", /** sendFrom **/
+			"",  /** sendFrom **/
 			map[string]any{}); err == nil || !strings.Contains(err.Error(), "4096") {
 			t.Fatalf("expected rendered content to exceed the limit, got %v", err)
 		}

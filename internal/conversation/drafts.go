@@ -55,7 +55,6 @@ func (m *Manager) DeleteStaleDrafts(ctx context.Context, retentionPeriod time.Du
 	cutoff := time.Now().Add(-retentionPeriod)
 	res, err := m.q.DeleteStaleDrafts.ExecContext(ctx, cutoff)
 	if err != nil {
-		m.lo.Error("error deleting stale drafts", "error", err)
 		return err
 	}
 

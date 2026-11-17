@@ -61,14 +61,14 @@ export function createRemoteLookup ({ fetchRows, onError }) {
     return firstPage
   }
 
-  const search = async (query) => {
+  const search = async (query, params) => {
     const term = (query || '').trim()
     if (!term) {
       await fetchFirstPage()
       return firstPageIDs.value.map((id) => byID.value[id]).filter(Boolean)
     }
     try {
-      return await load({ q: term, page: 1 })
+      return await load({ ...params, q: term, page: 1 })
     } catch (error) {
       onError(error)
       return []

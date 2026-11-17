@@ -5,7 +5,7 @@ import dropdown from './toolDropdown.vue'
 
 export const createToolColumns = (t, { onEdit } = {}) => [
   {
-    accessorKey: 'name',
+    accessorKey: 'display_name',
     header: () => h('div', null, t('globals.terms.name')),
     cell: ({ row }) =>
       h(
@@ -18,10 +18,15 @@ export const createToolColumns = (t, { onEdit } = {}) => [
                 class: 'text-foreground font-medium hover:underline cursor-pointer',
                 onClick: () => onEdit(row.original)
               },
-              row.getValue('name')
+              row.getValue('display_name')
             )
-          : row.getValue('name')
+          : row.getValue('display_name')
       )
+  },
+  {
+    accessorKey: 'name',
+    header: () => h('div', null, t('globals.terms.key')),
+    cell: ({ row }) => h('div', null, row.getValue('name'))
   },
   {
     accessorKey: 'url',

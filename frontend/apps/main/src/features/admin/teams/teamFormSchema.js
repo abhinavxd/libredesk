@@ -12,6 +12,7 @@ export const createTeamFormSchema = (t) => z.object({
     .trim().min(1, { message: t('globals.messages.required') }),
   conversation_assignment_type: z.string({ required_error: t('globals.messages.required') }),
   max_auto_assigned_conversations: z.coerce.number().default(0),
+  skip_offline_agents: z.boolean().default(false),
   timezone: z.string({ required_error: t('globals.messages.required') }),
   business_hours_id: z.number().optional().nullable(),
   sla_policy_id: z.number().optional().nullable(),

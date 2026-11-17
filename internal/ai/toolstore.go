@@ -4,7 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	neturl "net/url"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/abhinavxd/libredesk/internal/ai/models"
 	"github.com/abhinavxd/libredesk/internal/crypto"
@@ -81,7 +83,7 @@ func (m *Manager) CreateTool(t models.Tool) (models.Tool, error) {
 	}
 	params := toolParametersOrEmpty(t)
 	var created models.Tool
-	if err := m.q.InsertTool.Get(&created, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
+	if err := m.q.InsertTool.Get(&created, t.Name, t.DisplayName, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		m.lo.Error("error creating tool", "error", err)
 		return created, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
@@ -107,7 +109,7 @@ func (m *Manager) UpdateTool(id int, t models.Tool) (models.Tool, error) {
 	}
 	params := toolParametersOrEmpty(t)
 	var updated models.Tool
-	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
+	if err := m.q.UpdateTool.Get(&updated, id, t.Name, t.DisplayName, t.Description, t.URL, t.Method, auth, params, t.Enabled, t.RequiresVerification, t.CopilotEnabled, t.GenerateReplyEnabled, t.RequiresAgentApproval); err != nil {
 		if err == sql.ErrNoRows {
 			return updated, envelope.NewError(envelope.NotFoundError, m.i18n.T("globals.messages.notFound"), nil)
 		}
@@ -172,13 +174,19 @@ func (m *Manager) prepareToolAuth(raw, existing types.JSONText) (types.JSONText,
 	return types.JSONText(b), nil
 }
 
-// validateToolInput runs the shared create/update checks: name format, reserved name, allowed HTTP method, valid definition.
+// validateToolInput runs the shared create/update checks: name format, reserved name, display name (blank becomes the name), allowed HTTP method, valid definition.
 func (m *Manager) validateToolInput(t *models.Tool) error {
 	if !toolNameFormat.MatchString(t.Name) || len(t.Name) > maxToolNameLen {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.nameHint"), nil)
 	}
 	if reservedToolNames[t.Name] {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.ai.tool.reservedName"), nil)
+	}
+	if t.DisplayName = strings.TrimSpace(t.DisplayName); t.DisplayName == "" {
+		t.DisplayName = t.Name
+	}
+	if utf8.RuneCountInString(t.DisplayName) > maxToolDisplayNameLen {
+		return envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.fieldTooLong", "field", "{globals.terms.name}", "max", strconv.Itoa(maxToolDisplayNameLen)), nil)
 	}
 	if t.Method = strings.ToUpper(t.Method); !allowedToolMethods[t.Method] {
 		return envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.somethingWentWrong"), nil)

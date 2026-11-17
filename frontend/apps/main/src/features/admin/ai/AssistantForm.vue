@@ -220,7 +220,7 @@
             @update:checked="(checked) => toggleTool(tool.id, checked)"
           />
           <label :for="`tool-${tool.id}`" class="text-sm font-medium leading-none cursor-pointer">
-            {{ tool.name }}
+            {{ tool.display_name }}
           </label>
         </div>
         <p v-if="!tools.length" class="ui-description">

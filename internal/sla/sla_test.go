@@ -55,7 +55,9 @@ type appliedRow struct {
 
 func (stubTeamStore) Get(id int) (tmodels.Team, error) { return tmodels.Team{}, nil }
 
-func (stubUserStore) GetAgent(int, string) (umodels.User, error) { return umodels.User{}, nil }
+func (stubUserStore) GetAgent(int, string) (umodels.User, error) {
+	return umodels.User{Enabled: true}, nil
+}
 
 func (stubAppSettingsStore) GetByPrefix(prefix string) (types.JSONText, error) {
 	return types.JSONText(`{"app.business_hours_id":"1","app.timezone":"UTC"}`), nil

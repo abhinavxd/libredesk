@@ -18,6 +18,27 @@ func newTestManager(t *testing.T) *Manager {
 	return mgr
 }
 
+func TestSearchLiteralPunctuation(t *testing.T) {
+	names := []string{"support_ops", "supportXops", "rate%plan", "rateXplan", `path\team`, "pathteam", `trailing\`}
+	mgr := newTestManager(t)
+	for _, name := range names {
+		if _, err := mgr.Create(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, term := range []string{"support_ops", "rate%plan", `path\team`, `trailing\`} {
+		t.Run(term, func(t *testing.T) {
+			results, err := mgr.GetAll(term, 1, 30)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(results) != 1 || results[0].Name != term {
+				t.Fatalf("search %q returned %+v, want only the literal name", term, results)
+			}
+		})
+	}
+}
+
 func TestGetAllPagination(t *testing.T) {
 	mgr := newTestManager(t)
 	for _, name := range []string{"alpha", "bravo", "charlie", "delta", "echo"} {

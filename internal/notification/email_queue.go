@@ -137,10 +137,11 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 		Content:         e.Content,
 		Provider:        ProviderEmail,
 	}); err != nil {
-		q.lo.Error("error delivering notification email", "user_id", e.UserID, "type", e.Type, "error", err)
 		if e.Attempts+1 >= emailQueueMaxAttempts {
-			q.delete(e)
+			discarded := q.delete(e)
+			q.lo.Error("notification email retry limit reached", "queue_id", e.ID, "user_id", e.UserID, "type", e.Type, "attempt", e.Attempts+1, "discarded", discarded, "error", err)
 		} else {
+			q.lo.Warn("notification email delivery failed, retrying", "queue_id", e.ID, "user_id", e.UserID, "type", e.Type, "attempt", e.Attempts+1, "error", err)
 			q.retry(e)
 		}
 		return false
@@ -152,12 +153,12 @@ func (q *EmailQueue) deliver(e queuedEmail) bool {
 func (q *EmailQueue) delete(e queuedEmail) bool {
 	result, err := q.q.Delete.Exec(e.ID, e.ClaimedAt)
 	if err != nil {
-		q.lo.Error("error deleting delivered notification email", "user_id", e.UserID, "type", e.Type, "error", err)
+		q.lo.Error("error deleting notification email", "queue_id", e.ID, "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
 	}
 	deleted, err := result.RowsAffected()
 	if err != nil {
-		q.lo.Error("error counting deleted notification emails", "user_id", e.UserID, "type", e.Type, "error", err)
+		q.lo.Error("error counting deleted notification emails", "queue_id", e.ID, "user_id", e.UserID, "type", e.Type, "error", err)
 		return false
 	}
 	return deleted > 0
@@ -165,6 +166,6 @@ func (q *EmailQueue) delete(e queuedEmail) bool {
 
 func (q *EmailQueue) retry(e queuedEmail) {
 	if _, err := q.q.Retry.Exec(e.ID, time.Now().Add(emailQueueRetryDelay), e.ClaimedAt); err != nil {
-		q.lo.Error("error scheduling notification email retry", "user_id", e.UserID, "type", e.Type, "error", err)
+		q.lo.Error("error scheduling notification email retry", "queue_id", e.ID, "user_id", e.UserID, "type", e.Type, "error", err)
 	}
 }

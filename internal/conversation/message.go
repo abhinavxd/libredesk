@@ -141,7 +141,7 @@ func (m *Manager) IncomingMessageWorker(ctx context.Context) {
 				return
 			}
 			if _, err := m.ProcessIncomingMessage(msg); err != nil {
-				m.lo.Error("error processing incoming msg", "error", err)
+				m.lo.Error("error processing incoming message", "inbox_id", msg.InboxID, "channel", msg.Channel, "source_id", msg.SourceID.String, "error", err)
 			}
 		}
 	}
@@ -162,6 +162,12 @@ func (m *Manager) MessageSenderWorker(ctx context.Context) {
 	}
 }
 
+// GetAIConversationMessages excludes private messages, surveys and continuity emails before counting and pagination.
+func (m *Manager) GetAIConversationMessages(conversationUUID string, page, pageSize int) ([]models.Message, int, error) {
+	private := false
+	return m.getConversationMessages(conversationUUID, page, pageSize, &private, []string{models.MessageIncoming, models.MessageOutgoing}, true /** excludeCSAT **/)
+}
+
 // sendOutgoingMessage sends an outgoing message.
 func (m *Manager) sendOutgoingMessage(message models.Message) {
 	defer m.outgoingProcessingMessages.Delete(message.ID)
@@ -169,7 +175,7 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 	// Helper function to handle errors
 	handleError := func(err error, errorMsg string) bool {
 		if err != nil {
-			m.lo.Error(errorMsg, "error", err, "message_id", message.ID)
+			m.lo.Error(errorMsg, "error", err, "message_id", message.ID, "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID)
 			m.UpdateMessageStatus(message.UUID, models.MessageStatusFailed)
 			return true
 		}
@@ -235,6 +241,11 @@ func (m *Manager) sendOutgoingMessage(message models.Message) {
 		return
 	}
 
+	if errors.Is(err, livechat.ErrClientNotConnected) {
+		m.lo.Info("outgoing message stored for offline widget", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID)
+	} else {
+		m.lo.Info("outgoing message accepted by channel", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID, "channel", inb.Channel())
+	}
 	// Update status as sent.
 	m.UpdateMessageStatus(message.UUID, models.MessageStatusSent)
 
@@ -343,14 +354,9 @@ func (m *Manager) emailTemplateContent(message *models.Message, data map[string]
 	}
 	data["IsContinuityEmail"] = isContinuity
 	if isContinuity {
-		data["ContinuityContent"] = content
-		return "{{ .ContinuityContent }}"
+		return content
 	}
-	if references := m.emailArticleReferences(message); references != "" {
-		data["ArticleReferences"] = references
-		return content + "{{ .ArticleReferences }}"
-	}
-	return content
+	return content + m.emailArticleReferences(message)
 }
 
 // previousMessagesData returns the conversation's earlier messages exchanged with the contact, newest first, with incoming reply chains removed.
@@ -383,39 +389,7 @@ func (m *Manager) previousMessagesData(conversationID, messageID int) []previous
 
 // GetConversationMessages retrieves messages for a specific conversation.
 func (m *Manager) GetConversationMessages(conversationUUID string, page, pageSize int, private *bool, msgTypes []string) ([]models.Message, int, error) {
-	var (
-		messages = make([]models.Message, 0)
-		qArgs    []any
-	)
-
-	// Convert msgTypes slice to pq.StringArray for PostgreSQL
-	var typesArg any
-	if len(msgTypes) > 0 {
-		typesArg = pq.StringArray(msgTypes)
-	}
-
-	qArgs = append(qArgs, conversationUUID, private, typesArg)
-	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
-	if err != nil {
-		m.lo.Error("error generating messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
-		ReadOnly: true,
-	})
-	defer tx.Rollback()
-	if err != nil {
-		m.lo.Error("error preparing get messages query", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	if err := tx.Select(&messages, query, qArgs...); err != nil {
-		m.lo.Error("error fetching conversations", "error", err)
-		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-
-	return messages, pageSize, nil
+	return m.getConversationMessages(conversationUUID, page, pageSize, private, msgTypes, false /** excludeCSAT **/)
 }
 
 // GetAllConversationMessages returns the newest messages in a conversation in chronological order, capped at limit; a non-positive limit returns them all.
@@ -446,7 +420,9 @@ func (m *Manager) GetAllConversationMessages(conversationUUID string, private *b
 func (m *Manager) GetMessage(uuid string) (models.Message, error) {
 	var message models.Message
 	if err := m.q.GetMessage.Get(&message, uuid); err != nil {
-		m.lo.Error("error fetching message", "uuid", uuid, "error", err)
+		if !errors.Is(err, sql.ErrNoRows) {
+			m.lo.Error("error fetching message", "uuid", uuid, "error", err)
+		}
 		return message, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -588,13 +564,17 @@ func (m *Manager) ClearHandoffFormPending(messageUUID string) (bool, error) {
 	return n > 0, err
 }
 
+// RenderStaffTemplate fills template variables in text written by staff. Returns content unchanged on any error.
+func (m *Manager) RenderStaffTemplate(conversationUUID string, senderID int, content string) string {
+	data, err := m.BuildTemplateData(conversationUUID, senderID)
+	if err != nil {
+		return content
+	}
+	return m.template.RenderString(data, content)
+}
+
 // SendPrivateNote inserts a private message in a conversation.
 func (m *Manager) SendPrivateNote(media []mmodels.Media, senderID int, conversationUUID, content string, mentions []models.MentionInput) (models.Message, error) {
-	// Best-effort render template variables before saving.
-	if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-		content = m.template.RenderString(data, content)
-	}
-
 	message := models.Message{
 		ConversationUUID: conversationUUID,
 		SenderID:         senderID,
@@ -668,11 +648,6 @@ func (m *Manager) QueueReply(media []mmodels.Media, inboxID, senderID, contactID
 	}
 
 	isWhatsAppTemplate := inboxRecord.Channel == inbox.ChannelWhatsApp && extractInt(metaMap, "whatsapp_template_id") > 0
-	if !isWhatsAppTemplate {
-		if data, err := m.BuildTemplateData(conversationUUID, senderID); err == nil {
-			content = m.template.RenderString(data, content)
-		}
-	}
 
 	var (
 		sourceID    string
@@ -808,7 +783,7 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 
 	if err := tx.Stmtx(m.q.InsertMessage).Get(message, message.Type, message.Status, message.ConversationID, message.ConversationUUID, message.Content, message.TextContent, message.SenderID, message.SenderType,
 		message.Private, message.ContentType, message.SourceID, message.Meta); err != nil {
-		m.lo.Error("error inserting message in db", "error", err)
+		m.lo.Error("error inserting message in db", "inbox_id", message.InboxID, "conversation_uuid", message.ConversationUUID, "source_id", message.SourceID.String, "error", err)
 		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 
@@ -820,6 +795,9 @@ func (m *Manager) InsertMessageTx(tx *sqlx.Tx, message *models.Message) ([]strin
 
 // AfterMessageInsert runs the post-commit side effects of a message insert: participant, last message and broadcast.
 func (m *Manager) AfterMessageInsert(message *models.Message, inlineUUIDs []string) {
+	if message.Type == models.MessageIncoming {
+		m.lo.Info("incoming message stored", "message_uuid", message.UUID, "conversation_uuid", message.ConversationUUID, "inbox_id", message.InboxID, "source_id", message.SourceID.String)
+	}
 	m.addConversationParticipant(message.SenderID, message.ConversationUUID)
 
 	// Skip updating last_message and broadcasting for continuity emails.
@@ -1060,7 +1038,7 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Upload message attachments. On failure, delete the conversation if it was just created for this message.
 	if upErr := m.uploadMessageAttachments(&msg); upErr != nil {
-		m.lo.Error("error uploading message attachments", "message_source_id", in.SourceID.String, "error", upErr)
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			m.lo.Info("deleting conversation as message attachment upload failed", "conversation_uuid", conversationUUID, "message_source_id", in.SourceID.String)
 			if err := m.DeleteConversation(conversationUUID); err != nil {
@@ -1072,7 +1050,8 @@ func (m *Manager) ProcessIncomingMessage(in models.IncomingMessage) (models.Mess
 
 	// Insert message. On failure, delete the conversation if it was just created for this message.
 	if err = m.InsertMessage(&msg); err != nil {
-		m.lo.Error("error inserting incoming message", "message_source_id", in.SourceID.String, "conversation_uuid", conversationUUID, "is_new", isNewConversation, "error", err)
+		// The source keeps redelivering a message that never got saved, so its files must not stay behind.
+		m.deleteUploadedMedia(msg.Media)
 		if isNewConversation && conversationUUID != "" {
 			if delErr := m.DeleteConversation(conversationUUID); delErr != nil {
 				return models.Message{}, fmt.Errorf("deleting conversation after message insert failure: %w", delErr)
@@ -1588,6 +1567,20 @@ func (m *Manager) getOutgoingProcessingConversationIDs() []int {
 	return out
 }
 
+// deleteUploadedMedia removes attachment files and their thumbnails uploaded for a message that was not saved.
+func (m *Manager) deleteUploadedMedia(media []mmodels.Media) {
+	for _, md := range media {
+		if err := m.mediaStore.Delete(md.UUID); err != nil {
+			m.lo.Error("error deleting media of unsaved message", "media_uuid", md.UUID, "error", err)
+		}
+		if strings.HasPrefix(md.ContentType, "image/") {
+			if err := m.mediaStore.Delete(image.ThumbPrefix + md.UUID); err != nil {
+				m.lo.Error("error deleting thumbnail of unsaved message", "media_uuid", md.UUID, "error", err)
+			}
+		}
+	}
+}
+
 // uploadThumbnailForMedia prepares and uploads a thumbnail for an image attachment.
 func (m *Manager) uploadThumbnailForMedia(media mmodels.Media, content []byte) error {
 	// Create a reader from the content
@@ -1680,7 +1673,7 @@ func (m *Manager) ProcessIncomingMessageHooks(message models.Message, isNewConve
 		}
 
 		if conversation.SLAPolicyID.Int == 0 {
-			m.lo.Info("no SLA policy applied to conversation, skipping next response SLA event creation")
+			m.lo.Debug("no SLA policy applied to conversation, skipping next response SLA event creation")
 			return nil
 		}
 		if deadline, err := m.slaStore.CreateNextResponseSLAEvent(conversation.ID, conversation.AppliedSLAID.Int, conversation.SLAPolicyID.Int, conversation.AssignedTeamID.Int); err != nil && !errors.Is(err, sla.ErrUnmetSLAEventAlreadyExists) {
@@ -1852,4 +1845,39 @@ func (m *Manager) resolveSendFrom(conversationUUID string, inboxRecord imodels.I
 		return normalized, nil
 	}
 	return sendable[0], nil
+}
+
+func (m *Manager) getConversationMessages(conversationUUID string, page, pageSize int, private *bool, msgTypes []string, excludeCSAT bool) ([]models.Message, int, error) {
+	var (
+		messages = make([]models.Message, 0)
+		qArgs    []any
+	)
+
+	var typesArg any
+	if len(msgTypes) > 0 {
+		typesArg = pq.StringArray(msgTypes)
+	}
+
+	qArgs = append(qArgs, conversationUUID, private, typesArg, excludeCSAT)
+	query, pageSize, qArgs, err := m.generateMessagesQuery(m.q.GetMessages, qArgs, page, pageSize)
+	if err != nil {
+		m.lo.Error("error generating messages query", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	tx, err := m.db.BeginTxx(context.Background(), &sql.TxOptions{
+		ReadOnly: true,
+	})
+	defer tx.Rollback()
+	if err != nil {
+		m.lo.Error("error preparing get messages query", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	if err := tx.Select(&messages, query, qArgs...); err != nil {
+		m.lo.Error("error fetching conversations", "error", err)
+		return messages, pageSize, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+
+	return messages, pageSize, nil
 }

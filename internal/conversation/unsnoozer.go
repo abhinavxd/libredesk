@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -24,7 +25,9 @@ func (c *Manager) RunUnsnoozer(ctx context.Context, unsnoozeInterval time.Durati
 func (c *Manager) unsnoozeAll(ctx context.Context) {
 	res, err := c.q.UnsnoozeAll.ExecContext(ctx)
 	if err != nil {
-		c.lo.Error("error unsnoozing all conversations", "error", err)
+		if !errors.Is(err, context.Canceled) {
+			c.lo.Error("error unsnoozing all conversations", "error", err)
+		}
 		return
 	}
 	rows, _ := res.RowsAffected()

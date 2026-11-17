@@ -15,6 +15,7 @@ const pendingAgentRunTTL = 10 * time.Minute
 type approvalTool interface {
 	Tool
 	approvalRequired() bool
+	displayName() string
 	toolID() int
 	toolUpdatedAt() time.Time
 }
@@ -252,7 +253,11 @@ func completedAgentRun(content string) models.AgentRunResult {
 
 func agentRunApproval(run *pendingAgentRun) *models.ToolApproval {
 	toolCall := run.ToolCalls[run.NextToolCall]
-	return &models.ToolApproval{RunID: run.ID, ToolName: toolCall.Function.Name, Arguments: toolCall.Function.Arguments}
+	approval := &models.ToolApproval{RunID: run.ID, ToolName: toolCall.Function.Name, ToolDisplayName: toolCall.Function.Name, Arguments: toolCall.Function.Arguments}
+	if tool, ok := run.Registry[toolCall.Function.Name].(approvalTool); ok {
+		approval.ToolDisplayName = tool.displayName()
+	}
+	return approval
 }
 
 func sameAgentRunScope(a, b AgentRunScope) bool {

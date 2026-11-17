@@ -2,20 +2,47 @@ package conversation
 
 import (
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
+	"slices"
 	"testing"
+	"time"
 
 	am "github.com/abhinavxd/libredesk/internal/authz/models"
+	amodels "github.com/abhinavxd/libredesk/internal/automation/models"
 	"github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/csat"
 	"github.com/abhinavxd/libredesk/internal/dbutil"
+	"github.com/abhinavxd/libredesk/internal/inbox"
 	tmodels "github.com/abhinavxd/libredesk/internal/team/models"
 	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/abhinavxd/libredesk/internal/user"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
+	wmodels "github.com/abhinavxd/libredesk/internal/webhook/models"
 	"github.com/abhinavxd/libredesk/internal/ws"
 	wsmodels "github.com/abhinavxd/libredesk/internal/ws/models"
+	"github.com/jmoiron/sqlx/types"
 	"github.com/zerodha/logf"
 )
+
+type unassignWebhook struct {
+	webhookStore
+	events []wmodels.WebhookEvent
+}
+
+// assigneeSettingsStore returns blockAwayReassigning as the stored JSON value of every setting.
+type assigneeSettingsStore struct {
+	settingsStore
+	blockAwayReassigning string
+}
+
+func (w *unassignWebhook) TriggerEvent(event wmodels.WebhookEvent, _ any) {
+	w.events = append(w.events, event)
+}
+
+func (s assigneeSettingsStore) Get(string) (types.JSONText, error) {
+	return types.JSONText(s.blockAwayReassigning), nil
+}
 
 func TestCSATSubmissionBroadcastsSavedFeedback(t *testing.T) {
 	db := testutil.NewDB(t, "csat_live_update")
@@ -151,5 +178,600 @@ func TestPreviousConversationsRespectAccessBeforeLimit(t *testing.T) {
 				t.Fatalf("missing base permission: rows=%d err=%v", len(got), err)
 			}
 		})
+	}
+}
+
+func TestDisabledAgentGetsNoConversations(t *testing.T) {
+	db := testutil.NewDB(t, "disabled_assignee")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, active, disabled, deleted, inbox int
+	for id, columns := range map[*int]string{
+		&contact:  `('contact', 'Contact', '', true, NULL)`,
+		&active:   `('agent', 'Active', '', true, NULL)`,
+		&disabled: `('agent', 'Disabled', '', false, NULL)`,
+		&deleted:  `('agent', 'Deleted', '', true, NOW())`,
+	} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name, enabled, deleted_at) VALUES `+columns+` RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	newConversation := func(status string, assignee int) string {
+		var uuid string
+		if err := db.Get(&uuid, `INSERT INTO conversations (contact_id, inbox_id, status_id, assigned_user_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), NULLIF($4, 0)) RETURNING uuid`, contact, inbox, status, assignee); err != nil {
+			t.Fatal(err)
+		}
+		return uuid
+	}
+	assignee := func(uuid string) int {
+		var id int
+		if err := db.Get(&id, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, uuid); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	for name, tt := range map[string]struct{ assignee, want int }{
+		"active agent keeps a reopened conversation":    {active, active},
+		"disabled agent loses a reopened conversation":  {disabled, 0},
+		"deleted agent loses a reopened conversation":   {deleted, 0},
+		"unassigned conversation reopens as unassigned": {0, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			uuid := newConversation("Resolved", tt.assignee)
+			var id int
+			if err := m.q.ReOpenConversation.QueryRow(uuid).Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			if got := assignee(uuid); got != tt.want {
+				t.Fatalf("assignee after reopen = %d, want %d", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("assigning to a disabled agent is rejected", func(t *testing.T) {
+		uuid := newConversation("Open", active)
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if err := m.UpdateConversationUserAssignee(uuid, disabled, umodels.User{ID: active}); err == nil {
+			t.Fatal("assignment to a disabled agent succeeded")
+		}
+		if got := assignee(uuid); got != active {
+			t.Fatalf("assignee = %d, want it unchanged at %d", got, active)
+		}
+	})
+
+	t.Run("disabled agent is dropped from notification recipients", func(t *testing.T) {
+		render := func(umodels.User) (string, string, error) { return "", "", nil }
+		m.userStore = replyUserStore{agent: umodels.User{ID: disabled}}
+		if got := m.buildNotificationRecipients([]int{disabled}, render); len(got) != 0 {
+			t.Fatalf("recipients = %+v, want none", got)
+		}
+		m.userStore = replyUserStore{agent: umodels.User{ID: active, Enabled: true}}
+		if got := m.buildNotificationRecipients([]int{active}, render); len(got) != 1 {
+			t.Fatalf("recipients = %+v, want the active agent", got)
+		}
+	})
+}
+
+func TestAwayReassigningAssigneeFollowsBlockSetting(t *testing.T) {
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	m := &Manager{lo: &lo, i18n: testutil.NewI18n(t)}
+	away := umodels.User{ID: 1, Enabled: true, AvailabilityStatus: umodels.AwayAndReassigning}
+
+	for name, tt := range map[string]struct {
+		agent   umodels.User
+		setting string
+		wantErr bool
+	}{
+		"online agent is assignable with the setting on":                {umodels.User{Enabled: true, AvailabilityStatus: umodels.Online}, `true`, false},
+		"manually away agent is assignable with the setting on":         {umodels.User{Enabled: true, AvailabilityStatus: umodels.AwayManual}, `true`, false},
+		"away and reassigning agent is rejected with the setting on":    {away, `true`, true},
+		"away and reassigning agent is assignable with the setting off": {away, `false`, false},
+		"disabled agent is rejected with the setting off":               {umodels.User{AvailabilityStatus: umodels.Online}, `false`, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			m.userStore = replyUserStore{agent: tt.agent}
+			m.settingsStore = assigneeSettingsStore{blockAwayReassigning: tt.setting}
+			if err := m.ValidateUserAssignee(tt.agent.ID); (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateUserAssignee() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+
+	t.Run("assign user action is rejected for an away and reassigning agent", func(t *testing.T) {
+		db := testutil.NewDB(t, "away_assignee")
+		if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+			t.Fatal(err)
+		}
+		var contact, inbox int
+		if err := db.Get(&contact, `INSERT INTO users (type, first_name, last_name) VALUES ('contact', 'Contact', '') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(&away.ID, `INSERT INTO users (type, first_name, last_name, availability_status) VALUES ('agent', 'Away', '', 'away_and_reassigning') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+			t.Fatal(err)
+		}
+		var conv models.Conversation
+		if err := db.Get(&conv.UUID, `INSERT INTO conversations (contact_id, inbox_id, status_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = 'Open')) RETURNING uuid`, contact, inbox); err != nil {
+			t.Fatal(err)
+		}
+		m.userStore = replyUserStore{agent: away}
+		m.settingsStore = assigneeSettingsStore{blockAwayReassigning: `true`}
+
+		action := amodels.RuleAction{Type: amodels.ActionAssignUser, Value: []string{fmt.Sprint(away.ID)}}
+		if err := m.ApplyAction(action, conv, umodels.User{ID: contact}); err == nil {
+			t.Fatal("assign user action to an away and reassigning agent succeeded")
+		}
+		var assigned int
+		if err := db.Get(&assigned, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, conv.UUID); err != nil {
+			t.Fatal(err)
+		}
+		if assigned != 0 {
+			t.Fatalf("assignee = %d, want the conversation left unassigned", assigned)
+		}
+	})
+}
+
+func TestUnassignOpenUnassignsEachOpenConversation(t *testing.T) {
+	db := testutil.NewDB(t, "unassign_open")
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	lang := testutil.NewI18n(t)
+	inboxes, err := inbox.New(&lo, db, lang, "0123456789abcdef0123456789abcdef")
+	if err != nil {
+		t.Fatal(err)
+	}
+	users, err := user.New(lang, user.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	webhooks := &unassignWebhook{}
+	m := &Manager{
+		db: db, lo: &lo, i18n: lang, inboxStore: inboxes, userStore: users,
+		webhookStore: webhooks, wsHub: ws.NewHub(&lo, nil /** userStore **/),
+	}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, leaving, staying, inboxID int
+	for id, name := range map[*int]string{&contact: "Contact", &leaving: "Leaving", &staying: "Staying"} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name) VALUES ('agent', $1, '') RETURNING id`, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inboxID, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	db.MustExec(`INSERT INTO users (type, email, first_name, last_name) VALUES ('agent', $1, 'System', '')`, umodels.SystemUserEmail)
+	assignees := map[string]int{}
+	for subject, tt := range map[string]struct {
+		status   string
+		assignee int
+	}{
+		"open":           {"Open", leaving},
+		"snoozed":        {"Snoozed", leaving},
+		"resolved":       {"Resolved", leaving},
+		"other agent's":  {"Open", staying},
+		"never assigned": {"Open", 0},
+	} {
+		if _, err := db.Exec(`INSERT INTO conversations (contact_id, inbox_id, status_id, subject, assigned_user_id)
+		VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), $4, NULLIF($5, 0))`, contact, inboxID, tt.status, subject, tt.assignee); err != nil {
+			t.Fatal(err)
+		}
+		assignees[subject] = tt.assignee
+	}
+	assignees["open"], assignees["snoozed"] = 0, 0
+
+	// A second run finds nothing left to unassign.
+	for range 2 {
+		if err := m.UnassignOpen(leaving); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for subject, want := range assignees {
+		var got int
+		if err := db.Get(&got, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE subject = $1`, subject); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s conversation assignee = %d, want %d", subject, got, want)
+		}
+	}
+	if len(webhooks.events) != 2 {
+		t.Fatalf("unassigned events = %d, want one each for the open and snoozed conversations", len(webhooks.events))
+	}
+	for _, event := range webhooks.events {
+		if event != wmodels.EventConversationUnassigned {
+			t.Fatalf("event = %s, want %s", event, wmodels.EventConversationUnassigned)
+		}
+	}
+
+	// A conversation that changed hands or got resolved after the open list was read is left alone.
+	for subject, want := range map[string]int{"other agent's": staying, "resolved": leaving} {
+		var uuid string
+		if err := db.Get(&uuid, `SELECT uuid FROM conversations WHERE subject = $1`, subject); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.unassignIfStillOpen(uuid, leaving, umodels.User{}); err != nil {
+			t.Fatal(err)
+		}
+		var got int
+		if err := db.Get(&got, `SELECT COALESCE(assigned_user_id, 0) FROM conversations WHERE uuid = $1`, uuid); err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("%s conversation assignee = %d, want %d", subject, got, want)
+		}
+	}
+	if len(webhooks.events) != 2 {
+		t.Fatalf("unassigned events = %d, want none added for conversations left alone", len(webhooks.events))
+	}
+}
+
+func TestConversationListPaginationBeforeDetails(t *testing.T) {
+	db := testutil.NewDB(t, "conversation_list_pagination")
+	lo := logf.New(logf.Opts{})
+	m := &Manager{db: db, lo: &lo, i18n: testutil.NewI18n(t), settingsStore: stubSettingsStore{}}
+	if err := dbutil.ScanSQLFile("queries.sql", &m.q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, agent, other, inbox, team, policy int
+	for i, id := range []*int{&contact, &agent, &other} {
+		if err := db.Get(id, `INSERT INTO users (type, first_name, last_name, email) VALUES ($1, $2, '', $3) RETURNING id`,
+			[]string{"contact", "agent", "agent"}[i], fmt.Sprint(i), fmt.Sprintf("user%d@example.com", i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&team, `INSERT INTO teams (name, conversation_assignment_type) VALUES ('Team', 'Manual') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO team_members (team_id, user_id) VALUES ($1, $2)`, team, agent); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&policy, `INSERT INTO sla_policies (name, first_response_time, resolution_time) VALUES ('SLA', '1h', '1d') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Date(2026, time.January, 1, 12, 0, 0, 0, time.UTC)
+	latest := map[string]int{}
+	for n := 1; n <= 72; n++ {
+		status := "Closed"
+		if n > 64 {
+			status = "Open"
+		}
+		assigned := 0
+		if n%4 == 0 {
+			assigned = agent
+		} else if n%4 == 1 {
+			assigned = other
+		}
+		assignedTeam := 0
+		if n%4 == 2 {
+			assignedTeam = team
+		}
+		var conversationID, appliedID, messageID int
+		if err := db.Get(&conversationID, `INSERT INTO conversations
+			(contact_id, inbox_id, status_id, subject, assigned_user_id, assigned_team_id, last_message_at, created_at)
+			VALUES ($1, $2, (SELECT id FROM conversation_statuses WHERE name = $3), $4, NULLIF($5, 0), NULLIF($6, 0),
+			$7::timestamptz + $8 * interval '1 minute', $7::timestamptz + $8 * interval '1 minute') RETURNING id`,
+			contact, inbox, status, fmt.Sprint(n), assigned, assignedTeam, deadline, n); err != nil {
+			t.Fatal(err)
+		}
+		for _, history := range []bool{true, false} {
+			if err := db.Get(&appliedID, `INSERT INTO applied_slas
+				(conversation_id, sla_policy_id, status, created_at, first_response_deadline_at, resolution_deadline_at)
+				VALUES ($1, $2, CASE WHEN $3 THEN 'met'::applied_sla_status ELSE 'pending'::applied_sla_status END,
+				$4::timestamptz - CASE WHEN $3 THEN interval '1 day' ELSE interval '0 days' END, $4, $4) RETURNING id`,
+				conversationID, policy, history, deadline); err != nil {
+				t.Fatal(err)
+			}
+		}
+		latest[fmt.Sprint(n)] = appliedID
+		if _, err := db.Exec(`INSERT INTO sla_events (applied_sla_id, sla_policy_id, type, deadline_at) VALUES ($1, $2, 'next_response', $3)`, appliedID, policy, deadline); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Get(&messageID, `INSERT INTO conversation_messages (conversation_id, type, status, sender_id, sender_type) VALUES ($1, 'incoming', 'sent', $2, 'contact') RETURNING id`, conversationID, contact); err != nil {
+			t.Fatal(err)
+		}
+		if n%4 == 0 {
+			if _, err := db.Exec(`INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_user_id, mentioned_by_user_id) VALUES ($1, $2, $3, $4)`, conversationID, messageID, agent, other); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if n == 67 || n == 68 {
+			if _, err := db.Exec(`INSERT INTO conversation_mentions (conversation_id, message_id, mentioned_team_id, mentioned_by_user_id) VALUES ($1, $2, $3, $4)`, conversationID, messageID, team, other); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	var tags [2]int
+	for n := range tags {
+		if err := db.Get(&tags[n], `INSERT INTO tags (name) VALUES ($1) RETURNING id`, fmt.Sprintf("Tag %d", n)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`INSERT INTO conversation_tags (conversation_id, tag_id)
+			SELECT id, $1 FROM conversations WHERE subject::int % $2 = 0`, tags[n], n+2); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tagFilter := fmt.Sprintf(`[{"model":"conversations","field":"tags","operator":"contains","value":"[%d,%d,%d]"}]`, tags[0], tags[0], tags[1])
+	closedFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Closed"}]`
+	openFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Open"}]`
+	for _, tt := range []struct {
+		name, listType, order, orderBy, filters string
+		page, total                             int
+		want                                    []string
+	}{
+		{"closed second page", models.AllConversations, "desc", "", closedFilter, 2, 64, []string{"62", "61"}},
+		{"ascending", models.AllConversations, "asc", "conversations.created_at", closedFilter, 1, 64, []string{"1", "2"}},
+		{"assigned", models.AssignedConversations, "desc", "", closedFilter, 2, 16, []string{"56", "52"}},
+		{"assigned sparse open", models.AssignedConversations, "desc", "", openFilter, 1, 2, []string{"72", "68"}},
+		{"assigned sparse ascending", models.AssignedConversations, "asc", "", openFilter, 1, 2, []string{"68", "72"}},
+		{"assigned sparse past last page", models.AssignedConversations, "desc", "", openFilter, 2, 0, nil},
+		{"assigned tag union", models.AssignedConversations, "desc", "", tagFilter, 1, 18, []string{"72", "68"}},
+		{"assigned no filters", models.AssignedConversations, "desc", "", "", 1, 18, []string{"72", "68"}},
+		{"assigned no matches", models.AssignedConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
+		{"team", models.TeamUnassignedConversations, "desc", "", closedFilter, 1, 16, []string{"62", "58"}},
+		{"unassigned", models.UnassignedConversations, "desc", "", closedFilter, 1, 16, []string{"63", "59"}},
+		{"mentioned", models.MentionedConversations, "desc", "", closedFilter, 1, 16, []string{"64", "60"}},
+		{"mentioned open direct and team", models.MentionedConversations, "desc", "", openFilter, 1, 3, []string{"72", "68"}},
+		{"mentioned open second page", models.MentionedConversations, "desc", "", openFilter, 2, 3, []string{"67"}},
+		{"mentioned open ascending", models.MentionedConversations, "asc", "", openFilter, 1, 3, []string{"67", "68"}},
+		{"mentioned past last page", models.MentionedConversations, "desc", "", openFilter, 3, 0, nil},
+		{"mentioned no filters", models.MentionedConversations, "desc", "", "", 1, 19, []string{"72", "68"}},
+		{"mentioned no matches", models.MentionedConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
+		{"date filter", models.AllConversations, "desc", "", `[{"model":"conversations","field":"created_at","operator":"equals","value":"2026-01-01"}]`, 1, 72, []string{"72", "71"}},
+		{"contact filter", models.AllConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"user0@example.com"}]`, 1, 72, []string{"72", "71"}},
+		{"tag union", models.AllConversations, "desc", "", tagFilter, 1, 48, []string{"72", "70"}},
+		{"no filters", models.AllConversations, "", "", "", 1, 72, []string{"72", "71"}},
+		{"last page", models.AllConversations, "desc", "", closedFilter, 32, 64, []string{"2", "1"}},
+		{"past last page", models.AllConversations, "desc", "", closedFilter, 33, 0, nil},
+		{"no matches", models.AllConversations, "desc", "", `[{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}]`, 1, 0, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rows, err := m.GetConversations(agent, agent, []int{team}, []string{tt.listType}, tt.order, tt.orderBy, tt.filters, tt.page, 2 /** pageSize **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var subjects []string
+			for _, row := range rows {
+				subjects = append(subjects, row.Subject.String)
+				if row.Total != tt.total || row.AppliedSLAID.Int != latest[row.Subject.String] || row.UnreadMessageCount != 1 || !row.FirstResponseDueAt.Time.Equal(deadline) || !row.NextResponseDueAt.Time.Equal(deadline) {
+					t.Fatalf("incorrect total, unread count, or SLA details: %+v", row)
+				}
+				if (tt.listType == models.MentionedConversations) != row.MentionedMessageUUID.Valid {
+					t.Fatalf("incorrect mentioned message: %+v", row.MentionedMessageUUID)
+				}
+			}
+			if !slices.Equal(subjects, tt.want) {
+				t.Fatalf("subjects = %v, want %v", subjects, tt.want)
+			}
+		})
+	}
+
+	if _, err := db.Exec(`UPDATE conversations SET last_message_at = NULL WHERE subject = '68'`); err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		listType, order string
+		want            []string
+	}{
+		{models.AssignedConversations, "asc", []string{"72", "68"}},
+		{models.AssignedConversations, "desc", []string{"72", "68"}},
+		{models.MentionedConversations, "asc", []string{"67", "72", "68"}},
+		{models.MentionedConversations, "desc", []string{"72", "67", "68"}},
+	} {
+		t.Run(tt.listType+" null activity "+tt.order, func(t *testing.T) {
+			rows, err := m.GetConversations(agent, agent, nil /** teamIDs **/, []string{tt.listType}, tt.order, "", openFilter, 1 /** page **/, 3 /** pageSize **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var subjects []string
+			for _, row := range rows {
+				subjects = append(subjects, row.Subject.String)
+				if row.Total != len(tt.want) {
+					t.Fatalf("total = %d, want %d", row.Total, len(tt.want))
+				}
+			}
+			if !slices.Equal(subjects, tt.want) || rows[len(rows)-1].LastMessageAt.Valid {
+				t.Fatalf("incorrect null ordering: %v", subjects)
+			}
+		})
+	}
+	if _, err := db.Exec(`UPDATE conversations SET last_message_at = created_at WHERE subject = '68'`); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, orderBy := range []string{"users.email", "users.external_user_id", "inboxes.channel", "conversation_statuses.name", "conversations.next_sla_deadline_at"} {
+		for _, listType := range []string{models.AllConversations, models.AssignedConversations, models.MentionedConversations} {
+			t.Run(listType+" "+orderBy, func(t *testing.T) {
+				rows, err := m.GetConversations(agent, agent, nil /** teamIDs **/, []string{listType}, "desc", orderBy, closedFilter, 1 /** page **/, 2 /** pageSize **/)
+				wantTotal := 16
+				if listType == models.AllConversations {
+					wantTotal = 64
+				}
+				if err != nil || len(rows) != 2 || rows[0].Total != wantTotal {
+					t.Fatalf("joined ordering: rows=%d err=%v", len(rows), err)
+				}
+			})
+		}
+	}
+	for _, orderBy := range []string{"conversations.id; SELECT 1", "missing.column"} {
+		if _, _, err := m.makeConversationsListQuery(agent, agent, nil /** teamIDs **/, []string{models.AllConversations}, m.q.GetConversations, "desc", orderBy, 1 /** page **/, 2 /** pageSize **/, closedFilter); err == nil {
+			t.Fatalf("invalid ordering accepted: %s", orderBy)
+		}
+	}
+
+	type planNode struct {
+		Relation string     `json:"Relation Name"`
+		Subplan  string     `json:"Subplan Name"`
+		Loops    int        `json:"Actual Loops"`
+		Rows     int        `json:"Actual Rows"`
+		Plans    []planNode `json:"Plans"`
+	}
+	for _, listType := range []string{models.AllConversations, models.AssignedConversations, models.MentionedConversations, models.UnassignedConversations, models.TeamUnassignedConversations, models.TeamAllConversations} {
+		t.Run(listType+" plan", func(t *testing.T) {
+			query, args, err := m.makeConversationsListQuery(agent, agent, []int{team}, []string{listType}, m.q.GetConversations, "desc", "", 1 /** page **/, 2 /** pageSize **/, closedFilter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var raw []byte
+			if err := db.Get(&raw, "EXPLAIN (ANALYZE, FORMAT JSON) "+query, args...); err != nil {
+				t.Fatal(err)
+			}
+			var plan []struct{ Plan planNode }
+			if err := jsonv2.Unmarshal(raw, &plan); err != nil {
+				t.Fatal(err)
+			}
+			pending := []planNode{plan[0].Plan}
+			seen := map[string]bool{}
+			materialized := false
+			for len(pending) > 0 {
+				node := pending[0]
+				pending = append(pending[1:], node.Plans...)
+				if node.Subplan == "CTE matching" {
+					materialized = true
+					want := 16
+					if listType == models.AllConversations {
+						want = 64
+					}
+					if node.Rows != want || node.Loops != 1 {
+						t.Fatalf("filtered %d rows %d times, want %d rows once", node.Rows, node.Loops, want)
+					}
+				}
+				if node.Relation == "applied_slas" || node.Relation == "sla_events" {
+					seen[node.Relation] = true
+					if node.Loops > 2 {
+						t.Fatalf("%s looked up %d times for a two ticket page", node.Relation, node.Loops)
+					}
+				}
+			}
+			if !materialized {
+				t.Fatalf("incorrect filtering boundary for %s: %s", listType, raw)
+			}
+			if len(seen) != 2 {
+				t.Fatalf("missing SLA lookups in plan: %s", raw)
+			}
+		})
+	}
+	if _, err := db.Exec(`DELETE FROM applied_slas WHERE conversation_id IN (SELECT id FROM conversations WHERE subject = '64')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE conversations SET last_message_at = NULL WHERE subject = '64'`); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := m.GetAllConversationsList(agent, "desc", "", closedFilter, 32 /** page **/, 2 /** pageSize **/)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].Subject.String != "1" || rows[1].Subject.String != "64" || rows[1].Total != 64 || rows[1].LastMessageAt.Valid || rows[1].AppliedSLAID.Valid || rows[1].NextResponseDueAt.Valid {
+		t.Fatalf("incorrect null ordering or missing SLA details: %+v", rows)
+	}
+	if _, err := db.Exec(`INSERT INTO conversation_statuses (name) VALUES ('Waiting for approval');
+		UPDATE conversations SET status_id = (SELECT id FROM conversation_statuses WHERE name = 'Waiting for approval')
+		WHERE subject IN ('1', '2', '3', '4')`); err != nil {
+		t.Fatal(err)
+	}
+	rareFilter := `[{"model":"conversation_statuses","field":"name","operator":"equals","value":"Waiting for approval"}]`
+	for _, tt := range []struct {
+		name  string
+		lists []string
+		want  []string
+	}{
+		{"all", []string{models.AllConversations}, []string{"4", "3", "2", "1"}},
+		{"assigned", []string{models.AssignedConversations}, []string{"4"}},
+		{"mentioned", []string{models.MentionedConversations}, []string{"4"}},
+		{"unassigned", []string{models.UnassignedConversations}, []string{"3"}},
+		{"team inbox", []string{models.TeamUnassignedConversations}, []string{"2"}},
+		{"team all", []string{models.TeamAllConversations}, []string{"2"}},
+		{"combined view", []string{models.AssignedConversations, models.UnassignedConversations, models.TeamUnassignedConversations}, []string{"4", "3", "2"}},
+		{"overlapping view", []string{models.AssignedConversations, models.MentionedConversations}, []string{"4"}},
+	} {
+		t.Run("rare status "+tt.name, func(t *testing.T) {
+			rows, err := m.GetViewConversationsList(agent, agent, []int{team}, tt.lists, "desc", "", rareFilter, 1 /** page **/, 25 /** pageSize **/)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var subjects []string
+			for _, row := range rows {
+				subjects = append(subjects, row.Subject.String)
+				if row.Total != len(tt.want) {
+					t.Fatalf("total = %d, want %d", row.Total, len(tt.want))
+				}
+			}
+			if !slices.Equal(subjects, tt.want) {
+				t.Fatalf("subjects = %v, want %v", subjects, tt.want)
+			}
+		})
+	}
+	viewFilter := fmt.Sprintf(`{"logic":"AND","rules":[
+		{"model":"conversation_statuses","field":"name","operator":"equals","value":"Waiting for approval"},
+		{"logic":"OR","rules":[
+			{"model":"conversations","field":"tags","operator":"contains","value":"[%d,%d]"},
+			{"model":"users","field":"email","operator":"equals","value":"missing@example.com"}
+		]},
+		{"model":"inboxes","field":"channel","operator":"equals","value":"email"}
+	]}`, tags[0], tags[0])
+	rows, err = m.GetViewConversationsList(agent, agent, []int{team}, []string{models.AllConversations}, "desc", "", viewFilter, 1 /** page **/, 25 /** pageSize **/)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 || rows[0].Subject.String != "4" || rows[1].Subject.String != "2" || rows[0].Total != 2 {
+		t.Fatalf("incorrect filtered view: %+v", rows)
+	}
+}
+
+func TestAutoassignmentQuerySkipsManualTeams(t *testing.T) {
+	db := testutil.NewDB(t, "autoassignment_query")
+	var q queries
+	if err := dbutil.ScanSQLFile("queries.sql", &q, db, efs); err != nil {
+		t.Fatal(err)
+	}
+	var contact, inbox int
+	if err := db.Get(&contact, `INSERT INTO users (type, first_name) VALUES ('contact', 'Contact') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&inbox, `INSERT INTO inboxes (name, channel) VALUES ('Inbox', 'email') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, kind := range []string{"Manual", "Round robin"} {
+		var team int
+		if err := db.Get(&team, `INSERT INTO teams (name, conversation_assignment_type) VALUES ($1::text, $1::text::conversation_assignment_type) RETURNING id`, kind); err != nil {
+			t.Fatal(err)
+		}
+		var uuid string
+		if err := db.Get(&uuid, `INSERT INTO conversations (contact_id, inbox_id, status_id, assigned_team_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1), $3) RETURNING uuid`, contact, inbox, team); err != nil {
+			t.Fatal(err)
+		}
+		if kind == "Round robin" {
+			want = append(want, uuid)
+		}
+		if _, err := db.Exec(`INSERT INTO conversations (contact_id, inbox_id, status_id, assigned_team_id, assigned_user_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1), $3, $1)`, contact, inbox, team); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var rows []models.Conversation
+	if err := q.GetUnassignedConversations.Select(&rows); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, row := range rows {
+		got = append(got, row.UUID)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("assignment candidates = %v, want %v", got, want)
 	}
 }

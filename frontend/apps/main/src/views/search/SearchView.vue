@@ -28,14 +28,12 @@
             :term="term"
             :active-tab="activeTab"
             :sorts="sorts"
-            :show-clear-filters="hasActiveFilters(filters)"
             :loading="loading"
             :aria-busy="loading"
             :class="{ 'pointer-events-none opacity-60': loading }"
             @update:active-tab="selectTab"
             @change-sort="changeSort"
             @change-page="changePage"
-            @clear-filters="filters = emptyFilters()"
           />
           <p
             v-else-if="term.length < MIN_SEARCH_LENGTH"
@@ -59,9 +57,7 @@ import SearchHeader from '@main/features/search/SearchHeader.vue'
 import SearchFilters from '@main/features/search/SearchFilters.vue'
 import SearchResults from '@main/features/search/SearchResults.vue'
 import {
-  emptyFilters,
   filtersFromQuery,
-  hasActiveFilters,
   queryFromFilters,
   toFiltersJSON
 } from '@main/features/search/searchFilters'

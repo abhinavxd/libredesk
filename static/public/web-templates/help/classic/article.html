@@ -4,8 +4,8 @@
 {{ if not .Data.HelpCenter.Embed }}<nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
-        {{ if .Data.Collection.Name }}
-        <li><a href="{{ .Data.HelpCenter.BasePath }}/collections/{{ .Data.Collection.Slug }}">{{ .Data.Collection.Name }}</a></li>
+        {{ range .Data.CollectionTrail }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">{{ .Name }}</a></li>
         {{ end }}
         <li><span class="hc-current" aria-current="page">{{ .Data.Article.Title }}</span></li>
     </ol>
@@ -33,11 +33,7 @@
 {{ if and .Data.Related (not .Data.HelpCenter.Theme.Article.HideRelated) }}
 <aside class="hc-related">
     <h2>{{ $.L.T "helpCenter.relatedArticles" }}</h2>
-    <ul class="hc-article-list">
-        {{ range .Data.Related }}
-        <li><a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}</a></li>
-        {{ end }}
-    </ul>
+    {{ template "classic-article-items" (map "Articles" .Data.Related "Base" .Data.HelpCenter.BasePath) }}
 </aside>
 {{ end }}
 </div>

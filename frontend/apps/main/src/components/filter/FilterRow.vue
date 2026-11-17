@@ -78,6 +78,7 @@
             <SelectAgentCombobox
               v-else-if="fieldEntity === 'agent'"
               v-model="leafValue"
+              include-disabled
               :placeholder="t('placeholders.selectValue')"
             />
 

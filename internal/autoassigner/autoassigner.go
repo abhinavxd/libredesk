@@ -120,7 +120,6 @@ func (e *Engine) reloadBalancer() error {
 
 	err := e.populateTeamBalancer()
 	if err != nil {
-		e.lo.Error("error updating team balancer pool", "error", err)
 		return err
 	}
 	return nil
@@ -161,6 +160,12 @@ func (e *Engine) populateTeamBalancer() error {
 			// Skip user if availability status is `away_manual` or `away_and_reassigning`
 			if user.AvailabilityStatus == umodels.AwayManual || user.AvailabilityStatus == umodels.AwayAndReassigning {
 				e.lo.Debug("user is away, skipping autoasssignment ", "team_id", team.ID, "user_id", user.ID, "availability_status", user.AvailabilityStatus)
+				continue
+			}
+
+			// Skip offline users if the team has opted out of assigning to them.
+			if team.SkipOfflineAgents && user.AvailabilityStatus == umodels.Offline {
+				e.lo.Debug("user is offline, skipping autoassignment", "team_id", team.ID, "user_id", user.ID)
 				continue
 			}
 
@@ -227,16 +232,17 @@ func (e *Engine) assignConversations() error {
 				continue
 			}
 
-			activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
-			if err != nil {
-				e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
-				continue
-			}
-
-			if teamMax != 0 && activeConversationsCount >= teamMax {
-				e.lo.Debug("user has reached max auto assigned conversations limit, trying next user", "user_id", userID,
-					"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMax)
-				continue
+			if teamMax != 0 {
+				activeConversationsCount, err := e.conversationStore.ActiveUserConversationsCount(userID)
+				if err != nil {
+					e.lo.Error("error fetching active conversations count for user", "user_id", userID, "error", err)
+					continue
+				}
+				if activeConversationsCount >= teamMax {
+					e.lo.Debug("user has reached max auto assigned conversations limit, trying next user", "user_id", userID,
+						"user_active_conversations_count", activeConversationsCount, "max_auto_assigned_conversations", teamMax)
+					continue
+				}
 			}
 
 			if err := e.conversationStore.ClaimUnassignedConversation(conv.UUID, userID, teamID, e.systemUser); err != nil {
@@ -253,6 +259,7 @@ func (e *Engine) assignConversations() error {
 				e.lo.Error("error assigning conversation", "conversation_uuid", conv.UUID, "user_id", userID, "error", err)
 				continue
 			}
+			e.lo.Info("conversation automatically assigned", "conversation_uuid", conv.UUID, "user_id", userID, "team_id", teamID)
 			break
 		}
 	}

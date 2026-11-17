@@ -1,7 +1,7 @@
 {{ define "classic-article-items" }}
 <ul class="hc-article-list">
     {{ range .Articles }}
-    <li><a href="{{ $.Base }}/articles/{{ .Slug }}">{{ template "hc-doc-icon" }}{{ .Title }}{{ template "hc-arrow-icon" }}</a></li>
+    <li><a href="{{ $.Base }}/articles/{{ .Slug }}">{{ .Title }}{{ template "hc-arrow-icon" }}</a></li>
     {{ end }}
 </ul>
 {{ end }}
@@ -12,6 +12,9 @@
 <nav class="hc-breadcrumb" aria-label="{{ .L.T "globals.terms.breadcrumb" }}">
     <ol>
         <li><a href="{{ .Data.HelpCenter.BasePath }}">{{ .Data.HelpCenter.Name }}</a></li>
+        {{ range .Data.CollectionTrail }}
+        <li><a href="{{ $.Data.HelpCenter.BasePath }}/collections/{{ .Slug }}">{{ .Name }}</a></li>
+        {{ end }}
         <li><span class="hc-current" aria-current="page">{{ .Data.Collection.Name }}</span></li>
     </ol>
 </nav>
@@ -21,6 +24,7 @@
     <div class="hc-collection-headings">
         <h1>{{ .Data.Collection.Name }}</h1>
         {{ if .Data.Collection.Description }}<p class="hc-desc">{{ .Data.Collection.Description }}</p>{{ end }}
+        {{ if not .Data.HelpCenter.Theme.Cards.HideCount }}<span class="hc-count">{{ .Data.Collection.ArticleCount }} {{ .L.Tc "helpCenter.article" .Data.Collection.ArticleCount }}</span>{{ end }}
     </div>
 </header>
 

@@ -156,8 +156,8 @@ importers:
         specifier: ^9.14.5
         version: 9.14.5(vue@3.5.44)
       vue-letter:
-        specifier: ^0.2.1
-        version: 0.2.2
+        specifier: ^0.2.3
+        version: 0.2.3
       vue-picture-cropper:
         specifier: ^0.7.0
         version: 0.7.0(vue@3.5.44)
@@ -2306,8 +2306,8 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
-  follow-redirects@1.16.1:
-    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
+  follow-redirects@1.16.2:
+    resolution: {integrity: sha512-/kVP2U8z596Ia0gwFrwyIeo74ta5aVmSeU1FfAUMAmcEP5EP7zydmag3SLiN64NaRKef3lxsq7i/g7ltJQDGow==}
     engines: {node: '>=4.0'}
     peerDependencies:
       debug: '*'
@@ -3615,8 +3615,8 @@ packages:
     peerDependencies:
       vue: ^3.0.0
 
-  vue-letter@0.2.2:
-    resolution: {integrity: sha512-Y7Jk1lgNtkJqie2NelUyIUGckEjwji5zOImTBUIViUDkl4US8mv1g+FwobbvIpmUiwglTOJh7wrxlDBQYQIrDw==}
+  vue-letter@0.2.3:
+    resolution: {integrity: sha512-xbN8ufW7e2L5UtzLRmLl5KaBEEcv58w8aObxsiZlt8AZCe0jrOItuIR4sk8oR3WmoORbbmbkwSTjRV4jSJmQuw==}
 
   vue-picture-cropper@0.7.0:
     resolution: {integrity: sha512-NF7+Dgso6d0GB16E5d/BbrcTIHm1VWz8dS3IjLhoBl+ZeC+yDA46CyJphQuO32SisaPmrKHN8VbiE2LgAfhnkQ==}
@@ -5245,7 +5245,7 @@ snapshots:
 
   axios@1.20.0(debug@4.4.3(supports-color@8.1.1))(supports-color@8.1.1):
     dependencies:
-      follow-redirects: 1.16.1(debug@4.4.3(supports-color@8.1.1))
+      follow-redirects: 1.16.2(debug@4.4.3(supports-color@8.1.1))
       form-data: 4.0.6
       https-proxy-agent: 5.0.1(supports-color@8.1.1)
       proxy-from-env: 2.1.0
@@ -6023,7 +6023,7 @@ snapshots:
 
   flatted@3.4.4: {}
 
-  follow-redirects@1.16.1(debug@4.4.3(supports-color@8.1.1)):
+  follow-redirects@1.16.2(debug@4.4.3(supports-color@8.1.1)):
     optionalDependencies:
       debug: 4.4.3(supports-color@8.1.1)
 
@@ -7308,7 +7308,7 @@ snapshots:
       '@vue/devtools-api': 6.6.4
       vue: 3.5.44
 
-  vue-letter@0.2.2:
+  vue-letter@0.2.3:
     dependencies:
       lettersanitizer: 1.0.9
 

@@ -104,6 +104,17 @@ func TruncateUTF8(s string, maxBytes int) string {
 	return s[:maxBytes]
 }
 
+func TruncateRunes(s string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= limit {
+		return s
+	}
+	return string(runes[:limit])
+}
+
 // GenerateSlug generates a URL-friendly slug from a title; a script with no ASCII form falls back to a random slug.
 func GenerateSlug(title string) string {
 	slug := strings.ToLower(strings.TrimSpace(foldAccents(title)))

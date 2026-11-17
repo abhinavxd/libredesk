@@ -6,6 +6,26 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
   <meta name="theme-color" content="hsl(152 39% 30%)" />
+  <script>
+    (() => {
+      let theme
+      try {
+        theme = localStorage.getItem('vueuse-color-scheme')
+      } catch {}
+      const dark = theme === 'dark' ||
+        ((!theme || theme === 'auto') && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.classList.toggle('dark', dark)
+    })()
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    :root.dark {
+      color-scheme: dark;
+    }
+  </style>
   <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
   <link rel="apple-touch-icon" href="/images/pwa-icon-192.png" />
   <link rel="preload" href="/static/public/static/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>

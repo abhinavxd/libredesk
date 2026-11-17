@@ -45,7 +45,7 @@ func checkUpdates(curVersion string, interval time.Duration, app *App) {
 	fnCheck := func() {
 		out, err := fetchAppUpdate(client, updateCheckURL)
 		if err != nil {
-			app.lo.Error("error checking for app updates", "err", err)
+			app.lo.Warn("error checking for app updates", "err", err)
 			return
 		}
 

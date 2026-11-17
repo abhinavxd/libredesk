@@ -21,12 +21,12 @@ import (
 	bhmodels "github.com/abhinavxd/libredesk/internal/business_hours/models"
 	cmodels "github.com/abhinavxd/libredesk/internal/conversation/models"
 	"github.com/abhinavxd/libredesk/internal/envelope"
+	"github.com/abhinavxd/libredesk/internal/httputil"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat/proactive"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
 	"github.com/abhinavxd/libredesk/internal/stringutil"
 	umodels "github.com/abhinavxd/libredesk/internal/user/models"
-	realip "github.com/ferluci/fast-realip"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/valyala/fasthttp"
 	"github.com/volatiletech/null/v9"
@@ -40,6 +40,7 @@ const (
 	defaultSessionTTL               = 180 * 24 * time.Hour
 	minSessionTTL                   = 1 * time.Hour
 	maxChatMessageLength            = 10000
+	maxChatSubjectLength            = 255
 	maxEmailLength                  = 254
 	maxNameLength                   = 128
 	maxExternalUserIDLength         = 128
@@ -87,6 +88,7 @@ type chatInitReq struct {
 	DeliveryID string         `json:"delivery_id"`
 	BrowserKey string         `json:"browser_key"`
 	Message    string         `json:"message"`
+	Subject    string         `json:"subject"`
 	FormData   map[string]any `json:"form_data"`
 }
 
@@ -186,7 +188,7 @@ func handleChatInit(r *fastglue.Request) error {
 	var (
 		app               = r.Context.(*App)
 		req               = chatInitReq{}
-		clientIP          = realip.FromRequest(r.RequestCtx)
+		clientIP          = httputil.ClientIP(r.RequestCtx, app.clientIPHeader)
 		userAgent         = string(r.RequestCtx.Request.Header.Peek("User-Agent"))
 		contactID         int
 		isVisitor         bool
@@ -196,7 +198,7 @@ func handleChatInit(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat init request", "error", err)
+		app.lo.Debug("error unmarshalling chat init request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -206,6 +208,7 @@ func handleChatInit(r *fastglue.Request) error {
 	if len(req.Message) > maxChatMessageLength {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.Ts("globals.messages.maxLength", "max", strconv.Itoa(maxChatMessageLength)), nil, envelope.InputError)
 	}
+	req.Subject = normalizeChatSubject(req.Subject)
 
 	inbox, err := getWidgetInbox(r)
 	if err != nil {
@@ -258,7 +261,7 @@ func handleChatInit(r *fastglue.Request) error {
 		inbox.ID,
 		"",
 		time.Now(),
-		"",
+		req.Subject,
 		false,
 		meta,
 		conversationAttrs,
@@ -380,7 +383,7 @@ func handleAuthExchange(r *fastglue.Request) error {
 	// Verify the customer-generated JWT.
 	claims, err := verifyStandardJWT(req.JWT, inbox.Secret.String)
 	if err != nil {
-		app.lo.Error("invalid JWT in auth exchange", "error", err)
+		app.lo.Warn("widget authentication rejected: invalid JWT", "inbox_id", inbox.ID, "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusUnauthorized, app.i18n.T("globals.terms.unAuthorized"), nil, envelope.UnauthorizedError)
 	}
 
@@ -423,7 +426,9 @@ func handleAuthExchange(r *fastglue.Request) error {
 	sessionTTL := getSessionDuration(config)
 
 	sendSession := func(token string) error {
-		app.redis.Set(ctx, reverseKey, token, sessionTTL)
+		if err := app.redis.Set(ctx, reverseKey, token, sessionTTL).Err(); err != nil {
+			app.lo.Warn("error indexing widget session", "inbox_id", inbox.ID, "contact_id", contactID, "error", err)
+		}
 		return r.SendEnvelope(map[string]any{
 			"session_token": token,
 			"user": map[string]any{
@@ -549,7 +554,7 @@ func handleChatSendMessage(r *fastglue.Request) error {
 	)
 
 	if err := r.Decode(&req, "json"); err != nil {
-		app.lo.Error("error unmarshalling chat message request", "error", err)
+		app.lo.Debug("error unmarshalling chat message request", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.InputError)
 	}
 
@@ -715,7 +720,7 @@ func handleWidgetMediaUpload(r *fastglue.Request) error {
 	// Check file size
 	consts := app.consts.Load().(*constants)
 	if bytesToMegabytes(srcFileSize) > float64(consts.MaxFileUploadSizeMB) {
-		app.lo.Error("error: uploaded file size is larger than max allowed", "size", bytesToMegabytes(srcFileSize), "max_allowed", consts.MaxFileUploadSizeMB)
+		app.lo.Debug("widget upload rejected: file exceeds size limit", "size_mb", bytesToMegabytes(srcFileSize), "max_allowed_mb", consts.MaxFileUploadSizeMB)
 		return r.SendErrorEnvelope(
 			fasthttp.StatusRequestEntityTooLarge,
 			app.i18n.Ts("media.fileSizeTooLarge", "size", fmt.Sprintf("%dMB", consts.MaxFileUploadSizeMB)),
@@ -818,7 +823,7 @@ func getContactConversation(r *fastglue.Request, conversationUUID string) (int, 
 	}
 
 	if conversation.ContactID != contactID || conversation.InboxID != inbox.ID {
-		app.lo.Error("unauthorized access to conversation", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
+		app.lo.Warn("widget conversation access denied: contact or inbox does not match", "conversation_uuid", conversationUUID, "contact_id", contactID, "conversation_contact_id", conversation.ContactID, "session_inbox_id", inbox.ID, "conversation_inbox_id", conversation.InboxID)
 		return 0, cmodels.Conversation{}, envelope.NewError(envelope.PermissionError, app.i18n.T("status.deniedPermission"), nil)
 	}
 
@@ -1039,6 +1044,10 @@ func verifyStandardJWT(jwtToken string, inboxSecret string) (Claims, error) {
 	return *claims, nil
 }
 
+func normalizeChatSubject(subject string) string {
+	return stringutil.TruncateRunes(strings.Join(strings.Fields(subject), " "), maxChatSubjectLength)
+}
+
 // generateSessionToken creates a random session token and stores it in Redis.
 func generateSessionToken(app *App, userID, inboxID int, isVisitor bool, externalUserID string, ttl time.Duration) (string, error) {
 	b := make([]byte, 32)
@@ -1072,6 +1081,7 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 
 	data, err := app.redis.HGetAll(ctx, key).Result()
 	if err != nil {
+		app.lo.Error("error loading widget session", "error", err)
 		return nil, fmt.Errorf("looking up session: %w", err)
 	}
 	if len(data) == 0 {
@@ -1086,7 +1096,9 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 	if isVisitor {
 		ttl = defaultSessionTTL
 	}
-	app.redis.Expire(ctx, key, ttl)
+	if err := app.redis.Expire(ctx, key, ttl).Err(); err != nil {
+		app.lo.Warn("error refreshing widget session expiry", "inbox_id", inboxID, "contact_id", userID, "error", err)
+	}
 
 	return &WidgetSession{
 		UserID:         userID,
@@ -1098,7 +1110,9 @@ func loadSession(app *App, token string, config livechat.Config) (*WidgetSession
 
 // deleteSessionToken removes a session from Redis.
 func deleteSessionToken(app *App, token string) {
-	app.redis.Del(context.Background(), widgetSessionPrefix+token)
+	if err := app.redis.Del(context.Background(), widgetSessionPrefix+token).Err(); err != nil {
+		app.lo.Error("error deleting widget session", "error", err)
+	}
 }
 
 // marshalCustomAttributes marshals custom attributes to JSON, returning "{}" on error or empty input.

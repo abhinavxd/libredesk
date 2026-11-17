@@ -158,3 +158,59 @@ describe('Login Component', () => {
         cy.wait('@slowLogin')
     })
 })
+
+describe('Logout', () => {
+    beforeEach(() => {
+        cy.viewport(1440, 900)
+        cy.login()
+        cy.visit('/inboxes/assigned')
+    })
+
+    const clickLogout = () => {
+        cy.contains('button', 'System').click()
+        cy.contains('[role="menuitem"]', /log\s*out/i).click()
+    }
+
+    it('keeps the session active when logout fails', () => {
+        cy.intercept('POST', '**/api/v1/auth/logout', {
+            statusCode: 500,
+            body: { message: 'Logout failed. Try again.' }
+        }).as('logoutFailure')
+        clickLogout()
+        cy.wait('@logoutFailure')
+        cy.contains('Logout failed. Try again.').should('be.visible')
+        cy.location('pathname').should('eq', '/inboxes/assigned')
+        cy.request('/api/v1/agents/me').its('status').should('eq', 200)
+    })
+
+    it('requires a CSRF token and ignores the old GET logout route', () => {
+        cy.request({
+            method: 'POST',
+            url: '/api/v1/auth/logout',
+            failOnStatusCode: false
+        }).its('status').should('eq', 403)
+        cy.request({ url: '/logout', failOnStatusCode: false })
+        cy.request('/api/v1/agents/me').its('status').should('eq', 200)
+    })
+
+    it('preserves the login when an SSO provider is unavailable', () => {
+        cy.getCookie('libredesk_session').then((cookie) => {
+            cy.request({ url: '/api/v1/oidc/999999/login', followRedirect: false })
+                .its('status').should('eq', 302)
+            cy.getCookie('libredesk_session').its('value').should('eq', cookie.value)
+        })
+        cy.request('/api/v1/agents/me').its('status').should('eq', 200)
+    })
+
+    it('destroys the session before returning to the login page', () => {
+        cy.intercept('POST', '**/api/v1/auth/logout').as('logout')
+        clickLogout()
+        cy.wait('@logout').its('response.statusCode').should('eq', 200)
+        cy.location('pathname').should('eq', '/')
+        cy.get('#email').should('be.visible')
+        cy.request({
+            url: '/api/v1/agents/me',
+            failOnStatusCode: false
+        }).its('status').should('eq', 401)
+    })
+})
