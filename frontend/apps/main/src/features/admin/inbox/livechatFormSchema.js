@@ -318,6 +318,8 @@ export const createFormSchema = (t) =>
       direct_to_conversation: z.boolean().default(false),
       trusted_domains: z.string().optional(),
       blocked_ips: z.string().optional(),
+      turnstile_site_key: z.string().optional(),
+      turnstile_secret_key: z.string().optional(),
       home_apps: z.array(
         z.object({
           type: z.enum(['announcement', 'external_link', 'help']),
@@ -378,6 +380,18 @@ export const createFormSchema = (t) =>
           code: z.ZodIssueCode.custom,
           path: ['config', 'continuity', 'max_messages_per_email'],
           message: t('validation.minmaxNumber', { min: 1, max: 100 })
+        })
+      }
+    })
+    .superRefine((values, ctx) => {
+      const site = values.config?.turnstile_site_key?.trim() || ''
+      const secret = values.config?.turnstile_secret_key?.trim() || ''
+      // A masked secret with no site key is the admin turning the check off.
+      if (!site && secret && !secret.includes('•')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['config', 'turnstile_secret_key'],
+          message: t('validation.turnstilePair')
         })
       }
     })

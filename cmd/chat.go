@@ -85,11 +85,12 @@ type customAttributeWidget struct {
 }
 
 type chatInitReq struct {
-	DeliveryID string         `json:"delivery_id"`
-	BrowserKey string         `json:"browser_key"`
-	Message    string         `json:"message"`
-	Subject    string         `json:"subject"`
-	FormData   map[string]any `json:"form_data"`
+	DeliveryID     string         `json:"delivery_id"`
+	BrowserKey     string         `json:"browser_key"`
+	Message        string         `json:"message"`
+	Subject        string         `json:"subject"`
+	FormData       map[string]any `json:"form_data"`
+	TurnstileToken string         `json:"turnstile_token"`
 }
 
 type handoffFormReq struct {
@@ -106,6 +107,7 @@ type chatSettingsResponse struct {
 	BlockedIPs             *struct{}                     `json:"blocked_ips,omitempty"`
 	Continuity             *struct{}                     `json:"continuity,omitempty"`
 	SessionDuration        *struct{}                     `json:"session_duration,omitempty"`
+	TurnstileSecretKey     *struct{}                     `json:"turnstile_secret_key,omitempty"`
 	BusinessHours          []bhmodels.BusinessHours      `json:"business_hours,omitempty"`
 	DefaultBusinessHoursID int                           `json:"default_business_hours_id,omitempty"`
 	WorkingHoursUTCOffset  *int                          `json:"working_hours_utc_offset,omitempty"`
@@ -220,23 +222,32 @@ func handleChatInit(r *fastglue.Request) error {
 	if err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
-	initialConfig := resolveInitialChatConfig(config, getWidgetIsVisitor(r))
+
+	// A session is optional on init. No session means a new visitor.
+	contactID, _ = getWidgetContactID(r)
+	if contactID > 0 {
+		isVisitor = getWidgetIsVisitor(r)
+	} else {
+		isVisitor = true
+	}
+	initialConfig := resolveInitialChatConfig(config, isVisitor)
+
+	// Check visitors before a contact row or a campaign reply is created.
+	if err := enforceChatInitTurnstile(r, app, config, req.TurnstileToken, clientIP, contactID, isVisitor, inbox.ID); err != nil {
+		return err
+	}
 
 	if req.DeliveryID != "" {
 		return handleWidgetCampaignReply(r, req, inbox, initialConfig)
 	}
 
-	// Check if user is already authenticated (has session token).
-	contactID, _ = getWidgetContactID(r)
 	if contactID > 0 {
 		// Returning user (visitor or contact) with session token.
 		// Custom attributes from JWT were already saved during /auth/exchange.
 		// Only process form-level attributes here.
-		isVisitor = getWidgetIsVisitor(r)
 		conversationAttrs = saveContactAttrsAndCollectConvoAttrs(app, contactID, nil, req.FormData, initialConfig)
 	} else {
 		// New visitor - create visitor and session token.
-		isVisitor = true
 		visitor, newSessionToken, conversationAttrs, err = createVisitorContact(app, req.FormData, initialConfig, inbox)
 		if err != nil {
 			return sendErrorEnvelope(r, err)

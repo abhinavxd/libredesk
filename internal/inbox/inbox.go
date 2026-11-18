@@ -497,6 +497,11 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			}
 			inbox.Secret = null.StringFrom(encryptedSecret)
 		}
+		merged, err := m.MergeLiveChatSecrets(current.Config, inbox.Config)
+		if err != nil {
+			return imodels.Inbox{}, err
+		}
+		inbox.Config = merged
 	case ChannelWhatsApp:
 		merged, err := m.MergeWhatsAppSecrets(current.Config, inbox.Config)
 		if err != nil {
@@ -598,6 +603,48 @@ func (m *Manager) MergeWhatsAppSecrets(current, update json.RawMessage) (json.Ra
 	merged, err := json.Marshal(updateCfg)
 	if err != nil {
 		m.lo.Error("error marshalling whatsapp merged config", "error", err)
+		return nil, err
+	}
+	return merged, nil
+}
+
+// MergeLiveChatSecrets restores a masked Turnstile secret, and clears it when the site key is removed.
+// An empty site key turns the check off, so an empty or masked secret must not keep the stored secret.
+func (m *Manager) MergeLiveChatSecrets(current, update json.RawMessage) (json.RawMessage, error) {
+	var currentCfg, updateCfg map[string]any
+	if err := json.Unmarshal(current, &currentCfg); err != nil {
+		m.lo.Error("error unmarshalling current livechat config", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if len(update) == 0 {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+	}
+	if err := json.Unmarshal(update, &updateCfg); err != nil {
+		m.lo.Error("error unmarshalling livechat update config", "error", err)
+		return nil, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
+	}
+	if updateCfg == nil {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.Ts("globals.messages.empty", "name", "{globals.terms.config}"), nil)
+	}
+	if currentCfg == nil {
+		currentCfg = map[string]any{}
+	}
+	siteKey, _ := updateCfg["turnstile_site_key"].(string)
+	siteKey = strings.TrimSpace(siteKey)
+	updateCfg["turnstile_site_key"] = siteKey
+	if siteKey == "" {
+		updateCfg["turnstile_secret_key"] = ""
+	} else {
+		secret, _ := updateCfg["turnstile_secret_key"].(string)
+		if strings.TrimSpace(secret) == "" || strings.Contains(secret, stringutil.PasswordDummy) {
+			if existing, ok := currentCfg["turnstile_secret_key"].(string); ok {
+				updateCfg["turnstile_secret_key"] = existing
+			}
+		}
+	}
+	merged, err := json.Marshal(updateCfg)
+	if err != nil {
+		m.lo.Error("error marshalling livechat merged config", "error", err)
 		return nil, err
 	}
 	return merged, nil
@@ -919,6 +966,14 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 		}
 	}
 
+	if value, ok := cfg["turnstile_secret_key"].(string); ok && value != "" && !crypto.IsEncrypted(value) {
+		encrypted, err := crypto.Encrypt(value, m.encryptionKey)
+		if err != nil {
+			return nil, fmt.Errorf("encrypting turnstile secret: %w", err)
+		}
+		cfg["turnstile_secret_key"] = encrypted
+	}
+
 	encrypted, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling encrypted config: %w", err)
@@ -994,6 +1049,16 @@ func (m *Manager) decryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 				continue
 			}
 			cfg[fieldName] = decrypted
+		}
+	}
+
+	if value, ok := cfg["turnstile_secret_key"].(string); ok && crypto.IsEncrypted(value) {
+		decrypted, err := crypto.Decrypt(value, m.encryptionKey)
+		if err != nil {
+			m.lo.Error("error decrypting turnstile secret, clearing field", "error", err)
+			cfg["turnstile_secret_key"] = ""
+		} else {
+			cfg["turnstile_secret_key"] = decrypted
 		}
 	}
 
