@@ -1,4 +1,5 @@
 const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+const TURNSTILE_SCRIPT_TIMEOUT_MS = 8000
 
 export const TURNSTILE_FAILED = 'Could not verify that you are a person. Please try again.'
 
@@ -8,7 +9,7 @@ export function needsTurnstileToken(siteKey, isVisitor) {
   return typeof siteKey === 'string' && siteKey.trim() !== '' && isVisitor !== false
 }
 
-export function loadTurnstileScript(doc = document) {
+export function loadTurnstileScript(doc = document, { timeoutMs = TURNSTILE_SCRIPT_TIMEOUT_MS } = {}) {
   if (typeof window !== 'undefined' && window.turnstile) {
     return Promise.resolve(window.turnstile)
   }
@@ -17,17 +18,33 @@ export function loadTurnstileScript(doc = document) {
     const script = doc.createElement('script')
     script.src = TURNSTILE_SRC
     script.async = true
+    let settled = false
+    let timer
+    const fail = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      script.onload = null
+      script.onerror = null
+      script.remove()
+      scriptPromise = null
+      reject(new Error(TURNSTILE_FAILED))
+    }
+    timer = setTimeout(fail, timeoutMs)
     script.onload = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       if (window.turnstile) resolve(window.turnstile)
       else {
+        script.onload = null
+        script.onerror = null
+        script.remove()
         scriptPromise = null
         reject(new Error(TURNSTILE_FAILED))
       }
     }
-    script.onerror = () => {
-      scriptPromise = null
-      reject(new Error(TURNSTILE_FAILED))
-    }
+    script.onerror = fail
     doc.head.appendChild(script)
   })
   return scriptPromise

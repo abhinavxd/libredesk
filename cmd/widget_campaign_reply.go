@@ -64,6 +64,16 @@ func handleWidgetCampaignReply(r *fastglue.Request, req chatInitReq, inbox imode
 			return sendErrorEnvelope(r, envelope.NewError(envelope.GeneralError, app.i18n.T("globals.messages.errorSendingMessage"), nil))
 		}
 	} else {
+		// This reply starts a conversation. Check before the visitor row is created.
+		// Continuing an existing conversation, above, does not ask for a token.
+		contactID := contact.ID
+		isVisitor := visitor
+		if contactID == 0 {
+			isVisitor = true
+		}
+		if err := enforceChatInitTurnstile(r, app, config, req.TurnstileToken, httputil.ClientIP(r.RequestCtx, app.clientIPHeader), contactID, isVisitor, inbox.ID); err != nil {
+			return sendErrorEnvelope(r, err)
+		}
 		if contact.ID == 0 {
 			contact, sessionToken, attrs, err = createVisitorContact(app, req.FormData, config, inbox)
 			if err != nil {

@@ -1,5 +1,6 @@
 import axios from 'axios'
-import { attachTurnstileToken } from '../utils/turnstile.js'
+import { runChatInit } from '../utils/chatInit.js'
+import { requestTurnstileToken } from '../utils/turnstile.js'
 
 let _sessionToken = ''
 let _visitorToken = ''
@@ -133,13 +134,24 @@ const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
 const exchangeJWTForSession = (jwt) => http.post('/api/v1/widget/chat/auth/exchange', { jwt })
 const getAuthMe = () => http.get('/api/v1/widget/chat/auth/me')
-const initChatConversation = async (data) => {
-  const payload = await attachTurnstileToken(data, {
-    siteKey: _stores?.widgetStore?.config?.turnstile_site_key,
-    isVisitor: _stores?.userStore ? _stores.userStore.isVisitor : true
-  })
-  return http.post('/api/v1/widget/chat/conversations/init', payload)
+const refreshTurnstileConfig = async () => {
+  const inboxID = getInboxIDFromQuery()
+  if (!inboxID || !_stores?.widgetStore?.updateConfig) return
+  const resp = await getWidgetSettings(inboxID)
+  const config = resp?.data?.data
+  if (config) _stores.widgetStore.updateConfig(config)
 }
+
+const initChatConversation = (data) =>
+  runChatInit({
+    data,
+    getSession: () => _sessionToken,
+    isVisitor: () => (_stores?.userStore ? _stores.userStore.isVisitor : true),
+    getSiteKey: () => _stores?.widgetStore?.config?.turnstile_site_key,
+    requestToken: requestTurnstileToken,
+    refreshSiteKey: refreshTurnstileConfig,
+    post: (payload) => http.post('/api/v1/widget/chat/conversations/init', payload)
+  })
 const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const downloadTranscript = (uuid) =>

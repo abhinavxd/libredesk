@@ -59,6 +59,7 @@ import MessageInput from '@widget/components/MessageInput.vue'
 import PreChatForm from '@widget/components/PreChatForm.vue'
 import ProactiveMessage from '@widget/components/ProactiveMessage.vue'
 import { resolvePreChatForm } from '@widget/utils/preChatForm.js'
+import { SESSION_CHANGED } from '@widget/utils/chatInit.js'
 
 import { useProactiveStore } from '@widget/store/proactive.js'
 const proactive = useProactiveStore()
@@ -193,6 +194,8 @@ const handlePreChatFormSubmit = async ({ formData, message }) => {
     chatStore.preChatDraft = {}
     proactive.replied()
   } catch (error) {
+    // The session changed while Turnstile was pending. Drop the visitor submit.
+    if (error?.code === SESSION_CHANGED) return
     errorMessage.value = handleHTTPError(error).message
   } finally {
     isInitializing.value = false

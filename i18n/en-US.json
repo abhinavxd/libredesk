@@ -412,7 +412,7 @@
   "admin.inbox.livechat.trustedDomains.description": "One domain per line. *.example.com matches subdomains only, add the bare domain example.com separately. Leave empty to allow any domain.",
   "admin.inbox.livechat.trustedDomains.list": "Domain list",
   "admin.inbox.livechat.turnstile.secretKey": "Cloudflare Turnstile secret key",
-  "admin.inbox.livechat.turnstile.secretKey.description": "Secret key for the same Turnstile widget. It is stored encrypted. Leave this blank when editing to keep the saved secret. Clear the site key to turn the check off.",
+  "admin.inbox.livechat.turnstile.secretKey.description": "Secret key for the same Turnstile widget. It is stored encrypted. Leave this blank when editing to keep the saved secret. A changed site key needs a new secret. Clear the site key to turn the check off.",
   "admin.inbox.livechat.turnstile.siteKey": "Cloudflare Turnstile site key",
   "admin.inbox.livechat.turnstile.siteKey.description": "Public site key. Visitors must pass this check before a new chat starts. Signed-in users are not asked. The Turnstile widget hostname is this LibreDesk site, because the chat runs inside an iframe here. Leave both fields empty to turn the check off.",
   "admin.inbox.livechat.userSettings.visitors": "Visitors",

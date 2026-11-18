@@ -526,6 +526,10 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 
 	// Validate livechat-specific configuration
 	if inbox.Channel == livechat.ChannelLiveChat {
+		alias, err := turnstileKeyAlias(inbox.Config)
+		if err != nil || alias != "" {
+			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+		}
 		var config livechat.Config
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)

@@ -608,8 +608,41 @@ func (m *Manager) MergeWhatsAppSecrets(current, update json.RawMessage) (json.Ra
 	return merged, nil
 }
 
-// MergeLiveChatSecrets restores a masked Turnstile secret, and clears it when the site key is removed.
-// An empty site key turns the check off, so an empty or masked secret must not keep the stored secret.
+// NonCanonicalTurnstileKey returns a config key that names a Turnstile field without the exact
+// spelling. encoding/json still fills the struct field. Encryption and password masking look up
+// the exact key, so an alias would be stored and returned in plaintext.
+func NonCanonicalTurnstileKey(cfg map[string]any) string {
+	for key := range cfg {
+		if key == "turnstile_site_key" || key == "turnstile_secret_key" {
+			continue
+		}
+		if strings.EqualFold(key, "turnstile_site_key") || strings.EqualFold(key, "turnstile_secret_key") {
+			return key
+		}
+	}
+	return ""
+}
+
+func turnstileConfigString(cfg map[string]any, key string) (string, bool, error) {
+	value, ok := cfg[key]
+	if !ok {
+		return "", false, nil
+	}
+	text, ok := value.(string)
+	if !ok {
+		return "", true, fmt.Errorf("turnstile field %s is not a string", key)
+	}
+	return strings.TrimSpace(text), true, nil
+}
+
+func turnstileSecretIsBlank(secret string, present bool) bool {
+	return !present || secret == "" || strings.Contains(secret, stringutil.PasswordDummy)
+}
+
+// MergeLiveChatSecrets restores a masked Turnstile secret when the site key is unchanged.
+// Clearing the site key clears the secret. A different site key needs a new secret, because the
+// stored secret belongs to the previous widget. A non-string value is rejected rather than
+// treated as empty, which would turn the check off.
 func (m *Manager) MergeLiveChatSecrets(current, update json.RawMessage) (json.RawMessage, error) {
 	var currentCfg, updateCfg map[string]any
 	if err := json.Unmarshal(current, &currentCfg); err != nil {
@@ -629,17 +662,39 @@ func (m *Manager) MergeLiveChatSecrets(current, update json.RawMessage) (json.Ra
 	if currentCfg == nil {
 		currentCfg = map[string]any{}
 	}
-	siteKey, _ := updateCfg["turnstile_site_key"].(string)
-	siteKey = strings.TrimSpace(siteKey)
+	if key := NonCanonicalTurnstileKey(updateCfg); key != "" {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidValue"), nil)
+	}
+	siteKey, _, err := turnstileConfigString(updateCfg, "turnstile_site_key")
+	if err != nil {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidValue"), nil)
+	}
+	secret, secretSet, err := turnstileConfigString(updateCfg, "turnstile_secret_key")
+	if err != nil {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidValue"), nil)
+	}
 	updateCfg["turnstile_site_key"] = siteKey
-	if siteKey == "" {
+	currentSite, _ := currentCfg["turnstile_site_key"].(string)
+	currentSite = strings.TrimSpace(currentSite)
+	switch {
+	case siteKey == "":
+		// A typed secret with no site key is not "turn the check off".
+		if secretSet && secret != "" && !strings.Contains(secret, stringutil.PasswordDummy) {
+			return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.turnstilePair"), nil)
+		}
 		updateCfg["turnstile_secret_key"] = ""
-	} else {
-		secret, _ := updateCfg["turnstile_secret_key"].(string)
-		if strings.TrimSpace(secret) == "" || strings.Contains(secret, stringutil.PasswordDummy) {
+	case siteKey != currentSite:
+		if turnstileSecretIsBlank(secret, secretSet) {
+			return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.turnstilePair"), nil)
+		}
+		updateCfg["turnstile_secret_key"] = secret
+	default:
+		if turnstileSecretIsBlank(secret, secretSet) {
 			if existing, ok := currentCfg["turnstile_secret_key"].(string); ok {
 				updateCfg["turnstile_secret_key"] = existing
 			}
+		} else {
+			updateCfg["turnstile_secret_key"] = secret
 		}
 	}
 	merged, err := json.Marshal(updateCfg)
@@ -910,6 +965,9 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	var cfg map[string]any
 	if err := json.Unmarshal(config, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshalling config: %w", err)
+	}
+	if key := NonCanonicalTurnstileKey(cfg); key != "" {
+		return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidValue"), nil)
 	}
 
 	// Encrypt SMTP passwords

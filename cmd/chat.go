@@ -232,13 +232,15 @@ func handleChatInit(r *fastglue.Request) error {
 	}
 	initialConfig := resolveInitialChatConfig(config, isVisitor)
 
-	// Check visitors before a contact row or a campaign reply is created.
-	if err := enforceChatInitTurnstile(r, app, config, req.TurnstileToken, clientIP, contactID, isVisitor, inbox.ID); err != nil {
-		return err
-	}
-
+	// A campaign reply to an existing conversation is not a new chat. That handler
+	// checks Turnstile only in the branch that is about to create one.
 	if req.DeliveryID != "" {
 		return handleWidgetCampaignReply(r, req, inbox, initialConfig)
+	}
+
+	// Check visitors before a contact row is created. The error is not written yet.
+	if err := enforceChatInitTurnstile(r, app, config, req.TurnstileToken, clientIP, contactID, isVisitor, inbox.ID); err != nil {
+		return sendErrorEnvelope(r, err)
 	}
 
 	if contactID > 0 {

@@ -7,31 +7,102 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
+	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/testutil"
+	"github.com/zerodha/logf"
 )
 
 func TestChatInitNeedsTurnstile(t *testing.T) {
 	tests := []struct {
 		name      string
+		site      string
 		secret    string
 		contactID int
 		visitor   bool
 		want      bool
 	}{
-		{name: "off when secret is empty", secret: "  ", contactID: 0, visitor: true, want: false},
-		{name: "new visitor", secret: "sek", contactID: 0, visitor: true, want: true},
-		{name: "returning visitor", secret: "sek", contactID: 4, visitor: true, want: true},
-		{name: "signed-in user", secret: "sek", contactID: 4, visitor: false, want: false},
-		{name: "no session is a visitor even if the flag is false", secret: "sek", contactID: 0, visitor: false, want: true},
+		{name: "off when both keys are empty", site: " ", secret: "  ", contactID: 0, visitor: true, want: false},
+		{name: "site key with an unusable secret still checks", site: "site", secret: "", contactID: 0, visitor: true, want: true},
+		{name: "signed-in user skips an unusable secret", site: "site", secret: "", contactID: 4, visitor: false, want: false},
+		{name: "new visitor", site: "site", secret: "sek", contactID: 0, visitor: true, want: true},
+		{name: "returning visitor", site: "site", secret: "sek", contactID: 4, visitor: true, want: true},
+		{name: "signed-in user", site: "site", secret: "sek", contactID: 4, visitor: false, want: false},
+		{name: "no session is a visitor even if the flag is false", site: "site", secret: "sek", contactID: 0, visitor: false, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := chatInitNeedsTurnstile(tt.secret, tt.contactID, tt.visitor); got != tt.want {
+			if got := chatInitNeedsTurnstile(tt.site, tt.secret, tt.contactID, tt.visitor); got != tt.want {
 				t.Fatalf("chatInitNeedsTurnstile() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEnforceChatInitTurnstileReturnsEnvelope(t *testing.T) {
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	app := &App{lo: &lo, i18n: testutil.NewI18n(t)}
+	original := turnstileHTTPClient
+	turnstileHTTPClient = &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		t.Error("siteverify was called")
+		return nil, errors.New("siteverify was called")
+	})}
+	t.Cleanup(func() { turnstileHTTPClient = original })
+
+	// A nil request panics if the rejection is written with SendErrorEnvelope.
+	err := enforceChatInitTurnstile(nil, app, livechat.Config{TurnstileSiteKey: "site", TurnstileSecretKey: "sek"}, "", "203.0.113.8", 0, true, 7)
+	env, ok := err.(envelope.Error)
+	if !ok {
+		t.Fatalf("error = %T %v, want envelope.Error", err, err)
+	}
+	if env.ErrorType != envelope.InputError || env.Code != http.StatusBadRequest {
+		t.Fatalf("envelope = %#v", env)
+	}
+	data, _ := env.Data.(map[string]any)
+	if data["code"] != turnstileRequiredCode {
+		t.Fatalf("data = %#v", env.Data)
+	}
+
+	err = enforceChatInitTurnstile(nil, app, livechat.Config{TurnstileSiteKey: "site"}, "", "", 0, true, 7)
+	if _, ok := err.(envelope.Error); !ok {
+		t.Fatalf("unusable secret error = %T %v", err, err)
+	}
+	if err := enforceChatInitTurnstile(nil, app, livechat.Config{TurnstileSiteKey: "site"}, "", "", 4, false, 7); err != nil {
+		t.Fatalf("signed-in user error = %v", err)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+func TestValidateInboxRejectsTurnstileKeyAlias(t *testing.T) {
+	app := &App{i18n: testutil.NewI18n(t)}
+	err := validateInbox(app, imodels.Inbox{
+		Name:    "Chat",
+		Channel: livechat.ChannelLiveChat,
+		Config:  json.RawMessage(`{"Turnstile_Secret_Key":"sek"}`),
+	}, false)
+	env, ok := err.(envelope.Error)
+	if !ok || env.ErrorType != envelope.InputError {
+		t.Fatalf("error = %T %v", err, err)
+	}
+}
+
+func TestTurnstileKeyAlias(t *testing.T) {
+	alias, err := turnstileKeyAlias(json.RawMessage(`{"turnstile_site_key":"site","Turnstile_Secret_Key":"sek"}`))
+	if err != nil || alias != "Turnstile_Secret_Key" {
+		t.Fatalf("alias = %q, err = %v", alias, err)
+	}
+	alias, err = turnstileKeyAlias(json.RawMessage(`{"turnstile_site_key":"site","turnstile_secret_key":"sek"}`))
+	if err != nil || alias != "" {
+		t.Fatalf("canonical alias = %q, err = %v", alias, err)
 	}
 }
 
@@ -66,14 +137,19 @@ func TestChatSettingsHidesTurnstileSecret(t *testing.T) {
 }
 
 func TestVerifyTurnstileToken(t *testing.T) {
+	var mu sync.Mutex
 	var gotSecret, gotToken, gotIP string
+	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			t.Errorf("parse form: %v", err)
 		}
+		mu.Lock()
+		calls++
 		gotSecret = r.PostForm.Get("secret")
 		gotToken = r.PostForm.Get("response")
 		gotIP = r.PostForm.Get("remoteip")
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
 	}))
@@ -83,15 +159,19 @@ func TestVerifyTurnstileToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotSecret != "sek" || gotToken != "tok" || gotIP != "203.0.113.8" {
-		t.Fatalf("posted secret=%q token=%q ip=%q", gotSecret, gotToken, gotIP)
+	mu.Lock()
+	if calls != 1 || gotSecret != "sek" || gotToken != "tok" || gotIP != "203.0.113.8" {
+		t.Fatalf("calls=%d secret=%q token=%q ip=%q", calls, gotSecret, gotToken, gotIP)
 	}
+	mu.Unlock()
 
 	if err := verifyTurnstileToken(context.Background(), srv.Client(), srv.URL, "sek", "  ", "203.0.113.8"); !errors.Is(err, errTurnstileRejected) {
 		t.Fatalf("empty token error = %v", err)
 	}
-	if gotToken != "tok" {
-		t.Fatal("empty token was sent to siteverify")
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("empty token made %d siteverify calls", calls)
 	}
 }
 

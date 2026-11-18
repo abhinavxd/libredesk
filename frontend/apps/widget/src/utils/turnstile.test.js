@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest'
 import {
   TURNSTILE_FAILED,
   attachTurnstileToken,
+  loadTurnstileScript,
   needsTurnstileToken,
   requestTurnstileToken
 } from './turnstile.js'
@@ -17,6 +18,31 @@ describe('needsTurnstileToken', () => {
     expect(needsTurnstileToken('site', false)).toBe(false)
     expect(needsTurnstileToken('  ', true)).toBe(false)
     expect(needsTurnstileToken('', true)).toBe(false)
+  })
+})
+
+describe('loadTurnstileScript', () => {
+  test('drops a script that does not load so the next submit can retry', async () => {
+    const doc = document.implementation.createHTMLDocument('widget')
+    const pending = loadTurnstileScript(doc, { timeoutMs: 20 })
+    await expect(pending).rejects.toThrow(TURNSTILE_FAILED)
+    expect(doc.querySelector('script')).toBeNull()
+
+    let settled = false
+    const again = loadTurnstileScript(doc, { timeoutMs: 1000 })
+    again.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      }
+    )
+    expect(doc.querySelectorAll('script')).toHaveLength(1)
+    doc.querySelector('script').dispatchEvent(new Event('error'))
+    await expect(again).rejects.toThrow(TURNSTILE_FAILED)
+    expect(settled).toBe(true)
+    expect(doc.querySelector('script')).toBeNull()
   })
 })
 
