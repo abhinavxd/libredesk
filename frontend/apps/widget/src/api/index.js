@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { runChatInit } from '../utils/chatInit.js'
+import { runChatInit, sessionForWidgetRequest } from '../utils/chatInit.js'
 import { requestTurnstileToken } from '../utils/turnstile.js'
 
 let _sessionToken = ''
@@ -90,8 +90,14 @@ http.interceptors.request.use((request) => {
   if (request.url && request.url.includes('/api/v1/widget/')) {
     const inboxId = getInboxIDFromQuery()
 
-    if (_sessionToken) {
-      request.headers['Authorization'] = `Bearer ${_sessionToken}`
+    // Init binds the session it started with. The interceptor runs later, so a
+    // session that moved in between must not lend this request its bearer token.
+    let session = _sessionToken
+    if (request.boundSession !== undefined) {
+      session = sessionForWidgetRequest(request.boundSession, _sessionToken)
+    }
+    if (session) {
+      request.headers['Authorization'] = `Bearer ${session}`
     }
 
     if (inboxId) {
@@ -150,7 +156,8 @@ const initChatConversation = (data) =>
     getSiteKey: () => _stores?.widgetStore?.config?.turnstile_site_key,
     requestToken: requestTurnstileToken,
     refreshSiteKey: refreshTurnstileConfig,
-    post: (payload) => http.post('/api/v1/widget/chat/conversations/init', payload)
+    post: (payload, session) =>
+      http.post('/api/v1/widget/chat/conversations/init', payload, { boundSession: session })
   })
 const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)

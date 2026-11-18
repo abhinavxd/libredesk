@@ -13,6 +13,16 @@ function sessionChangedError() {
   return error
 }
 
+// sessionForWidgetRequest returns the session a widget request must send.
+// A bound session is the one captured before dispatch. If the live session has
+// moved, the request is dropped instead of borrowing the new bearer token.
+export function sessionForWidgetRequest(boundSession, liveSession) {
+  if (boundSession !== undefined && boundSession !== liveSession) {
+    throw sessionChangedError()
+  }
+  return boundSession !== undefined ? boundSession : liveSession
+}
+
 // runChatInit posts a new live chat. A visitor token is collected for a normal init.
 // A campaign reply is posted once without a token, because a reply to an existing
 // conversation does not need one. The server asks for a token only when that reply
@@ -23,18 +33,28 @@ export async function runChatInit({ data, getSession, isVisitor, getSiteKey, req
   const visitorAtStart = isVisitor()
   const changed = () => getSession() !== sessionAtStart
 
+  // tokenSiteKey is the key the posted token was issued for, not the key at error time.
+  let tokenSiteKey = ''
+
   const withToken = async (payload) => {
     if (changed()) throw sessionChangedError()
     const siteKey = getSiteKey()
     if (!needsTurnstileToken(siteKey, visitorAtStart)) return payload
-    const token = await requestToken(siteKey)
+    let token
+    try {
+      token = await requestToken(siteKey)
+    } catch (error) {
+      if (changed()) throw sessionChangedError()
+      throw error
+    }
     if (changed()) throw sessionChangedError()
+    tokenSiteKey = siteKey
     return { ...payload, turnstile_token: token }
   }
 
   const guardedPost = async (payload) => {
     if (changed()) throw sessionChangedError()
-    const response = await post(payload)
+    const response = await post(payload, sessionAtStart)
     if (changed()) throw sessionChangedError()
     return response
   }
@@ -49,11 +69,15 @@ export async function runChatInit({ data, getSession, isVisitor, getSiteKey, req
       if (changed()) throw sessionChangedError()
       if (!visitorAtStart || !isTurnstileRequired(error) || refreshed) throw error
       refreshed = true
-      const previousKey = getSiteKey()
-      await refreshSiteKey()
+      try {
+        await refreshSiteKey()
+      } catch (refreshError) {
+        if (changed()) throw sessionChangedError()
+        throw refreshError
+      }
       // A rejected token for the same site key is final. The visitor can submit again.
       // A campaign create has no token yet, and a changed site key needs a new one.
-      if (payload?.turnstile_token && getSiteKey() === previousKey) throw error
+      if (payload?.turnstile_token && getSiteKey() === tokenSiteKey) throw error
       payload = await withToken(data)
       if (!payload?.turnstile_token) throw error
     }

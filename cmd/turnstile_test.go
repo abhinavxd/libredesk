@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/abhinavxd/libredesk/internal/envelope"
 	"github.com/abhinavxd/libredesk/internal/inbox/channel/livechat"
 	imodels "github.com/abhinavxd/libredesk/internal/inbox/models"
+	"github.com/abhinavxd/libredesk/internal/setting"
 	"github.com/abhinavxd/libredesk/internal/testutil"
 	"github.com/zerodha/logf"
 )
@@ -83,15 +85,40 @@ func (fn roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestValidateInboxRejectsTurnstileKeyAlias(t *testing.T) {
-	app := &App{i18n: testutil.NewI18n(t)}
-	err := validateInbox(app, imodels.Inbox{
-		Name:    "Chat",
-		Channel: livechat.ChannelLiveChat,
-		Config:  json.RawMessage(`{"Turnstile_Secret_Key":"sek"}`),
-	}, false)
+	db := testutil.NewDB(t, "turnstile_alias")
+	lo := logf.New(logf.Opts{Level: logf.FatalLevel})
+	settings, err := setting.New(setting.Opts{DB: db, Lo: &lo})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := &App{i18n: testutil.NewI18n(t), lo: &lo, setting: settings}
+	valid := json.RawMessage(`{"theme":"light","campaign_cooldown":"0s","launcher":{"position":"right","icon_scale":100,"spacing":{"side":0,"bottom":0}},"branding":{"light":{"colors":{"primary":"#111111"}},"dark":{"colors":{"primary":"#222222"}}},"turnstile_site_key":"site","turnstile_secret_key":"sek"}`)
+	inbox := imodels.Inbox{Name: "Chat", Channel: livechat.ChannelLiveChat, Config: valid}
+	if err := validateInbox(app, inbox, false); err != nil {
+		t.Fatal(err)
+	}
+	inbox.Config = bytes.ReplaceAll(valid, []byte(`"turnstile_secret_key"`), []byte(`"Turnstile_Secret_Key"`))
+	err = validateInbox(app, inbox, false)
 	env, ok := err.(envelope.Error)
 	if !ok || env.ErrorType != envelope.InputError {
-		t.Fatalf("error = %T %v", err, err)
+		t.Fatalf("alias error = %T %v", err, err)
+	}
+}
+
+func TestDuplicateTurnstileSecretDecodersDisagree(t *testing.T) {
+	raw := []byte(`{"turnstile_site_key":"site","turnstile_secret_key":"sek","turnstile_secret_key":null}`)
+	var cfg livechat.Config
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	// The struct keeps the first string, so validation of that struct still sees a secret.
+	// The map keeps null. encryptInboxConfig rejects that map before it is stored.
+	if cfg.TurnstileSecretKey != "sek" || decoded["turnstile_secret_key"] != nil {
+		t.Fatalf("struct secret %q, map secret %#v", cfg.TurnstileSecretKey, decoded["turnstile_secret_key"])
 	}
 }
 

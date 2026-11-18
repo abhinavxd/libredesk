@@ -148,6 +148,14 @@ func TestTurnstileSecretEncryptRoundTrip(t *testing.T) {
 	if _, err := m.encryptInboxConfig(json.RawMessage(`{"turnstile_site_key":"site","Turnstile_Secret_Key":"super-secret"}`)); err == nil {
 		t.Fatal("case-variant secret was encrypted")
 	}
+	if _, err := m.encryptInboxConfig(json.RawMessage(`{"turnstile_site_key":"site","turnstile_secret_key":null}`)); err == nil {
+		t.Fatal("null secret was stored beside a site key")
+	}
+	_, err = m.encryptInboxConfig(json.RawMessage(`{"turnstile_site_key":"site","turnstile_secret_key":"sek","turnstile_secret_key":null}`))
+	env, ok := err.(envelope.Error)
+	if !ok || env.ErrorType != envelope.InputError {
+		t.Fatalf("duplicate null secret error = %T %v", err, err)
+	}
 }
 
 func TestClearPasswordsMasksTurnstileSecret(t *testing.T) {

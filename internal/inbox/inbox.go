@@ -969,6 +969,15 @@ func (m *Manager) encryptInboxConfig(config json.RawMessage) (json.RawMessage, e
 	if key := NonCanonicalTurnstileKey(cfg); key != "" {
 		return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.invalidValue"), nil)
 	}
+	// The widget turns the check on from the site key alone. A null or blank secret would
+	// then fail every visitor. A map keeps the last duplicate key, while a struct can keep
+	// an earlier string, so this reads the map that is about to be stored.
+	if site, _ := cfg["turnstile_site_key"].(string); strings.TrimSpace(site) != "" {
+		secret, ok := cfg["turnstile_secret_key"].(string)
+		if !ok || strings.TrimSpace(secret) == "" {
+			return nil, envelope.NewError(envelope.InputError, m.i18n.T("validation.turnstilePair"), nil)
+		}
+	}
 
 	// Encrypt SMTP passwords
 	if smtpSlice, ok := cfg["smtp"].([]any); ok {

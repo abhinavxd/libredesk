@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { SESSION_CHANGED, runChatInit } from './chatInit.js'
+import { SESSION_CHANGED, runChatInit, sessionForWidgetRequest } from './chatInit.js'
 
 const required = () => {
   const error = new Error('turnstile')
@@ -173,6 +173,92 @@ describe('runChatInit', () => {
     expect(posts).toEqual([])
   })
 
+  test('treats a token failure after a session switch as a dropped submit', async () => {
+    let session = 'visitor'
+    const posts = []
+    await expect(
+      runChatInit({
+        data: { message: 'hi' },
+        getSession: () => session,
+        isVisitor: () => true,
+        getSiteKey: () => 'site',
+        requestToken: async () => {
+          session = 'signed-in'
+          throw new Error('script failed')
+        },
+        refreshSiteKey: async () => {},
+        post: async (payload) => {
+          posts.push(payload)
+          return { ok: true }
+        }
+      })
+    ).rejects.toMatchObject({ code: SESSION_CHANGED })
+    expect(posts).toEqual([])
+  })
+
+  test('treats a settings failure after a session switch as a dropped submit', async () => {
+    let session = 'visitor'
+    await expect(
+      runChatInit({
+        data: { message: 'hi', delivery_id: 'delivery' },
+        getSession: () => session,
+        isVisitor: () => true,
+        getSiteKey: () => 'site',
+        requestToken: async () => 'token-1',
+        refreshSiteKey: async () => {
+          session = 'signed-in'
+          throw new Error('settings failed')
+        },
+        post: async () => {
+          throw required()
+        }
+      })
+    ).rejects.toMatchObject({ code: SESSION_CHANGED })
+  })
+
+  test('retries when the site key changed after the token was requested', async () => {
+    const posts = []
+    let siteKey = 'old'
+    await runChatInit({
+      data: { message: 'hi' },
+      getSession: () => 'visitor',
+      isVisitor: () => true,
+      getSiteKey: () => siteKey,
+      requestToken: async (key) => {
+        siteKey = 'new'
+        return `token-for-${key}`
+      },
+      refreshSiteKey: async () => {},
+      post: async (payload) => {
+        posts.push(payload)
+        if (payload.turnstile_token === 'token-for-old') throw required()
+        return { ok: true }
+      }
+    })
+    expect(posts.map((payload) => payload.turnstile_token)).toEqual(['token-for-old', 'token-for-new'])
+  })
+
+  test('gives the post the session captured before dispatch', async () => {
+    let session = 'visitor'
+    let seen
+    await expect(
+      runChatInit({
+        data: { message: 'hi' },
+        getSession: () => session,
+        isVisitor: () => true,
+        getSiteKey: () => '',
+        requestToken: async () => 'token-1',
+        refreshSiteKey: async () => {},
+        post: async (_payload, bound) => {
+          seen = bound
+          session = 'signed-in'
+          return { ok: true }
+        }
+      })
+    ).rejects.toMatchObject({ code: SESSION_CHANGED })
+    expect(seen).toBe('visitor')
+  })
+
   test('discards a response that arrives after the session changes', async () => {
     let session = 'visitor'
     await expect(
@@ -189,5 +275,16 @@ describe('runChatInit', () => {
         }
       })
     ).rejects.toMatchObject({ code: SESSION_CHANGED })
+  })
+})
+
+describe('sessionForWidgetRequest', () => {
+  test('keeps a bound session and rejects one that has moved', () => {
+    expect(sessionForWidgetRequest('visitor', 'visitor')).toBe('visitor')
+    expect(sessionForWidgetRequest(undefined, 'live')).toBe('live')
+    expect(sessionForWidgetRequest('', '')).toBe('')
+    expect(() => sessionForWidgetRequest('visitor', 'signed-in')).toThrow(
+      expect.objectContaining({ code: SESSION_CHANGED })
+    )
   })
 })
