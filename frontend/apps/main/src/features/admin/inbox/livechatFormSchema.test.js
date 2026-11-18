@@ -823,4 +823,26 @@ describe('Livechat Inbox Form Schema', () => {
   test('empty object', () => {
     expect(() => schema.parse({})).toThrow()
   })
+
+  test('keeps a turnstile site key and secret', () => {
+    const parsed = schema.parse(withConfig({ turnstile_site_key: 'site', turnstile_secret_key: 'secret' }))
+    expect(parsed.config.turnstile_site_key).toBe('site')
+    expect(parsed.config.turnstile_secret_key).toBe('secret')
+  })
+
+  test('allows a blank turnstile secret so an edit can keep the saved secret', () => {
+    expect(() => schema.parse(withConfig({ turnstile_site_key: 'site', turnstile_secret_key: '' }))).not.toThrow()
+  })
+
+  test('rejects a turnstile secret when the site key is cleared', () => {
+    const result = schema.safeParse(withConfig({ turnstile_site_key: '', turnstile_secret_key: 'secret' }))
+    expect(result.success).toBe(false)
+    expect(result.error.issues[0].path.join('.')).toBe('config.turnstile_secret_key')
+  })
+
+  test('allows a masked turnstile secret when the site key is cleared', () => {
+    expect(() =>
+      schema.parse(withConfig({ turnstile_site_key: '', turnstile_secret_key: '••••••••••' }))
+    ).not.toThrow()
+  })
 })

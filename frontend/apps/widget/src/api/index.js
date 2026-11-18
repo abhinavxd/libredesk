@@ -1,4 +1,6 @@
 import axios from 'axios'
+import { runChatInit, sessionForWidgetRequest } from '../utils/chatInit.js'
+import { requestTurnstileToken } from '../utils/turnstile.js'
 
 let _sessionToken = ''
 let _visitorToken = ''
@@ -88,8 +90,14 @@ http.interceptors.request.use((request) => {
   if (request.url && request.url.includes('/api/v1/widget/')) {
     const inboxId = getInboxIDFromQuery()
 
-    if (_sessionToken) {
-      request.headers['Authorization'] = `Bearer ${_sessionToken}`
+    // Init binds the session it started with. The interceptor runs later, so a
+    // session that moved in between must not lend this request its bearer token.
+    let session = _sessionToken
+    if (request.boundSession !== undefined) {
+      session = sessionForWidgetRequest(request.boundSession, _sessionToken)
+    }
+    if (session) {
+      request.headers['Authorization'] = `Bearer ${session}`
     }
 
     if (inboxId) {
@@ -132,7 +140,25 @@ const getLanguage = (lang) => http.get(`/api/v1/lang/${lang}`)
 const getAvailableLanguages = () => http.get('/api/v1/lang')
 const exchangeJWTForSession = (jwt) => http.post('/api/v1/widget/chat/auth/exchange', { jwt })
 const getAuthMe = () => http.get('/api/v1/widget/chat/auth/me')
-const initChatConversation = (data) => http.post('/api/v1/widget/chat/conversations/init', data)
+const refreshTurnstileConfig = async () => {
+  const inboxID = getInboxIDFromQuery()
+  if (!inboxID || !_stores?.widgetStore?.updateConfig) return
+  const resp = await getWidgetSettings(inboxID)
+  const config = resp?.data?.data
+  if (config) _stores.widgetStore.updateConfig(config)
+}
+
+const initChatConversation = (data) =>
+  runChatInit({
+    data,
+    getSession: () => _sessionToken,
+    isVisitor: () => (_stores?.userStore ? _stores.userStore.isVisitor : true),
+    getSiteKey: () => _stores?.widgetStore?.config?.turnstile_site_key,
+    requestToken: requestTurnstileToken,
+    refreshSiteKey: refreshTurnstileConfig,
+    post: (payload, session) =>
+      http.post('/api/v1/widget/chat/conversations/init', payload, { boundSession: session })
+  })
 const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const downloadTranscript = (uuid) =>
