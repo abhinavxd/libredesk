@@ -304,7 +304,6 @@ func (m *Manager) Create(inbox imodels.Inbox) (imodels.Inbox, error) {
 
 	var createdInbox imodels.Inbox
 	if err := tx.Stmtx(m.queries.InsertInbox).Get(&createdInbox, inbox.Channel, encryptedConfig, inbox.Name, inbox.From, inbox.Enabled, inbox.CSATEnabled, inbox.PromptTagsOnReply, inbox.ReopenWindowHours, inbox.Secret, inbox.LinkedEmailInboxID, inbox.FromNameTemplate); err != nil {
-		m.lo.Error("error creating inbox", "error", err)
 		return imodels.Inbox{}, m.persistenceError("creating inbox", err)
 	}
 	if inbox.Channel == ChannelEmail {
@@ -448,10 +447,6 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		if err := json.Unmarshal(inbox.Config, &updateCfg); err != nil {
 			m.lo.Error("error unmarshalling update config", "id", id, "error", err)
 			return imodels.Inbox{}, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
-		}
-
-		if len(updateCfg.IMAP) == 0 {
-			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
 		}
 
 		if len(updateCfg.SMTP) == 0 {
@@ -653,6 +648,14 @@ func (m *Manager) StartAliasVerification(ctx context.Context, id int, address st
 	idx := slices.IndexFunc(inbox.Aliases, func(alias imodels.EmailAlias) bool { return strings.EqualFold(alias.Email, normalized) })
 	if idx < 0 {
 		return envelope.NewError(envelope.InputError, m.i18n.T("admin.inbox.aliases.saveBeforeVerify"), nil)
+	}
+	// Verification completes when IMAP reads back the message sent here.
+	var cfg imodels.Config
+	if err := json.Unmarshal(inbox.Config, &cfg); err != nil {
+		return m.persistenceError("reading email config", err)
+	}
+	if len(cfg.IMAP) == 0 {
+		return envelope.NewError(envelope.InputError, m.i18n.T("inbox.emptyIMAP"), nil)
 	}
 	runtimeInbox, err := m.Get(id)
 	if err != nil {

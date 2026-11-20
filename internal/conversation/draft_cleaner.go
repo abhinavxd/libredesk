@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -18,7 +19,7 @@ func (c *Manager) RunDraftCleaner(ctx context.Context, retentionPeriod time.Dura
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := c.DeleteStaleDrafts(ctx, retentionPeriod); err != nil {
+			if err := c.DeleteStaleDrafts(ctx, retentionPeriod); err != nil && !errors.Is(err, context.Canceled) {
 				c.lo.Error("error cleaning stale drafts", "error", err)
 			}
 		}

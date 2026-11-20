@@ -232,6 +232,7 @@ func (m *Manager) statWindow(a models.Assistant, start, end time.Time) (models.S
 
 // recordEvent logs a handoff/resolve marker so rate and reopen metrics are queryable.
 func (m *Manager) recordEvent(assistantID, conversationID int, eventType string) {
+	m.lo.Info("ai agent decision", "assistant_id", assistantID, "conversation_id", conversationID, "decision", eventType)
 	if _, err := m.q.InsertAIAgentEvent.Exec(assistantID, conversationID, eventType); err != nil {
 		m.lo.Error("error recording ai agent event", "type", eventType, "error", err)
 	}

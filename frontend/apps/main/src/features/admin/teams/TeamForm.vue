@@ -29,54 +29,19 @@
           <FormMessage />
         </FormItem>
       </FormField>
-      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
-        <FormItem>
-          <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
-          <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
-                    {{ at.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormControl>
-          <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
-        <FormItem>
-          <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
-          <FormControl>
-            <Input type="number" placeholder="0" v-bind="componentField" />
-          </FormControl>
-          <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-      <FormField v-slot="{ componentField }" name="timezone">
+      <FormField v-slot="{ value, handleChange, handleBlur, meta }" name="timezone">
         <FormItem>
           <FormLabel>{{ $t('globals.terms.timezone', 1) }}</FormLabel>
           <FormControl>
-            <Select v-bind="componentField">
-              <SelectTrigger>
-                <SelectValue :placeholder="$t('admin.general.timezone.placeholder')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="(value, label) in timeZones" :key="value" :value="value">
-                    {{ label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <ComboBox
+              :model-value="value"
+              :items="timeZoneOptions"
+              virtual
+              :default-label="value"
+              :placeholder="$t('admin.general.timezone.placeholder')"
+              @update:model-value="(v) => handleChange(v, meta.validated)"
+              @blur="handleBlur"
+            />
           </FormControl>
           <FormDescription>{{ $t('admin.team.timezone.description') }}</FormDescription>
           <FormMessage />
@@ -132,7 +97,51 @@
           <FormMessage />
         </FormItem>
       </FormField>
+
+      <FormField name="conversation_assignment_type" v-slot="{ componentField }">
+        <FormItem>
+          <FormLabel>{{ $t('admin.team.assignmentType') }}</FormLabel>
+          <FormControl>
+            <Select v-bind="componentField">
+              <SelectTrigger>
+                <SelectValue :placeholder="$t('admin.team.assignmentType.placeholder')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem v-for="at in assignmentTypes" :key="at.value" :value="at.value">
+                    {{ at.label }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormControl>
+          <FormDescription>{{ $t('admin.team.assignmentType.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="max_auto_assigned_conversations">
+        <FormItem>
+          <FormLabel>{{ $t('admin.team.maxAutoAssigned') }}</FormLabel>
+          <FormControl>
+            <Input type="number" placeholder="0" v-bind="componentField" />
+          </FormControl>
+          <FormDescription>{{ $t('admin.team.maxAutoAssigned.description') }}</FormDescription>
+          <FormMessage />
+        </FormItem>
+      </FormField>
     </FormGrid>
+
+    <FormField v-slot="{ componentField, handleChange }" name="skip_offline_agents">
+      <FormItem>
+        <SwitchField
+          :title="$t('admin.team.skipOfflineAgents')"
+          :description="$t('admin.team.skipOfflineAgents.description')"
+          :checked="componentField.modelValue"
+          @update:checked="handleChange"
+        />
+      </FormItem>
+    </FormField>
 
     <Button type="submit" :isLoading="isLoading"> {{ submitLabel }} </Button>
   </form>
@@ -140,6 +149,7 @@
 
 <script setup>
 import FormGrid from '@shared-ui/components/FormGrid.vue'
+import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { ref, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { Button } from '@shared-ui/components/ui/button/index.js'
@@ -167,7 +177,8 @@ import { useEmitter } from '@main/composables/useEmitter.js'
 import { Input } from '@shared-ui/components/ui/input/index.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useSlaStore } from '@main/stores/sla.js'
-import { timeZones } from '@main/constants/timezones.js'
+import { timeZoneOptions } from '@main/constants/timezones.js'
+import ComboBox from '@shared-ui/components/ui/combobox/ComboBox.vue'
 import api from '@main/api/index.js'
 import { useI18n } from 'vue-i18n'
 

@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title></title>
+    <style>
+      @page {
+        size: A4;
+        margin: 18mm 16mm;
+      }
+
+      body {
+        margin: 0;
+        font:
+          10pt/1.5 system-ui,
+          sans-serif;
+      }
+
+      header {
+        margin-block-end: 7mm;
+        padding-block-end: 5mm;
+        border-block-end: 1px solid;
+        break-inside: avoid;
+        break-after: avoid;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 20pt;
+        font-weight: 600;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+        unicode-bidi: plaintext;
+      }
+
+      pre {
+        margin: 0;
+        font: inherit;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        unicode-bidi: plaintext;
+        tab-size: 4;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- Custom templates need text containers with data-transcript-title and data-transcript-body attributes. -->
+      <header><h1 data-transcript-title></h1></header>
+      <pre data-transcript-body></pre>
+    </main>
+  </body>
+</html>

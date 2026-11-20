@@ -10,6 +10,16 @@
         }
         var lang = document.querySelector('[data-hc-lang]');
         if (!lang) return;
+        if (window.Intl && Intl.DisplayNames) {
+            lang.querySelectorAll('[data-hc-locale-name]').forEach(function (el) {
+                var code = el.dataset.hcLocaleName;
+                try {
+                    // Many languages write their own name in lower case, which reads as unfinished in a menu.
+                    var name = new Intl.DisplayNames([code], { type: 'language' }).of(code);
+                    el.textContent = name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
+                } catch (e) {}
+            });
+        }
         var btn = lang.querySelector('.hc-lang-btn');
         var menu = lang.querySelector('.hc-lang-menu');
         var animation;
@@ -107,22 +117,25 @@
             });
         }
 
-        if (tracked.length && 'IntersectionObserver' in window) {
-            var visible = new Set();
+        if (tracked.length) {
+            // A heading counts as reached once it scrolls up to the line where an anchor jump would place it.
+            var line = (parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0) + 12;
+            var queued = false;
             var markActive = function () {
+                queued = false;
                 var current = null;
                 for (var i = 0; i < tracked.length; i++) {
-                    if (visible.has(tracked[i])) { current = links[i]; break; }
+                    if (tracked[i].getBoundingClientRect().top > line) break;
+                    current = links[i];
                 }
+                // The last sections can be too short to ever reach that line.
+                if (window.scrollY > 0 && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) current = links[links.length - 1];
                 links.forEach(function (a) { a.classList.toggle('hc-toc-active', a === current); });
             };
-            var observer = new IntersectionObserver(function (entries) {
-                entries.forEach(function (e) {
-                    if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target);
-                });
-                markActive();
-            }, { rootMargin: '0px 0px -70% 0px' });
-            tracked.forEach(function (h) { observer.observe(h); });
+            window.addEventListener('scroll', function () {
+                if (!queued) { queued = true; requestAnimationFrame(markActive); }
+            }, { passive: true });
+            markActive();
         }
     }
 
@@ -163,14 +176,23 @@
     var box = document.getElementById('hc-helpful');
     if (box) {
         var key = 'hc-feedback:' + box.dataset.endpoint;
-        var done = function () {
+        var done = function (pointer) {
             box.querySelector('.hc-helpful-actions').hidden = true;
             box.querySelector('.hc-helpful-q').hidden = true;
-            box.querySelector('.hc-helpful-thanks').hidden = false;
+            var thanks = box.querySelector('.hc-helpful-thanks');
+            thanks.hidden = false;
+            if (pointer) {
+                var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                thanks.animate([{ opacity: 0 }, { opacity: 1 }], {
+                    duration: reduced ? 100 : 160,
+                    easing: 'cubic-bezier(0.23, 1, 0.32, 1)'
+                });
+            }
         };
         try { if (localStorage.getItem(key)) done(); } catch (e) {}
         box.querySelectorAll('button').forEach(function (b) {
-            b.addEventListener('click', function () {
+            b.addEventListener('click', function (e) {
+                var pointer = e.detail > 0;
                 var buttons = box.querySelectorAll('button');
                 var error = box.querySelector('.hc-helpful-error');
                 error.hidden = true;
@@ -181,7 +203,7 @@
                     body: JSON.stringify({ helpful: b.dataset.helpful === 'true' })
                 }).then(function (res) {
                     if (!res.ok) throw new Error('Feedback request failed');
-                    done();
+                    done(pointer);
                     try { localStorage.setItem(key, b.dataset.helpful); } catch (e) {}
                 }).catch(function () {
                     error.hidden = false;

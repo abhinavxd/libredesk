@@ -1,7 +1,9 @@
 package notifier
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,7 +78,8 @@ func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	if err := db.Get(&convID, `INSERT INTO conversations (contact_id, inbox_id, status_id) VALUES ($1, $2, (SELECT id FROM conversation_statuses LIMIT 1)) RETURNING id`, userID, inboxID); err != nil {
 		t.Fatal(err)
 	}
-	lo := logf.New(logf.Opts{})
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
 	provider := &emailDeliveryProvider{}
 	outbound := NewService(map[string]Notifier{ProviderEmail: provider}, 1, 1, &lo)
 	queue, err := NewEmailQueue(EmailQueueOpts{DB: db, Outbound: outbound, Lo: &lo})
@@ -134,11 +137,19 @@ func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	if queued() != 1 {
 		t.Fatalf("queued emails after failure = %d, want 1", queued())
 	}
+	if !strings.Contains(logs.String(), "level=warn") || strings.Contains(logs.String(), "retry limit reached") {
+		t.Fatalf("retry has incorrect outcome logging: %s", logs.String())
+	}
+	logs.Reset()
 	for attempt := 2; attempt <= emailQueueMaxAttempts; attempt++ {
 		queue.deliver(claimOne())
 	}
 	if queued() != 0 {
 		t.Fatalf("queued emails after final failure = %d, want 0", queued())
+	}
+
+	if !strings.Contains(logs.String(), "level=error") || !strings.Contains(logs.String(), "retry limit reached") || !strings.Contains(logs.String(), "queue_id=") {
+		t.Fatalf("terminal failure has no correlated error: %s", logs.String())
 	}
 
 	send(email)
@@ -150,6 +161,17 @@ func TestDelayedEmailRetriesThenGivesUp(t *testing.T) {
 	}
 	if attempts != 0 {
 		t.Fatalf("attempts after replacement = %d, want 0", attempts)
+	}
+
+	entry := claimOne()
+	entry.Attempts = emailQueueMaxAttempts - 1
+	logs.Reset()
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	queue.deliver(entry)
+	if !strings.Contains(logs.String(), "SMTP unavailable") || !strings.Contains(logs.String(), "discarded=false") {
+		t.Fatalf("cleanup failure hid the delivery failure: %s", logs.String())
 	}
 }
 

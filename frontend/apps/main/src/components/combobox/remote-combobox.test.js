@@ -25,6 +25,7 @@ vi.mock('@/stores/users', () => ({
   useUsersStore: () => ({ options: [], fetchUsers: vi.fn(), searchUsers: vi.fn(), ensureUserIDs })
 }))
 vi.mock('@/stores/user', () => ({ useUserStore: () => ({ userID: 1 }) }))
+vi.mock('@/stores/appSettings', () => ({ useAppSettingsStore: () => ({ settings: {} }) }))
 vi.mock('@/stores/tag', () => ({
   useTagStore: () => ({
     tagOptions: [],

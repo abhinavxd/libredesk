@@ -64,6 +64,7 @@ func (m *Manager) Get(id int) (models.BusinessHours, error) {
 		if err == sql.ErrNoRows {
 			return businessHours, ErrBusinessHoursNotFound
 		}
+		m.lo.Error("error fetching business hours", "business_hours_id", id, "error", err)
 		return businessHours, err
 	}
 	return businessHours, nil

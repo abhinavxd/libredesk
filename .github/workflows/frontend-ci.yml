@@ -49,17 +49,19 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: "1.25.0"
-
-      - name: Install pnpm
-        run: npm install -g pnpm@9.15.3
+          go-version: "1.27.3"
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          node-version: "24"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+          cache: true
+          cache_dependency_path: frontend/pnpm-lock.yaml
 
       - name: Cache the cypress binary
         uses: actions/cache@v4
@@ -101,6 +103,17 @@ jobs:
         run: |
           ./libredesk --install --idempotent-install --yes --config ./config.toml
           ./libredesk --upgrade --yes --config ./config.toml
+          # Fixtures simulate incoming messages through the contact writing permission.
+          docker exec -i '${{ job.services.db.id }}' psql -U libredesk -d libredesk -v ON_ERROR_STOP=1 <<'SQL'
+          WITH fixture_role AS (
+            INSERT INTO roles (name, description, permissions)
+            VALUES ('Cypress contact writer', 'Create incoming test messages', '{messages:write_as_contact}')
+            RETURNING id
+          )
+          INSERT INTO user_roles (user_id, role_id)
+          SELECT users.id, fixture_role.id FROM users CROSS JOIN fixture_role
+          WHERE users.email = 'System';
+          SQL
           ./libredesk --config ./config.toml &
           for i in $(seq 1 60); do
             if [ "$(curl --connect-timeout 1 --max-time 2 -s -o /dev/null -w '%{http_code}' http://localhost:9000/ || true)" = "200" ]; then

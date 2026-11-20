@@ -302,7 +302,7 @@ func (e *Engine) EvaluateNewConversationRules(conversation cmodels.Conversation)
 	}:
 	default:
 		// Queue is full.
-		e.lo.Warn("EvaluateNewConversationRules: newConversationQ is full, unable to enqueue conversation")
+		e.lo.Error("EvaluateNewConversationRules: newConversationQ is full, unable to enqueue conversation", "conversation_uuid", conversation.UUID)
 	}
 }
 
@@ -330,7 +330,7 @@ func (e *Engine) EvaluateConversationUpdateRules(conversation cmodels.Conversati
 		previousValues: previousValues,
 	}:
 	default:
-		e.lo.Warn("EvaluateConversationUpdateRules: updateConversationQ is full, unable to enqueue conversation")
+		e.lo.Error("EvaluateConversationUpdateRules: updateConversationQ is full, unable to enqueue conversation", "conversation_uuid", conversation.UUID, "event_type", eventType)
 	}
 }
 
@@ -349,7 +349,7 @@ func (e *Engine) handleNewConversation(conversation cmodels.Conversation) {
 	e.lo.Debug("handling new conversation for automation rule evaluation", "uuid", conversation.UUID)
 	rules := e.filterRulesByType(models.RuleTypeNewConversation, "")
 	if len(rules) == 0 {
-		e.lo.Info("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
+		e.lo.Debug("no rules to evaluate for new conversation rule evaluation", "uuid", conversation.UUID)
 		return
 	}
 	e.evalConversationRules(rules, conversation, nil)
@@ -360,7 +360,7 @@ func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eve
 	e.lo.Debug("handling update conversation for automation rule evaluation", "uuid", conversation.UUID, "event_type", eventType)
 	rules := e.filterRulesByType(models.RuleTypeConversationUpdate, eventType)
 	if len(rules) == 0 {
-		e.lo.Info("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
+		e.lo.Debug("no rules to evaluate for conversation update", "uuid", conversation.UUID, "event_type", eventType)
 		return
 	}
 	e.evalConversationRules(rules, conversation, previousValues)
@@ -370,7 +370,7 @@ func (e *Engine) handleUpdateConversation(conversation cmodels.Conversation, eve
 func (e *Engine) handleTimeTrigger() {
 	rules := e.filterRulesByType(models.RuleTypeTimeTrigger, "")
 	if len(rules) == 0 {
-		e.lo.Info("no rules to evaluate for time trigger")
+		e.lo.Debug("no rules to evaluate for time trigger")
 		return
 	}
 	lookbackDays := e.timeTriggerLookbackDays
@@ -391,7 +391,7 @@ func (e *Engine) handleTimeTrigger() {
 			return
 		}
 		batch++
-		e.lo.Info("fetched conversation batch for time trigger", "batch", batch, "after_id", afterID, "count", len(refs))
+		e.lo.Debug("fetched conversation batch for time trigger", "batch", batch, "after_id", afterID, "count", len(refs))
 		if len(refs) == 0 {
 			break
 		}
@@ -459,6 +459,7 @@ func (e *Engine) queryRules() []models.Rule {
 		}
 		// Set values from DB.
 		for i := range rulesBatch {
+			rulesBatch[i].ID = rule.ID
 			rulesBatch[i].Type = rule.Type
 			rulesBatch[i].Events = rule.Events
 			rulesBatch[i].ExecutionMode = rule.ExecutionMode

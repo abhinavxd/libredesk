@@ -2,6 +2,7 @@ package template
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -35,15 +36,8 @@ const (
 // RenderString renders Go template variables in the given content string
 // without wrapping it in the base email template. Returns original content on any error.
 func (m *Manager) RenderString(data any, content string) string {
-	t, err := template.New("content").Funcs(m.funcMap).Parse(content)
-	if err != nil {
-		return content
-	}
-	var buf strings.Builder
-	if err := t.Execute(&buf, data); err != nil {
-		return content
-	}
-	return buf.String()
+	rendered, _ := renderString(data, content, m.funcMap)
+	return rendered
 }
 
 // RenderStoredTemplate fetches a template by name and renders its body with the provided data
@@ -53,16 +47,20 @@ func (m *Manager) RenderStoredTemplate(name string, data any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return m.RenderString(data, tmpl.Body), nil
+	rendered, err := renderString(data, tmpl.Body, m.funcMap)
+	if err != nil {
+		m.lo.Warn("saved template interpolation failed, using original content", "template", name, "error", err)
+	}
+	return rendered, nil
 }
 
-// RenderEmailWithTemplate renders content inside the default outgoing email template.
+// RenderEmailWithTemplate places content verbatim inside the default outgoing email template.
 func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, error) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	defaultTmpl, err := m.getDefaultOutgoingEmailTemplate()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrTemplateNotFound) {
 		m.lo.Error("error fetching default outgoing email template", "error", err)
 	}
 
@@ -75,15 +73,17 @@ func (m *Manager) RenderEmailWithTemplate(data any, content string) (string, err
 		return "", fmt.Errorf("parsing base template: %w", err)
 	}
 
+	// The reply is already rendered and can hold contact-supplied text, so it is inserted as a value and never parsed as a template.
 	contentCount := 0
-	trackContent := template.FuncMap{
+	contentFuncs := template.FuncMap{
 		"_libredeskTrackContent": func() string {
 			contentCount++
 			return ""
 		},
+		"_libredeskReplyContent": func() string { return content },
 	}
-	baseTemplate.Funcs(trackContent)
-	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Funcs(trackContent).Parse(`{{_libredeskTrackContent}}` + content)
+	baseTemplate.Funcs(contentFuncs)
+	contentTemplate, err := template.New(TmplContent).Funcs(m.funcMap).Funcs(contentFuncs).Parse(`{{_libredeskTrackContent}}{{_libredeskReplyContent}}`)
 	if err != nil {
 		return "", fmt.Errorf("parsing content template: %w", err)
 	}
@@ -267,4 +267,16 @@ func countContentTemplates(node parse.Node) int {
 		return countContentTemplates(node.List) + countContentTemplates(node.ElseList)
 	}
 	return 0
+}
+
+func renderString(data any, content string, funcs template.FuncMap) (string, error) {
+	t, err := template.New("content").Funcs(funcs).Parse(content)
+	if err != nil {
+		return content, err
+	}
+	var buf strings.Builder
+	if err := t.Execute(&buf, data); err != nil {
+		return content, err
+	}
+	return buf.String(), nil
 }

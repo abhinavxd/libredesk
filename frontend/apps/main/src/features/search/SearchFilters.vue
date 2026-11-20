@@ -7,7 +7,7 @@
           :items="statusItems"
           :placeholder="t('globals.terms.status')"
           align="start"
-          @update:model-value="set('status', $event)"
+          @select="toggle('status', $event)"
         />
       </div>
       <div :class="FILTER_CLASS">
@@ -16,7 +16,7 @@
           :items="inboxStore.options"
           :placeholder="t('globals.terms.inbox')"
           align="start"
-          @update:model-value="set('inbox', $event)"
+          @select="toggle('inbox', $event)"
         />
       </div>
       <div :class="FILTER_CLASS">
@@ -24,8 +24,9 @@
           :model-value="filters.assignee"
           :placeholder="t('globals.terms.assignee')"
           :prepend-items="unassignedItem"
+          include-disabled
           align="start"
-          @update:model-value="set('assignee', $event)"
+          @select="toggle('assignee', $event)"
         />
       </div>
       <CollapsibleTrigger as-child>
@@ -38,6 +39,16 @@
           <ChevronDown :class="['size-4', { 'rotate-180': advancedOpen }]" aria-hidden="true" />
         </Button>
       </CollapsibleTrigger>
+      <Button
+        v-if="hasActiveFilters(filters)"
+        type="button"
+        variant="ghost"
+        class="shrink-0 gap-2 font-normal text-muted-foreground"
+        @click="emit('update:filters', emptyFilters())"
+      >
+        <X class="size-4" aria-hidden="true" />
+        {{ t('globals.messages.clearFilters') }}
+      </Button>
     </div>
 
     <CollapsibleContent style="animation: none">
@@ -48,7 +59,7 @@
             :items="priorityItems"
             :placeholder="t('globals.terms.priority')"
             align="start"
-            @update:model-value="set('priority', $event)"
+            @select="toggle('priority', $event)"
           />
         </div>
         <div :class="FILTER_CLASS">
@@ -57,7 +68,7 @@
             :placeholder="t('globals.terms.team')"
             :prepend-items="unassignedItem"
             align="start"
-            @update:model-value="set('team', $event)"
+            @select="toggle('team', $event)"
           />
         </div>
         <div class="w-36 shrink-0">
@@ -112,7 +123,7 @@ import { useConversationStore } from '@main/stores/conversation'
 import { useInboxStore } from '@main/stores/inbox'
 import { useTagStore } from '@main/stores/tag'
 import SearchTagFilter from './SearchTagFilter.vue'
-import { UNASSIGNED } from './searchFilters'
+import { UNASSIGNED, emptyFilters, hasActiveFilters, toggleFilter } from './searchFilters'
 
 const FILTER_CLASS = 'flex-1 min-w-28'
 
@@ -155,6 +166,10 @@ const selectedTags = computed(() => {
 
 const set = (key, value) => {
   emit('update:filters', { ...props.filters, [key]: value ?? (key === 'tags' ? [] : '') })
+}
+
+const toggle = (key, item) => {
+  emit('update:filters', toggleFilter(props.filters, key, item.value))
 }
 
 const removeTag = (value) => {

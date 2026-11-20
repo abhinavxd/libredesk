@@ -10,17 +10,6 @@
             </span>
           </TabsTrigger>
         </TabsList>
-        <Button
-          v-if="showClearFilters"
-          type="button"
-          variant="ghost"
-          size="sm"
-          class="shrink-0 text-muted-foreground"
-          @click="emit('clearFilters')"
-        >
-          <X class="h-4 w-4" aria-hidden="true" />
-          {{ t('globals.messages.clearFilters') }}
-        </Button>
         <div class="ml-auto flex items-center gap-2">
           <Label for="search-sort" class="font-normal text-muted-foreground">
             {{ t('globals.messages.sortBy') }}
@@ -84,9 +73,7 @@
 </template>
 
 <script setup>
-import { X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
-import { Button } from '@shared-ui/components/ui/button'
 import { Label } from '@shared-ui/components/ui/label'
 import { Spinner } from '@shared-ui/components/ui/spinner'
 import {
@@ -123,10 +110,9 @@ defineProps({
   term: { type: String, default: '' },
   activeTab: { type: String, required: true },
   sorts: { type: Object, required: true },
-  showClearFilters: { type: Boolean, default: false },
   loading: { type: Boolean, default: false }
 })
-const emit = defineEmits(['update:activeTab', 'changeSort', 'changePage', 'clearFilters'])
+const emit = defineEmits(['update:activeTab', 'changeSort', 'changePage'])
 
 const { t } = useI18n()
 

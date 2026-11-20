@@ -2,7 +2,7 @@
   <div class="h-screen overflow-y-auto overscroll-contain bg-secondary">
     <div class="flex min-h-full flex-col">
       <main class="flex flex-1 items-start justify-center px-4 pb-10 pt-[15vh] sm:px-6">
-        <div class="auth-content w-full max-w-sm">
+        <div class="auth-content w-full max-w-sm origin-top animate-swing-in">
           <slot />
         </div>
       </main>

@@ -110,7 +110,7 @@ func (s *Service) worker(ctx context.Context) {
 				return
 			}
 			if err := s.SendSync(message); err != nil {
-				s.lo.Error("error sending message", "error", err)
+				s.lo.Error("error sending notification", "provider", message.Provider, "recipient_count", len(message.RecipientEmails), "error", err)
 			}
 		}
 	}

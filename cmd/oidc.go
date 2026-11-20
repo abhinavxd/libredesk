@@ -42,7 +42,7 @@ func handleGetOIDC(r *fastglue.Request) error {
 func handleCreateOIDC(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = models.OIDC{}
+		req = models.OIDC{VerifyEmail: true}
 	)
 	if err := r.Decode(&req, "json"); err != nil {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), nil, envelope.GeneralError)
@@ -60,7 +60,6 @@ func handleCreateOIDC(r *fastglue.Request) error {
 
 	// Reload the auth manager to update the OIDC providers.
 	if err := reloadAuth(app); err != nil {
-		app.lo.Error("error reloading auth", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
@@ -74,7 +73,7 @@ func handleCreateOIDC(r *fastglue.Request) error {
 func handleUpdateOIDC(r *fastglue.Request) error {
 	var (
 		app = r.Context.(*App)
-		req = models.OIDC{}
+		req = models.OIDC{VerifyEmail: true}
 	)
 	id, err := strconv.Atoi(r.RequestCtx.UserValue("id").(string))
 	if err != nil || id == 0 {
@@ -100,7 +99,6 @@ func handleUpdateOIDC(r *fastglue.Request) error {
 
 	// Reload the auth manager to update the OIDC providers.
 	if err := reloadAuth(app); err != nil {
-		app.lo.Error("error reloading auth", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 
@@ -122,7 +120,6 @@ func handleDeleteOIDC(r *fastglue.Request) error {
 	}
 	app.auth.RemoveProvider(id)
 	if err := reloadAuth(app); err != nil {
-		app.lo.Error("error reloading auth", "error", err)
 		return r.SendErrorEnvelope(fasthttp.StatusInternalServerError, app.i18n.T("globals.messages.somethingWentWrong"), nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(true)

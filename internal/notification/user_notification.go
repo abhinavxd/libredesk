@@ -92,7 +92,7 @@ func (m *UserNotificationManager) Create(userID int, notificationType models.Not
 	}
 	body.String = pushPreview(body.String, notificationBodyRunes)
 	if err := m.q.InsertNotification.Get(&notification, userID, notificationType, title, body, conversationID, messageID, actorID, meta, pq.Array(models.ReplyTypes)); err != nil {
-		m.lo.Error("error creating notification", "user_id", userID, "error", err)
+		m.lo.Error("error creating notification", "user_id", userID, "type", notificationType, "conversation_id", conversationID.Int, "message_id", messageID.Int, "error", err)
 		return notification, envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return notification, nil
@@ -151,7 +151,9 @@ func (m *UserNotificationManager) DeleteAll(userID int) error {
 func (m *UserNotificationManager) DeleteOldNotifications(ctx context.Context) error {
 	res, err := m.q.DeleteOldNotifications.ExecContext(ctx)
 	if err != nil {
-		m.lo.Error("error deleting old notifications", "error", err)
+		if !errors.Is(err, context.Canceled) {
+			m.lo.Error("error deleting old notifications", "error", err)
+		}
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
@@ -167,9 +169,7 @@ func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
 		return
 	case <-time.After(60 * time.Second):
 	}
-	if err := m.DeleteOldNotifications(ctx); err != nil {
-		m.lo.Error("error cleaning old notifications", "error", err)
-	}
+	_ = m.DeleteOldNotifications(ctx)
 
 	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
@@ -179,9 +179,7 @@ func (m *UserNotificationManager) RunNotificationCleaner(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := m.DeleteOldNotifications(ctx); err != nil {
-				m.lo.Error("error cleaning old notifications", "error", err)
-			}
+			_ = m.DeleteOldNotifications(ctx)
 		}
 	}
 }

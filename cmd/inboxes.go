@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"net/url"
 	"regexp"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -172,7 +173,7 @@ func validateWhatsAppCredentials(r *fastglue.Request, app *App, inb imodels.Inbo
 func ensureWhatsAppCSATTemplate(app *App, inboxID int) {
 	defer func() {
 		if r := recover(); r != nil {
-			app.lo.Error("recovered from panic in whatsapp csat template ensure", "inbox_id", inboxID, "panic", r)
+			app.lo.Error("recovered from panic in whatsapp csat template ensure", "inbox_id", inboxID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	reconcileWhatsAppCSATTemplate(app, inboxID)
@@ -365,7 +366,7 @@ func handleVerifySendForInboxAlias(r *fastglue.Request) error {
 func repointWhatsAppWebhookAfterDelete(app *App, deleted imodels.Inbox) {
 	defer func() {
 		if r := recover(); r != nil {
-			app.lo.Error("recovered from panic in whatsapp webhook repoint", "inbox_id", deleted.ID, "panic", r)
+			app.lo.Error("recovered from panic in whatsapp webhook repoint", "inbox_id", deleted.ID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	cfg, err := whatsAppConfigFromRecord(deleted)
@@ -386,7 +387,7 @@ func repointWhatsAppWebhookAfterDelete(app *App, deleted imodels.Inbox) {
 func postSaveWhatsAppTasks(app *App, inboxID int) {
 	defer func() {
 		if r := recover(); r != nil {
-			app.lo.Error("recovered from panic in whatsapp post-save tasks", "inbox_id", inboxID, "panic", r)
+			app.lo.Error("recovered from panic in whatsapp post-save tasks", "inbox_id", inboxID, "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	subscribeWhatsAppWebhook(app, inboxID)
@@ -397,7 +398,7 @@ func postSaveWhatsAppTasks(app *App, inboxID int) {
 func reconcileWhatsAppRootURL(app *App) {
 	defer func() {
 		if r := recover(); r != nil {
-			app.lo.Error("recovered from panic in whatsapp root url reconcile", "panic", r)
+			app.lo.Error("recovered from panic in whatsapp root url reconcile", "panic", r, "stack", string(debug.Stack()))
 		}
 	}()
 	inboxes, err := app.inbox.GetAll()

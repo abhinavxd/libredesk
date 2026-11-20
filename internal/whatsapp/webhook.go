@@ -263,6 +263,7 @@ func (p *WebhookPayload) ExtractStatuses() []ParsedStatus {
 				}
 				if len(s.Errors) > 0 {
 					err := s.Errors[0]
+					ps.ErrorCode = err.Code
 					ps.UserMsg = firstNonEmptyStr(err.ErrorData.Details, err.UserMsg, err.Message)
 				}
 				out = append(out, ps)

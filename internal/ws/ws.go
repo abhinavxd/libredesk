@@ -4,12 +4,17 @@ package ws
 import (
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	umodels "github.com/abhinavxd/libredesk/internal/user/models"
 	"github.com/abhinavxd/libredesk/internal/ws/models"
 	"github.com/fasthttp/websocket"
 	"github.com/zerodha/logf"
 )
+
+// agentOfflineGrace is how long an agent can have no open socket before being marked offline, so page reloads don't flip their status.
+const agentOfflineGrace = 30 * time.Second
 
 // Hub maintains the set of registered websockets clients.
 type Hub struct {
@@ -17,6 +22,9 @@ type Hub struct {
 
 	clients      map[int][]*Client
 	clientsMutex sync.RWMutex
+
+	offlineGrace time.Duration
+	closing      atomic.Bool
 
 	convSubsList   map[string]map[*Client]struct{}
 	convSubsOpen   map[string]map[*Client]struct{}
@@ -30,11 +38,13 @@ type Hub struct {
 
 type userStore interface {
 	UpdateLastActive(userID int) (bool, error)
+	MarkAgentOffline(userID int) bool
 }
 
 type conversationStore interface {
 	BroadcastTypingToWidgetClientsOnly(conversationUUID string, isTyping bool)
 	FilterAuthorizedListUUIDs(agentID int, uuids []string) ([]string, error)
+	BroadcastAgentAvailability(agentID int, status string)
 }
 
 // NewHub creates a new websocket hub.
@@ -43,6 +53,7 @@ func NewHub(lo *logf.Logger, userStore userStore) *Hub {
 		lo:                lo,
 		clients:           make(map[int][]*Client, 64),
 		clientsMutex:      sync.RWMutex{},
+		offlineGrace:      agentOfflineGrace,
 		convSubsList:      make(map[string]map[*Client]struct{}, 1024),
 		convSubsOpen:      make(map[string]map[*Client]struct{}, 64),
 		clientListSubs:    make(map[*Client]map[string]struct{}, 64),
@@ -65,6 +76,7 @@ func (h *Hub) KickUser(userID int) {
 
 // CloseAll sends a close frame to every connected client and returns the number closed.
 func (h *Hub) CloseAll() int {
+	h.closing.Store(true)
 	h.clientsMutex.RLock()
 	clients := make([]*Client, 0, len(h.clients))
 	for _, userClients := range h.clients {
@@ -187,6 +199,9 @@ func (h *Hub) RemoveClient(client *Client) {
 		}
 		if len(clients) == 0 {
 			delete(h.clients, client.ID)
+			if h.userStore != nil && !h.closing.Load() {
+				time.AfterFunc(h.offlineGrace, func() { h.markOfflineIfDisconnected(client.ID) })
+			}
 		} else {
 			h.clients[client.ID] = clients
 		}
@@ -263,6 +278,25 @@ func (h *Hub) removeConversationSub(client *Client, uuid string) {
 	}
 	if h.clientOpenSub[client] == uuid {
 		delete(h.clientOpenSub, client)
+	}
+}
+
+// markOfflineIfDisconnected marks the agent offline unless they reconnected during the grace period or the server is shutting down.
+func (h *Hub) markOfflineIfDisconnected(userID int) {
+	h.clientsMutex.RLock()
+	connected := len(h.clients[userID]) > 0
+	h.clientsMutex.RUnlock()
+	if connected || h.closing.Load() {
+		return
+	}
+	if h.userStore.MarkAgentOffline(userID) {
+		h.broadcastAgentAvailability(userID, umodels.Offline)
+	}
+}
+
+func (h *Hub) broadcastAgentAvailability(userID int, status string) {
+	if h.conversationStore != nil {
+		h.conversationStore.BroadcastAgentAvailability(userID, status)
 	}
 }
 

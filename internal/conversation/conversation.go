@@ -57,6 +57,7 @@ var (
 	efs                             embed.FS
 	errConversationNotFound         = errors.New("conversation not found")
 	ErrConversationAlreadyAssigned  = errors.New("conversation already assigned")
+	ErrAssigneeUnavailable          = errors.New("assignee is unavailable")
 	ErrMessageNotFound              = errors.New("message not found")
 	conversationsAllowedFields      = []string{"status_id", "priority_id", "assigned_team_id", "assigned_user_id", "inbox_id", "last_message_at", "last_interaction_at", "last_interaction_sender", "created_at", "waiting_since", "next_sla_deadline_at", "snoozed_until", "sla_policy_id"}
 	conversationStatusAllowedFields = []string{"id", "name"}
@@ -209,6 +210,7 @@ type mediaStore interface {
 	ContentIDExists(contentID, conversationUUID string) (bool, string, error)
 	Upload(fileName, contentType string, content io.ReadSeeker) (string, string, error)
 	UploadAndInsert(fileName, contentType, contentID string, modelType null.String, modelID null.Int, content io.ReadSeeker, fileSize int, disposition null.String, meta []byte, private bool) (mmodels.Media, error)
+	Delete(name string) error
 }
 
 type inboxStore interface {
@@ -345,6 +347,7 @@ type queries struct {
 	GetConversationsCreatedAfter        *sqlx.Stmt `query:"get-conversations-created-after"`
 	GetUnassignedConversations          *sqlx.Stmt `query:"get-unassigned-conversations"`
 	GetConversations                    string     `query:"get-conversations"`
+	GetConversationsPageBase            string     `query:"get-conversations-page-base"`
 	GetContactChatConversations         *sqlx.Stmt `query:"get-contact-chat-conversations"`
 	GetChatConversation                 *sqlx.Stmt `query:"get-chat-conversation"`
 	GetContactPreviousConversations     *sqlx.Stmt `query:"get-contact-previous-conversations"`
@@ -373,7 +376,8 @@ type queries struct {
 	SetConversationTags                 *sqlx.Stmt `query:"set-conversation-tags"`
 	RemoveConversationTags              *sqlx.Stmt `query:"remove-conversation-tags"`
 	GetConversationTags                 *sqlx.Stmt `query:"get-conversation-tags"`
-	UnassignOpenConversations           *sqlx.Stmt `query:"unassign-open-conversations"`
+	GetOpenConversationUUIDsByAssignee  *sqlx.Stmt `query:"get-open-conversation-uuids-by-assignee"`
+	UnassignOpenConversation            *sqlx.Stmt `query:"unassign-open-conversation"`
 	ReOpenConversation                  *sqlx.Stmt `query:"re-open-conversation"`
 	UnsnoozeAll                         *sqlx.Stmt `query:"unsnooze-all"`
 	DeleteConversation                  *sqlx.Stmt `query:"delete-conversation"`
@@ -688,7 +692,7 @@ func (c *Manager) GetConversationParticipants(uuid string) ([]models.Conversatio
 	return conv, nil
 }
 
-// GetUnassignedConversations retrieves unassigned conversations.
+// GetUnassignedConversations returns team inbox tickets for round robin assignment.
 func (c *Manager) GetUnassignedConversations() ([]models.Conversation, error) {
 	var conv []models.Conversation
 	if err := c.q.GetUnassignedConversations.Select(&conv); err != nil {
@@ -866,13 +870,45 @@ func (c *Manager) UpdateConversationUserAssignee(uuid string, assigneeID int, ac
 		return nil
 	}
 
+	if err := c.ValidateUserAssignee(assigneeID); err != nil {
+		return err
+	}
+
 	if err := c.updateAssignee(uuid, assigneeID, models.AssigneeTypeUser); err != nil {
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
 	return c.afterUserAssignedHooks(uuid, assigneeID, actor, amodels.PreviousValues(previousConversation))
 }
 
-// ClaimUnassignedConversation atomically assigns a conversation only if still unassigned and still in expectedTeamID, else returns ErrConversationAlreadyAssigned.
+// ValidateUserAssignee rejects agents who are disabled, or away and reassigning while the general setting blocks them.
+func (c *Manager) ValidateUserAssignee(assigneeID int) error {
+	assignee, err := c.userStore.GetAgentCachedOrLoad(assigneeID)
+	if err != nil {
+		return err
+	}
+	if !assignee.Enabled {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.assigneeDisabled"), nil)
+	}
+	if assignee.AvailabilityStatus == umodels.AwayAndReassigning && c.blocksAwayReassigningAssignees() {
+		return envelope.NewError(envelope.InputError, c.i18n.T("conversation.error.agentAwayReassigning"), nil)
+	}
+	return nil
+}
+
+// blocksAwayReassigningAssignees reports whether the general setting blocks assigning to away and reassigning agents.
+func (c *Manager) blocksAwayReassigningAssignees() bool {
+	b, err := c.settingsStore.Get("app.block_assign_away_reassigning")
+	if err != nil {
+		return false
+	}
+	var block bool
+	if err := json.Unmarshal(b, &block); err != nil {
+		return false
+	}
+	return block
+}
+
+// ClaimUnassignedConversation atomically assigns a conversation only if still unassigned, still in expectedTeamID and the assignee is an enabled, non-away agent of that team.
 func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedTeamID int, actor umodels.User) error {
 	previousConversation, err := c.GetConversation(0, uuid, "")
 	if err != nil {
@@ -880,17 +916,15 @@ func (c *Manager) ClaimUnassignedConversation(uuid string, assigneeID, expectedT
 	}
 	prev, prevErr := c.GetConversationListItem(uuid)
 
-	res, err := c.q.ClaimUnassignedConversation.Exec(uuid, assigneeID, expectedTeamID)
-	if err != nil {
+	var available, claimed bool
+	if err := c.q.ClaimUnassignedConversation.QueryRow(uuid, assigneeID, expectedTeamID).Scan(&available, &claimed); err != nil {
 		c.lo.Error("error claiming unassigned conversation", "uuid", uuid, "error", err)
 		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
 	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		c.lo.Error("error reading rows affected for conversation claim", "uuid", uuid, "error", err)
-		return envelope.NewError(envelope.GeneralError, c.i18n.T("globals.messages.somethingWentWrong"), nil)
-	}
-	if rows == 0 {
+	if !claimed {
+		if !available {
+			return ErrAssigneeUnavailable
+		}
 		return ErrConversationAlreadyAssigned
 	}
 
@@ -1086,7 +1120,7 @@ func (c *Manager) UpdateConversationStatus(uuid string, statusID int, status, sn
 	if status == models.StatusSnoozed {
 		duration, err := time.ParseDuration(snoozeDur)
 		if err != nil || duration <= 0 {
-			c.lo.Error("error parsing snooze duration", "duration", snoozeDur, "error", err)
+			c.lo.Debug("error parsing snooze duration", "duration", snoozeDur, "error", err)
 			return envelope.NewError(envelope.InputError, c.i18n.T("validation.invalidSnoozeDuration"), nil)
 		}
 		snoozeUntil = time.Now().Add(duration)
@@ -1553,13 +1587,41 @@ func (m *Manager) NotifyMention(conversationUUID string, message models.Message,
 	}
 }
 
-// UnassignOpen unassigns all open conversations belonging to a user.
-// i.e conversations without status `Closed` and `Resolved`.
+// UnassignOpen unassigns every conversation of a user that is not in a resolved status, one at a time so each change is broadcast.
 func (m *Manager) UnassignOpen(userID int) error {
-	if _, err := m.q.UnassignOpenConversations.Exec(userID); err != nil {
-		m.lo.Error("error unassigning open conversations", "error", err)
+	var uuids []string
+	if err := m.q.GetOpenConversationUUIDsByAssignee.Select(&uuids, userID); err != nil {
+		m.lo.Error("error fetching open conversations of user", "user_id", userID, "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
 	}
+	if len(uuids) == 0 {
+		return nil
+	}
+	systemUser, err := m.userStore.GetSystemUser()
+	if err != nil {
+		return err
+	}
+	for _, uuid := range uuids {
+		if err := m.unassignIfStillOpen(uuid, userID, systemUser); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// unassignIfStillOpen clears the user assignee only if the conversation is still assigned to userID and unresolved, and reports the change only then.
+func (m *Manager) unassignIfStillOpen(uuid string, userID int, actor umodels.User) error {
+	prev, prevErr := m.GetConversationListItem(uuid)
+	res, err := m.q.UnassignOpenConversation.Exec(uuid, userID)
+	if err != nil {
+		m.lo.Error("error unassigning open conversation", "uuid", uuid, "user_id", userID, "error", err)
+		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
+	}
+	// The conversation was reassigned or resolved after the list of open conversations was read.
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return nil
+	}
+	m.afterAssigneeRemoved(uuid, models.AssigneeTypeUser, actor, prev, prevErr)
 	return nil
 }
 
@@ -1637,7 +1699,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 		}
 		return m.UpdateConversationStatus(conv.UUID, statusID, "", "", user)
 	case amodels.ActionSendPrivateNote:
-		_, err := m.SendPrivateNote([]mmodels.Media{}, user.ID, conv.UUID, action.Value[0], nil)
+		_, err := m.SendPrivateNote([]mmodels.Media{}, user.ID, conv.UUID, m.RenderStaffTemplate(conv.UUID, user.ID, action.Value[0]), nil)
 		if err != nil {
 			return fmt.Errorf("sending private note: %w", err)
 		}
@@ -1657,7 +1719,7 @@ func (m *Manager) ApplyAction(action amodels.RuleAction, conv models.Conversatio
 			user.ID,
 			conv.ContactID,
 			conv.UUID,
-			action.Value[0],
+			m.RenderStaffTemplate(conv.UUID, user.ID, action.Value[0]),
 			to,
 			nil,
 			nil,
@@ -1755,6 +1817,9 @@ func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipie
 		if err != nil {
 			m.lo.Error("error fetching agent for email notification", "user_id", id, "error", err)
 			recipients = append(recipients, delivery)
+			continue
+		}
+		if !recipient.Enabled {
 			continue
 		}
 
@@ -1859,7 +1924,12 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 		m.lo.Error("error removing conversation assignee", "error", err)
 		return envelope.NewError(envelope.GeneralError, m.i18n.T("globals.messages.errorUpdatingConversation"), nil)
 	}
+	m.afterAssigneeRemoved(uuid, typ, actor, prev, prevErr)
+	return nil
+}
 
+// afterAssigneeRemoved fires the webhook and broadcasts that follow a removed assignee, given the conversation's prior list item.
+func (m *Manager) afterAssigneeRemoved(uuid, typ string, actor umodels.User, prev models.ConversationListItem, prevErr error) {
 	// Trigger webhook for conversation unassigned from user.
 	if typ == models.AssigneeTypeUser {
 		conversation, err := m.GetConversation(0, uuid, "")
@@ -1880,18 +1950,7 @@ func (m *Manager) RemoveConversationAssignee(uuid, typ string, actor umodels.Use
 		}
 	}
 
-	next, nextErr := m.GetConversationListItem(uuid)
-	if nextErr != nil {
-		m.lo.Error("error fetching conversation list item for unassign broadcast", "uuid", uuid, "error", nextErr)
-		return nil
-	}
-	var prevPtr *models.ConversationListItem
-	if prevErr == nil {
-		prevPtr = &prev
-	}
-	m.BroadcastConvReassignment(prevPtr, &next)
-
-	return nil
+	m.broadcastReassignment(uuid, prev, prevErr)
 }
 
 // SendCSATReply sends a CSAT reply message to a conversation. No-op if one was already sent.
@@ -2051,14 +2110,11 @@ func (c *Manager) getConversationTags(uuid string) ([]string, error) {
 	return tags, nil
 }
 
-// makeConversationsListQuery prepares a SQL query string for conversations list
-// viewingUserID is used as $1 for per-agent unread count calculation
-// $2 is includeMentions bool for conditional mentioned_message_uuid column
-func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []interface{}, error) {
+// makeConversationsListQuery filters tickets once for counting and pagination before loading page details.
+func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs []int, listTypes []string, baseQuery, order, orderBy string, page, pageSize int, filtersJSON string) (string, []any, error) {
 	includeMentions := slices.Contains(listTypes, models.MentionedConversations)
 	qArgs := []any{viewingUserID, includeMentions}
 
-	// Set defaults
 	if orderBy == "" {
 		orderBy = "conversations.last_message_at"
 	}
@@ -2069,7 +2125,6 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		filtersJSON = "[]"
 	}
 
-	// Validate inputs
 	if pageSize > conversationsListMaxPageSize {
 		pageSize = conversationsListMaxPageSize
 	}
@@ -2078,23 +2133,19 @@ func (c *Manager) makeConversationsListQuery(viewingUserID, userID int, teamIDs 
 		return "", nil, fmt.Errorf("no conversation list types specified")
 	}
 
-	// Prepare the conditions based on the list types.
 	conditions, err := appendListTypeConditions(listTypes, viewingUserID, userID, teamIDs, &qArgs)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// Build the base query with list type conditions
-	whereClause := listTypeWhereClause(conditions)
-
-	baseQuery = fmt.Sprintf(baseQuery, whereClause)
-
-	return dbutil.BuildPaginatedQuery(baseQuery, qArgs, dbutil.PaginationOptions{
-		Order:    order,
-		OrderBy:  orderBy,
-		Page:     page,
-		PageSize: pageSize,
-		Location: c.FilterLocation(),
+	pageBase := fmt.Sprintf(c.q.GetConversationsPageBase, orderBy, listTypeWhereClause(conditions))
+	return dbutil.BuildCountedPaginatedQuery(baseQuery, pageBase, qArgs, dbutil.PaginationOptions{
+		Order:        order,
+		OrderBy:      orderBy,
+		Page:         page,
+		PageSize:     pageSize,
+		Location:     c.FilterLocation(),
+		ReuseMatches: true,
 	}, filtersJSON, ListFilterAllowedFields, ListFilterRenderers)
 }
 
@@ -2104,7 +2155,7 @@ func (c *Manager) ValidateListFilters(filtersJSON string) error {
 	if err == nil {
 		return nil
 	}
-	c.lo.Error("error validating view filters", "error", err)
+	c.lo.Debug("error validating view filters", "error", err)
 	if errors.Is(err, dbutil.ErrTooManyGroups) {
 		return envelope.NewError(envelope.InputError, c.i18n.Ts("conversation.filters.tooManyGroups", "max", fmt.Sprintf("%d", dbutil.MaxFilterGroups)), nil)
 	}

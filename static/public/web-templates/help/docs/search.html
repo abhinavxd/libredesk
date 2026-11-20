@@ -4,17 +4,21 @@
 <form class="hcd-page-search" action="{{ .Data.HelpCenter.BasePath }}/search" method="GET" role="search">
     {{ template "hc-search-icon" "hc-search-icon" }}
     <input type="search" name="q" value="{{ .Data.Query }}" placeholder="{{ .L.T "helpCenter.searchPlaceholder" }}" aria-label="{{ .L.T "helpCenter.searchPlaceholder" }}" autocomplete="off" />
-    <button type="submit" class="hc-sr-only">{{ .L.T "globals.terms.search" }}</button>
+    <button type="submit" class="hc-sr-only" tabindex="-1">{{ .L.T "globals.terms.search" }}</button>
 </form>
 
 {{ if .Data.Query }}
 <h1 class="hcd-page-title">{{ .L.T "helpCenter.searchResults" }} &ldquo;{{ .Data.Query }}&rdquo;</h1>
 {{ if .Data.Results }}
+<p class="hc-search-count">{{ .Data.ResultCount }}</p>
 <ul class="hcd-results">
     {{ range .Data.Results }}
     <li>
-        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">{{ .Title }}</a>
-        {{ if .Content }}<p class="hcd-snippet">{{ .Content }}</p>{{ end }}
+        <a href="{{ $.Data.HelpCenter.BasePath }}/articles/{{ .Slug }}">
+            <span data-hc-search-text>{{ .Title }}</span>
+            {{ if .CollectionName }}<span class="hc-typeahead-collection">{{ .CollectionName }}</span>{{ end }}
+            {{ if .Content }}<p class="hcd-snippet" data-hc-search-text>{{ .Content }}</p>{{ end }}
+        </a>
     </li>
     {{ end }}
 </ul>

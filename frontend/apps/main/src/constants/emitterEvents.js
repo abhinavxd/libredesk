@@ -19,6 +19,7 @@ export const EMITTER_EVENTS = {
 
 export const CONVERSATION_ACTIONS = {
     DOWNLOAD_TRANSCRIPT: 'download-transcript',
+    DOWNLOAD_TRANSCRIPT_PDF: 'download-transcript-pdf',
     SUGGEST_TAGS: 'suggest-tags',
     SUMMARIZE: 'summarize'
 }

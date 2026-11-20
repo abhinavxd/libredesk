@@ -3,6 +3,7 @@ package notifier
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -194,7 +195,9 @@ func (m *PushManager) deliver(ctx context.Context, delivery pushDelivery) error 
 	for _, subscription := range subscriptions {
 		resp, err := m.sender(ctx, payload, subscription, m.subject, m.publicKey, m.privateKey)
 		if err != nil {
-			m.lo.Error("push endpoint rejected notification", "subscription_id", subscription.ID, "error", err)
+			if !errors.Is(err, context.Canceled) {
+				m.lo.Error("push endpoint rejected notification", "subscription_id", subscription.ID, "error", err)
+			}
 			continue
 		}
 		if resp == nil {

@@ -23,6 +23,11 @@
     --tw-exit-translate-y: 0 !important;
   }
 
+  .animate-swing-in {
+    animation-name: fade-in;
+    animation-duration: 100ms;
+  }
+
   .animate-shake,
   .animate-slide-in,
   .animate-slide-out,
