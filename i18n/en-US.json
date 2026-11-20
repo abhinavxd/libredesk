@@ -941,6 +941,7 @@
   "globals.messages.connectionFailedRefresh": "Connection failed. Please refresh.",
   "globals.messages.continueConversation": "Continue your conversation",
   "globals.messages.copied": "Copied to clipboard",
+  "globals.messages.copyFailed": "Could not copy to clipboard",
   "globals.messages.copyLink": "Copy link",
   "globals.messages.correctEmailErrors": "Please correct the email errors",
   "globals.messages.coverImageUrl": "Cover image URL",
