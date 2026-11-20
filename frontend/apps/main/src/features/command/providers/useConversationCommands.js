@@ -30,6 +30,7 @@ import { useUsersStore } from '@main/stores/users'
 import { useTeamStore } from '@main/stores/team'
 import { useTagStore } from '@main/stores/tag'
 import { useEmitter } from '@main/composables/useEmitter'
+import { copyToClipboard } from '@shared-ui/utils/clipboard.js'
 import { EMITTER_EVENTS, CONVERSATION_ACTIONS } from '@main/constants/emitterEvents'
 import { permissions as perms } from '@main/constants/permissions'
 import { CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@main/constants/conversation'
@@ -358,8 +359,15 @@ export function useConversationCommands({ openSnoozeDatePicker }) {
   ]
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href)
-    emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.copied') })
+    const success = await copyToClipboard(window.location.href)
+    if (success) {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.copied') })
+    } else {
+      emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
+        variant: 'destructive',
+        description: t('globals.messages.copyFailed')
+      })
+    }
   }
 
   const miscCommands = (conv) => [

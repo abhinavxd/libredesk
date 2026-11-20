@@ -239,6 +239,7 @@ import { useEmitter } from '@/composables/useEmitter'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { getTextFromHTML } from '@shared-ui/utils/string.js'
+import { copyToClipboard } from '@shared-ui/utils/clipboard.js'
 import { UserTypeAgent } from '@/constants/user'
 import { COPILOT_NAME } from '@/constants/copilot'
 import { permissions as perms } from '@/constants/permissions.js'
@@ -448,13 +449,13 @@ const resolveToolApproval = async (approval, approved) => {
 }
 
 const copyAnswer = async (content) => {
-  try {
-    await navigator.clipboard.writeText(getTextFromHTML(content))
+  const success = await copyToClipboard(getTextFromHTML(content))
+  if (success) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, { description: t('globals.messages.copied') })
-  } catch {
+  } else {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('copilot.copyFailed')
+      description: t('globals.messages.copyFailed')
     })
   }
 }
