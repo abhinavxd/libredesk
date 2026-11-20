@@ -1,6 +1,6 @@
 <template>
   <!-- Set fixed width only when not in fullscreen. -->
-  <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen }">
+  <div class="flex flex-col h-full" :class="{ 'max-h-[600px]': !isFullscreen, 'pointer-events-none': disabled }">
     <!-- Message type toggle -->
     <div
       class="flex items-center justify-between"
@@ -165,8 +165,8 @@
         :message-type="messageType"
         :placeholder="isCramped ? t('globals.terms.typeMessage') : t('editor.hint.full')"
         :insertContent="insertContent"
-        :autoFocus="false"
-        :disabled="isDraftLoading"
+        :autoFocus="false"                                                                                                                              
+        :disabled="isDraftLoading || disabled" 
         :enableMentions="messageType === 'private_note'"
         :enableConversationReferences="messageType === 'private_note'"
         :enableInlineImages="conversationStore.current.inbox_channel === 'email'"
@@ -345,6 +345,10 @@ const props = defineProps({
     default: false
   },
   isGenerating: {
+    type: Boolean,
+    default: false
+  },
+  disabled: {
     type: Boolean,
     default: false
   },
