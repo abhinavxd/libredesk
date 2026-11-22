@@ -72,7 +72,7 @@
             <FormItem>
               <FormLabel>{{ t('admin.ai.reasoningEffort') }}</FormLabel>
               <FormControl>
-                <Input type="text" placeholder="none" v-bind="componentField" />
+                <Input type="text" v-bind="componentField" />
               </FormControl>
               <FormDescription>{{ t('admin.ai.reasoningEffortHint') }}</FormDescription>
               <FormMessage />

@@ -57,6 +57,9 @@ Read today, tomorrow and other relative dates in the workspace time zone unless 
 // Endpoints (baseURL+model) that rejected max_tokens and require max_completion_tokens.
 var wantsMaxCompletionTokens sync.Map
 
+// Endpoints (baseURL+model) that only accept tools when reasoning_effort is "none".
+var wantsReasoningNoneWithTools sync.Map
+
 // OpenAIClient talks to any OpenAI-compatible API (base URL selects the host).
 type OpenAIClient struct {
 	cfg    models.ProviderConfig
@@ -152,6 +155,8 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 	}
 	if o.cfg.ReasoningEffort != "" {
 		body["reasoning_effort"] = o.cfg.ReasoningEffort
+	} else if _, ok := wantsReasoningNoneWithTools.Load(o.cfg.BaseURL + "|" + model); ok && len(payload.Tools) > 0 {
+		body["reasoning_effort"] = "none"
 	}
 	if len(payload.Tools) > 0 {
 		body["tools"] = payload.Tools
@@ -316,16 +321,19 @@ func (o *OpenAIClient) post(ctx context.Context, path string, body map[string]an
 			if adaptations < maxParamAdaptations {
 				if param, ok := adaptUnsupportedParam(body, respBytes); ok {
 					adaptations++
-					if param == "max_tokens" {
-						if m, ok := body["model"].(string); ok {
+					if m, ok := body["model"].(string); ok {
+						switch {
+						case param == "max_tokens":
 							wantsMaxCompletionTokens.Store(o.cfg.BaseURL+"|"+m, true)
+						case param == "reasoning_effort" && body["reasoning_effort"] == "none":
+							wantsReasoningNoneWithTools.Store(o.cfg.BaseURL+"|"+m, true)
 						}
 					}
 					bodyBytes, err = json.Marshal(body)
 					if err != nil {
 						return nil, fmt.Errorf("marshalling request body: %w", err)
 					}
-					o.lo.Warn("AI provider rejected a request parameter, retrying without it; later requests will adapt it automatically", "param", param)
+					o.lo.Warn("AI provider rejected a request parameter, retrying with it adjusted; later requests will adapt it automatically", "param", param)
 					// Param adaptations have their own budget; don't spend a transient-retry slot on them.
 					attempt--
 					continue
@@ -396,6 +404,14 @@ func adaptUnsupportedParam(body map[string]any, resp []byte) (string, bool) {
 	var parsed apiErrorResponse
 	if err := json.Unmarshal(resp, &parsed); err != nil {
 		return "", false
+	}
+	// Reasoning models reject tools at their default effort (code is null) and ask for "none" instead.
+	if parsed.Error.Param == "reasoning_effort" {
+		_, hasEffort := body["reasoning_effort"]
+		if _, hasTools := body["tools"]; hasTools && !hasEffort {
+			body["reasoning_effort"] = "none"
+			return "reasoning_effort", true
+		}
 	}
 	if parsed.Error.Code != "unsupported_parameter" && parsed.Error.Code != "unsupported_value" {
 		return "", false

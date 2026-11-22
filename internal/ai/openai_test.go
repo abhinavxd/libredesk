@@ -64,6 +64,83 @@ func TestLearnedParamAdaptation(t *testing.T) {
 	}
 }
 
+func TestReasoningEffortNoneForTools(t *testing.T) {
+	var bodies []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decoding request body: %v", err)
+		}
+		bodies = append(bodies, body)
+		// OpenAI reasoning models reject tools at the default effort with a null error code.
+		if _, hasTools := body["tools"]; hasTools && body["reasoning_effort"] != "none" {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":{"message":"Function tools with reasoning_effort are not supported. To use function tools, use /v1/responses or set reasoning_effort to 'none'.","type":"invalid_request_error","param":"reasoning_effort","code":null}}`))
+			return
+		}
+		w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	lo := logf.New(logf.Opts{Writer: &bytes.Buffer{}})
+	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "reasoning-none-tools-test-model"}
+	messages := []models.ChatMessage{{Role: "user", Content: "hi"}}
+	withTools := models.ChatCompletionPayload{Messages: messages, Tools: []models.ToolDef{{Type: "function", Function: models.ToolFunction{Name: "lookup"}}}}
+
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), withTools); err != nil {
+		t.Fatalf("request with tools should succeed after sending reasoning_effort none, got %v", err)
+	}
+	if len(bodies) != 2 {
+		t.Fatalf("expected one rejected request and one retry, got %d requests", len(bodies))
+	}
+	if _, ok := bodies[0]["reasoning_effort"]; ok {
+		t.Fatal("first request must not send reasoning_effort when the setting is blank")
+	}
+	if bodies[1]["reasoning_effort"] != "none" {
+		t.Fatalf("retry must send reasoning_effort none, got %v", bodies[1]["reasoning_effort"])
+	}
+
+	// A fresh client must remember the endpoint and send "none" with tools up front.
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), withTools); err != nil {
+		t.Fatalf("learned request should succeed, got %v", err)
+	}
+	if len(bodies) != 3 || bodies[2]["reasoning_effort"] != "none" {
+		t.Fatalf("learned request must send reasoning_effort none in a single round trip, got %d requests, last %v", len(bodies), bodies[len(bodies)-1])
+	}
+
+	// Without tools the blank setting still sends no reasoning_effort.
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), models.ChatCompletionPayload{Messages: messages}); err != nil {
+		t.Fatalf("request without tools should succeed, got %v", err)
+	}
+	if _, ok := bodies[3]["reasoning_effort"]; ok {
+		t.Fatal("request without tools must not send reasoning_effort")
+	}
+}
+
+func TestReasoningEffortErrorKeepsConfiguredValue(t *testing.T) {
+	requests := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":{"message":"Function tools with reasoning_effort are not supported.","type":"invalid_request_error","param":"reasoning_effort","code":null}}`))
+	}))
+	defer srv.Close()
+
+	lo := logf.New(logf.Opts{Writer: &bytes.Buffer{}})
+	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "reasoning-configured-test-model", ReasoningEffort: "low"}
+	payload := models.ChatCompletionPayload{
+		Messages: []models.ChatMessage{{Role: "user", Content: "hi"}},
+		Tools:    []models.ToolDef{{Type: "function", Function: models.ToolFunction{Name: "lookup"}}},
+	}
+
+	if _, err := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC).SendChatCompletion(context.Background(), payload); err == nil {
+		t.Fatal("an admin-configured reasoning_effort must not be overridden, so the provider error should surface")
+	}
+	if requests != 1 {
+		t.Fatalf("expected no retry for a configured reasoning_effort, got %d requests", requests)
+	}
+}
+
 func TestEmbeddingBatches(t *testing.T) {
 	// A handful of small inputs stays a single request (the common per-snippet reindex path).
 	if got := embeddingBatches([]string{"a", "b", "c"}); len(got) != 1 || got[0] != (embeddingBatch{0, 3}) {
