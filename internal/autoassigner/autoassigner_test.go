@@ -2,6 +2,7 @@ package autoassigner
 
 import (
 	"io"
+	"slices"
 	"sort"
 	"testing"
 
@@ -27,8 +28,11 @@ type fakeTeamStore struct {
 }
 
 func (f *fakeTeamStore) GetAll() ([]tmodels.Team, error) { return f.teams, nil }
+
+// GetMembers returns a copy, like the DB-backed store, because populateTeamBalancer
+// shuffles the slice in place.
 func (f *fakeTeamStore) GetMembers(teamID int) ([]tmodels.TeamMember, error) {
-	return f.members[teamID], nil
+	return slices.Clone(f.members[teamID]), nil
 }
 
 func (s *assignmentStore) GetUnassignedConversations() ([]models.Conversation, error) {
