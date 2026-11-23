@@ -42,8 +42,9 @@ func (oidc *OIDC) SetProviderLogo() {
 }
 
 // ClearSecrets masks sensitive fields with dummy values for API responses.
+// An env-var reference (prefix "env:") is preserved as-is so the admin can see which variable is configured.
 func (oidc *OIDC) ClearSecrets() {
-	if oidc.ClientSecret != "" {
+	if oidc.ClientSecret != "" && !strings.HasPrefix(oidc.ClientSecret, "env:") {
 		oidc.ClientSecret = strings.Repeat(stringutil.PasswordDummy, 10)
 	}
 }
