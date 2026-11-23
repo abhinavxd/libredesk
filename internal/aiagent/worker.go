@@ -329,6 +329,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		ConversationUUID:  conv.UUID,
 		InboxID:           conv.InboxID,
 		ContactEmail:      func() string { return conv.Contact.Email.String },
+		ContactPhone:      func() string { return conv.Contact.PhoneNumber.String },
 		Verified:          verified,
 		OnToolRequest:     outcome.toolCalled,
 	}

@@ -16,6 +16,7 @@ const (
 
 	contactIDHeader       = "X-Libredesk-Contact-External-Id"
 	contactEmailHeader    = "X-Libredesk-Contact-Email"
+	contactPhoneHeader    = "X-Libredesk-Contact-Phone"
 	contactVerifiedHeader = "X-Libredesk-Contact-Verified"
 )
 
@@ -92,9 +93,10 @@ func withUser(next func(http.ResponseWriter, *http.Request, User)) http.HandlerF
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(contactIDHeader)
 		email := r.Header.Get(contactEmailHeader)
+		phone := r.Header.Get(contactPhoneHeader)
 		verified := r.Header.Get(contactVerifiedHeader)
 		body, _ := io.ReadAll(r.Body)
-		log.Printf("%s %s external_id=%q email=%q verified=%q args=%s", r.Method, r.URL.Path, id, email, verified, body)
+		log.Printf("%s %s external_id=%q email=%q phone=%q verified=%q args=%s", r.Method, r.URL.Path, id, email, phone, verified, body)
 
 		if r.Header.Get(apiKeyHeader) != apiKey {
 			writeError(w, http.StatusUnauthorized, "invalid or missing "+apiKeyHeader)
