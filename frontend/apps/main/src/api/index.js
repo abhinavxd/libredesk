@@ -395,8 +395,8 @@ const getMentionedConversations = (params) =>
   http.get('/api/v1/conversations/mentioned', { params, abortOnRoute: true })
 const getSidebarCounts = () => http.get('/api/v1/conversations/sidebar-counts')
 const getViewCount = (id) => http.get(`/api/v1/views/${id}/count`)
-const getViewConversations = (id, params) =>
-  http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute: true })
+const getViewConversations = (id, params, abortOnRoute = true) =>
+  http.get(`/api/v1/views/${id}/conversations`, { params, abortOnRoute })
 const uploadMedia = (data) =>
   http.post('/api/v1/media', data, {
     headers: {

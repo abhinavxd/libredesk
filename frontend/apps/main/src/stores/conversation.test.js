@@ -10,7 +10,8 @@ import { WebSocketClient } from '@main/websocket'
 const { api } = vi.hoisted(() => ({ api: {
   getConversationMessage: vi.fn(), getConversationMessages: vi.fn(), updateAssigneeLastSeen: vi.fn(),
   markConversationAsUnread: vi.fn(), getConversation: vi.fn(), getAllConversations: vi.fn(), getUsersCompact: vi.fn(),
-  updateConversationStatus: vi.fn(), updateAssignee: vi.fn(), removeAssignee: vi.fn(), getSidebarCounts: vi.fn()
+  updateConversationStatus: vi.fn(), updateAssignee: vi.fn(), removeAssignee: vi.fn(), getSidebarCounts: vi.fn(),
+  getViewConversations: vi.fn()
 } }))
 vi.mock('@main/api', () => ({ default: api }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ currentRoute: ref({ params: { uuid: 'conversation-a' } }) }) }))
@@ -544,5 +545,202 @@ describe('conversation read state', () => {
     await store.fetchMessages('conversation-a')
     expect(api.getConversationMessages).toHaveBeenCalledWith('conversation-a', { page: 1, page_size: 30 })
     expect(store.conversationMessages.map(message => message.uuid)).toEqual([oldMessage.uuid, reply.uuid])
+  })
+})
+
+describe('view list refresh', () => {
+  const row = (n, extra = {}) => ({ uuid: `c${n}`, status: 'Open', last_message_at: new Date(Date.UTC(2026, 0, 1) - n * 1000).toISOString(), ...extra })
+  const rows = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => row(from + i))
+  const page = (results, total = results.length, pageNo = 1, perPage = 25) => ({ data: { data: {
+    results, total, page: pageNo, per_page: perPage, total_pages: Math.ceil(total / perPage)
+  } } })
+  const uuids = store => store.conversations.data.map(c => c.uuid)
+
+  const openView = async (results, total) => {
+    const store = useConversationStore()
+    store.setListStatus('', false)
+    api.getViewConversations.mockResolvedValueOnce(page(results, total))
+    await store.fetchConversationsList(false, 'view', 0, [], 1)
+    const client = new WebSocketClient()
+    client.socket = {}
+    const send = (type, data) => client.handleMessage({ target: client.socket, data: JSON.stringify({ type, data }) })
+    return { store, send }
+  }
+  const markResolved = (send, n) => {
+    send('new_message', {
+      conversation_uuid: `c${n}`, uuid: `activity-${n}`, type: 'activity', preview: 'marked as Resolved',
+      created_at: '2026-01-02T00:00:00Z', sender_type: 'agent', sender_id: 7, conversation: row(n, { status: 'Resolved' })
+    })
+    send('conversation_update', { uuid: `c${n}`, status: 'Resolved' })
+  }
+  let hidden = false
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    hidden = false
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+  })
+
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    delete document.hidden
+    api.getViewConversations.mockReset()
+    api.getAllConversations.mockReset()
+  })
+
+  it('drops a row that stopped matching the view and keeps the conversation open', async () => {
+    const { store, send } = await openView([row(1), row(2)])
+    store.conversation.data = row(1)
+    store.selectAll()
+    markResolved(send, 1)
+    expect(uuids(store)).toEqual(['c1', 'c2'])
+
+    api.getViewConversations.mockResolvedValueOnce(page([row(2)]))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(2)
+    expect(api.getViewConversations.mock.calls[0][2]).toBe(true)
+    expect(api.getViewConversations.mock.calls[1][2]).toBe(false)
+    expect(store.conversationsList.map(c => c.uuid)).toEqual(['c2'])
+    expect(store.conversations.total).toBe(1)
+    expect([...store.selectedUUIDs]).toEqual(['c2'])
+    expect(store.conversation.data).toMatchObject({ uuid: 'c1', status: 'Resolved' })
+
+    send('new_conversation', row(1, { status: 'Resolved', assigned_user_id: 12 }))
+    expect(store.conversation.data.assigned_user_id).toBe(12)
+  })
+
+  it('brings the row back when the open conversation matches the view again', async () => {
+    const { store, send } = await openView([row(2)])
+    store.conversation.data = row(1, { status: 'Resolved' })
+    send('conversation_update', { uuid: 'c1', status: 'Open' })
+    api.getViewConversations.mockResolvedValueOnce(page([row(1), row(2)]))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(uuids(store)).toEqual(['c1', 'c2'])
+    expect(store.conversations.total).toBe(2)
+  })
+
+  it('refreshes again for a second change a few seconds later', async () => {
+    const { store, send } = await openView([row(1), row(2), row(3)])
+    api.getViewConversations.mockResolvedValueOnce(page([row(2), row(3)])).mockResolvedValueOnce(page([row(3)]))
+    markResolved(send, 1)
+    await vi.advanceTimersByTimeAsync(5000)
+    markResolved(send, 2)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(3)
+    expect(uuids(store)).toEqual(['c3'])
+  })
+
+  it('does not refetch for a conversation that is neither loaded nor open', async () => {
+    const { send } = await openView([row(2)])
+    markResolved(send, 9)
+    send('new_conversation', row(8))
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(1)
+  })
+
+  it('re-reads every loaded page in one request and keeps paging aligned', async () => {
+    const { store, send } = await openView(rows(1, 25), 60)
+    api.getViewConversations.mockResolvedValueOnce(page(rows(26, 50), 60, 2))
+    store.fetchNextConversations()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.getViewConversations.mock.calls[1]).toMatchObject([1, { page: 2, page_size: 25 }, true])
+
+    markResolved(send, 30)
+    api.getViewConversations.mockResolvedValueOnce(page([...rows(1, 29), ...rows(31, 51)], 59, 1, 50))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(api.getViewConversations.mock.calls[2]).toMatchObject([1, { page: 1, page_size: 50 }, false])
+    expect(uuids(store)).toHaveLength(50)
+    expect(uuids(store)).not.toContain('c30')
+    expect(uuids(store)).toContain('c51')
+    expect(store.conversations).toMatchObject({ total: 59, page: 2, hasMore: true })
+
+    api.getViewConversations.mockResolvedValueOnce(page(rows(52, 60), 59, 3))
+    store.fetchNextConversations()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(api.getViewConversations.mock.calls[3]).toMatchObject([1, { page: 3, page_size: 25 }, true])
+    expect(uuids(store)).toHaveLength(59)
+    expect(store.conversations.hasMore).toBe(false)
+  })
+
+  it('keeps rows when the response does not span the loaded list', async () => {
+    const { store } = await openView(rows(1, 25), 60)
+    let finishRefresh
+    api.getViewConversations.mockImplementationOnce(() => new Promise(done => { finishRefresh = done }))
+    const refresh = store.fetchFirstPageConversations()
+    api.getViewConversations.mockResolvedValueOnce(page(rows(26, 50), 60, 2))
+    await store.fetchConversationsList(false, 'view', 0, [], 1, 2)
+    finishRefresh(page(rows(1, 25), 60))
+    await refresh
+    expect(uuids(store)).toHaveLength(50)
+  })
+
+  it('waits for a list request in flight', async () => {
+    const { store, send } = await openView([row(1), row(2)])
+    let finishOlder
+    api.getViewConversations.mockImplementationOnce(() => new Promise(done => { finishOlder = done }))
+    const older = store.fetchFirstPageConversations()
+    markResolved(send, 1)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(2)
+
+    finishOlder(page([row(1), row(2)]))
+    await older
+    api.getViewConversations.mockResolvedValueOnce(page([row(2)]))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(3)
+    expect(uuids(store)).toEqual(['c2'])
+  })
+
+  it('ignores a first page that answers after a newer one', async () => {
+    const { store } = await openView([row(1), row(2)])
+    let finishOlder
+    api.getViewConversations.mockImplementationOnce(() => new Promise(done => { finishOlder = done }))
+    const older = store.fetchFirstPageConversations()
+    api.getViewConversations.mockResolvedValueOnce(page([row(2)]))
+    await store.fetchFirstPageConversations()
+    finishOlder(page([row(1), row(2)]))
+    await older
+    expect(uuids(store)).toEqual(['c2'])
+    expect(store.conversations.total).toBe(1)
+  })
+
+  it('waits for a hidden tab to become visible', async () => {
+    const { store, send } = await openView([row(1), row(2)])
+    hidden = true
+    markResolved(send, 1)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(api.getViewConversations).toHaveBeenCalledTimes(1)
+
+    hidden = false
+    api.getViewConversations.mockResolvedValueOnce(page([row(2)]))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(uuids(store)).toEqual(['c2'])
+  })
+
+  it('still refreshes during a steady stream of updates', async () => {
+    const { store, send } = await openView([row(1), row(2)])
+    api.getViewConversations.mockResolvedValue(page([row(2)]))
+    for (let i = 0; i < 6; i++) {
+      markResolved(send, 1)
+      await vi.advanceTimersByTimeAsync(400)
+    }
+    expect(api.getViewConversations.mock.calls.length).toBeGreaterThan(1)
+    expect(uuids(store)).toEqual(['c2'])
+  })
+
+  it('leaves other lists as they are', async () => {
+    const store = useConversationStore()
+    store.setListStatus('Open', false)
+    api.getAllConversations.mockResolvedValueOnce(page([row(1), row(2)]))
+    await store.fetchConversationsList(false, 'all')
+    store.mergeConversationUpdate({ uuid: 'c1', status: 'Resolved' })
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(api.getAllConversations).toHaveBeenCalledTimes(1)
+    expect(store.conversationsList.map(c => c.uuid)).toEqual(['c2'])
+
+    api.getAllConversations.mockResolvedValueOnce(page([row(2)]))
+    await store.fetchFirstPageConversations()
+    expect(uuids(store)).toEqual(['c1', 'c2'])
   })
 })

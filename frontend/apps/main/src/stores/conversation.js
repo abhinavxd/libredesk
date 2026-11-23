@@ -13,7 +13,7 @@ import { playNotificationSound } from '@shared-ui/composables/useNotificationSou
 import MessageCache from '@main/utils/conversation-message-cache'
 import { getI18n } from '@main/i18n'
 import { CONVERSATION_LIST_TYPE, CONVERSATION_DEFAULT_STATUSES, TAG_ACTION } from '@/constants/conversation'
-import { useThrottleFn, useStorage } from '@vueuse/core'
+import { useDebounceFn, useThrottleFn, useStorage } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
 import { useUsersStore } from '@/stores/users'
 import { useNotificationStore } from '@/stores/notification'
@@ -276,6 +276,9 @@ export const useConversationStore = defineStore('conversation', () => {
   }
   // Bumped on resetConversations() so in-flight requests can drop stale responses.
   let contextSeq = 0
+  // Send order of first-page requests and of the newest one applied, so an older answer cannot undo a newer one.
+  let firstPageSeq = 0
+  let firstPageApplied = 0
   const emitter = useEmitter()
 
   const incrementMessageVersion = () => setTimeout(() => messages.version++, 0)
@@ -689,11 +692,13 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.fetching = true
     if (page === 0) page = conversations.page
     const seq = contextSeq
+    const firstPage = page === 1 ? ++firstPageSeq : 0
     const isStale = () => seq !== contextSeq
     try {
       conversations.errorMessage = ''
       const response = await makeConversationListRequest(listType, teamID, viewID, filters, page)
-      if (isStale()) return
+      if (isStale() || (firstPage && firstPage < firstPageApplied)) return
+      if (firstPage) firstPageApplied = firstPage
       processConversationListResponse(response)
     } catch (error) {
       if (isStale()) return
@@ -749,12 +754,13 @@ export const useConversationStore = defineStore('conversation', () => {
           filters
         })
       case CONVERSATION_LIST_TYPE.VIEW:
+        // A first page spans every loaded row, and a refresh of a loaded view survives route changes.
         return await api.getViewConversations(viewID, {
           page: page,
-          page_size: CONV_LIST_PAGE_SIZE,
+          page_size: page === 1 ? conversations.page * CONV_LIST_PAGE_SIZE : CONV_LIST_PAGE_SIZE,
           order_by: sortFieldMap[conversations.sortField].model + "." + sortFieldMap[conversations.sortField].field,
           order: sortFieldMap[conversations.sortField].order
-        })
+        }, page > 1 || !conversations.initialized)
       case CONVERSATION_LIST_TYPE.MENTIONED:
         return await api.getMentionedConversations({
           page: page,
@@ -789,12 +795,21 @@ export const useConversationStore = defineStore('conversation', () => {
       if (!mergeIntoList(conv.uuid, conv)) newConversations.push(conv)
     }
     conversations.page = Math.max(conversations.page, apiResponse.page)
-    conversations.hasMore = apiResponse.total_pages > conversations.page
+    conversations.hasMore = apiResponse.total > conversations.page * CONV_LIST_PAGE_SIZE
     if (!conversations.data) conversations.data = []
     if (apiResponse.page === 1) {
       conversations.data.unshift(...newConversations)
     } else {
       conversations.data.push(...newConversations)
+    }
+    // Views are filtered on the server, so a row missing from a first page that spans the loaded list no longer belongs in it.
+    if (conversations.listType === CONVERSATION_LIST_TYPE.VIEW && apiResponse.page === 1 &&
+      apiResponse.per_page >= conversations.page * CONV_LIST_PAGE_SIZE) {
+      const returned = new Set(apiResponse.results.map(c => c.uuid))
+      if (conversations.data.some(c => !returned.has(c.uuid))) {
+        conversations.data = conversations.data.filter(c => returned.has(c.uuid))
+        selectedUUIDs.value = new Set([...selectedUUIDs.value].filter(uuid => returned.has(uuid)))
+      }
     }
     conversations.total = apiResponse.total
 
@@ -948,6 +963,14 @@ export const useConversationStore = defineStore('conversation', () => {
   function refreshConversationList () {
     throttledFetchFirstPage()
   }
+
+  // Only the server can tell whether a conversation still matches a view, so live updates re-read the loaded rows.
+  // Waits for a list request in flight and for a hidden tab to become visible.
+  const refreshViewList = useDebounceFn(() => {
+    if (conversations.listType !== CONVERSATION_LIST_TYPE.VIEW) return
+    if (conversations.fetching || document.hidden) return refreshViewList()
+    fetchFirstPageConversations()
+  }, 500, { maxWait: 2000 })
 
   function updateConversationLastMessage (uuid, message) {
     const conv = conversations.data?.find(c => c.uuid === uuid)
@@ -1103,6 +1126,9 @@ export const useConversationStore = defineStore('conversation', () => {
   // Keeps the list total in step when a live update moves a loaded row into or out of the current list.
   function mergeLiveUpdate (uuid, payload) {
     const existing = conversations.data?.find(c => c.uuid === uuid)
+    if (conversations.listType === CONVERSATION_LIST_TYPE.VIEW && (existing || conversation.data?.uuid === uuid)) {
+      refreshViewList()
+    }
     if (!existing) return null
     const wasListed = isInCurrentList(existing)
     deepMerge(existing, payload)
@@ -1116,12 +1142,8 @@ export const useConversationStore = defineStore('conversation', () => {
   function handleConvPush (payload) {
     if (!payload || !payload.uuid) return
     rememberAssignee(payload)
-    if (mergeLiveUpdate(payload.uuid, payload)) {
-      if (conversation.data?.uuid === payload.uuid) {
-        deepMerge(conversation.data, payload)
-      }
-      return
-    }
+    if (conversation.data?.uuid === payload.uuid) deepMerge(conversation.data, payload)
+    if (mergeLiveUpdate(payload.uuid, payload)) return
     if (!canPushInsert(payload)) return
     if (conversations.status !== '' && payload.status !== conversations.status) return
     if (!conversations.data) conversations.data = []
