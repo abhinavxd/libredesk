@@ -477,7 +477,7 @@ func serveIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(injectWsURLMeta(file.ReadBytes(), app.setting.GetAppWsURL()))
 
 	// Set CSRF cookie if not already set.
 	if err := app.auth.SetCSRFCookie(r); err != nil {
@@ -508,7 +508,7 @@ func serveWidgetIndexPage(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(http.StatusNotFound, app.i18n.T("validation.notFoundFile"), nil, envelope.NotFoundError)
 	}
 	r.RequestCtx.Response.Header.Set("Content-Type", "text/html")
-	r.RequestCtx.Response.SetBodyRaw(file.ReadBytes())
+	r.RequestCtx.Response.SetBodyRaw(injectWsURLMeta(file.ReadBytes(), app.setting.GetAppWsURL()))
 
 	return nil
 }
@@ -701,4 +701,16 @@ func handleHealthCheck(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusServiceUnavailable, "database unreachable", nil, envelope.GeneralError)
 	}
 	return r.SendEnvelope(true)
+}
+
+// injectWsURLMeta inserts a <meta name="libredesk-ws-url"> tag into the HTML when wsURL is
+// non-empty. The tag is placed just before </head> so the JS apps can read it at startup and
+// prefix their WebSocket paths with the configured base URL.
+// When wsURL is empty the HTML is returned unmodified.
+func injectWsURLMeta(html []byte, wsURL string) []byte {
+	if wsURL == "" {
+		return html
+	}
+	meta := `<meta name="libredesk-ws-url" content="` + strings.ReplaceAll(wsURL, `"`, `&quot;`) + `">`
+	return []byte(strings.Replace(string(html), "</head>", meta+"</head>", 1))
 }

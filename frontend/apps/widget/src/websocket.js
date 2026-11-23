@@ -3,6 +3,13 @@ import { useChatStore } from './store/chat.js'
 import { useWidgetStore } from './store/widget.js'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound.js'
 
+// getWsURL builds the full WebSocket URL. See main app websocket.js for the full rationale.
+function getWsURL (path) {
+  const meta = document.querySelector('meta[name="libredesk-ws-url"]')
+  const base = meta ? meta.content.replace(/\/$/, '') : ''
+  return base + path
+}
+
 export const WS_EVENT = {
   JOIN: 'join',
   MESSAGE: 'message',
@@ -57,7 +64,7 @@ export class WidgetWebSocketClient {
     if (this.socket) this.socket.close()
 
     try {
-      this.socket = new WebSocket('/widget/ws')
+      this.socket = new WebSocket(getWsURL('/widget/ws'))
       this.socket.addEventListener('open', this.handleOpen.bind(this))
       this.socket.addEventListener('message', this.handleMessage.bind(this))
       this.socket.addEventListener('error', this.handleError.bind(this))
