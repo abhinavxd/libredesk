@@ -1,5 +1,7 @@
 import { ref, watch, onUnmounted } from 'vue'
-import { useEditor } from '@tiptap/vue-3'
+import { createNodeFromContent, useEditor } from '@tiptap/vue-3'
+import { Slice } from '@tiptap/pm/model'
+import { Selection } from '@tiptap/pm/state'
 import { useInlineImageUpload } from '@main/composables/useInlineImageUpload'
 
 export function useTextEditor({
@@ -22,6 +24,7 @@ export function useTextEditor({
   onOtherFiles = () => {}
 }) {
   const isInternalUpdate = ref(false)
+  let hasBeenFocused = false
 
   const { handlePaste, handleDrop, insertImages } = useInlineImageUpload({
     getEditor: () => editor.value,
@@ -88,6 +91,9 @@ export function useTextEditor({
       isInternalUpdate.value = false
       onUpdate()
     },
+    onFocus: () => {
+      hasBeenFocused = true
+    },
     onBlur
   })
 
@@ -114,5 +120,17 @@ export function useTextEditor({
     editor.value?.commands.focus(position)
   }
 
-  return { editor, insertImages, extractMentions, focus }
+  const insertHtml = (html) => {
+    if (!editor.value) return
+    const { state, view } = editor.value
+    const tr = state.tr
+    // A never-focused editor parks its selection at the start, which would prepend to a draft.
+    if (!hasBeenFocused) tr.setSelection(Selection.atEnd(tr.doc))
+    // replaceSelection fits the closed blocks around the cursor without splitting off empty paragraphs.
+    const slice = new Slice(createNodeFromContent(html, state.schema), 0, 0)
+    tr.replaceSelection(slice)
+    view.dispatch(tr.scrollIntoView())
+  }
+
+  return { editor, insertImages, extractMentions, focus, insertHtml }
 }
