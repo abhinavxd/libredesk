@@ -6,6 +6,16 @@ import { useConnectionStore } from './stores/connection'
 import { WS_EVENT, WS_EPHEMERAL_TYPES } from './constants/websocket'
 import { playNotificationSound } from '@shared-ui/composables/useNotificationSound'
 
+// getWsURL builds the full WebSocket URL for the given path.
+// When the server has injected a <meta name="libredesk-ws-url"> tag (app.ws_url is set),
+// that value is used as the base so the socket connects through a separate port or host.
+// Otherwise the path is used as-is and the browser resolves it against the page origin.
+function getWsURL (path) {
+  const meta = document.querySelector('meta[name="libredesk-ws-url"]')
+  const base = meta ? meta.content.replace(/\/$/, '') : ''
+  return base + path
+}
+
 export class WebSocketClient {
   constructor() {
     this.socket = null
@@ -39,7 +49,7 @@ export class WebSocketClient {
     if (this.socket) this.socket.close()
 
     try {
-      this.socket = new WebSocket('/ws')
+      this.socket = new WebSocket(getWsURL('/ws'))
       this.socket.addEventListener('open', this.handleOpen.bind(this))
       this.socket.addEventListener('message', this.handleMessage.bind(this))
       this.socket.addEventListener('error', this.handleError.bind(this))

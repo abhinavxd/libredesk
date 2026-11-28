@@ -222,6 +222,17 @@ func (m *Manager) GetAppRootURL() (string, error) {
 	return strings.Trim(string(rootURL), "\""), nil
 }
 
+// GetAppWsURL returns the optional WebSocket base URL (app.ws_url). It is empty when the
+// setting is unset, meaning the agent and widget pages should derive the WebSocket URL from
+// the page origin.
+func (m *Manager) GetAppWsURL() string {
+	b, err := m.Get("app.ws_url")
+	if err != nil {
+		return ""
+	}
+	return strings.Trim(string(b), "\"")
+}
+
 // GetAppTimezone returns the configured app timezone, empty if unset or unreadable.
 func (m *Manager) GetAppTimezone() string {
 	b, err := m.Get("app.timezone")
