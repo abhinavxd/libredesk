@@ -2,6 +2,7 @@ package notifier
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/abhinavxd/libredesk/internal/dbutil"
@@ -50,6 +51,7 @@ type EmailQueue struct {
 	checker  DeliveryChecker
 	outbound EmailSender
 	lo       *logf.Logger
+	disabled atomic.Bool
 }
 
 type EmailQueueOpts struct {
@@ -72,7 +74,20 @@ func NewEmailQueue(opts EmailQueueOpts) (*EmailQueue, error) {
 	}, nil
 }
 
+// SetEnabled turns notification emails on or off without a restart. While
+// disabled nothing is sent or queued, and already queued emails wait.
+func (q *EmailQueue) SetEnabled(enabled bool) {
+	q.disabled.Store(!enabled)
+}
+
+func (q *EmailQueue) Enabled() bool {
+	return !q.disabled.Load()
+}
+
 func (q *EmailQueue) Send(e models.Email) bool {
+	if q.disabled.Load() {
+		return false
+	}
 	if err := q.outbound.Send(Message{
 		RecipientEmails: []string{e.Recipient},
 		Subject:         e.Subject,
@@ -86,6 +101,9 @@ func (q *EmailQueue) Send(e models.Email) bool {
 }
 
 func (q *EmailQueue) SendAfter(e models.Email, delay time.Duration) bool {
+	if q.disabled.Load() {
+		return false
+	}
 	if _, err := q.q.Enqueue.Exec(e.UserID, e.NotificationID, e.Type, e.ConversationID, e.Recipient,
 		e.Subject, e.Content, time.Now().Add(delay), e.MessageID); err != nil {
 		q.lo.Error("error queueing notification email", "user_id", e.UserID, "type", e.Type, "error", err)
@@ -103,6 +121,9 @@ func (q *EmailQueue) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if q.disabled.Load() {
+				continue
+			}
 			for _, e := range q.due() {
 				deliver, err := q.checker.ShouldDeliver(e.UserID, models.NotificationReference{
 					Type: e.Type, ConversationID: e.ConversationID, MessageID: e.MessageID, NotificationID: e.NotificationID,
