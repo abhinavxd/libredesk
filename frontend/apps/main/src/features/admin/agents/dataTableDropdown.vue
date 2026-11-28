@@ -4,7 +4,7 @@
     <DropdownMenuContent>
       <DropdownMenuItem @click="editUser(props.user.id)">
         <Pencil class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.edit') }}
+        {{ $t('globals.actions.edit') }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
@@ -12,7 +12,7 @@
         class="text-destructive focus:text-destructive"
       >
         <Trash class="mr-2 h-4 w-4" />
-        {{ $t('globals.messages.delete') }}
+        {{ $t('globals.actions.delete') }}
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
@@ -26,7 +26,7 @@
       <AlertDialogFooter>
         <AlertDialogCancel>{{ $t('globals.messages.cancel') }}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" @click="handleDelete">{{
-          $t('globals.messages.delete')
+          $t('globals.actions.delete')
         }}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

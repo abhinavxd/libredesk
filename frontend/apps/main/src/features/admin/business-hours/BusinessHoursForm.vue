@@ -236,7 +236,7 @@ const props = defineProps({
 const submitLabel = computed(() => {
   return (
     props.submitLabel ||
-    (props.isNewForm ? t('globals.messages.create') : t('globals.messages.save'))
+    (props.isNewForm ? t('globals.actions.create') : t('globals.messages.save'))
   )
 })
 
