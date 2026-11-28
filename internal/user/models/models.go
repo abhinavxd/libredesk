@@ -80,6 +80,7 @@ type User struct {
 	Country                null.String          `db:"country" json:"country"`
 	Meta                   json.RawMessage      `db:"meta" json:"meta"`
 	CustomAttributes       json.RawMessage      `db:"custom_attributes" json:"custom_attributes"`
+	Preferences            json.RawMessage      `db:"preferences" json:"preferences"`
 	ExternalUserID         null.String          `db:"external_user_id" json:"external_user_id"`
 	Teams                  tmodels.TeamsCompact `db:"teams" json:"teams"`
 	ContactChannelID       int                  `db:"contact_channel_id" json:"contact_channel_id,omitempty"`

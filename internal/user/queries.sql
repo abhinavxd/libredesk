@@ -74,6 +74,7 @@ SELECT
     u.external_user_id,
     u.api_secret,
     u.custom_attributes,
+    u.preferences,
     array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL) AS roles,
     COALESCE(
         (SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'emoji', t.emoji))
@@ -139,8 +140,13 @@ updated_at = now()
 WHERE id = $1;
 
 -- name: update-avatar
-UPDATE users  
+UPDATE users
 SET avatar_url = $2, updated_at = now()
+WHERE id = $1;
+
+-- name: update-preferences
+UPDATE users
+SET preferences = $2, updated_at = now()
 WHERE id = $1;
 
 -- name: update-availability
