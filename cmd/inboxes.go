@@ -247,6 +247,19 @@ func handleUpdateInbox(r *fastglue.Request) error {
 		return r.SendErrorEnvelope(fasthttp.StatusBadRequest, app.i18n.T("errors.parsingRequest"), err.Error(), envelope.InputError)
 	}
 
+	// The Turnstile secret arrives masked. Restore it before the pair is validated.
+	if inbox.Channel == livechat.ChannelLiveChat {
+		previous, err := app.inbox.GetDBRecord(id)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		merged, err := app.inbox.MergeLiveChatSecrets(previous.Config, inbox.Config)
+		if err != nil {
+			return sendErrorEnvelope(r, err)
+		}
+		inbox.Config = merged
+	}
+
 	if err := validateInbox(app, inbox, true); err != nil {
 		return sendErrorEnvelope(r, err)
 	}
@@ -513,6 +526,10 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 
 	// Validate livechat-specific configuration
 	if inbox.Channel == livechat.ChannelLiveChat {
+		alias, err := turnstileKeyAlias(inbox.Config)
+		if err != nil || alias != "" {
+			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
+		}
 		var config livechat.Config
 		if err := json.Unmarshal(inbox.Config, &config); err != nil {
 			return envelope.NewError(envelope.InputError, app.i18n.T("validation.invalidValue"), nil)
@@ -642,6 +659,10 @@ func validateInbox(app *App, inbox imodels.Inbox, isUpdate bool) error {
 			if !httputil.ValidateIPOrCIDR(entry) {
 				return envelope.NewError(envelope.InputError, app.i18n.Ts("validation.invalidIPOrCIDR", "entry", entry), nil)
 			}
+		}
+
+		if err := validateTurnstileConfig(app, config); err != nil {
+			return err
 		}
 
 		// Validate linked email inbox if specified
@@ -781,6 +802,33 @@ func trimInboxFields(inb *imodels.Inbox) error {
 			return err
 		}
 		inb.Config = trimmedConfig
+	}
+
+	if inb.Channel == livechat.ChannelLiveChat && len(inb.Config) > 0 {
+		var cfg map[string]any
+		if err := json.Unmarshal(inb.Config, &cfg); err != nil {
+			return err
+		}
+		changed := false
+		for _, field := range []string{"turnstile_site_key", "turnstile_secret_key"} {
+			value, ok := cfg[field].(string)
+			if !ok {
+				continue
+			}
+			trimmed := strings.TrimSpace(value)
+			if trimmed == value {
+				continue
+			}
+			cfg[field] = trimmed
+			changed = true
+		}
+		if changed {
+			trimmedConfig, err := json.Marshal(cfg)
+			if err != nil {
+				return err
+			}
+			inb.Config = trimmedConfig
+		}
 	}
 
 	if inb.Channel == whatsappChannel.ChannelWhatsApp && len(inb.Config) > 0 {

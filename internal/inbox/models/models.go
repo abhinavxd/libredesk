@@ -188,6 +188,21 @@ func (m *Inbox) ClearPasswords() error {
 		if m.Secret.Valid && m.Secret.String != "" {
 			m.Secret = null.StringFrom(strings.Repeat(stringutil.PasswordDummy, 10))
 		}
+		if len(m.Config) == 0 {
+			break
+		}
+		var cfg map[string]any
+		if err := json.Unmarshal(m.Config, &cfg); err != nil {
+			return err
+		}
+		if secret, ok := cfg["turnstile_secret_key"].(string); ok && secret != "" {
+			cfg["turnstile_secret_key"] = strings.Repeat(stringutil.PasswordDummy, 10)
+			cleared, err := json.Marshal(cfg)
+			if err != nil {
+				return err
+			}
+			m.Config = cleared
+		}
 	case "whatsapp":
 		var cfg map[string]any
 		if err := json.Unmarshal(m.Config, &cfg); err != nil {

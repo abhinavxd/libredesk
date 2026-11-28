@@ -181,6 +181,8 @@ type Config struct {
 	HomeApps                       []HomeApp         `json:"home_apps"`
 	TrustedDomains                 []string          `json:"trusted_domains"`
 	BlockedIPs                     []string          `json:"blocked_ips"`
+	TurnstileSiteKey               string            `json:"turnstile_site_key"`
+	TurnstileSecretKey             string            `json:"turnstile_secret_key"`
 	DirectToConversation           bool              `json:"direct_to_conversation"`
 	GreetingMessage                string            `json:"greeting_message"`
 	ChatIntroduction               string            `json:"chat_introduction"`

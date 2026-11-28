@@ -1465,6 +1465,34 @@
                     </FormItem>
                   </FormField>
                 </FormGrid>
+
+                <FormGrid>
+                  <FormField v-slot="{ componentField }" name="config.turnstile_site_key">
+                    <FormItem>
+                      <FormLabel>{{ $t('admin.inbox.livechat.turnstile.siteKey') }}</FormLabel>
+                      <FormControl>
+                        <Input type="text" v-bind="componentField" autocomplete="off" />
+                      </FormControl>
+                      <FormDescription>{{
+                        $t('admin.inbox.livechat.turnstile.siteKey.description')
+                      }}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
+
+                  <FormField v-slot="{ componentField }" name="config.turnstile_secret_key">
+                    <FormItem>
+                      <FormLabel>{{ $t('admin.inbox.livechat.turnstile.secretKey') }}</FormLabel>
+                      <FormControl>
+                        <Input type="password" v-bind="componentField" autocomplete="new-password" />
+                      </FormControl>
+                      <FormDescription>{{
+                        $t('admin.inbox.livechat.turnstile.secretKey.description')
+                      }}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  </FormField>
+                </FormGrid>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -1604,6 +1632,8 @@ const FIELD_SECTION = [
   ['config.session_duration', 'security'],
   ['config.trusted_domains', 'security'],
   ['config.blocked_ips', 'security'],
+  ['config.turnstile_site_key', 'security'],
+  ['config.turnstile_secret_key', 'security'],
   ['secret', 'security'],
   ['config.continuity', 'continuity'],
   ['config.brand_name', 'basics'],
@@ -1819,6 +1849,8 @@ const form = useForm({
       direct_to_conversation: false,
       trusted_domains: '',
       blocked_ips: '',
+      turnstile_site_key: '',
+      turnstile_secret_key: '',
       home_apps: [],
       visitors: {
         start_conversation_button_text: 'Start conversation',
@@ -2165,6 +2197,8 @@ watch(
           prechat_form: pc,
           campaigns: newValues.config?.campaigns || [],
           campaign_cooldown: newValues.config?.campaign_cooldown || '24h',
+          turnstile_site_key: newValues.config?.turnstile_site_key || '',
+          turnstile_secret_key: newValues.config?.turnstile_secret_key || '',
           help: newValues.config?.help || defaultWidgetHelp(),
           features: {
             ...newValues.config?.features,

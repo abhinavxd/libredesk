@@ -74,6 +74,7 @@ import { sendWidgetTyping } from '@widget/websocket.js'
 import { useTypingIndicator } from '@shared-ui/composables/useTypingIndicator.js'
 import MessageInputActions from './MessageInputActions.vue'
 import api, { saveSession } from '@widget/api/index.js'
+import { SESSION_CHANGED } from '@widget/utils/chatInit.js'
 
 import { useProactiveStore } from '@widget/store/proactive.js'
 const proactive = useProactiveStore()
@@ -200,6 +201,9 @@ const sendMessage = async () => {
     }
     emit('error', '')
   } catch (error) {
+    // The session changed while Turnstile was pending. Drop the visitor submit.
+    if (error?.code === SESSION_CHANGED) return
+
     // Remove failed message if we have a temp ID.
     if (tempMessageID) {
       chatStore.removeMessage(chatStore.currentConversation.uuid, tempMessageID)
