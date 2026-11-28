@@ -73,8 +73,23 @@ type chatCompletionResponse struct {
 			Content   string            `json:"content"`
 			ToolCalls []models.ToolCall `json:"tool_calls"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
+		// Gateways such as OpenRouter add the upstream provider's own reason and, for a failed upstream
+		// call, an error object inside an otherwise successful response.
+		NativeFinishReason string `json:"native_finish_reason"`
+		Error              *struct {
+			Code    any    `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
 	} `json:"choices"`
 	Usage json.RawMessage `json:"usage"`
+}
+
+// completionUsageDetails reads the reasoning token count some providers report, for the log only.
+type completionUsageDetails struct {
+	CompletionTokensDetails struct {
+		ReasoningTokens int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
 }
 
 type embeddingsResponse struct {
@@ -172,15 +187,29 @@ func (o *OpenAIClient) SendChatCompletion(ctx context.Context, payload models.Ch
 	}
 
 	var usage models.TokenUsage
+	var details completionUsageDetails
 	if len(parsed.Usage) > 0 {
 		if err := json.Unmarshal(parsed.Usage, &usage); err != nil {
 			o.lo.Warn("could not parse token usage from provider response", "error", err)
 		}
+		_ = json.Unmarshal(parsed.Usage, &details)
 	}
-	o.lo.Debug("chat completion response", "model", model, "prompt_tokens", usage.PromptTokens, "completion_tokens", usage.CompletionTokens, "total_tokens", usage.TotalTokens)
+	choice := parsed.Choices[0]
+	o.lo.Debug("chat completion response", "model", model, "finish_reason", choice.FinishReason, "prompt_tokens", usage.PromptTokens, "completion_tokens", usage.CompletionTokens, "total_tokens", usage.TotalTokens)
+	if choice.Error != nil && choice.Error.Message != "" {
+		return models.ChatCompletionResult{}, fmt.Errorf("provider returned an error in the response: %s", choice.Error.Message)
+	}
+	// An empty answer is worth a line in the log, and a truncated one a clear error: a reasoning model
+	// that spends the whole token budget on thinking returns no text at all.
+	if strings.TrimSpace(choice.Message.Content) == "" && len(choice.Message.ToolCalls) == 0 {
+		o.lo.Warn("chat completion returned no content", "model", model, "finish_reason", choice.FinishReason, "native_finish_reason", choice.NativeFinishReason, "max_tokens", maxTokens, "completion_tokens", usage.CompletionTokens, "reasoning_tokens", details.CompletionTokensDetails.ReasoningTokens)
+		if choice.FinishReason == "length" || choice.NativeFinishReason == "max_tokens" || choice.NativeFinishReason == "length" {
+			return models.ChatCompletionResult{}, fmt.Errorf("%w: max_tokens %d, completion tokens %d", ErrOutputTruncated, maxTokens, usage.CompletionTokens)
+		}
+	}
 	return models.ChatCompletionResult{
-		Content:   parsed.Choices[0].Message.Content,
-		ToolCalls: parsed.Choices[0].Message.ToolCalls,
+		Content:   choice.Message.Content,
+		ToolCalls: choice.Message.ToolCalls,
 		Usage:     usage,
 	}, nil
 }

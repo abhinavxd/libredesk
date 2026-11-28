@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -252,5 +253,49 @@ func TestCompletionRequestsIncludeCurrentTime(t *testing.T) {
 		if !ok || err != nil || at.Before(before) || at.After(after) || strings.Count(messages[0].Content, "Current date and time:") != 1 {
 			t.Fatalf("missing or stale request clock: %q", messages[0].Content)
 		}
+	}
+}
+
+func TestSendChatCompletionEmptyAnswers(t *testing.T) {
+	var response string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(response))
+	}))
+	defer srv.Close()
+	var logs bytes.Buffer
+	lo := logf.New(logf.Opts{Writer: &logs})
+	cfg := models.ProviderConfig{BaseURL: srv.URL, APIKey: "test", Model: "empty-answer-test-model", MaxTokens: 1024}
+	payload := models.ChatCompletionPayload{Messages: []models.ChatMessage{{Role: "user", Content: "hi"}}}
+	client := NewOpenAIClient(cfg, &lo, srv.Client(), time.UTC)
+
+	// The whole budget went into reasoning: no text, finish_reason length.
+	response = `{"choices":[{"message":{"content":""},"finish_reason":"length"}],"usage":{"completion_tokens":1024,"completion_tokens_details":{"reasoning_tokens":1024}}}`
+	_, err := client.SendChatCompletion(context.Background(), payload)
+	if !errors.Is(err, ErrOutputTruncated) {
+		t.Fatalf("truncated answer: err = %v, want ErrOutputTruncated", err)
+	}
+	if !strings.Contains(logs.String(), "reasoning_tokens=1024") || !strings.Contains(logs.String(), "finish_reason=length") {
+		t.Fatalf("truncation not logged with reason and tokens: %s", logs.String())
+	}
+
+	// A gateway reporting the upstream provider's error inside a 200 response.
+	response = `{"choices":[{"message":{"content":""},"finish_reason":"error","error":{"code":502,"message":"Provider returned error"}}]}`
+	_, err = client.SendChatCompletion(context.Background(), payload)
+	if err == nil || !strings.Contains(err.Error(), "Provider returned error") {
+		t.Fatalf("provider error in response: err = %v, want the provider's message", err)
+	}
+
+	// An honest empty answer stays an empty result for the caller to report.
+	response = `{"choices":[{"message":{"content":"  "},"finish_reason":"stop"}]}`
+	res, err := client.SendChatCompletion(context.Background(), payload)
+	if err != nil || strings.TrimSpace(res.Content) != "" {
+		t.Fatalf("empty stop answer: res = %q, err = %v; want empty content, nil", res.Content, err)
+	}
+
+	// Tool calls without text are a normal step, not an empty answer.
+	response = `{"choices":[{"message":{"content":"","tool_calls":[{"id":"c1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`
+	res, err = client.SendChatCompletion(context.Background(), payload)
+	if err != nil || len(res.ToolCalls) != 1 {
+		t.Fatalf("tool call step: tool calls = %d, err = %v; want 1, nil", len(res.ToolCalls), err)
 	}
 }
