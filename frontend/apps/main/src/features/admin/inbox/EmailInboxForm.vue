@@ -931,6 +931,7 @@ import SwitchField from '@shared-ui/components/SwitchField.vue'
 import { Button } from '@shared-ui/components/ui/button/index.js'
 import HelpPopover from '@main/components/HelpPopover.vue'
 import { formatTemplateVariables } from '@shared-ui/utils/string'
+import { copyToClipboard as copyTextToClipboard } from '@shared-ui/utils/clipboard.js'
 import {
   Select,
   SelectContent,
@@ -1283,15 +1284,15 @@ const submitOAuthCredentials = async () => {
 }
 
 const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text)
+  const success = await copyTextToClipboard(text)
+  if (success) {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       description: t('globals.messages.copied')
     })
-  } catch (error) {
+  } else {
     emitter.emit(EMITTER_EVENTS.SHOW_TOAST, {
       variant: 'destructive',
-      description: t('globals.messages.somethingWentWrong')
+      description: t('globals.messages.copyFailed')
     })
   }
 }
