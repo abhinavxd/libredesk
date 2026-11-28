@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -577,6 +578,19 @@ func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, inc
 		return err
 	}
 
+	// If the message carries a Reply-To header whose address is not one of the inbox's own
+	// addresses, use it as the contact identity. Web forms and notification services typically
+	// send from a no-reply address and put the real customer in Reply-To; without this the
+	// contact becomes the no-reply sender and agents must fix the recipient by hand every time.
+	if replyToAddr := extractReplyToAddress(envelope, e.ReceivesAddress); replyToAddr != "" {
+		incomingMsg.Contact.Email = null.StringFrom(replyToAddr)
+		// Update meta so the outbound reply prefills To from the Reply-To address.
+		if err := setReplyToMeta(&incomingMsg, replyToAddr); err != nil {
+			e.lo.Warn("could not store reply_to in meta", "error", err)
+		}
+		e.lo.Debug("using Reply-To as contact email", "reply_to", replyToAddr, "message_id", incomingMsg.SourceID.String)
+	}
+
 	// Extract conversation UUID from plus-addressed recipient (e.g., inbox+conv-{uuid}@domain)
 	incomingMsg.ConversationUUIDFromReplyTo = extractConversationUUIDFromRecipient(envelope)
 	if incomingMsg.ConversationUUIDFromReplyTo != "" {
@@ -746,6 +760,44 @@ func setInboxAddressMeta(message *models.IncomingMessage, address string) error 
 	}
 	message.Meta = encoded
 	return nil
+}
+
+// setReplyToMeta stores the Reply-To address in the message meta so the outbound
+// reply composer can prefill the To field from it rather than from the From address.
+func setReplyToMeta(message *models.IncomingMessage, replyTo string) error {
+	meta := make(map[string]any)
+	if len(message.Meta) > 0 {
+		if err := json.Unmarshal(message.Meta, &meta); err != nil {
+			return fmt.Errorf("unmarshalling incoming message meta: %w", err)
+		}
+	}
+	meta["reply_to"] = replyTo
+	encoded, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("marshalling incoming message meta: %w", err)
+	}
+	message.Meta = encoded
+	return nil
+}
+
+// extractReplyToAddress parses the first Reply-To address that is not owned by the inbox.
+// Returns the lowercase address, or "" if none is usable.
+func extractReplyToAddress(envelope *enmime.Envelope, isInboxAddress func(string) bool) string {
+	raw := envelope.GetHeader("Reply-To")
+	if raw == "" {
+		return ""
+	}
+	addrs, err := mail.ParseAddressList(raw)
+	if err != nil || len(addrs) == 0 {
+		return ""
+	}
+	for _, addr := range addrs {
+		lower := strings.ToLower(addr.Address)
+		if lower != "" && !isInboxAddress(lower) {
+			return lower
+		}
+	}
+	return ""
 }
 
 // extractAllHTMLParts extracts all HTML parts from the given enmime part by traversing the tree.
