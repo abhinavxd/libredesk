@@ -1,12 +1,16 @@
 package email
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +29,8 @@ import (
 const (
 	defaultReadInterval      = time.Duration(5 * time.Minute)
 	defaultScanInboxSince    = time.Duration(48 * time.Hour)
+	imapIOTimeout            = 10 * time.Minute
+	imapDialTimeout          = 30 * time.Second
 	aliasVerificationTimeout = 10 * time.Minute
 )
 
@@ -33,6 +39,35 @@ var recipientHeaders = []string{"To", "Cc", "Bcc", "X-Original-To", "Original-Re
 
 // Charset autodetection is disabled: it overrides the declared charset and misreads mostly-ASCII UTF-8 bodies as ISO-8859-1.
 var mimeParser = enmime.NewParser(enmime.DisableCharacterDetection(true))
+
+// imapConn renews network deadlines on each transfer, including reads after go-imap clears its deadline.
+type imapConn struct {
+	net.Conn
+	timeout time.Duration
+	cancel  context.CancelCauseFunc
+}
+
+func (c *imapConn) Read(p []byte) (int, error) {
+	if err := c.Conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	n, err := c.Conn.Read(p)
+	if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
+		c.cancel(err)
+	}
+	return n, err
+}
+
+func (c *imapConn) Write(p []byte) (int, error) {
+	if err := c.Conn.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		return 0, err
+	}
+	n, err := c.Conn.Write(p)
+	if netErr, ok := errors.AsType[net.Error](err); ok && netErr.Timeout() {
+		c.cancel(err)
+	}
+	return n, err
+}
 
 // ReadIncomingMessages reads and processes incoming messages from an IMAP server based on the provided configuration.
 func (e *Email) ReadIncomingMessages(ctx context.Context, cfg imodels.IMAPConfig) error {
@@ -85,35 +120,67 @@ func (e *Email) readMailbox(ctx context.Context, scanInboxSince time.Duration, c
 }
 
 // processMailbox processes emails in the specified mailbox.
-func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) error {
-	var (
-		client *imapclient.Client
-		err    error
-	)
+func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration, cfg imodels.IMAPConfig) (err error) {
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil /* cause */)
+	defer func() {
+		if ctx.Err() != nil {
+			err = context.Cause(ctx)
+		}
+	}()
 
-	address := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	switch cfg.TLSType {
+	case "none", "starttls", "tls":
+	default:
+		return fmt.Errorf("unknown IMAP TLS type: %q", cfg.TLSType)
+	}
+
+	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	dialer := net.Dialer{Timeout: imapDialTimeout}
+	conn, err := dialer.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return fmt.Errorf("failed to connect to IMAP server: %w", err)
+	}
+	conn = &imapConn{Conn: conn, timeout: imapIOTimeout, cancel: cancel}
+	defer conn.Close()
+	// IMAP waits do not accept a context, so cancellation must close the connection.
+	stop := context.AfterFunc(ctx, func() { conn.Close() })
+	defer stop()
+
 	imapOptions := &imapclient.Options{
 		TLSConfig: &tls.Config{
+			ServerName:         cfg.Host,
 			InsecureSkipVerify: cfg.TLSSkipVerify,
 		},
 		// The default decoder only knows UTF-8, ISO-8859-1 and US-ASCII, leaving other charsets in subjects and sender names undecoded.
 		WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader},
 	}
+	var client *imapclient.Client
 	switch cfg.TLSType {
 	case "none":
-		client, err = imapclient.DialInsecure(address, imapOptions)
+		client = imapclient.New(conn, imapOptions)
 	case "starttls":
-		client, err = imapclient.DialStartTLS(address, imapOptions)
+		client, err = imapclient.NewStartTLS(conn, imapOptions)
 	case "tls":
-		client, err = imapclient.DialTLS(address, imapOptions)
-	default:
-		return fmt.Errorf("unknown IMAP TLS type: %q", cfg.TLSType)
+		imapOptions.TLSConfig.NextProtos = []string{"imap"}
+		tlsConn := tls.Client(conn, imapOptions.TLSConfig)
+		handshakeCtx, cancelHandshake := context.WithTimeout(ctx, imapDialTimeout)
+		err = tlsConn.HandshakeContext(handshakeCtx)
+		cancelHandshake()
+		if err == nil {
+			client = imapclient.New(tlsConn, imapOptions)
+		}
 	}
 	if err != nil {
 		return fmt.Errorf("failed to connect to IMAP server: %w", err)
 	}
 
-	defer client.Logout()
+	defer func() {
+		if ctx.Err() == nil {
+			client.Logout().Wait()
+		}
+		client.Close()
+	}()
 
 	// Authenticate based on auth type
 	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
@@ -129,12 +196,16 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 			token:    oauthConfig.AccessToken,
 		}
 		if err := client.Authenticate(saslClient); err != nil {
-			e.flagAuthError()
+			if ctx.Err() == nil {
+				e.flagAuthError()
+			}
 			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
 		}
 	} else {
 		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
-			e.flagAuthError()
+			if ctx.Err() == nil {
+				e.flagAuthError()
+			}
 			return fmt.Errorf("error logging in to the IMAP server: %w", err)
 		}
 	}
@@ -236,10 +307,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 	fetchCmd := client.Fetch(seqSet, fetchOptions)
 	defer func() {
-		// Close downloads the rest of the FETCH first, which would hold up shutdown.
-		if ctx.Err() != nil {
-			return
-		}
+		// Drain buffered FETCH data so the decoder can exit after the connection closes.
 		if err := fetchCmd.Close(); err != nil {
 			resultErr = errors.Join(resultErr, fmt.Errorf("fetching mailbox messages: %w", err))
 		}
@@ -291,7 +359,7 @@ func (e *Email) fetchAndProcessMessages(ctx context.Context, client *imapclient.
 
 			// Body section.
 			if bs, ok := item.(imapclient.FetchItemDataBodySection); ok && bs.Literal != nil {
-				envelope, err := mimeParser.ReadEnvelope(bs.Literal)
+				envelope, err := readIMAPEnvelope(client, bs.Literal)
 				if err != nil {
 					e.lo.Error("error reading envelope", "error", err)
 					continue
@@ -488,10 +556,7 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 	fullFetchCmd := client.Fetch(seqSet, fetchOptions)
 	defer func() {
-		// Close downloads the rest of the message first, which would hold up shutdown.
-		if ctx.Err() != nil {
-			return
-		}
+		// Drain unread body data so the decoder can exit after the connection closes.
 		if err := fullFetchCmd.Close(); err != nil {
 			resultErr = errors.Join(resultErr, fmt.Errorf("fetching mailbox messages: %w", err))
 		}
@@ -517,14 +582,14 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 
 		if fullItem, ok := fullFetchItem.(imapclient.FetchItemDataBodySection); ok {
 			e.lo.Debug("fetching full message body", "message_id", messageID)
-			return e.processFullMessage(fullItem, incomingMsg)
+			return e.processFullMessage(client, fullItem, incomingMsg)
 		}
 	}
 }
 
 // processFullMessage processes the full message and enqueues it for inserting into the database.
-func (e *Email) processFullMessage(item imapclient.FetchItemDataBodySection, incomingMsg models.IncomingMessage) error {
-	envelope, err := mimeParser.ReadEnvelope(item.Literal)
+func (e *Email) processFullMessage(client *imapclient.Client, item imapclient.FetchItemDataBodySection, incomingMsg models.IncomingMessage) error {
+	envelope, err := readIMAPEnvelope(client, item.Literal)
 	if err != nil {
 		e.lo.Error("error parsing email envelope", "error", err, "message_id", incomingMsg.SourceID.String)
 		return fmt.Errorf("parsing email envelope: %w", err)
@@ -824,4 +889,17 @@ func extractConversationUUIDFromRecipient(envelope *enmime.Envelope) string {
 		}
 	}
 	return ""
+}
+
+// Finish the download before MIME parsing can retry reads after a network error.
+func readIMAPEnvelope(client *imapclient.Client, literal imap.LiteralReader) (*enmime.Envelope, error) {
+	if literal == nil {
+		return nil, errors.New("IMAP server returned an empty message body")
+	}
+	data, err := io.ReadAll(literal)
+	if err != nil {
+		client.Close()
+		return nil, err
+	}
+	return mimeParser.ReadEnvelope(bytes.NewReader(data))
 }
