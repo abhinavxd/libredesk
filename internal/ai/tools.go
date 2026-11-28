@@ -134,6 +134,9 @@ type ToolContext struct {
 	// ContactEmail is evaluated live per tool call (never snapshotted) so a contact whose email is
 	// set or corrected mid-turn is identified by the current address, not the one at run start.
 	ContactEmail func() string
+	// ContactPhone is evaluated live per tool call so that a WhatsApp contact's phone number is
+	// always current. Useful for tools that look up a contact by phone rather than by email.
+	ContactPhone func() string
 	// Verified is evaluated live per tool call (never snapshotted) so a contact who verifies
 	// mid-turn passes on the same turn. A nil func is treated as unverified (fail closed).
 	Verified func() bool
@@ -148,6 +151,13 @@ func (c ToolContext) contactEmail() string {
 		return ""
 	}
 	return c.ContactEmail()
+}
+
+func (c ToolContext) contactPhone() string {
+	if c.ContactPhone == nil {
+		return ""
+	}
+	return c.ContactPhone()
 }
 
 // httpTool is an admin-defined custom tool that calls an external HTTP endpoint.
@@ -265,6 +275,9 @@ func (t *httpTool) Execute(ctx context.Context, args string) (string, error) {
 	}
 	if email := t.tctx.contactEmail(); email != "" {
 		req.Header.Set("X-Libredesk-Contact-Email", email)
+	}
+	if phone := t.tctx.contactPhone(); phone != "" {
+		req.Header.Set("X-Libredesk-Contact-Phone", phone)
 	}
 	req.Header.Set("X-Libredesk-Contact-Verified", strconv.FormatBool(t.tctx.verified()))
 	if t.tctx.ConversationUUID != "" {
