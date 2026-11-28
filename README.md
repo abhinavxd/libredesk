@@ -63,6 +63,14 @@ The fastest way to get a libredesk instance running. Railway provisions the app,
 
 __________________
 
+### Cottage
+
+Managed hosting from Cottage. It runs Libredesk with Postgres and Redis, backs it up every night and installs updates for you.
+
+[![Deploy on Cottage](https://cottage.host/badge.svg)](https://cottage.host/deploy/libredesk)
+
+__________________
+
 ### Docker
 
 The latest image is available on DockerHub at [`libredesk/libredesk:latest`](https://hub.docker.com/r/libredesk/libredesk/tags?page=1&ordering=last_updated&name=latest)
