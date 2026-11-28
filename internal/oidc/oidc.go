@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/abhinavxd/libredesk/internal/crypto"
@@ -21,6 +22,11 @@ var (
 	efs         embed.FS
 	redirectURL = "/api/v1/oidc/%d/finish"
 )
+
+// envSecretPrefix marks a client_secret value as an env-var reference rather than a literal.
+// When a secret is stored as "env:MY_VAR", Libredesk reads os.Getenv("MY_VAR") at runtime
+// instead of decrypting a database-stored value. The prefix is preserved in the database as-is.
+const envSecretPrefix = "env:"
 
 // Manager handles oidc-related operations.
 type Manager struct {
@@ -195,16 +201,30 @@ func (o *Manager) validateCredentials(oidc models.OIDC) error {
 	if strings.TrimSpace(oidc.ClientSecret) == "" {
 		return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_secret`"), nil)
 	}
+	// Validate that an env-var reference is not empty (the variable name must be non-blank).
+	if strings.HasPrefix(oidc.ClientSecret, envSecretPrefix) {
+		varName := strings.TrimPrefix(oidc.ClientSecret, envSecretPrefix)
+		if strings.TrimSpace(varName) == "" {
+			return envelope.NewError(envelope.InputError, o.i18n.Ts("globals.messages.empty", "name", "`client_secret` env var name"), nil)
+		}
+	}
 	return nil
 }
 
 // encryptOIDC encrypts sensitive OIDC fields (ClientID and ClientSecret).
 // Returns the encrypted values and any error encountered.
+// When ClientSecret starts with envSecretPrefix it is stored as-is; encrypting a pointer
+// would corrupt the reference and serve no security purpose.
 func (o *Manager) encryptOIDC(clientID, clientSecret string) (encClientID, encClientSecret string, err error) {
 	encClientID, err = crypto.Encrypt(clientID, o.encryptionKey)
 	if err != nil {
 		o.lo.Error("error encrypting client_id", "error", err)
 		return "", "", err
+	}
+
+	// Env-var references are stored verbatim — encrypting a pointer is pointless.
+	if strings.HasPrefix(clientSecret, envSecretPrefix) {
+		return encClientID, clientSecret, nil
 	}
 
 	encClientSecret, err = crypto.Encrypt(clientSecret, o.encryptionKey)
@@ -229,6 +249,15 @@ func (o *Manager) decryptOIDC(oidc *models.OIDC) {
 	}
 
 	if oidc.ClientSecret != "" {
+		// Env-var reference: resolve at runtime, never attempt to decrypt.
+		if strings.HasPrefix(oidc.ClientSecret, envSecretPrefix) {
+			varName := strings.TrimPrefix(oidc.ClientSecret, envSecretPrefix)
+			oidc.ClientSecret = os.Getenv(varName)
+			if oidc.ClientSecret == "" {
+				o.lo.Error("OIDC client_secret env var is not set or empty", "var", varName, "oidc_id", oidc.ID)
+			}
+			return
+		}
 		decrypted, err := crypto.Decrypt(oidc.ClientSecret, o.encryptionKey)
 		if err != nil {
 			o.lo.Error("error decrypting client_secret, clearing field", "error", err, "oidc_id", oidc.ID)
