@@ -81,7 +81,7 @@
         </div>
 
         <div
-          class="flex flex-col justify-end message-bubble"
+          class="flex flex-col justify-end message-bubble transition-colors duration-150"
           :class="bubbleClasses"
         >
           <div v-if="isDeleted" class="text-sm italic text-muted-foreground">
@@ -117,12 +117,10 @@
                 v-else-if="message.content_type !== 'text' && sanitizedContent"
                 ref="messageContentEl"
                 @click="onMessageContentClick"
-                :class="{
-                  'email-light-canvas': !isOutgoing && convStore.current?.inbox_channel === 'email'
-                }"
               >
                 <Letter
-                  :html="sanitizedContent"
+                  :key="useNormalizedEmailColors ? 'dark' : 'original'"
+                  :html="renderedHtmlContent"
                   :allowedSchemas="allowedSchemas"
                   :rewriteExternalLinks="rewriteMessageLink"
                   :allowed-css-properties="extendedCssProperties"
@@ -135,7 +133,9 @@
                 v-if="isExpandable && !isExpanded"
                 class="absolute left-0 right-0 bottom-0 h-24 flex items-end justify-center pointer-events-none"
                 :class="
-                  message.private
+                  useOriginalEmailColors
+                    ? 'bg-gradient-to-t from-white via-white/90 to-transparent'
+                    : message.private
                     ? 'bg-gradient-to-t from-private via-private/90 to-transparent'
                     : isOutgoing
                       ? 'bg-gradient-to-t from-secondary via-secondary/90 to-transparent'
@@ -312,6 +312,7 @@ import api from '@main/api'
 import { containsQuoteMarkers } from '@shared-ui/utils/quotedContent.js'
 import { getMessageDeliveryStatus } from './messageDeliveryStatus.js'
 import { delayedLoading } from '@main/utils/delayed-loading'
+import { normalizeEmailHtml } from '@/utils/emailHtmlNormalizer.js'
 
 const extendedCssProperties = [...allowedCssProperties, 'transform', 'transform-origin']
 // The sanitizer has no strikethrough tag, so these are rewritten to a styled span it keeps.
@@ -330,15 +331,20 @@ const measureExpandable = () => {
   isExpandable.value = el.scrollHeight > COLLAPSE_THRESHOLD_PX
 }
 
-onMounted(async () => {
-  await nextTick()
-  measureExpandable()
-
-  // Email HTML images change height after initial paint - re-measure on load.
+// Email HTML images change height after initial paint - re-measure on load. Also re-run
+// whenever the content DOM is (re)created, since changing its color mode remounts the
+// Letter subtree and any images it inserts are fresh elements with no listener attached.
+const attachImageLoadListeners = () => {
   const imgs = contentWrapperEl.value?.querySelectorAll?.('img') ?? []
   imgs.forEach((img) => {
     if (!img.complete) img.addEventListener('load', measureExpandable, { once: true })
   })
+}
+
+onMounted(async () => {
+  await nextTick()
+  measureExpandable()
+  attachImageLoadListeners()
 })
 
 const props = defineProps({
@@ -352,6 +358,14 @@ const props = defineProps({
     default: false
   },
   groupWithNext: {
+    type: Boolean,
+    default: false
+  },
+  darkMode: {
+    type: Boolean,
+    default: false
+  },
+  showOriginalEmailColors: {
     type: Boolean,
     default: false
   }
@@ -431,6 +445,27 @@ const sanitizedContent = computed(() => {
     .replace(STRIKE_OPEN_TAG, '<span style="text-decoration: line-through">')
     .replace(STRIKE_CLOSE_TAG, '</span>')
 })
+const isIncomingEmailHtml = computed(
+  () => !isOutgoing.value && !props.message.private &&
+    convStore.current?.inbox_channel === 'email' && props.message.content_type === 'html'
+)
+const useNormalizedEmailColors = computed(
+  () => props.darkMode && isIncomingEmailHtml.value && !props.showOriginalEmailColors
+)
+const useOriginalEmailColors = computed(
+  () => props.darkMode && isIncomingEmailHtml.value && props.showOriginalEmailColors
+)
+const renderedHtmlContent = computed(() =>
+  normalizeEmailHtml(sanitizedContent.value, useNormalizedEmailColors.value)
+)
+
+// Letter captures its sanitized HTML during setup and does not react to prop changes.
+// Remount it when the rendered color mode changes, then reconnect image load measurement.
+watch(useNormalizedEmailColors, async () => {
+  await nextTick()
+  measureExpandable()
+  attachImageLoadListeners()
+})
 
 const nonInlineAttachments = computed(() =>
   props.message.attachments.filter((attachment) => attachment.disposition !== 'inline')
@@ -439,6 +474,8 @@ const nonInlineAttachments = computed(() =>
 const bubbleClasses = computed(() => ({
   'bg-private': isOutgoing.value && props.message.private,
   'bg-secondary border border-border': isOutgoing.value && !props.message.private,
+  'bg-white text-neutral-950 border-neutral-300 [color-scheme:light]':
+    useOriginalEmailColors.value,
   'opacity-50 animate-pulse': isOutgoing.value && props.message.status === 'pending',
   'border-destructive': isOutgoing.value && props.message.status === 'failed',
   relative: isOutgoing.value,
