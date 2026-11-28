@@ -113,29 +113,38 @@ func (e *Email) processMailbox(ctx context.Context, scanInboxSince time.Duration
 		return fmt.Errorf("failed to connect to IMAP server: %w", err)
 	}
 
+	// Wait for the greeting: some providers drop commands sent before it.
+	if err := client.WaitGreeting(); err != nil {
+		client.Close()
+		return fmt.Errorf("error waiting for IMAP greeting: %w", err)
+	}
+
 	defer client.Logout()
 
-	// Authenticate based on auth type
-	if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
-		// Refresh OAuth token if needed
-		oauthConfig, _, err := e.refreshOAuthIfNeeded()
-		if err != nil {
-			return err
-		}
+	// Authenticate based on auth type. A PREAUTH greeting already authenticated
+	// the connection, so sending LOGIN or AUTHENTICATE would be rejected.
+	if client.State() == imap.ConnStateNotAuthenticated {
+		if e.authType == imodels.AuthTypeOAuth2 && e.oauth != nil {
+			// Refresh OAuth token if needed
+			oauthConfig, _, err := e.refreshOAuthIfNeeded()
+			if err != nil {
+				return err
+			}
 
-		// Use XOAUTH2 authentication
-		saslClient := &xoauth2IMAPClient{
-			username: cfg.Username,
-			token:    oauthConfig.AccessToken,
-		}
-		if err := client.Authenticate(saslClient); err != nil {
-			e.flagAuthError()
-			return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
-		}
-	} else {
-		if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
-			e.flagAuthError()
-			return fmt.Errorf("error logging in to the IMAP server: %w", err)
+			// Use XOAUTH2 authentication
+			saslClient := &xoauth2IMAPClient{
+				username: cfg.Username,
+				token:    oauthConfig.AccessToken,
+			}
+			if err := client.Authenticate(saslClient); err != nil {
+				e.flagAuthError()
+				return fmt.Errorf("error authenticating with OAuth to IMAP server: %w", err)
+			}
+		} else {
+			if err := client.Login(cfg.Username, cfg.Password).Wait(); err != nil {
+				e.flagAuthError()
+				return fmt.Errorf("error logging in to the IMAP server: %w", err)
+			}
 		}
 	}
 	e.clearAuthError()
